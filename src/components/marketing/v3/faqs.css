@@ -171,10 +171,15 @@
 
 /* ── cabecera de la página ── */
 .lp .lp-rotulo {
-  font-family: "Space Mono", monospace;
-  font-size: 11px;
-  letter-spacing: 0.2em;
+  /* Sora, la misma familia del logotipo, en un peso más liviano y con
+     tracking abierto: distinto del wordmark pero de la misma línea gráfica.
+     Antes iba en Space Mono con un punto verde delante — quitado. */
+  font-family: Sora, system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 11.5px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
+  text-decoration: none;
   color: var(--mut);
 }
 .lp .tope {

@@ -1,4 +1,5 @@
 import { Faqs } from "@/components/marketing/v3/faqs";
+import { getUser } from "@/lib/auth/session";
 
 export const metadata = {
   title: "Preguntas frecuentes — CARTERA+",
@@ -10,6 +11,8 @@ export const metadata = {
  * Página pública. No está detrás del muro de suscripción a propósito: alguien
  * que todavía no se registró tiene que poder leerla entera antes de decidir.
  */
-export default function FaqsPage() {
-  return <Faqs />;
+export default async function FaqsPage() {
+  // Misma regla que la landing: con sesión, un solo botón «Ir a mi panel».
+  const user = await getUser();
+  return <Faqs conSesion={Boolean(user)} />;
 }

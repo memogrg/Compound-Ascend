@@ -9,6 +9,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
+import { AgentMark } from "@/components/ui/agent-mark";
 import { useToast } from "@/components/ui/toast";
 import { formatMoney } from "@/lib/format";
 import { assignCategoryAction } from "@/modules/financial-base/api/v2-actions";
@@ -185,7 +186,10 @@ export function PorClasificarCard({
                       data-tip="Sugerido por IA según comercios parecidos. Tocá «usar» o elegí otro."
                       style={{ display: "inline-flex", alignItems: "center", gap: 6, flex: "none" }}
                     >
-                      <span className="ai-sug">✨ {sugName}</span>
+                      <span className="ai-sug">
+                        <AgentMark />
+                        {sugName}
+                      </span>
                       <button
                         type="button"
                         className="use-btn"

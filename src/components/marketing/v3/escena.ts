@@ -1129,11 +1129,13 @@ export function montarTelefono(op) {
       capFps.textContent = Math.round(fps) + " fps";
       if (!judged && t > 2.4) {
         judged = true;
+        /* Con pocos fps se apagan los reflejos, pero NO se baja el dpr: a dpr 1 la
+         pantalla del teléfono queda en ~350 px reales y el texto sale borroso —
+         era la causa del «se ve blur» que se reportó desde una Mac con Retina. */
         if (fps < 45) {
-          renderer.setPixelRatio(1);
           sheenMesh.visible = false;
           barraMesh.visible = false;
-          diag.textContent = "menos de 45 fps → dpr 1, sin reflejos de cristal";
+          diag.textContent = "menos de 45 fps → sin reflejos de cristal";
         } else
           diag.textContent =
             "WebGL2 · " +
@@ -1157,10 +1159,14 @@ export function montarTelefono(op) {
      de verdad dentro del rango corto — es lo que delata que hay vidrio y no una calcomanía. */
     const frente = Math.max(0, Math.cos(rig.rotation.y));
     const oblicuo = frente * Math.abs(Math.sin(rig.rotation.y));
-    sheenMesh.material.opacity = 0.02 * frente + 0.3 * oblicuo;
+    /* Con la pose fija a −12° estos dos términos daban 0,08 y 0,24 de blanco ADITIVO
+     encima de la pantalla: una franja lechosa clavada sobre el contenido que se leía
+     como «opaco» y «borroso». Los multiplicadores venían de la vuelta completa. Ahora el
+     cristal es un indicio en el borde (≤ 0,02 y ≤ 0,06), no un velo sobre las cifras. */
+    sheenMesh.material.opacity = 0.01 * frente + 0.05 * oblicuo;
     barraMesh.material.map.offset.y = -rig.rotation.y * 1.9 + 0.16;
     barraMesh.material.map.repeat.y = 1.35;
-    barraMesh.material.opacity = 0.07 * frente + 0.85 * oblicuo;
+    barraMesh.material.opacity = 0.02 * frente + 0.2 * oblicuo;
 
     /* La sombra se corre con la inclinación. Una sombra clavada mientras el objeto se mueve
      es de las cosas que el ojo detecta sin saber por qué. */

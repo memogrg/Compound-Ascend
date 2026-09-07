@@ -350,20 +350,16 @@
    repo — la genera Tailwind. Verificado creando un <p class="overline"> vacío fuera de
    `.lp`: sale con la línea igual. La única defensa real es no usar nombres de utilidad. */
 .lp .lp-rotulo {
-  font-family: "Space Mono", monospace;
-  font-size: 11px;
-  letter-spacing: 0.2em;
+  /* Sora, la misma familia del logotipo, en un peso más liviano y con
+     tracking abierto: distinto del wordmark pero de la misma línea gráfica.
+     Antes iba en Space Mono con un punto verde delante — quitado. */
+  font-family: Sora, system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 11.5px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
+  text-decoration: none;
   color: var(--mut);
-}
-.lp .lp-rotulo > i {
-  display: inline-block;
-  vertical-align: middle;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--green);
-  margin-right: 10px;
 }
 /* El cintillo del agente es el nombre del producto dentro del producto: se le da
    un punto más de cuerpo y el + en verde, para que no se pierda como una etiqueta más. */
@@ -422,12 +418,18 @@
 /* ── 01 hero ── */
 .lp .hero {
   position: relative;
-  padding: 30px 0 18px;
+  padding: 22px 0 10px;
   text-align: center;
   min-height: calc(100svh - 60px);
   display: flex;
   flex-direction: column;
   overflow: clip;
+}
+/* El titular del hero va un punto más chico que el resto de los h1 y el bloque de
+   texto se aprieta (gap 15→10): el espacio que se libera se lo lleva el teléfono,
+   que es lo que hay que poder leer. */
+.lp .hero h1 {
+  font-size: clamp(38px, 5vw, 70px);
 }
 .lp .aurora {
   position: absolute;
@@ -500,7 +502,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 15px;
+  gap: 10px;
 }
 .lp .hline {
   display: block;
@@ -622,11 +624,14 @@
 .lp .hero .lead {
   max-width: 34em;
 }
+/* El escenario del teléfono. Antes se quedaba con lo que sobraba bajo 100svh (unos
+   330 px en un portátil): el aparato salía chico y la pantalla no se leía. Ahora tiene
+   una altura mínima proporcional a la ventana y el hero crece si hace falta. */
 .lp .escena {
   position: relative;
   flex: 1 1 0;
-  min-height: 330px;
-  margin-top: 4px;
+  min-height: clamp(460px, 58vh, 680px);
+  margin-top: 0;
   z-index: 1;
 }
 /* El lienzo ABSOLUTO: en flujo con height:100% el porcentaje cae al tamaño intrínseco del
@@ -2610,7 +2615,7 @@
     padding-top: 36px;
   }
   .lp .escena {
-    min-height: 340px;
+    min-height: clamp(380px, 52vh, 520px);
   }
   .lp .dolores,
   .lp .pasos,
