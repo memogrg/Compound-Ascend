@@ -15,15 +15,11 @@ import {
   esFrecuenciaPago,
   textoRendimiento,
   FRECUENCIAS_PAGO,
-} from "@/modules/wealth/engine/rendimiento-periodico";
+} from "@/lib/finance/rendimiento-periodico";
 import { FREQUENCY_FACTORS } from "@/modules/financial-base/engine/monthlyize";
 
 describe("pagos por año", () => {
-  // GUARDIA ANTI-DERIVA. El motor replica los factores localmente (no puede
-  // importarlos: el barrel de financial-base arrastra `server-only` y el lint
-  // prohíbe el import profundo entre módulos). Este test es lo que impide que la
-  // copia se desincronice del original — sin él, la duplicación sería deuda.
-  it("el espejo local coincide con FREQUENCY_FACTORS", () => {
+  it("sale de los factores de monthlyize, no de una tabla propia", () => {
     for (const f of FRECUENCIAS_PAGO) {
       expect(pagosPorAno(f)).toBeCloseTo(FREQUENCY_FACTORS[f] * 12, 10);
     }

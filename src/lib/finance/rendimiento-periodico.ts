@@ -15,14 +15,13 @@
  * La retención es dato del USUARIO, no una tasa que el producto afirme. Acá sólo
  * se aplica el porcentaje que venga.
  */
-// El factor de mensualización se replica localmente, mismo patrón y mismo motivo
-// que `rental-roi.ts`: este motor corre en el wizard (cliente), que no puede
-// importar el valor a través del barrel de financial-base (arrastra
-// `server-only`), y el lint prohíbe el import profundo entre módulos — los
-// internos de un módulo son privados (CLAUDE.md).
-//
-// La duplicación NO queda suelta: `tests/unit/rendimiento-periodico.test.ts`
-// compara este espejo contra FREQUENCY_FACTORS y falla si se desincronizan.
+// Vive en `lib/` y no en un módulo A PROPÓSITO: lo consumen wealth (el wizard) y
+// financial-base (la proyección de ingreso pasivo), y `financial-base` no puede
+// importar de `wealth` — la dirección es control/wealth → financial-base, nunca
+// al revés (CLAUDE.md). Desde `lib/` además se importa `monthlyize` directo: la
+// regla que prohíbe imports profundos aplica a `src/modules/**`, no acá, así que
+// no hace falta replicar los factores como sí tuvo que hacer `rental-roi.ts`.
+import { FREQUENCY_FACTORS, type Frequency } from "@/modules/financial-base/engine/monthlyize";
 
 /** Frecuencias con las que se puede pagar un dividendo o un cupón. */
 export const FRECUENCIAS_PAGO = [
@@ -36,16 +35,6 @@ export const FRECUENCIAS_PAGO = [
 
 export type FrecuenciaPago = (typeof FRECUENCIAS_PAGO)[number];
 
-/** Espejo de FREQUENCY_FACTORS (financial-base/engine/monthlyize), solo las de pago. */
-const FACTOR_MENSUAL: Record<FrecuenciaPago, number> = {
-  mensual: 1,
-  bimensual: 0.5,
-  trimestral: 1 / 3,
-  cuatrimestral: 1 / 4,
-  semestral: 1 / 6,
-  anual: 1 / 12,
-};
-
 export function esFrecuenciaPago(v: string | null | undefined): v is FrecuenciaPago {
   return !!v && (FRECUENCIAS_PAGO as readonly string[]).includes(v);
 }
@@ -58,7 +47,7 @@ export function esFrecuenciaPago(v: string | null | undefined): v is FrecuenciaP
  * grafía haría fallar el lookup en silencio (factor 0 → todo daría cero).
  */
 export function pagosPorAno(frecuencia: FrecuenciaPago): number {
-  return (FACTOR_MENSUAL[frecuencia] ?? 0) * 12;
+  return (FREQUENCY_FACTORS[frecuencia as Frequency] ?? 0) * 12;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -121,7 +110,7 @@ export function calcularRendimiento(config: ConfigRendimiento, base: number): Re
   const retenido = (bruto * retencion) / 100;
   const neto = bruto - retenido;
 
-  const netoMensual = neto * (FACTOR_MENSUAL[config.frecuencia] ?? 0);
+  const netoMensual = neto * (FREQUENCY_FACTORS[config.frecuencia as Frequency] ?? 0);
   const netoAnual = neto * porAno;
 
   return {
