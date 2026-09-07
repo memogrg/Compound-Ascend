@@ -13,6 +13,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { formatMoney, currencySymbol } from "@/lib/format";
+// Motor compartido: mismo cálculo que la web y que la proyección de ingreso pasivo.
+import {
+  calcularRendimiento,
+  esFrecuenciaPago,
+  textoRendimiento,
+  FRECUENCIAS_PAGO,
+} from "@/lib/finance/rendimiento-periodico";
 import { useCaptureToday } from "@/components/tz/timezone-context";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
@@ -27,7 +34,6 @@ import {
 import { CATEGORY_META, CASHFLOW_CATEGORIES, GROWTH_CATEGORIES } from "@/modules/wealth/constants";
 import { computeRentalRoi } from "@/modules/wealth/engine/rental-roi";
 import {
-  DIVIDENDO_VACIO,
   buildHoldingPayload,
   categoryFromAssetType,
   profileForCategory,
@@ -62,6 +68,13 @@ import {
 const numStr = (n: number | undefined): string => (n == null ? "" : String(n));
 
 const CUR_OPTS: Opt[] = CURRENCIES.map((c) => ({ value: c.value, label: c.label }));
+/** Frecuencias del dividendo. El VALOR es 'bimensual' (la grafía de monthlyize);
+ *  la etiqueta desambigua, igual que en los ingresos (#740). */
+const FRECUENCIA_DIV_OPTS: Opt[] = FRECUENCIAS_PAGO.map((f) => ({
+  value: f,
+  label: f === "bimensual" ? "Cada 2 meses (bimestral)" : f.charAt(0).toUpperCase() + f.slice(1),
+}));
+
 const REGION_OPTS: Opt[] = [
   { value: "us", label: "US" },
   { value: "cr", label: "CR" },
@@ -119,6 +132,26 @@ export function HoldingWizardSheet({
   );
   const [cur, setCur] = useState(prefill?.currency ?? primaryCurrency);
   const [aportoCadaMes, setAportoCadaMes] = useState(prefill?.isRecurring ?? false);
+  // ── Dividendos (acciones/ETF) ──
+  const [pagaDividendos, setPagaDividendos] = useState(prefill?.paysDividends ?? false);
+  const [dividendoModo, setDividendoModo] = useState<"yield" | "manual">(
+    (prefill?.dividendMode as "yield" | "manual") ?? "yield",
+  );
+  const [dividendoYieldPct, setDividendoYieldPct] = useState<number | undefined>(
+    prefill?.dividendYieldPct ?? undefined,
+  );
+  const [dividendoMonto, setDividendoMonto] = useState<number | undefined>(
+    prefill?.dividendAmount ?? undefined,
+  );
+  const [dividendoFrecuencia, setDividendoFrecuencia] = useState(
+    prefill?.dividendFrequency ?? "trimestral",
+  );
+  const [dividendoRetencionPct, setDividendoRetencionPct] = useState<number | undefined>(
+    prefill?.dividendWithholdingPct || undefined,
+  );
+  const [dividendoProximaFecha, setDividendoProximaFecha] = useState(
+    prefill?.dividendNextDate ?? "",
+  );
   const [aporteMensual, setAporteMensual] = useState<number | undefined>(
     prefill?.monthlyContribution ?? undefined,
   );
@@ -266,7 +299,13 @@ export function HoldingWizardSheet({
       region,
       aportoCadaMes,
       aporteMensual: numStr(aporteMensual),
-      ...DIVIDENDO_VACIO,
+      pagaDividendos,
+      dividendoModo,
+      dividendoYieldPct: dividendoYieldPct == null ? "" : String(dividendoYieldPct),
+      dividendoMonto: dividendoMonto == null ? "" : String(dividendoMonto),
+      dividendoFrecuencia,
+      dividendoRetencionPct: dividendoRetencionPct == null ? "" : String(dividendoRetencionPct),
+      dividendoProximaFecha,
       registerExpense,
     };
   }
@@ -320,6 +359,20 @@ export function HoldingWizardSheet({
             onInvested={setInvested}
             onCurrency={setCur}
             aportoCadaMes={aportoCadaMes}
+            pagaDividendos={pagaDividendos}
+            onPagaDividendos={setPagaDividendos}
+            dividendoModo={dividendoModo}
+            onDividendoModo={setDividendoModo}
+            dividendoYieldPct={dividendoYieldPct}
+            onDividendoYieldPct={setDividendoYieldPct}
+            dividendoMonto={dividendoMonto}
+            onDividendoMonto={setDividendoMonto}
+            dividendoFrecuencia={dividendoFrecuencia}
+            onDividendoFrecuencia={setDividendoFrecuencia}
+            dividendoRetencionPct={dividendoRetencionPct}
+            onDividendoRetencionPct={setDividendoRetencionPct}
+            dividendoProximaFecha={dividendoProximaFecha}
+            onDividendoProximaFecha={setDividendoProximaFecha}
             onAportoCadaMes={setAportoCadaMes}
             aporteMensual={aporteMensual}
             onAporteMensual={setAporteMensual}
@@ -464,6 +517,20 @@ type Step2Props = {
   onInvested: (v: number | undefined) => void;
   onCurrency: (v: string) => void;
   aportoCadaMes: boolean;
+  pagaDividendos: boolean;
+  onPagaDividendos: (v: boolean) => void;
+  dividendoModo: "yield" | "manual";
+  onDividendoModo: (v: "yield" | "manual") => void;
+  dividendoYieldPct: number | undefined;
+  onDividendoYieldPct: (v: number | undefined) => void;
+  dividendoMonto: number | undefined;
+  onDividendoMonto: (v: number | undefined) => void;
+  dividendoFrecuencia: string;
+  onDividendoFrecuencia: (v: string) => void;
+  dividendoRetencionPct: number | undefined;
+  onDividendoRetencionPct: (v: number | undefined) => void;
+  dividendoProximaFecha: string;
+  onDividendoProximaFecha: (v: string) => void;
   onAportoCadaMes: (v: boolean) => void;
   aporteMensual: number | undefined;
   onAporteMensual: (v: number | undefined) => void;
@@ -507,6 +574,28 @@ type Step2Props = {
 
 function Step2Fields(p: Step2Props) {
   const { profile, cur } = p;
+  // El tipo de activo sale de la categoría (CATEGORY_META), igual que en la web.
+  const tipoActivo = p.category ? CATEGORY_META[p.category].defaultAssetType : null;
+
+  // Vista previa del dividendo con el MISMO motor que la web y que la proyección
+  // de ingreso pasivo: un solo cálculo, tres superficies.
+  const vistaPreviaDividendo = (() => {
+    if (!p.pagaDividendos || !esFrecuenciaPago(p.dividendoFrecuencia)) return null;
+    const base = p.currentValue ?? p.invested ?? 0;
+    const retencion = p.dividendoRetencionPct ?? 0;
+    const r = calcularRendimiento(
+      {
+        modo: p.dividendoModo,
+        yieldPct: p.dividendoYieldPct ?? 0,
+        montoPorPago: p.dividendoMonto ?? 0,
+        frecuencia: p.dividendoFrecuencia,
+        retencionPct: retencion,
+      },
+      base,
+    );
+    return textoRendimiento(r, retencion, (n) => formatMoney(n, cur));
+  })();
+
   return (
     <div style={{ display: "grid", gap: 2 }}>
       <TextInput
@@ -732,6 +821,75 @@ function Step2Fields(p: Step2Props) {
           onChange={p.onAporteMensual}
           currency={cur}
         />
+      ) : null}
+
+      {/* Dividendos · solo acciones y ETF. Mismo motor que la web: la vista previa
+          y la proyección de ingreso pasivo salen del mismo cálculo. */}
+      {tipoActivo === "accion" || tipoActivo === "etf" ? (
+        <>
+          <Toggle
+            name="pagaDividendos"
+            label="¿Paga dividendos?"
+            value={p.pagaDividendos}
+            onChange={p.onPagaDividendos}
+            hint="El ingreso entra solo en tu flujo del mes; no hace falta registrar cada pago."
+          />
+          {p.pagaDividendos ? (
+            <>
+              <Segmented
+                name="dividendoModo"
+                label="Cómo lo calculamos"
+                value={p.dividendoModo}
+                onChange={(v) => p.onDividendoModo(v as "yield" | "manual")}
+                options={[
+                  { value: "yield", label: "% anual" },
+                  { value: "manual", label: "Monto por pago" },
+                ]}
+              />
+              {p.dividendoModo === "yield" ? (
+                <MoneyField
+                  name="dividendoYieldPct"
+                  label="% anual"
+                  value={p.dividendoYieldPct}
+                  onChange={p.onDividendoYieldPct}
+                  currency="%"
+                  hint="El 'dividend yield' que ves en tu bróker."
+                />
+              ) : (
+                <MoneyField
+                  name="dividendoMonto"
+                  label="Monto bruto por pago"
+                  value={p.dividendoMonto}
+                  onChange={p.onDividendoMonto}
+                  currency={cur}
+                />
+              )}
+              <SheetSelect
+                name="dividendoFrecuencia"
+                label="Frecuencia"
+                value={p.dividendoFrecuencia}
+                onChange={p.onDividendoFrecuencia}
+                options={FRECUENCIA_DIV_OPTS}
+                sheetTitle="Frecuencia del dividendo"
+              />
+              <MoneyField
+                name="dividendoRetencionPct"
+                label="Retención de impuestos"
+                value={p.dividendoRetencionPct}
+                onChange={p.onDividendoRetencionPct}
+                currency="%"
+                hint="Muchos brókers retienen impuesto en origen (p. ej. 30% en acciones de EE. UU. para no residentes, o menos con tratado). Poné el % que ves en tu estado de cuenta."
+                note={vistaPreviaDividendo}
+              />
+              <DateField
+                name="dividendoProximaFecha"
+                label="Próximo pago"
+                value={p.dividendoProximaFecha}
+                onChange={p.onDividendoProximaFecha}
+              />
+            </>
+          ) : null}
+        </>
       ) : null}
 
       {/* Región */}
