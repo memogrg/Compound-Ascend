@@ -32,6 +32,8 @@ export function LandingMotion() {
     const intervalos = [];
     const tiempos = [];
     const observadores = [];
+    // Bucles de requestAnimationFrame que deben morir con el componente.
+    const cuadros = [];
 
     const setInterval = (fn, ms) => {
       const id = window.setInterval(fn, ms);
@@ -540,7 +542,11 @@ export function LandingMotion() {
          · La animación arranca sola al entrar en pantalla y dura ~6 s. NO va atada
            al scroll a propósito: con scroll rápido se la salta y en móvil da
            tirones. El autoplay siempre se ve bien.
-         · Corre UNA vez. Repetirla en bucle convertiría un argumento en un adorno.
+         · Corre EN BUCLE mientras el bloque está a la vista: recorrido de 6 s,
+           pausa de 3,5 s en diciembre para leer el resultado, vuelta a enero y
+           otra vez. Antes corría una sola vez, y quien llegaba bajando con el
+           scroll la pescaba ya terminada: veía una gráfica plana y ningún
+           «desarrollo». Fuera de pantalla se detiene y al volver sigue donde iba.
          · Con `prefers-reduced-motion` se pinta diciembre de una y no se anima.
          · El SVG se dibuja acá y no en el HTML para que la geometría salga de los
            datos: si mañana cambian las cifras, la curva se recalcula sola.
@@ -768,31 +774,49 @@ export function LandingMotion() {
         }
 
         pintar(0);
-        let corrio = false;
-        function correr() {
-          if (corrio) return;
-          corrio = true;
-          // Declaraciones separadas: `ini` SÍ se reasigna en cada cuadro, así
-          // que no puede compartir el `const` de la duración.
-          const DUR = 6000;
-          let ini = null;
-          function paso(ts) {
-            if (ini === null) ini = ts;
-            const p = Math.min(1, (ts - ini) / DUR);
+        /* El ciclo: 0,5 s en enero → 6 s de recorrido → 3,5 s en diciembre → de nuevo.
+           Un solo reloj de fase (`fase`, en ms) que avanza solo mientras el bloque
+           está a la vista; al salir se congela y al volver retoma donde estaba. */
+        const ESPERA_INI = 500,
+          DUR = 6000,
+          ESPERA_FIN = 3500,
+          CICLO = ESPERA_INI + DUR + ESPERA_FIN;
+        let fase = 0,
+          tPrev = null,
+          aLaVista = false,
+          rafId = 0;
+        function paso(ts) {
+          rafId = 0;
+          if (!aLaVista) {
+            tPrev = null;
+            return;
+          }
+          if (tPrev !== null) fase = (fase + Math.min(100, ts - tPrev)) % CICLO;
+          tPrev = ts;
+          let t = 0;
+          if (fase >= ESPERA_INI + DUR) t = 11;
+          else if (fase > ESPERA_INI) {
+            const p = (fase - ESPERA_INI) / DUR;
             // arranca despacio y frena al final: el año se siente recorrido, no barrido
             const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
-            pintar(e * 11);
-            if (p < 1) requestAnimationFrame(paso);
+            t = e * 11;
           }
-          requestAnimationFrame(paso);
+          pintar(t);
+          rafId = requestAnimationFrame(paso);
         }
 
+        cuadros.push({
+          parar: function () {
+            aLaVista = false;
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = 0;
+          },
+        });
+
         new ObservadorVigilado(
-          function (ent, obs) {
-            if (ent[0].isIntersecting) {
-              setTimeout(correr, 350);
-              obs.disconnect();
-            }
+          function (ent) {
+            aLaVista = ent[0].isIntersecting;
+            if (aLaVista && !rafId) rafId = requestAnimationFrame(paso);
           },
           { threshold: 0.35 },
         ).observe(caja);
@@ -901,6 +925,7 @@ export function LandingMotion() {
       intervalos.forEach(window.clearInterval);
       tiempos.forEach(window.clearTimeout);
       observadores.forEach((o) => o.disconnect());
+      cuadros.forEach((c) => c.parar());
     };
   }, []);
 
