@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidarRuta } from "@/lib/revalidation/rutas-espejo";
 import { assetInputSchema, liabilityInputSchema } from "@/modules/rich-life/schemas";
 import {
   createAsset,
@@ -36,7 +36,7 @@ export async function addAssetAction(raw: unknown): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await createAsset(parsed.data);
-    revalidatePath("/mi-rich-life");
+    revalidarRuta("/mi-rich-life");
     return { ok: true };
   } catch (err) {
     logger.error("addAsset fallido", { message: err instanceof Error ? err.message : "?" });
@@ -50,7 +50,7 @@ export async function addLiabilityAction(raw: unknown): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await createLiability(parsed.data);
-    revalidatePath("/mi-rich-life");
+    revalidarRuta("/mi-rich-life");
     return { ok: true };
   } catch (err) {
     logger.error("addLiability fallido", { message: err instanceof Error ? err.message : "?" });
@@ -64,7 +64,7 @@ export async function editAssetAction(id: string, raw: unknown): Promise<ActionR
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await updateAsset(id, parsed.data);
-    revalidatePath("/mi-rich-life");
+    revalidarRuta("/mi-rich-life");
     return { ok: true };
   } catch (err) {
     logger.error("editAsset fallido", { message: err instanceof Error ? err.message : "?" });
@@ -78,7 +78,7 @@ export async function editLiabilityAction(id: string, raw: unknown): Promise<Act
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await updateLiability(id, parsed.data);
-    revalidatePath("/mi-rich-life");
+    revalidarRuta("/mi-rich-life");
     return { ok: true };
   } catch (err) {
     logger.error("editLiability fallido", { message: err instanceof Error ? err.message : "?" });
@@ -90,7 +90,7 @@ export async function removeAssetAction(id: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false };
   try {
     await deleteAsset(id);
-    revalidatePath("/mi-rich-life");
+    revalidarRuta("/mi-rich-life");
     return { ok: true };
   } catch {
     return { ok: false };
@@ -101,7 +101,7 @@ export async function removeLiabilityAction(id: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false };
   try {
     await deleteLiability(id);
-    revalidatePath("/mi-rich-life");
+    revalidarRuta("/mi-rich-life");
     return { ok: true };
   } catch {
     return { ok: false };

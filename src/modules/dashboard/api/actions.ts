@@ -5,19 +5,19 @@
  * conductual (memoria conductual, Fase 4d). RLS garantiza que solo afecte
  * filas del propio usuario/hogar.
  */
-import { revalidatePath } from "next/cache";
+import { revalidarRuta } from "@/lib/revalidation/rutas-espejo";
 
 export async function dismissInsightAction(id: string): Promise<void> {
   const { dismissInsight } = await import("@/lib/insights");
   await dismissInsight(id);
-  revalidatePath("/dashboard");
+  revalidarRuta("/dashboard");
 }
 
 /** Restaura los insights descartados ("Recordar acciones" de la campana). */
 export async function restoreInsightsAction(): Promise<void> {
   const { restoreDismissedInsights } = await import("@/lib/insights");
   await restoreDismissedInsights();
-  revalidatePath("/dashboard");
+  revalidarRuta("/dashboard");
 }
 
 export type BellInsight = {

@@ -116,10 +116,9 @@ export async function fusionarSobresAction(args: {
     const { fusionarSobres } = await import("@/lib/rhythm/rhythm-service");
     await fusionarSobres(args.fromId, args.intoId);
 
-    const { revalidatePath } = await import("next/cache");
-    revalidatePath("/gastos");
-    revalidatePath("/m/gastos");
-    revalidatePath("/mi-base-financiera");
+    const { revalidarRuta } = await import("@/lib/revalidation/rutas-espejo");
+    revalidarRuta("/gastos"); // el espejo agrega /m/gastos
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("fusionarSobres fallido", {
@@ -200,9 +199,8 @@ export async function setMonthConfigClosedAction(
     const { setMonthConfigClosed } = await import("@/lib/rhythm/rhythm-service");
     await setMonthConfigClosed(period, closed);
 
-    const { revalidatePath } = await import("next/cache");
-    revalidatePath("/gastos");
-    revalidatePath("/m/gastos");
+    const { revalidarRuta } = await import("@/lib/revalidation/rutas-espejo");
+    revalidarRuta("/gastos"); // el espejo agrega /m/gastos
     return { ok: true };
   } catch (err) {
     logger.error("setMonthConfigClosed fallido", {

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidarRuta } from "@/lib/revalidation/rutas-espejo";
 import { z } from "zod";
 import { notFutureDate, NOT_FUTURE_MSG } from "@/lib/validation";
 import { userToday } from "@/lib/time/user-time";
@@ -59,7 +59,7 @@ export async function addGoalAction(raw: unknown): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await createGoal(parsed.data);
-    revalidatePath("/control-financiero");
+    revalidarRuta("/control-financiero");
     return { ok: true };
   } catch (err) {
     logger.error("addGoal fallido", { message: err instanceof Error ? err.message : "?" });
@@ -104,10 +104,10 @@ export async function createSavingsSobreAction(raw: unknown): Promise<ActionResu
         contributionDate: await userToday(),
       });
     }
-    revalidatePath("/control-financiero");
-    revalidatePath("/gastos");
-    revalidatePath("/transacciones");
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/control-financiero");
+    revalidarRuta("/gastos");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("createSavingsSobre fallido", {
@@ -124,7 +124,7 @@ export async function createSavingsSobreAction(raw: unknown): Promise<ActionResu
  */
 export async function addDefensePolicyAction(raw: unknown): Promise<ActionResult> {
   const res = await addPolicyAction(raw);
-  if (res.ok) revalidatePath("/control-financiero");
+  if (res.ok) revalidarRuta("/control-financiero");
   return res;
 }
 
@@ -191,8 +191,8 @@ export async function addDefenseSeguroAction(raw: unknown): Promise<ActionResult
       if (policyId) await deletePolicy(policyId);
       throw goalErr;
     }
-    revalidatePath("/patrimonio/proteccion");
-    revalidatePath("/control-financiero");
+    revalidarRuta("/patrimonio/proteccion");
+    revalidarRuta("/control-financiero");
     return { ok: true };
   } catch (err) {
     logger.error("addDefenseSeguro fallido", {
@@ -208,7 +208,7 @@ export async function addDebtAction(raw: unknown): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await createDebt(parsed.data);
-    revalidatePath("/control-financiero");
+    revalidarRuta("/control-financiero");
     return { ok: true };
   } catch (err) {
     logger.error("addDebt fallido", { message: err instanceof Error ? err.message : "?" });
@@ -222,7 +222,7 @@ export async function editGoalAction(id: string, raw: unknown): Promise<ActionRe
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await updateGoal(id, parsed.data);
-    revalidatePath("/control-financiero");
+    revalidarRuta("/control-financiero");
     return { ok: true };
   } catch (err) {
     logger.error("editGoal fallido", { message: err instanceof Error ? err.message : "?" });
@@ -236,7 +236,7 @@ export async function editDebtAction(id: string, raw: unknown): Promise<ActionRe
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await updateDebt(id, parsed.data);
-    revalidatePath("/control-financiero");
+    revalidarRuta("/control-financiero");
     return { ok: true };
   } catch (err) {
     logger.error("editDebt fallido", { message: err instanceof Error ? err.message : "?" });
@@ -250,14 +250,14 @@ export async function reportPaymentAction(raw: unknown): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await addDebtPayment(parsed.data);
-    revalidatePath("/deudas");
+    revalidarRuta("/deudas");
     // El pago también se registra DESDE el frasco "Deudas" del tab de Gastos, y cambia el avance
     // del mes de esa fila.
-    revalidatePath("/gastos");
-    revalidatePath(`/deudas/${parsed.data.debtId}`);
+    revalidarRuta("/gastos");
+    revalidarRuta(`/deudas/${parsed.data.debtId}`);
     // El pago también nace como transacción vinculada (Fase 1 · orquestador).
-    revalidatePath("/transacciones");
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("reportPayment fallido", { message: err instanceof Error ? err.message : "?" });
@@ -275,10 +275,10 @@ export async function updateDebtPaymentAction(
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await updateDebtPayment(paymentId, parsed.data);
-    revalidatePath("/deudas");
-    revalidatePath(`/deudas/${parsed.data.debtId}`);
-    revalidatePath("/transacciones");
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/deudas");
+    revalidarRuta(`/deudas/${parsed.data.debtId}`);
+    revalidarRuta("/transacciones");
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("updateDebtPayment fallido", {
@@ -296,10 +296,10 @@ export async function deleteDebtPaymentAction(
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await deleteDebtPayment(paymentId);
-    revalidatePath("/deudas");
-    revalidatePath(`/deudas/${debtId}`);
-    revalidatePath("/transacciones");
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/deudas");
+    revalidarRuta(`/deudas/${debtId}`);
+    revalidarRuta("/transacciones");
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("deleteDebtPayment fallido", {
@@ -327,12 +327,12 @@ export async function addGoalContributionAction(raw: unknown): Promise<ActionRes
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await addGoalContribution(parsed.data);
-    revalidatePath("/control-financiero");
+    revalidarRuta("/control-financiero");
     // El aporte también se registra DESDE el frasco de Ahorro del tab de Gastos.
-    revalidatePath("/gastos");
-    revalidatePath("/ahorro");
-    revalidatePath("/transacciones");
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/gastos");
+    revalidarRuta("/ahorro");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("addGoalContribution fallido", {
@@ -407,10 +407,10 @@ export async function withdrawGoalAction(raw: unknown): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await withdrawFromGoal(parsed.data);
-    revalidatePath("/control-financiero");
-    revalidatePath("/ahorro");
-    revalidatePath("/transacciones");
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/control-financiero");
+    revalidarRuta("/ahorro");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("withdrawGoal fallido", { message: err instanceof Error ? err.message : "?" });
@@ -448,10 +448,10 @@ export async function revertGoalMovementAction(transactionId: string): Promise<A
   }
   try {
     await deleteTransaction(transactionId);
-    revalidatePath("/control-financiero");
-    revalidatePath("/ahorro");
-    revalidatePath("/transacciones");
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/control-financiero");
+    revalidarRuta("/ahorro");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("revertGoalMovement fallido", {
@@ -556,10 +556,10 @@ export async function spendFromGoalAction(raw: unknown): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await spendFromGoal(parsed.data);
-    revalidatePath("/control-financiero");
-    revalidatePath("/ahorro");
-    revalidatePath("/transacciones");
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/control-financiero");
+    revalidarRuta("/ahorro");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("spendFromGoal fallido", { message: err instanceof Error ? err.message : "?" });
@@ -576,7 +576,7 @@ export async function removeGoalAction(id: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false };
   try {
     await deleteGoal(id);
-    revalidatePath("/control-financiero");
+    revalidarRuta("/control-financiero");
     return { ok: true };
   } catch {
     return { ok: false };
@@ -587,7 +587,7 @@ export async function removeDebtAction(id: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false };
   try {
     await deleteDebt(id);
-    revalidatePath("/control-financiero");
+    revalidarRuta("/control-financiero");
     return { ok: true };
   } catch {
     return { ok: false };
@@ -602,9 +602,9 @@ export async function convertGoalToEmergencyFundAction(goalId: string): Promise<
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await convertGoalToEmergencyFund(goalId);
-    revalidatePath("/patrimonio/proteccion");
-    revalidatePath("/dashboard");
-    revalidatePath("/mi-rich-life");
+    revalidarRuta("/patrimonio/proteccion");
+    revalidarRuta("/dashboard");
+    revalidarRuta("/mi-rich-life");
     return { ok: true };
   } catch (err) {
     logger.error("convertGoalToEmergencyFund fallido", {
