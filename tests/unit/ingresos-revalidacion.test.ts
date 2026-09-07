@@ -12,10 +12,20 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// Los tipos van explícitos: sin ellos TS infiere del valor inicial
+// (`agendadoPara: null` como tipo literal) y rechaza el mockResolvedValueOnce
+// que devuelve un periodo.
 const h = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
-  registerIncomeSource: vi.fn(async () => ({ budgetItemId: "b1", agendadoPara: null })),
-  updateIncomeSource: vi.fn(async () => ({ fueraDeFase: false })),
+  registerIncomeSource: vi.fn(
+    async (): Promise<{
+      budgetItemId: string | null;
+      agendadoPara: { year: number; month: number } | null;
+    }> => ({ budgetItemId: "b1", agendadoPara: null }),
+  ),
+  updateIncomeSource: vi.fn(async (): Promise<{ fueraDeFase: boolean }> => ({
+    fueraDeFase: false,
+  })),
   deleteIncomeSource: vi.fn(async () => {}),
   receivePartialIncome: vi.fn(async () => {}),
   removeOutOfPhaseIncomeLine: vi.fn(async () => {}),
