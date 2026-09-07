@@ -116,9 +116,7 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
             <div className="aur a3"></div>
           </div>
           <div className="wrap in">
-            <p className="lp-rotulo">
-              <i></i>Tu asesor financiero, siempre con vos
-            </p>
+            <p className="lp-rotulo">Tu asesor financiero personal</p>
             <h1>
               <span className="hline">
                 <span>Tu dinero,</span>
@@ -418,7 +416,20 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
                   <div className="cuerpo">
                     <div className="canales">
                       <div className="canal">
-                        <span className="lp-ic">💬</span>
+                        <span className="lp-ic ic-v" aria-hidden="true">
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.4-4.2A8 8 0 1 1 21 12Z" />
+                          </svg>
+                        </span>
                         <b>Chat</b>
                       </div>
                       <div className="canal">
@@ -455,39 +466,47 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
                   conecta los puntos
                 </h3>
                 <p className="p">
-                  No registra gastos: entiende tu situación. Ingresos, deudas, ahorro y metas, una
-                  sola lectura.
+                  No registra gastos: entiende tu situación. Ingresos, gastos, deudas, ahorro,
+                  inversiones y protección, en una sola lectura.
                 </p>
                 <div className="art">
                   <div className="cuerpo">
-                    <svg className="hilos" viewBox="0 0 300 176" fill="none" aria-hidden="true">
+                    <svg className="hilos" viewBox="0 0 300 184" fill="none" aria-hidden="true">
+                      {/* Seis hilos, uno por cada área que la app junta. «Ahorro» absorbe a
+                       «Metas» —en el producto se trabajan igual— y entran «Inversiones» y
+                       «Defensa patrimonial», el nombre que ya usa la sección de Patrimonio. */}
                       <g stroke="#cfd6cf" strokeWidth="1.2">
-                        <path d="M92 22 C 170 22, 180 78, 236 88" />
-                        <path d="M92 55 C 170 55, 184 74, 236 88" />
-                        <path d="M92 88 C 160 88, 190 88, 236 88" />
-                        <path d="M92 121 C 170 121, 184 102, 236 88" />
-                        <path d="M92 154 C 170 154, 180 98, 236 88" />
+                        <path d="M144 18.5 C 206 18.5, 188 88, 236 88" />
+                        <path d="M144 46.5 C 206 46.5, 188 88, 236 88" />
+                        <path d="M144 74.5 C 206 74.5, 188 88, 236 88" />
+                        <path d="M144 102.5 C 206 102.5, 188 88, 236 88" />
+                        <path d="M144 130.5 C 206 130.5, 188 88, 236 88" />
+                        <path d="M144 158.5 C 206 158.5, 188 88, 236 88" />
                       </g>
                       <g className="nodos">
-                        <rect x="6" y="12" width="86" height="21" rx="10.5" />
-                        <text x="20" y="26">
+                        <rect x="6" y="8" width="138" height="21" rx="10.5" />
+                        <text x="20" y="22">
                           Ingresos
                         </text>
-                        <rect x="6" y="45" width="86" height="21" rx="10.5" />
-                        <text x="20" y="59">
+                        <rect x="6" y="36" width="138" height="21" rx="10.5" />
+                        <text x="20" y="50">
                           Gastos
                         </text>
-                        <rect x="6" y="78" width="86" height="21" rx="10.5" />
-                        <text x="20" y="92">
+                        <rect x="6" y="64" width="138" height="21" rx="10.5" />
+                        <text x="20" y="78">
                           Deudas
                         </text>
-                        <rect x="6" y="111" width="86" height="21" rx="10.5" />
-                        <text x="20" y="125">
+                        <rect x="6" y="92" width="138" height="21" rx="10.5" />
+                        <text x="20" y="106">
                           Ahorro
                         </text>
-                        <rect x="6" y="144" width="86" height="21" rx="10.5" />
-                        <text x="20" y="158">
-                          Metas
+                        <rect x="6" y="120" width="138" height="21" rx="10.5" />
+                        <text x="20" y="134">
+                          Inversiones
+                        </text>
+                        <rect x="6" y="148" width="138" height="21" rx="10.5" />
+                        <text x="20" y="162">
+                          Defensa patrimonial
                         </text>
                       </g>
                       {/* El punto donde todo converge es la marca. Disco blanco con anillo verde
@@ -1326,7 +1345,7 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
                 <span className="cw">
                   CARTERA<i>+</i>
                 </span>
-                <span className="sep">·</span>Tu asesor financiero, siempre con vos.
+                <span className="sep">·</span>Tu asesor financiero personal.
               </p>
             </div>
           </div>

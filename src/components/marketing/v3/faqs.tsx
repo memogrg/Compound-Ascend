@@ -13,7 +13,7 @@ import { FaqsMotion } from "./faqs-motion";
  * los encuentra igual. El CSS va prefijado con `.lp` por lo mismo que la
  * landing —nombres genéricos que ya existen en globals.css—.
  */
-export function Faqs() {
+export function Faqs({ conSesion = false }: { conSesion?: boolean }) {
   return (
     <div className="lp">
       {/* El isotipo, el mismo símbolo de la landing. */}
@@ -71,12 +71,20 @@ export function Faqs() {
             <a href="/faqs" className="act">
               FAQs
             </a>
-            <a href="#" className="lp-btn lp-btn-ghost">
-              Iniciar sesión
-            </a>
-            <a href="#" className="lp-btn btn-green">
-              Probá 14 días
-            </a>
+            {conSesion ? (
+              <a href="/dashboard" className="lp-btn btn-green">
+                Ir a mi panel
+              </a>
+            ) : (
+              <>
+                <a href="/login" className="lp-btn lp-btn-ghost">
+                  Iniciar sesión
+                </a>
+                <a href="/empezar?plan=pro" className="lp-btn btn-green">
+                  Probá 14 días
+                </a>
+              </>
+            )}
           </nav>
         </div>
       </header>
@@ -1323,13 +1331,19 @@ export function Faqs() {
         <div className="wrap">
           <h2>¿Te quedó una duda que no está acá?</h2>
           <p>Escribinos y la contestamos. Si le sirve a alguien más, la sumamos a esta página.</p>
-          <a className="lp-btn btn-green btn-lg" href="#">
-            Probar{" "}
-            <span className="cw cw-inv">
-              CARTERA<i>+</i>
-            </span>{" "}
-            14 días
-          </a>
+          {conSesion ? (
+            <a className="lp-btn btn-green btn-lg" href="/dashboard">
+              Ir a mi panel
+            </a>
+          ) : (
+            <a className="lp-btn btn-green btn-lg" href="/empezar?plan=pro">
+              Probar{" "}
+              <span className="cw cw-inv">
+                CARTERA<i>+</i>
+              </span>{" "}
+              14 días
+            </a>
+          )}
           <p className="fine">
             14 días de prueba · No se cobra hasta el día 15 · Cancelás cuando querás
           </p>
