@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import {
   buildHoldingPayload,
+  DIVIDENDO_VACIO,
   type HoldingFormValues,
 } from "@/modules/wealth/engine/holding-payload";
 import type { InvestmentCategory } from "@/modules/wealth/types";
@@ -50,6 +51,7 @@ function mk(overrides: Partial<HoldingFormValues> = {}): HoldingFormValues {
     region: "us",
     aportoCadaMes: false,
     aporteMensual: "",
+    ...DIVIDENDO_VACIO,
     registerExpense: false,
     ...overrides,
   };

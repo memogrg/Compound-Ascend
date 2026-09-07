@@ -11,6 +11,9 @@
 import { CATEGORY_META } from "@/modules/wealth/constants";
 import type { AssetType, InvestmentCategory } from "@/modules/wealth/types";
 import type { HoldingInput } from "@/modules/wealth/schemas";
+// Motor compartido en `lib/`: la validación de la grafía de frecuencia vive
+// junto al cálculo, no duplicada acá.
+import { esFrecuenciaPago } from "@/lib/finance/rendimiento-periodico";
 
 export type HoldingFrequency =
   "semanal" | "mensual" | "trimestral" | "semestral" | "anual" | "al_vencimiento";
@@ -29,6 +32,21 @@ export type RentalCosts = {
 };
 
 /** Todos los campos de captura del wizard (strings/bools tal cual el estado del form). */
+/**
+ * Estado inicial del bloque de dividendos. Existe para que un formulario que
+ * todavía no lo expone (o un test) no tenga que inventar siete campos: se
+ * expanden estos y el payload sale con `paysDividends: false`.
+ */
+export const DIVIDENDO_VACIO = {
+  pagaDividendos: false,
+  dividendoModo: "yield" as const,
+  dividendoYieldPct: "",
+  dividendoMonto: "",
+  dividendoFrecuencia: "trimestral",
+  dividendoRetencionPct: "",
+  dividendoProximaFecha: "",
+};
+
 export type HoldingFormValues = {
   category: InvestmentCategory;
   name: string;
@@ -56,6 +74,14 @@ export type HoldingFormValues = {
   // Comunes
   region: string;
   aportoCadaMes: boolean;
+  // ── Dividendos (acciones/ETF) ──
+  pagaDividendos: boolean;
+  dividendoModo: "yield" | "manual";
+  dividendoYieldPct: string;
+  dividendoMonto: string;
+  dividendoFrecuencia: string;
+  dividendoRetencionPct: string;
+  dividendoProximaFecha: string;
   aporteMensual: string;
   registerExpense: boolean;
 };
@@ -154,6 +180,7 @@ export function buildHoldingPayload(v: HoldingFormValues): HoldingInput {
     region: v.region,
     isRecurring: v.aportoCadaMes,
     monthlyContribution: v.aportoCadaMes ? parseFloat(v.aporteMensual) || undefined : undefined,
+    ...dividendoPayload(v),
     registerExpense: v.registerExpense,
     // Fecha capturada tz-aware por el form (useCaptureToday → captureToday(tz)); NUNCA el reloj
     // UTC del server, que a la noche en zonas negativas (p.ej. UTC-6) ya es "mañana" → fecharía la
@@ -199,4 +226,33 @@ export function buildHoldingPayload(v: HoldingFormValues): HoldingInput {
     }
   }
   return base;
+}
+
+/**
+ * Campos de dividendo del formulario → entrada del holding.
+ *
+ * Todo cuelga de `pagaDividendos`: apagado no manda NADA más que el flag en
+ * false, y el servicio limpia las columnas. Una config que sobreviva al apagado
+ * seguiría proyectando ingreso pasivo que el usuario ya dijo que no recibe.
+ *
+ * Sólo viaja el campo del modo elegido, por la misma razón que en el servicio:
+ * un `dividendAmount` poblado con modo 'yield' invita a leerlo sin mirar el modo.
+ */
+function dividendoPayload(v: HoldingFormValues) {
+  if (!v.pagaDividendos) return { paysDividends: false };
+  const num = (s: string) => {
+    const n = parseFloat(s);
+    return Number.isFinite(n) && n >= 0 ? n : undefined;
+  };
+  return {
+    paysDividends: true,
+    dividendMode: v.dividendoModo,
+    dividendYieldPct: v.dividendoModo === "yield" ? num(v.dividendoYieldPct) : undefined,
+    dividendAmount: v.dividendoModo === "manual" ? num(v.dividendoMonto) : undefined,
+    dividendFrequency: (esFrecuenciaPago(v.dividendoFrecuencia)
+      ? v.dividendoFrecuencia
+      : "trimestral") as HoldingInput["dividendFrequency"],
+    dividendWithholdingPct: num(v.dividendoRetencionPct) ?? 0,
+    dividendNextDate: v.dividendoProximaFecha || undefined,
+  };
 }

@@ -58,6 +58,13 @@ export function rowToHolding(r: {
   region?: string | null;
   is_recurring?: boolean | null;
   monthly_contribution?: number | null;
+  pays_dividends?: boolean | null;
+  dividend_mode?: string | null;
+  dividend_yield_pct?: number | null;
+  dividend_amount?: number | null;
+  dividend_frequency?: string | null;
+  dividend_withholding_pct?: number | null;
+  dividend_next_date?: string | null;
   purchase_price?: number | null;
   closing_costs?: number | null;
   vacancy_pct?: number | null;
@@ -99,6 +106,13 @@ export function rowToHolding(r: {
     region: r.region ?? null,
     isRecurring: r.is_recurring ?? false,
     monthlyContribution: r.monthly_contribution == null ? null : Number(r.monthly_contribution),
+    paysDividends: r.pays_dividends ?? false,
+    dividendMode: (r.dividend_mode ?? null) as "yield" | "manual" | null,
+    dividendYieldPct: r.dividend_yield_pct == null ? null : Number(r.dividend_yield_pct),
+    dividendAmount: r.dividend_amount == null ? null : Number(r.dividend_amount),
+    dividendFrequency: r.dividend_frequency ?? null,
+    dividendWithholdingPct: Number(r.dividend_withholding_pct ?? 0),
+    dividendNextDate: r.dividend_next_date ?? null,
     purchasePrice: r.purchase_price == null ? null : Number(r.purchase_price),
     closingCosts: r.closing_costs == null ? null : Number(r.closing_costs),
     vacancyPct: r.vacancy_pct == null ? null : Number(r.vacancy_pct),
@@ -113,7 +127,7 @@ export function rowToHolding(r: {
 }
 
 export const HOLDING_COLS =
-  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,updated_at,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail,nature,category,income_month,region,is_recurring,monthly_contribution,purchase_price,closing_costs,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly,debt_id,annual_rate_pct,maturity_date,term_years";
+  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,updated_at,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail,nature,category,income_month,region,is_recurring,monthly_contribution,purchase_price,closing_costs,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly,debt_id,annual_rate_pct,maturity_date,term_years,pays_dividends,dividend_mode,dividend_yield_pct,dividend_amount,dividend_frequency,dividend_withholding_pct,dividend_next_date";
 
 const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
 
@@ -283,6 +297,40 @@ function taxonomyColumns(input: HoldingInput) {
     is_recurring: input.isRecurring ?? false,
     // Solo el recurrente lleva aporte mensual; el resto lo deja en NULL.
     monthly_contribution: input.isRecurring ? (input.monthlyContribution ?? null) : null,
+    ...dividendPayload(input),
+  };
+}
+
+/**
+ * Config de dividendos → columnas. Todo cuelga de `pays_dividends`: al apagarlo
+ * se LIMPIA el resto en vez de dejarlo colgando, porque de esas columnas sale la
+ * proyección de ingreso pasivo — una config huérfana seguiría proyectando plata
+ * que el usuario ya dijo que no recibe.
+ *
+ * Y sólo se guarda el campo del modo elegido: dejar `dividend_amount` poblado
+ * con modo 'yield' invita a que alguien lo lea sin mirar el modo.
+ */
+function dividendPayload(input: HoldingInput) {
+  if (!input.paysDividends) {
+    return {
+      pays_dividends: false,
+      dividend_mode: null,
+      dividend_yield_pct: null,
+      dividend_amount: null,
+      dividend_frequency: null,
+      dividend_withholding_pct: 0,
+      dividend_next_date: null,
+    };
+  }
+  const modo = input.dividendMode ?? "yield";
+  return {
+    pays_dividends: true,
+    dividend_mode: modo,
+    dividend_yield_pct: modo === "yield" ? (input.dividendYieldPct ?? null) : null,
+    dividend_amount: modo === "manual" ? (input.dividendAmount ?? null) : null,
+    dividend_frequency: input.dividendFrequency ?? "trimestral",
+    dividend_withholding_pct: input.dividendWithholdingPct ?? 0,
+    dividend_next_date: input.dividendNextDate || null,
   };
 }
 
