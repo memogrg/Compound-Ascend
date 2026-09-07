@@ -1,8 +1,13 @@
 /**
  * Fuente de ingesta GENÉRICA para notificaciones de bancos y cooperativas de
- * Costa Rica que todavía no tienen plantilla propia (BNCR, BCR, Popular,
- * Scotiabank, Promerica, Davivienda, Lafise, Coopenae…). BAC tiene la suya y va
- * primero en el registro; esta entra solo si aquella no reconoce el correo.
+ * Costa Rica que todavía no tienen plantilla propia (Popular, Scotiabank,
+ * Lafise, Coopenae, Coopeservidores, Cathay, BCT, Improsa, General…).
+ *
+ * Los CINCO con plantilla dedicada —BAC, BCR, BNCR, Davivienda y Promerica—
+ * van primero en el registro; esta entra sólo si ninguna reconoce el correo.
+ * (Este comentario listaba a BCR, BNCR, Promerica y Davivienda como "sin
+ * plantilla propia": era cierto cuando se escribió y dejó de serlo al sumarlas.
+ * Corregido al verificar la FAQ de bancos, issue #726.)
  *
  * Cómo trabaja: identifica el banco (dominio del remitente o marca en el texto),
  * descarta rechazos, saca monto+moneda, clasifica el tipo de aviso (compra,
