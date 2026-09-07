@@ -6,7 +6,7 @@
  * configurado (dev), no persisten pero devuelven el diagnóstico calculado para
  * no bloquear la experiencia.
  */
-import { revalidatePath } from "next/cache";
+import { revalidarRuta } from "@/lib/revalidation/rutas-espejo";
 import { escapeHtml } from "@/lib/security/escape-html";
 import { profileDraftSchema } from "@/modules/personal-profile/schemas";
 import {
@@ -41,11 +41,11 @@ export async function startWithDemoAction(): Promise<StartResult> {
   }
   try {
     await seedDemoTemplate();
-    revalidatePath("/dashboard");
-    revalidatePath("/mi-base-financiera");
-    revalidatePath("/control-financiero");
-    revalidatePath("/patrimonio");
-    revalidatePath("/mi-rich-life");
+    revalidarRuta("/dashboard");
+    revalidarRuta("/mi-base-financiera");
+    revalidarRuta("/control-financiero");
+    revalidarRuta("/patrimonio");
+    revalidarRuta("/mi-rich-life");
     return { ok: true };
   } catch (err) {
     logger.error("startWithDemo fallido", { message: err instanceof Error ? err.message : "?" });
@@ -58,7 +58,7 @@ export async function startManualAction(): Promise<StartResult> {
   if (!isSupabaseConfigured()) return { ok: true };
   try {
     await markOnboardingStarted();
-    revalidatePath("/dashboard");
+    revalidarRuta("/dashboard");
     return { ok: true };
   } catch {
     return { ok: true }; // no bloqueamos la navegación
@@ -221,7 +221,7 @@ export async function revokeInvitationAction(invitationId: string): Promise<Mana
     const { revokeInvitation } =
       await import("@/modules/personal-profile/services/household-members-service");
     await revokeInvitation(parsed.data);
-    revalidatePath("/configuracion");
+    revalidarRuta("/configuracion");
     return { ok: true };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "No pudimos revocar." };
@@ -237,7 +237,7 @@ export async function removeHouseholdMemberAction(userId: string): Promise<Manag
     const { removeHouseholdMember } =
       await import("@/modules/personal-profile/services/household-members-service");
     await removeHouseholdMember(parsed.data);
-    revalidatePath("/configuracion");
+    revalidarRuta("/configuracion");
     return { ok: true };
   } catch (err) {
     return {
@@ -267,8 +267,8 @@ export async function acceptInvitationAction(token: string): Promise<AcceptResul
     logger.warn("aceptar invitación fallido", { message: error.message });
     return { ok: false, message: friendlyAcceptError(error.message) };
   }
-  revalidatePath("/dashboard");
-  revalidatePath("/mi-perfil-financiero");
+  revalidarRuta("/dashboard");
+  revalidarRuta("/mi-perfil-financiero");
   return { ok: true };
 }
 
@@ -297,7 +297,7 @@ export async function updateDisplayNameAction(name: string): Promise<AcceptResul
     return { ok: false, message: "No pudimos guardar tu nombre. Inténtalo de nuevo." };
   }
   await supabase.auth.updateUser({ data: { display_name: parsed.data } });
-  revalidatePath("/dashboard");
+  revalidarRuta("/dashboard");
   return { ok: true };
 }
 

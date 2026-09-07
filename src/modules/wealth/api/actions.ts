@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidarRuta } from "@/lib/revalidation/rutas-espejo";
 import {
   investmentInputSchema,
   policyInputSchema,
@@ -105,9 +105,9 @@ export async function setDesiredLifestyleAction(
   const cur = /^[A-Za-z]{3}$/.test(currency) ? currency.toUpperCase() : "CRC";
   try {
     await setDesiredMonthlyLifestyle(value, cur);
-    revalidatePath("/mi-rich-life");
-    revalidatePath("/m/libertad");
-    revalidatePath("/m");
+    revalidarRuta("/mi-rich-life");
+    revalidarRuta("/m/libertad");
+    revalidarRuta("/m");
     return { ok: true };
   } catch (err) {
     logger.error("setDesiredLifestyle fallido", {
@@ -129,8 +129,8 @@ export async function setPeaceMonthsAction(months: number): Promise<ActionResult
   try {
     const { setPeaceMonths } = await import("@/modules/wealth/services/fund-sizing-service");
     await setPeaceMonths(months);
-    revalidatePath("/patrimonio/proteccion");
-    revalidatePath("/m/proteccion");
+    revalidarRuta("/patrimonio/proteccion");
+    revalidarRuta("/m/proteccion");
     return { ok: true };
   } catch (err) {
     logger.error("setPeaceMonths fallido", { message: err instanceof Error ? err.message : "?" });
@@ -144,7 +144,7 @@ export async function addInvestmentAction(raw: unknown): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await createInvestment(parsed.data);
-    revalidatePath("/patrimonio");
+    revalidarRuta("/patrimonio");
     return { ok: true };
   } catch (err) {
     logger.error("addInvestment fallido", { message: err instanceof Error ? err.message : "?" });
@@ -158,7 +158,7 @@ export async function addPolicyAction(raw: unknown): Promise<ActionResult & { id
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     const id = await createPolicy(parsed.data);
-    revalidatePath("/patrimonio/proteccion");
+    revalidarRuta("/patrimonio/proteccion");
     return { ok: true, id };
   } catch (err) {
     logger.error("addPolicy fallido", { message: err instanceof Error ? err.message : "?" });
@@ -172,7 +172,7 @@ export async function editInvestmentAction(id: string, raw: unknown): Promise<Ac
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await updateInvestment(id, parsed.data);
-    revalidatePath("/patrimonio");
+    revalidarRuta("/patrimonio");
     return { ok: true };
   } catch (err) {
     logger.error("editInvestment fallido", { message: err instanceof Error ? err.message : "?" });
@@ -186,7 +186,7 @@ export async function editPolicyAction(id: string, raw: unknown): Promise<Action
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await updatePolicy(id, parsed.data);
-    revalidatePath("/patrimonio/proteccion");
+    revalidarRuta("/patrimonio/proteccion");
     return { ok: true };
   } catch (err) {
     logger.error("editPolicy fallido", { message: err instanceof Error ? err.message : "?" });
@@ -198,7 +198,7 @@ export async function removeInvestmentAction(id: string): Promise<ActionResult> 
   if (!isSupabaseConfigured()) return { ok: false };
   try {
     await deleteInvestment(id);
-    revalidatePath("/patrimonio");
+    revalidarRuta("/patrimonio");
     return { ok: true };
   } catch {
     return { ok: false };
@@ -209,7 +209,7 @@ export async function removePolicyAction(id: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false };
   try {
     await deletePolicy(id);
-    revalidatePath("/patrimonio/proteccion");
+    revalidarRuta("/patrimonio/proteccion");
     return { ok: true };
   } catch {
     return { ok: false };
@@ -224,9 +224,9 @@ export async function payPolicyPremiumAction(raw: unknown): Promise<ActionResult
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await payPolicyPremium(parsed.data);
-    revalidatePath("/patrimonio/proteccion");
-    revalidatePath("/gastos");
-    revalidatePath("/transacciones");
+    revalidarRuta("/patrimonio/proteccion");
+    revalidarRuta("/gastos");
+    revalidarRuta("/transacciones");
     return { ok: true };
   } catch (err) {
     logger.error("payPolicyPremium fallido", { message: err instanceof Error ? err.message : "?" });
@@ -245,7 +245,7 @@ export async function addHoldingAction(raw: unknown): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await createHolding(parsed.data);
-    revalidatePath("/patrimonio");
+    revalidarRuta("/patrimonio");
     return { ok: true };
   } catch (err) {
     logger.error("addHolding fallido", { message: err instanceof Error ? err.message : "?" });
@@ -259,7 +259,7 @@ export async function editHoldingAction(id: string, raw: unknown): Promise<Actio
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await updateHolding(id, parsed.data);
-    revalidatePath("/patrimonio");
+    revalidarRuta("/patrimonio");
     return { ok: true };
   } catch (err) {
     logger.error("editHolding fallido", { message: err instanceof Error ? err.message : "?" });
@@ -282,8 +282,8 @@ export async function setHoldingDcaAction(
   }
   try {
     await setHoldingDca(id, monthlyContribution);
-    revalidatePath("/patrimonio");
-    revalidatePath("/dashboard");
+    revalidarRuta("/patrimonio");
+    revalidarRuta("/dashboard");
     return { ok: true };
   } catch (err) {
     logger.error("setHoldingDca fallido", { message: err instanceof Error ? err.message : "?" });
@@ -295,7 +295,7 @@ export async function removeHoldingAction(id: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false };
   try {
     await deleteHolding(id);
-    revalidatePath("/patrimonio");
+    revalidarRuta("/patrimonio");
     return { ok: true };
   } catch {
     return { ok: false };
@@ -310,7 +310,7 @@ export async function contributeToHoldingAction(raw: unknown): Promise<ActionRes
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await contributeToHolding(parsed.data);
-    revalidatePath("/patrimonio");
+    revalidarRuta("/patrimonio");
     return { ok: true };
   } catch (err) {
     logger.error("contributeToHolding fallido", {
@@ -332,9 +332,9 @@ export async function sellHoldingAction(raw: unknown): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await recordHoldingSale(parsed.data);
-    revalidatePath("/patrimonio");
-    revalidatePath("/transacciones");
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/patrimonio");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("sellHolding fallido", { message: err instanceof Error ? err.message : "?" });
@@ -348,10 +348,10 @@ export async function addDividendAction(raw: unknown): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await createDividend(parsed.data);
-    revalidatePath("/patrimonio");
+    revalidarRuta("/patrimonio");
     // El dividendo también nace como transacción vinculada (Fase 1).
-    revalidatePath("/transacciones");
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("addDividend fallido", { message: err instanceof Error ? err.message : "?" });
@@ -363,9 +363,9 @@ export async function removeDividendAction(id: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false };
   try {
     await deleteDividend(id);
-    revalidatePath("/patrimonio");
-    revalidatePath("/transacciones");
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/patrimonio");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch {
     return { ok: false };
@@ -380,10 +380,10 @@ export async function addRentalIncomeAction(raw: unknown): Promise<ActionResult>
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await createRentalPayment(parsed.data);
-    revalidatePath("/patrimonio");
+    revalidarRuta("/patrimonio");
     // La renta también nace como transacción vinculada (Fase 1).
-    revalidatePath("/transacciones");
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("addRentalIncome fallido", { message: err instanceof Error ? err.message : "?" });
@@ -395,9 +395,9 @@ export async function removeRentalPaymentAction(id: string): Promise<ActionResul
   if (!isSupabaseConfigured()) return { ok: false };
   try {
     await deleteRentalPayment(id);
-    revalidatePath("/patrimonio");
-    revalidatePath("/transacciones");
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/patrimonio");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch {
     return { ok: false };
@@ -489,7 +489,7 @@ export async function recordHoldingValuationAction(
   if (!(value > 0) || !asOf) return { ok: false, message: "Valor y fecha requeridos." };
   try {
     await recordHoldingValuation(holdingId, asOf, value);
-    revalidatePath("/patrimonio");
+    revalidarRuta("/patrimonio");
     return { ok: true };
   } catch (err) {
     logger.error("recordHoldingValuation fallido", {
@@ -526,7 +526,7 @@ export async function adjustContributionPriceAction(
   if (!(newPrice > 0)) return { ok: false, message: "El precio debe ser mayor a 0." };
   try {
     await adjustContributionPrice(contributionId, newPrice);
-    revalidatePath("/patrimonio");
+    revalidarRuta("/patrimonio");
     return { ok: true };
   } catch (err) {
     logger.error("adjustContributionPrice fallido", {
@@ -553,7 +553,7 @@ export async function createInvestmentAlertAction(
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     const res = await createInvestmentAlert(input);
-    if (res.ok) revalidatePath("/patrimonio");
+    if (res.ok) revalidarRuta("/patrimonio");
     return res;
   } catch (err) {
     logger.error("createInvestmentAlert fallido", {
@@ -576,7 +576,7 @@ export async function updateInvestmentAlertAction(
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     const res = await updateInvestmentAlert(id, patch);
-    if (res.ok) revalidatePath("/patrimonio");
+    if (res.ok) revalidarRuta("/patrimonio");
     return res;
   } catch (err) {
     logger.error("updateInvestmentAlert fallido", {
@@ -590,7 +590,7 @@ export async function deleteInvestmentAlertAction(id: string): Promise<ActionRes
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     const res = await deleteInvestmentAlert(id);
-    if (res.ok) revalidatePath("/patrimonio");
+    if (res.ok) revalidarRuta("/patrimonio");
     return res;
   } catch (err) {
     logger.error("deleteInvestmentAlert fallido", {
@@ -618,7 +618,7 @@ export async function advancePremiumsAction(
   if (!(globalAmount > 0)) return { ok: false, message: "Ingresá un monto válido." };
   try {
     const { advanced } = await advancePremiums(holdingId, globalAmount);
-    revalidatePath("/patrimonio");
+    revalidarRuta("/patrimonio");
     return { ok: true, advanced };
   } catch (err) {
     logger.error("advancePremiums fallido", { message: err instanceof Error ? err.message : "?" });

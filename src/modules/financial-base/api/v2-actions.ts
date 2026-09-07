@@ -5,7 +5,7 @@
  * Regla de oro: lo real vive en `transactions`; el presupuesto en `budget_items`.
  * Toda mutación revalida /mi-base-financiera y /dashboard.
  */
-import { revalidatePath } from "next/cache";
+import { revalidarRuta } from "@/lib/revalidation/rutas-espejo";
 import {
   budgetItemInputSchema,
   incomeSourceInputSchema,
@@ -125,23 +125,16 @@ function fieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
 }
 
 function revalidate() {
-  revalidatePath("/mi-base-financiera");
-  revalidatePath("/dashboard");
+  revalidarRuta("/mi-base-financiera");
+  revalidarRuta("/dashboard");
 }
 
-/**
- * Rutas que pintan fuentes de ingreso, WEB Y MÓVIL. El móvil vive en su propio
- * árbol de rutas (`/m/...`) y quedaba fuera de toda revalidación: sólo
- * `/m/transacciones` estaba cubierta en todo este archivo. Efecto: al marcar
- * "Recibido" en el móvil el servidor seguía sirviendo el dato viejo y hacía
- * falta recargar a mano.
- */
+/** Rutas que pintan fuentes de ingreso. El móvil sale solo del espejo (#752). */
 function revalidarIngresos() {
+  // Las móviles ya no se listan a mano: `revalidarRuta` agrega las gemelas de
+  // cada ruta web desde la tabla espejo (/m/ingresos, /m/mi-base-financiera, /m).
   revalidate();
-  revalidatePath("/ingresos");
-  revalidatePath("/m/ingresos");
-  revalidatePath("/m/mi-base-financiera");
-  revalidatePath("/m");
+  revalidarRuta("/ingresos");
 }
 
 // ---------- Presupuesto ----------
@@ -430,7 +423,7 @@ export async function ensureRecurringIncomeAction(
       monthPeriod(parsed.data.periodYear, parsed.data.periodMonth),
     );
     revalidate();
-    revalidatePath("/ingresos");
+    revalidarRuta("/ingresos");
     return { ok: true, copied };
   } catch (err) {
     logger.error("ensureRecurringIncome fallido", {
@@ -451,7 +444,7 @@ export async function registerPassiveIncomeWithStubAction(raw: unknown): Promise
   try {
     await registerPassiveIncomeWithStub(parsed.data);
     revalidarIngresos();
-    revalidatePath("/patrimonio");
+    revalidarRuta("/patrimonio");
     return { ok: true };
   } catch (err) {
     logger.error("registerPassiveIncomeWithStub fallido", {
@@ -503,9 +496,9 @@ export async function addTransactionAction(
       }
     }
     revalidate();
-    revalidatePath("/transacciones");
-    revalidatePath("/deudas");
-    revalidatePath("/ahorro");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/deudas");
+    revalidarRuta("/ahorro");
 
     let sobre: SobreRemaining | undefined;
     if (parsed.data.kind === "gasto" && parsed.data.categoryId) {
@@ -528,7 +521,7 @@ export async function addTransactionAction(
           occurredOn: parsed.data.occurredOn,
           merchant: parsed.data.merchantOrSource ?? parsed.data.description ?? null,
         })) ?? undefined;
-      if (unido) revalidatePath("/transacciones");
+      if (unido) revalidarRuta("/transacciones");
     }
     return { ok: true, sobre, unido };
   } catch (err) {
@@ -627,8 +620,8 @@ export async function confirmIngestProposalAction(
       await supabase.from("ingest_proposals").update({ status: "pending" }).eq("id", id);
       return res;
     }
-    revalidatePath("/transacciones");
-    revalidatePath("/dashboard");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/dashboard");
     return { ok: true };
   } catch (err) {
     logger.error("confirmIngestProposal fallido", {
@@ -656,8 +649,8 @@ export async function mergeIngestProposalAction(
   try {
     const res = await mergeProposalIntoTransaction(ids.data.p, ids.data.t);
     if (res.ok) {
-      revalidatePath("/transacciones");
-      revalidatePath("/m/transacciones");
+      revalidarRuta("/transacciones");
+      revalidarRuta("/m/transacciones");
     }
     return res;
   } catch (err) {
@@ -718,7 +711,7 @@ export async function discardIngestProposalAction(id: string): Promise<ActionRes
       .select("id")
       .maybeSingle();
     if (!claimed) return { ok: false, message: "Esa propuesta ya no está disponible." };
-    revalidatePath("/transacciones");
+    revalidarRuta("/transacciones");
     return { ok: true };
   } catch (err) {
     logger.error("discardIngestProposal fallido", {
@@ -742,9 +735,9 @@ export async function linkTransactionAction(raw: unknown): Promise<ActionResult>
   try {
     await linkExistingTransaction(parsed.data);
     revalidate();
-    revalidatePath("/transacciones");
-    revalidatePath("/deudas");
-    revalidatePath("/ahorro");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/deudas");
+    revalidarRuta("/ahorro");
     return { ok: true };
   } catch (err) {
     logger.error("linkTransaction fallido", { message: err instanceof Error ? err.message : "?" });
@@ -912,8 +905,8 @@ export async function assignCategoryAction(raw: unknown): Promise<ActionResult> 
       }
     }
 
-    revalidatePath("/transacciones");
-    revalidatePath("/gastos");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/gastos");
     revalidate();
     return { ok: true };
   } catch (err) {
@@ -1069,7 +1062,7 @@ export async function hideCategoryAction(raw: unknown): Promise<ActionResult> {
   try {
     await hideCategory(parsed.data.baseId, parsed.data.reassignToId ?? null);
     revalidate();
-    revalidatePath("/gastos");
+    revalidarRuta("/gastos");
     return { ok: true };
   } catch (err) {
     logger.error("hideCategory fallido", { message: err instanceof Error ? err.message : "?" });
@@ -1091,7 +1084,7 @@ export async function forkCategoryAction(raw: unknown): Promise<ActionResult & {
       isEssential: parsed.data.isEssential,
     });
     revalidate();
-    revalidatePath("/gastos");
+    revalidarRuta("/gastos");
     return { ok: true, id: id ?? undefined };
   } catch (err) {
     logger.error("forkCategory fallido", { message: err instanceof Error ? err.message : "?" });
@@ -1110,7 +1103,7 @@ export async function unhideCategoryAction(raw: unknown): Promise<ActionResult> 
   try {
     await unhideCategory(parsed.data.baseId);
     revalidate();
-    revalidatePath("/gastos");
+    revalidarRuta("/gastos");
     return { ok: true };
   } catch (err) {
     logger.error("unhideCategory fallido", { message: err instanceof Error ? err.message : "?" });
@@ -1126,7 +1119,7 @@ export async function unforkCategoryAction(raw: unknown): Promise<ActionResult> 
   try {
     await unforkCategory(parsed.data.baseId);
     revalidate();
-    revalidatePath("/gastos");
+    revalidarRuta("/gastos");
     return { ok: true };
   } catch (err) {
     logger.error("unforkCategory fallido", { message: err instanceof Error ? err.message : "?" });

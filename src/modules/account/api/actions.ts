@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidarRuta } from "@/lib/revalidation/rutas-espejo";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import {
@@ -57,7 +57,7 @@ export async function updateCurrencyAction(code: string): Promise<AccountActionR
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await updatePrimaryCurrency(parsed.data);
-    PATHS.forEach((p) => revalidatePath(p));
+    PATHS.forEach((p) => revalidarRuta(p));
     return { ok: true };
   } catch (err) {
     logger.error("updateCurrency fallido", { message: err instanceof Error ? err.message : "?" });
@@ -75,7 +75,7 @@ export async function updateNotificationPrefAction(
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await updateNotificationChannel(channel as NotificationChannel, enabled);
-    PATHS.forEach((p) => revalidatePath(p));
+    PATHS.forEach((p) => revalidarRuta(p));
     return { ok: true };
   } catch (err) {
     logger.error("updateNotificationPref fallido", {
@@ -103,7 +103,7 @@ export async function saveUserTimezone(tz: string): Promise<AccountActionResult>
     if (!ok) return { ok: false, message: "Zona horaria no válida." };
     const store = await cookies();
     store.set(TZ_COOKIE, tz, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
-    PATHS.forEach((p) => revalidatePath(p));
+    PATHS.forEach((p) => revalidarRuta(p));
     return { ok: true };
   } catch (err) {
     logger.error("saveUserTimezone fallido", { message: err instanceof Error ? err.message : "?" });
@@ -124,7 +124,7 @@ export async function setDisplayCurrencyAction(code: string): Promise<AccountAct
       sameSite: "lax",
     });
   }
-  PATHS.forEach((p) => revalidatePath(p));
+  PATHS.forEach((p) => revalidarRuta(p));
   return { ok: true };
 }
 
@@ -187,7 +187,7 @@ export async function clearAllDataAction(): Promise<AccountActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
   try {
     await clearAllFinancialData();
-    PATHS.forEach((p) => revalidatePath(p));
+    PATHS.forEach((p) => revalidarRuta(p));
     return { ok: true };
   } catch (err) {
     logger.error("clearAllData fallido", { message: err instanceof Error ? err.message : "?" });
@@ -287,8 +287,8 @@ export async function resolveIngestNoticeAction(id: string): Promise<AccountActi
   try {
     const res = await resolveIngestNotice(id);
     if (res.ok) {
-      revalidatePath("/configuracion");
-      revalidatePath("/m/perfil");
+      revalidarRuta("/configuracion");
+      revalidarRuta("/m/perfil");
     }
     return res;
   } catch (err) {
@@ -307,7 +307,7 @@ export async function pollIngestNowAction(): Promise<PollNowResult> {
     const res = await pollIngestNow();
     if (res.ok) {
       for (const p of ["/configuracion", "/m/perfil", "/transacciones", "/m/transacciones"]) {
-        revalidatePath(p);
+        revalidarRuta(p);
       }
     }
     return res;

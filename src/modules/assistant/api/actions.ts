@@ -5,7 +5,7 @@
  * creación tras la confirmación explícita del usuario (desde el wizard, la
  * tarjeta de acción de IA o el receipt scanner). El endpoint de chat nunca crea.
  */
-import { revalidatePath } from "next/cache";
+import { revalidarRuta } from "@/lib/revalidation/rutas-espejo";
 import {
   transactionInputSchema,
   priceAlertInputSchema,
@@ -138,12 +138,12 @@ export async function confirmTransactionAction(raw: unknown): Promise<ConfirmRes
   }
   try {
     await createTransaction(parsed.data);
-    revalidatePath("/mi-base-financiera");
-    revalidatePath("/dashboard");
+    revalidarRuta("/mi-base-financiera");
+    revalidarRuta("/dashboard");
     // El pipeline central puede vincular/propagar (Fase 5).
-    revalidatePath("/transacciones");
-    revalidatePath("/deudas");
-    revalidatePath("/ahorro");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/deudas");
+    revalidarRuta("/ahorro");
     // Restante del sobre para el mensaje del chat — SOLO gasto con sobre (ingreso / "Sin sobre"
     // no aplican). Best-effort: lo lee DESPUÉS de crear, así ya descuenta esta transacción; si
     // falla, se degrada al éxito genérico sin cifra inventada.
@@ -183,9 +183,9 @@ export async function confirmGoalAction(raw: unknown): Promise<ConfirmResult> {
   }
   try {
     await createGoal(parsed.data);
-    revalidatePath("/ahorro");
-    revalidatePath("/dashboard");
-    revalidatePath("/control-financiero");
+    revalidarRuta("/ahorro");
+    revalidarRuta("/dashboard");
+    revalidarRuta("/control-financiero");
     await marcarConfirmada("create_goal");
     return { ok: true };
   } catch (err) {
@@ -211,9 +211,9 @@ export async function confirmPriceAlertAction(raw: unknown): Promise<ConfirmResu
   try {
     const res = await createInvestmentAlert({ kind: "price", ...parsed.data });
     if (!res.ok) return { ok: false, message: res.message ?? "No se pudo crear la alerta." };
-    revalidatePath("/patrimonio");
-    revalidatePath("/patrimonio/indicadores");
-    revalidatePath("/dashboard");
+    revalidarRuta("/patrimonio");
+    revalidarRuta("/patrimonio/indicadores");
+    revalidarRuta("/dashboard");
     await marcarConfirmada("create_price_alert");
     return { ok: true };
   } catch (err) {
@@ -318,10 +318,10 @@ export async function confirmBatchTransactionsAction(raw: unknown): Promise<Batc
   }
 
   if (creadas > 0) {
-    revalidatePath("/transacciones");
-    revalidatePath("/gastos");
-    revalidatePath("/mi-base-financiera");
-    revalidatePath("/dashboard");
+    revalidarRuta("/transacciones");
+    revalidarRuta("/gastos");
+    revalidarRuta("/mi-base-financiera");
+    revalidarRuta("/dashboard");
   }
   if (creadas > 0) await marcarConfirmada("create_transactions_batch");
   return { ok: creadas > 0, creadas, fallidas, duplicadas };
@@ -371,8 +371,8 @@ export async function confirmAdjustBudgetAction(raw: unknown): Promise<ConfirmRe
     // mes está fuera de ventana: es una edición tardía real.
     const res = await setEnvelopeBudgetAction({ ...parsed.data, confirmedOutsideWindow: true });
     if (!res.ok) return { ok: false, message: res.message ?? "No se pudo ajustar el presupuesto." };
-    revalidatePath("/gastos");
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/gastos");
+    revalidarRuta("/mi-base-financiera");
     await marcarConfirmada("adjust_budget");
     return { ok: true };
   } catch (err) {
@@ -408,8 +408,8 @@ export async function confirmMoveBudgetAction(raw: unknown): Promise<ConfirmResu
       period: monthPeriod(parsed.data.periodYear, parsed.data.periodMonth),
     });
     if (!res.ok) return { ok: false, message: res.message ?? "No se pudo mover el presupuesto." };
-    revalidatePath("/gastos");
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/gastos");
+    revalidarRuta("/mi-base-financiera");
     await marcarConfirmada("move_budget");
     return { ok: true };
   } catch (err) {
@@ -553,7 +553,7 @@ export async function updateMemoryFactAction(id: string, fact: string): Promise<
   try {
     const { updateFactText } = await import("@/lib/ai/memory-store");
     await updateFactText(id, fact);
-    revalidatePath("/configuracion");
+    revalidarRuta("/configuracion");
     return { ok: true };
   } catch (err) {
     // El mensaje de la guarda de cifras es informativo y va tal cual al usuario.
@@ -572,7 +572,7 @@ export async function forgetMemoryFactAction(raw: unknown): Promise<ConfirmResul
   try {
     const { archiveFact } = await import("@/lib/ai/memory-store");
     await archiveFact(id);
-    revalidatePath("/configuracion");
+    revalidarRuta("/configuracion");
     return { ok: true };
   } catch (err) {
     logger.error("forgetMemoryFact fallido", { message: err instanceof Error ? err.message : "?" });
@@ -587,7 +587,7 @@ export async function deleteMemoryFactAction(id: string): Promise<ConfirmResult>
   try {
     const { deleteFact } = await import("@/lib/ai/memory-store");
     await deleteFact(id);
-    revalidatePath("/configuracion");
+    revalidarRuta("/configuracion");
     return { ok: true };
   } catch (err) {
     logger.error("deleteMemoryFact fallido", { message: err instanceof Error ? err.message : "?" });
@@ -601,7 +601,7 @@ export async function clearMyMemoryAction(): Promise<ConfirmResult> {
   try {
     const { clearMemory } = await import("@/lib/ai/memory-store");
     await clearMemory();
-    revalidatePath("/configuracion");
+    revalidarRuta("/configuracion");
     return { ok: true };
   } catch (err) {
     logger.error("clearMyMemory fallido", { message: err instanceof Error ? err.message : "?" });

@@ -10,7 +10,7 @@
  * indicadores pasaron a leer el presupuesto vivo (budget_items) y esas tablas
  * dejaron de tener pantalla que las escribiera.
  */
-import { revalidatePath } from "next/cache";
+import { revalidarRuta } from "@/lib/revalidation/rutas-espejo";
 import { z } from "zod";
 import {
   setOpeningBalance,
@@ -43,7 +43,7 @@ export async function setOpeningBalanceAction(
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await setOpeningBalance(parsed.data, cur);
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("setOpeningBalance fallido", {
@@ -61,7 +61,7 @@ export async function reconcileBalanceAction(realBalance: number): Promise<Actio
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await reconcileBalance(parsed.data);
-    revalidatePath("/mi-base-financiera");
+    revalidarRuta("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("reconcileBalance fallido", { message: err instanceof Error ? err.message : "?" });
