@@ -57,16 +57,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
     } catch {
       // sin inversiones / sin sesión: sin badge
     }
-    try {
-      // Acciones pendientes (la próxima mejor + las de este mes). Best-effort: el plan ya es
-      // tolerante a fallos, así que si igual se cae, la navegación va sin número.
-      const { getActionPlan } = await import("@/modules/actions/services/actions-service");
-      const plan = await getActionPlan();
-      const pendientes = (plan.hero ? 1 : 0) + plan.now.length;
-      if (pendientes > 0) navBadges = { ...navBadges, actions: pendientes };
-    } catch {
-      // sin datos suficientes: sin badge
-    }
+    // NO se calcula acá el badge de "Mis acciones". Sería `getActionPlan()`, que compone el
+    // diagnóstico de control, la decisión del excedente, los insights, los fondos y las
+    // posiciones — y este layout envuelve TODA página del área autenticada, así que abrir
+    // /transacciones o /ingresos pasaría a pagar ese trabajo para pintar un número en el
+    // sidebar. El badge de `wealth` de arriba se queda porque es un `count(*)` de una tabla.
   }
 
   return (
