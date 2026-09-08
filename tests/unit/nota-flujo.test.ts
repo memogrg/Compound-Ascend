@@ -13,7 +13,13 @@
  */
 import { describe, it, expect } from "vitest";
 import { CATEGORY_META, etiquetaPayout, natureOfCategory } from "@/modules/wealth/constants";
-import { INVESTMENT_CATEGORIES, type RentalFrequency } from "@/modules/wealth/types";
+import {
+  INVESTMENT_CATEGORIES,
+  type AssetType,
+  type InvestmentCategory,
+  type RentalFrequency,
+} from "@/modules/wealth/types";
+import { categoryFromAssetType } from "@/modules/wealth/engine/holding-payload";
 import {
   calcularRendimiento,
   esFrecuenciaPago,
@@ -66,6 +72,24 @@ describe("las dos categorías de nota", () => {
     // Con barrera el capital es condicionado en las dos: 100% no lo vuelve seguro.
     expect(lecturaDeRiesgo(terminosDeNota(terminos)).nivel).toBe("condicionado");
     expect(lecturaDeRiesgo(terminosDeNota(terminos)).puntos[0]).toContain("Barrera");
+  });
+
+  it("la naturaleza sale de la CATEGORÍA, no del tipo de activo", () => {
+    // Es lo que el detalle mira para presentarse: dos holdings con el mismo
+    // `asset_type` tienen naturaleza distinta según dónde se los guardó. Si el
+    // detalle ramificara por tipo (como hacía), las dos se verían iguales.
+    const naturalezaDe = (categoria: InvestmentCategory | null, assetType: AssetType) =>
+      CATEGORY_META[categoria ?? categoryFromAssetType(assetType)].nature;
+
+    expect(naturalezaDe("nota_estructurada_flujo", "nota_estructurada")).toBe("cashflow");
+    expect(naturalezaDe("nota_estructurada", "nota_estructurada")).toBe("growth");
+  });
+
+  it("sin categoría, una nota cae en crecimiento: es el default declarado", () => {
+    // No se infiere flujo desde el cupón: un holding de crecimiento con pago
+    // configurado seguiría siendo de crecimiento, y adivinar lo contradiría.
+    expect(categoryFromAssetType("nota_estructurada")).toBe("nota_estructurada");
+    expect(CATEGORY_META[categoryFromAssetType("nota_estructurada")].nature).toBe("growth");
   });
 
   it("el pago se llama cupón en las dos, porque lo decide el tipo de activo", () => {

@@ -22,8 +22,9 @@ import {
   updateInvestmentAlertAction,
   deleteInvestmentAlertAction,
 } from "@/modules/wealth/api/actions";
-import { monthlyValuations } from "@/modules/wealth/engine/portfolio-engine";
-import { etiquetaPayout } from "@/modules/wealth/constants";
+import { monthlyValuations, monthlyIncomeOf } from "@/modules/wealth/engine/portfolio-engine";
+import { categoryFromAssetType } from "@/modules/wealth/engine/holding-payload";
+import { CATEGORY_META, etiquetaPayout } from "@/modules/wealth/constants";
 import { lecturaDeRiesgo } from "@/modules/wealth/engine/nota-estructurada";
 // Mismo motor que el detalle web: los términos y el cupón se arman una vez.
 import {
@@ -150,6 +151,13 @@ export function HoldingDetailSheet({
   // inmueble, mientras sus cupones no tenían dónde verse.
   const nota = esNota(raw);
   const rental = isRental(holding) && !plan && !nota;
+  // QUÉ ES ESTO: naturaleza y categoría. El detalle ramificaba sólo por tipo de
+  // activo, así que una nota de FLUJO se presentaba igual que una de crecimiento.
+  const categoria = raw.category ?? categoryFromAssetType(raw.assetType);
+  const metaCategoria = CATEGORY_META[categoria];
+  const esFlujo = metaCategoria?.nature === "cashflow";
+  // Lo que GENERA por mes: el número de cabecera de un activo de flujo.
+  const ingresoMensual = monthlyIncomeOf(raw);
   const lectura = nota ? lecturaDeRiesgo(terminosDeNota(raw)) : null;
   const filasNota = nota ? filasDeNota(raw) : [];
   const etiquetaPagos = etiquetaPayout(raw.assetType);
@@ -641,6 +649,36 @@ export function HoldingDetailSheet({
               </div>
             ) : null}
 
+            {/* Qué es esto: naturaleza y categoría. */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  color: esFlujo ? "var(--c-income)" : "var(--c-invest)",
+                }}
+              >
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: 999,
+                    background: esFlujo ? "var(--c-income)" : "var(--c-invest)",
+                    display: "inline-block",
+                  }}
+                />
+                {esFlujo ? "Flujo de caja" : "Crecimiento patrimonial"}
+              </span>
+              {metaCategoria?.label ? (
+                <span className="muted" style={{ fontSize: 11.5 }}>
+                  · {metaCategoria.label}
+                </span>
+              ) : null}
+            </div>
+
             {/* Resumen */}
             <div className="card card-p" style={{ padding: 12 }}>
               <div className="between">
@@ -680,6 +718,31 @@ export function HoldingDetailSheet({
                   </div>
                 </>
               )}
+              {/* En un activo de FLUJO lo que importa es cuánto genera; el valor
+                  y el retorno vienen después (el rendimiento llega como pago,
+                  no como plusvalía). */}
+              {esFlujo && ingresoMensual > 0 ? (
+                <div
+                  className="between"
+                  style={{
+                    marginTop: 8,
+                    paddingTop: 8,
+                    borderTop: "1px solid var(--line)",
+                    alignItems: "center",
+                  }}
+                >
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    {capitalizar(etiquetaPagos.singular)} neto
+                  </span>
+                  <span className="mono pos" style={{ fontSize: 13.5, fontWeight: 700 }}>
+                    {formatMoney(ingresoMensual, cur)}
+                    <span className="muted" style={{ fontSize: 11, fontWeight: 500 }}>
+                      {" "}
+                      /mes
+                    </span>
+                  </span>
+                </div>
+              ) : null}
               {quoted && history.length > 1 ? (
                 <div style={{ marginTop: 8 }}>
                   <MScrubChart
