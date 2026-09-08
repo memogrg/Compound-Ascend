@@ -39,7 +39,11 @@ export { getEnvelopesSummary, formatEnvelopesReply } from "./services/envelopes-
 export type { EnvelopesSummary } from "./services/envelopes-service";
 // Líneas derivadas del presupuesto (renta/dividendos/…): wealth las sincroniza
 // al registrar un pago para conciliarlo contra la barra "Recibido".
-export { syncDerivedBudget } from "./services/derived-budget-service";
+export {
+  syncDerivedBudget,
+  ingresoPasivoDerivadoPromedio,
+  type IngresoPasivoPromedio,
+} from "./services/derived-budget-service";
 export { monthPeriod, previousMonthPeriod } from "./engine/period";
 // Fase 3 · flujo inverso: al borrar un stub de inversión, wealth revierte las
 // fuentes de ingreso vinculadas (dirección wealth → financial-base).

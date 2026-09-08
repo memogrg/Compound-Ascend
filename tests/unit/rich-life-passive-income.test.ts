@@ -88,6 +88,12 @@ vi.mock("@/modules/financial-base", () => ({
   getDisplayCurrency: async () => "USD",
   getPrimaryCurrency: async () => "USD",
   getLiquidityBalance: async () => ({ balance: 0, currency: "USD", hasOpening: false }),
+  // PROMEDIO mensual del rendimiento de inversiones, no la línea del mes: un
+  // alquiler en USD y un cupón en CRC, ya promediados por el motor.
+  ingresoPasivoDerivadoPromedio: async () => [
+    { sourceId: "h-alquiler", monthly: 1_445.75, currency: "USD" },
+    { sourceId: "h-nota", monthly: 114_500, currency: "CRC" },
+  ],
 }));
 // El compromiso se lee aparte (total-commitment-service); acá no es lo que se prueba.
 vi.mock("@/modules/wealth/services/total-commitment-service", () => ({
@@ -106,18 +112,17 @@ import { aggregateNetWorth } from "@/modules/rich-life/services/rich-life-servic
 describe("aggregateNetWorth · ingreso pasivo", () => {
   it("suma la renta derivada de inversiones a la lista manual de ingresos pasivos", async () => {
     const agg = await aggregateNetWorth();
-    // 100 (manual) + 1.445,75 (alquiler USD) + 114.500/500 = 229 (cupón CRC) = 1.774,75
+    // 100 (manual) + 1.445,75 (alquiler USD) + 114.500/500 = 229 (cupón CRC) = 1.774,75.
+    // Los tres son promedios mensuales: la suma es la misma los doce meses.
     expect(agg.passiveIncomeMonthly).toBeCloseTo(1_774.75, 2);
   });
 
-  it("cuenta la renta Y el pago periódico configurado (dividendo/cupón)", async () => {
-    // El tooltip del wizard promete desde siempre que el dividendo "entra en la
-    // cobertura de ingreso pasivo", pero la consulta sólo contaba 'rental'.
+  it("NO lee la línea del presupuesto del mes: el promedio no tiene calendario", async () => {
+    // Mientras esto salía de `budget_items` del periodo, un cupón trimestral
+    // hacía que la cobertura dijera 0% dos meses y el triple el tercero.
     await aggregateNetWorth();
-    const porTipo = filtrosBudgetItems.find((f) => f.col === "source_kind");
-    expect(porTipo, "la consulta ya no filtra por source_kind").toBeDefined();
-    expect(porTipo!.vals).toContain("rental");
-    expect(porTipo!.vals).toContain("dividend");
+    const delPresupuesto = filtrosBudgetItems.find((f) => f.col === "source_kind");
+    expect(delPresupuesto, "la cobertura volvió a leer budget_items").toBeUndefined();
   });
 
   it("el compromiso viaja en el agregado para que todos usen el mismo denominador", async () => {

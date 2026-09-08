@@ -20,6 +20,7 @@ import {
   naturalezaDeLinea,
 } from "@/modules/financial-base/engine/base-engine";
 import { userCurrentPeriod, userToday } from "@/lib/time/user-time";
+import { ingresoPasivoDerivadoPromedio } from "@/modules/financial-base/services/derived-budget-service";
 import { convertCurrency, SUPPORTED_CURRENCIES } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import {
@@ -101,7 +102,13 @@ export type BaseSummary = {
 async function baseItemsDelPeriodo(
   p: { year: number; month: number },
   ctx?: AuthContext,
-): Promise<{ incomes: IncomeSource[]; expenses: ExpenseItem[] }> {
+): Promise<{
+  incomes: IncomeSource[];
+  expenses: ExpenseItem[];
+  /** Ids de las líneas de ingreso derivadas de inversiones (renta/dividendo).
+   *  Van por CALENDARIO, así que los indicadores las cambian por su promedio. */
+  idsDerivadosInversion: Set<string>;
+}> {
   const { db: supabase, userId } = await resolveAuth(ctx);
   const memberIds = await householdMemberIds(supabase, userId);
 
@@ -119,10 +126,14 @@ async function baseItemsDelPeriodo(
 
   const incomes: IncomeSource[] = [];
   const expenses: ExpenseItem[] = [];
+  const idsDerivadosInversion = new Set<string>();
   for (const r of bi.data ?? []) {
     const amount = Number(r.amount);
     const frequency = r.frequency as Frequency;
     if (r.type === "income") {
+      if (r.source_kind === "rental" || r.source_kind === "dividend") {
+        idsDerivadosInversion.add(r.id);
+      }
       incomes.push({
         id: r.id,
         name: r.name,
@@ -161,7 +172,7 @@ async function baseItemsDelPeriodo(
       });
     }
   }
-  return { incomes, expenses };
+  return { incomes, expenses, idsDerivadosInversion };
 }
 
 /**
@@ -267,18 +278,47 @@ async function decidirPeriodo(
 async function _getBaseSummary(ctx?: AuthContext): Promise<BaseSummary> {
   const actual = await userCurrentPeriod(ctx);
   const decision = await decidirPeriodo(actual, ctx);
-  const [{ incomes, expenses }, primary, rates] = await Promise.all([
-    baseItemsDelPeriodo(decision.periodo, ctx),
-    getDisplayCurrency(ctx),
-    getFxRates(),
-  ]);
+  const [{ incomes, expenses, idsDerivadosInversion }, primary, rates, promediosDerivados] =
+    await Promise.all([
+      baseItemsDelPeriodo(decision.periodo, ctx),
+      getDisplayCurrency(ctx),
+      getFxRates(),
+      ingresoPasivoDerivadoPromedio(),
+    ]);
   // Los indicadores agregan dinero, así que normalizamos cada ítem a la moneda
   // de visualización antes de sumar. Los montos por ítem se conservan en su moneda
   // original (los componentes los muestran tal cual el usuario los registró).
-  const incForEngine = incomes.map((i) => ({
-    ...i,
-    amountMonthly: convertCurrency(i.amountMonthly, i.currency, primary, rates),
-  }));
+  // Las líneas derivadas de inversiones se escriben por CALENDARIO (el pago
+  // completo, sólo en sus meses). Para los INDICADORES se cambian por su promedio
+  // mensual: si no, un cupón trimestral haría que la tasa de ahorro y el score de
+  // salud saltaran un mes de cada tres y no describieran nada. Es el corte de #740
+  // —`monthlyPlanned` para el flujo del mes, `monthlyize` para los indicadores—
+  // aplicado al rendimiento de las inversiones.
+  //
+  // `incomes` sale intacto: las pantallas del presupuesto siguen mostrando el mes.
+  const incForEngine: IncomeSource[] = incomes
+    .filter((i) => !idsDerivadosInversion.has(i.id))
+    .map((i) => ({
+      ...i,
+      amountMonthly: convertCurrency(i.amountMonthly, i.currency, primary, rates),
+    }));
+  for (const d of promediosDerivados) {
+    incForEngine.push({
+      id: `derivado-${d.sourceId}`,
+      name: "Rendimiento de inversiones",
+      // Es ingreso pasivo por definición: lo produce un activo, no el trabajo.
+      incomeType: "pasivo",
+      category: null,
+      amount: d.monthly,
+      currency: d.currency,
+      frequency: "mensual" as Frequency,
+      isFixed: true,
+      certainty: null,
+      ownerScope: "usuario" as OwnerScope,
+      includeInBudget: true,
+      amountMonthly: convertCurrency(d.monthly, d.currency, primary, rates),
+    });
+  }
   const expForEngine = expenses.map((e) => ({
     ...e,
     amountMonthly: convertCurrency(e.amountMonthly, e.currency, primary, rates),
