@@ -151,6 +151,11 @@ function NorteBand({ norte, currency }: { norte: NorteVM; currency: string }) {
         <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, margin: 0 }}>
           {norte.nextBestAction}
         </p>
+        {/* El panel dice cuál es; el orden completo, el porqué y qué hacer con ella viven en
+            Mis acciones. El texto de arriba no cambia: cambia adónde lleva. */}
+        <Link href="/mis-acciones" className="nba-link">
+          Ver mis acciones →
+        </Link>
       </div>
     </section>
   );

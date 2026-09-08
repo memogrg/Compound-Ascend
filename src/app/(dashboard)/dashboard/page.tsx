@@ -12,7 +12,6 @@ import { Observations, type Observation } from "@/modules/dashboard/components/o
 import { ensureMonthlyContributions } from "@/modules/wealth/services/contribution-service";
 import { ensureRecurringIncome } from "@/modules/financial-base/services/budget-service";
 import { userCurrentPeriod } from "@/lib/time/user-time";
-import { SurplusDecision, getSurplusDecision } from "@/modules/wealth";
 import { SetupHub, getSetupProgress } from "@/modules/setup";
 
 /** Datos del panel en streaming: el shell pinta de inmediato con skeletons. */
@@ -70,9 +69,9 @@ async function DashboardContent() {
     // Sin observaciones: el panel sigue.
   }
 
-  // Decisión del excedente (F3): solo con fondos cubiertos y excedente. Best-effort: si falla,
-  // no tumba el Centro de mando. Se ubica DESPUÉS del panel (overview primero, luego el deep-dive).
-  const surplus = await getSurplusDecision().catch(() => null);
+  // La decisión del excedente (F3) YA NO se pinta acá: vive en Mis acciones → Decisiones, que
+  // es el único lugar donde viven las recomendaciones. `getSurplusDecision` sigue existiendo y
+  // lo consumen ese módulo y el asesor; lo que se quitó es el render duplicado.
 
   // Hub de configuración: estado de los cuatro asistentes DERIVADO del dato real
   // (sin banderas). Best-effort: si la lectura falla, el panel sigue sin la tarjeta.
@@ -80,7 +79,7 @@ async function DashboardContent() {
 
   return (
     <>
-      {/* Orden del Centro de mando: ① saludo · ② notificaciones · ③ excedente · ④ el resto. */}
+      {/* Orden del Centro de mando: ① saludo · ② notificaciones · ③ el resto. */}
       <div style={{ marginBottom: 18 }}>
         <h2 className="greet">
           Hola, <span className="it">{data.name}</span>
@@ -94,9 +93,6 @@ async function DashboardContent() {
       ) : null}
       <Observations observations={observations} />
       {setupProgress.length > 0 ? <SetupHub progress={setupProgress} /> : null}
-      {surplus && surplus.fundsCovered && surplus.monthlySurplus > 0 ? (
-        <SurplusDecision report={surplus} />
-      ) : null}
       <DashboardView
         name={data.name}
         summary={data.summary}
