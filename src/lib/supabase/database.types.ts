@@ -62,6 +62,12 @@ export type ProfileRow = Timestamps & {
   trial_ends_at: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
+
+  /**
+   * Prioridad declarada para ordenar "Mis acciones" (migración 20260909000001).
+   * null = no la eligió a mano → se deriva del ranking `priorities` del onboarding.
+   */
+  action_priority: "deudas" | "orden" | "proteger" | "crecer" | null;
 };
 
 /**
@@ -917,6 +923,23 @@ export type UserInsightRow = Timestamps &
     status: string;
   };
 
+/**
+ * Decisión de la persona sobre UNA acción de "Mis acciones" (migración 20260909000001).
+ * Las acciones no se guardan: se derivan de los motores en cada corrida y se reencuentran
+ * con su estado por `action_key` ('<source>:<kind>:<related|periodo>'). PERSONAL: la RLS es
+ * solo del dueño, aunque la fila lleve household_id como el resto de los datos.
+ */
+export type UserActionStateRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  action_key: string;
+  status: string;
+  snooze_until: string | null;
+  /** Impacto congelado al marcar 'hecha' (monto/meses/moneda). */
+  impact: Json | null;
+};
+
 // ── El ritmo del mes (migración 20260813000001) ─────────────────────────────
 // Las tres son de SCOPE HOGAR salvo notification_log (por usuario: cada miembro
 // tiene su correo, su zona horaria y sus preferencias de canal).
@@ -1269,6 +1292,7 @@ export interface Database {
       investment_transactions: UserTable<InvestmentTransactionRow>;
       insurance_policies: UserTable<InsurancePolicyRow>;
       user_insights: UserTable<UserInsightRow>;
+      user_action_states: UserTable<UserActionStateRow>;
       budget_month_config: UserTable<BudgetMonthConfigRow>;
       budget_late_edits: UserTable<BudgetLateEditRow>;
       notification_log: UserTable<NotificationLogRow>;

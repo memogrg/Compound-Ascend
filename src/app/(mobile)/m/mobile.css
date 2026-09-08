@@ -4436,3 +4436,182 @@ body:has(.m-shell[data-theme="dark"]) {
   flex: 1 1 auto;
   justify-content: center;
 }
+
+/* ============================================================
+   MIS ACCIONES (/m/mis-acciones + la ficha del Inicio)
+   Scoped a .m-shell como todo el móvil. Reutiliza .m-seg/.m-seg-item (pestañas),
+   .m-cc (tarjetas), .m-btn (botones) y el kit de contenido; acá solo vive lo que
+   esta pantalla aporta: los chips de prioridad, el cuerpo de la acción y la ficha
+   de "próxima mejor acción" del Inicio.
+   ============================================================ */
+
+/* Prioridad: fila de chips que se desliza. Nunca se envuelve — con cuatro etiquetas
+   largas, dos líneas de chips empujan la primera acción fuera de la pantalla. */
+.m-shell .m-acc-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0 12px;
+  margin: 0 -16px;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+.m-shell .m-acc-chips::-webkit-scrollbar {
+  display: none;
+}
+.m-shell .m-acc-chip {
+  flex: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.m-shell .m-acc-chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink, #fff);
+}
+
+/* La nota de la prioridad. */
+.m-shell .m-acc-note {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  border-left: 3px solid var(--accent);
+  padding: 2px 0 2px 12px;
+  margin-bottom: 14px;
+}
+
+/* Cuerpo de una acción. */
+.m-shell .m-acc-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+.m-shell .m-acc-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-top: 6px;
+}
+.m-shell .m-acc-why {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin: 6px 0 0;
+}
+.m-shell .m-acc-impact {
+  font-size: 12.5px;
+  font-weight: 700;
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-top: 10px;
+}
+.m-shell .m-acc-lock {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin-top: 10px;
+}
+.m-shell .m-acc-blockers {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--danger);
+  line-height: 1.4;
+}
+.m-shell .m-acc-orden {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+.m-shell .m-acc-teach {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text);
+  margin: 0 0 16px;
+}
+
+/* Los tres botones + el "¿por qué?", en una sola fila que puede envolver. */
+.m-shell .m-acc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.m-shell .m-acc-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 9px 13px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.m-shell .m-acc-btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink, #fff);
+}
+.m-shell .m-acc-btn:disabled {
+  opacity: 0.55;
+}
+.m-shell .m-acc-link {
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 9px 4px;
+  cursor: pointer;
+}
+
+/* El comparador del excedente es un componente de la web: acá se le da aire y se deja
+   que sus grillas internas envuelvan. No se duplica ni se reescribe. */
+.m-shell .m-acc-embed {
+  margin-bottom: 14px;
+}
+
+/* Ficha «Tu próxima mejor acción» del Inicio (arriba del carrusel). */
+.m-shell .m-nba {
+  background: var(--surface);
+  border-radius: 18px;
+  box-shadow: var(--e1);
+  padding: 14px 16px;
+  border-left: 3px solid var(--accent);
+}
+.m-shell .m-nba-t {
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-top: 8px;
+}
+.m-shell .m-nba-i {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 6px;
+}
+.m-shell .m-nba-a {
+  margin-top: 12px;
+  width: 100%;
+  justify-content: center;
+}

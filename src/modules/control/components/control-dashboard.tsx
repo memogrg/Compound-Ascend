@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import { GoalCard } from "./goal-card";
 // Fase 4.1 (interconexión): botón Retirar — aditivo, coordinar con el owner
@@ -125,6 +126,10 @@ export function ControlDashboard({
           >
             <strong style={{ color: "var(--success)" }}>Por qué:</strong> {d.impact}
           </div>
+          {/* El orden completo, con su estado y su explicación, vive en Mis acciones. */}
+          <Link href="/mis-acciones" className="nba-link">
+            Ver mis acciones →
+          </Link>
         </div>
       </section>
 

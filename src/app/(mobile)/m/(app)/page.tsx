@@ -21,9 +21,11 @@ import {
   LibertadFicha,
 } from "../components/home-cards/ficha-cards";
 import { MHomeCardError } from "../components/home-cards/card-shell";
+import { ProximaAccionFicha } from "../components/home-cards/proxima-accion";
 import { MobileHeader } from "../components/mobile-header";
 import { HomeAddLauncher } from "../components/home-add-launcher";
 import { SetupHub, getSetupProgress } from "@/modules/setup";
+import { getActionPlan } from "@/modules/actions";
 
 /**
  * Pantalla de Inicio del móvil (/m) — "centro de mando" del diseño
@@ -66,6 +68,14 @@ const M_ROUTE: Record<string, string> = {
  * NO toques nav.ts por esto: los títulos de pantalla y el menú siguen con los nombres
  * canónicos. Lo que se acorta es el atajo, no la sección.
  */
+/** Dominio de la acción, en la voz del móvil. Paridad con el chip de la web. */
+const M_ACCION_LABEL: Record<string, string> = {
+  deuda: "Deuda",
+  orden: "Orden",
+  proteger: "Protección",
+  crecer: "Crecimiento",
+};
+
 const M_LABEL: Record<string, string> = {
   flujo: "Gastos",
   ahorro: "Ahorro",
@@ -86,7 +96,7 @@ export default async function MobileHome() {
   // `data` (panel) alimenta el saludo, los accesos y la próxima acción; `homeCards` (Delta 1)
   // alimenta las 9 fichas; `view`+`liq` dan a "Movimientos recientes" la MISMA capacidad que
   // Transacciones (editar/borrar + detalle del viaje del dinero).
-  const [data, recent, homeCards, view, liq] = await Promise.all([
+  const [data, recent, homeCards, view, liq, plan] = await Promise.all([
     getDashboardData({ previewDemo: preview }),
     preview
       ? Promise.resolve([] as Transaction[])
@@ -94,6 +104,9 @@ export default async function MobileHome() {
     preview ? Promise.resolve(null) : getHomeCardsData().catch(() => null),
     preview ? Promise.resolve(null) : loadBaseView().catch(() => null),
     preview ? Promise.resolve(null) : getLiquidityAfterByTxn().catch(() => null),
+    // Próxima mejor acción: la misma que /m/mis-acciones muestra arriba. `undefined` = no se
+    // pudo cargar (ficha de error); `null` = cargó y no hay nada que proponer (no se pinta).
+    preview ? Promise.resolve(null) : getActionPlan().catch(() => undefined),
   ]);
 
   const { panel, insights } = data;
@@ -144,6 +157,23 @@ export default async function MobileHome() {
         {setupProgress.length > 0 ? (
           <div style={{ marginBottom: 14 }}>
             <SetupHub progress={setupProgress} mobile />
+          </div>
+        ) : null}
+
+        {/* Qué hacer, antes de cómo estoy: la próxima mejor acción va arriba del carrusel.
+            Si el plan no cargó se muestra la ficha de error como cualquier otra; si cargó y no
+            hay nada que proponer, no se muestra nada (no hay "buenas noticias" que inventar). */}
+        {plan === undefined ? (
+          <div style={{ marginBottom: 14 }}>
+            <MHomeCardError eyebrow="Tu próxima mejor acción" icon="goal" />
+          </div>
+        ) : plan?.hero ? (
+          <div style={{ marginBottom: 14 }}>
+            <ProximaAccionFicha
+              title={plan.hero.title}
+              impact={plan.hero.impact.label}
+              kindLabel={M_ACCION_LABEL[plan.hero.kind] ?? "Acción"}
+            />
           </div>
         ) : null}
 
