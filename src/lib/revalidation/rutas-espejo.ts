@@ -45,6 +45,10 @@ const ESPEJO_MOVIL: Record<string, readonly string[]> = {
   // El inicio móvil muestra el panel Y el hub de configuración.
   "/dashboard": ["/m", "/m/configurar"],
 
+  // Mis acciones: la pantalla móvil gemela, y el Inicio móvil, que muestra la ficha de la
+  // próxima mejor acción (si no se repinta, la ficha sigue proponiendo lo ya hecho).
+  "/mis-acciones": ["/m/mis-acciones", "/m"],
+
   // Perfil y cuenta.
   "/mi-perfil-financiero": ["/m/mi-perfil-financiero", "/m/perfil-financiero"],
   "/configuracion": ["/m/perfil"],
@@ -62,6 +66,7 @@ export const RUTAS_MOVILES_APP = [
   "/m/libertad",
   "/m/metas",
   "/m/mi-base-financiera",
+  "/m/mis-acciones",
   "/m/patrimonio",
   "/m/perfil",
   "/m/proteccion",

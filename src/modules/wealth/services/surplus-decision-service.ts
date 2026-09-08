@@ -32,7 +32,13 @@ export type SurplusDecisionReport = SurplusComparison & {
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-export async function getSurplusDecision(): Promise<SurplusDecisionReport> {
+/**
+ * @param debtId Deuda contra la que comparar. Sin él (el caso de siempre) la elige la regla:
+ *   la cara manda, si no la de mayor saldo. Se agregó para que "Mis acciones → Decisiones"
+ *   deje comparar contra OTRA deuda activa sin cambiar en nada el comportamiento por defecto:
+ *   un id que no exista o esté saldado cae de vuelta en la elección automática.
+ */
+export async function getSurplusDecision(debtId?: string): Promise<SurplusDecisionReport> {
   const [funds, base, currency, debts, liveBalances, rates] = await Promise.all([
     getDefenseFundsReport(),
     getBaseSummary(),
@@ -57,7 +63,9 @@ export async function getSurplusDecision(): Promise<SurplusDecisionReport> {
   const expensive = [...active]
     .sort((a, b) => Number(b.apr ?? 0) - Number(a.apr ?? 0))
     .find((d) => Number(d.apr ?? 0) / 100 > DEBT_INVEST_THRESHOLD);
-  const selected = expensive ?? [...active].sort((a, b) => live(b) - live(a))[0] ?? null;
+  // Elección explícita (Decisiones): solo si la deuda existe y sigue viva. Si no, la regla.
+  const chosen = debtId ? active.find((d) => d.id === debtId) : undefined;
+  const selected = chosen ?? expensive ?? [...active].sort((a, b) => live(b) - live(a))[0] ?? null;
 
   const conv = (n: number, from: string) => convertCurrency(n, from, currency, rates);
   const debtInput: AmortizationInput | null = selected
@@ -89,5 +97,18 @@ export async function getSurplusDecision(): Promise<SurplusDecisionReport> {
 
   const comparison = compareSurplus({ monthlySurplus: surplus, horizonYears, apr, pay });
 
-  return { ...comparison, currency, fundsCovered, debtName: selected?.name ?? null };
+  // La regla del 12% mira la CARTERA, no la deuda que se eligió mirar. Sin esto, elegir la
+  // hipoteca al 8% teniendo una tarjeta al 24% destaparía la comparación de inversión — la
+  // regla se saltaría con un cambio de selector. En el camino por defecto no cambia nada
+  // (la elección automática ya es la cara, así que `comparison.gated` ya venía en true).
+  const gated = comparison.gated || expensive != null;
+
+  return {
+    ...comparison,
+    gated,
+    invest: gated ? [] : comparison.invest,
+    currency,
+    fundsCovered,
+    debtName: selected?.name ?? null,
+  };
 }
