@@ -14,7 +14,8 @@ import { useEdgeSwipe } from "../lib/use-edge-swipe";
  * y orden canónicos, con cada ítem apuntando a su ruta /m. Así toda pantalla /m es
  * alcanzable desde el menú. es-MX, tema claro, safe areas.
  *
- * Mapeo web→/m: Centro de mando→/m (en el móvil se llama "Inicio") · Mi Base Financiera→/m/mi-base-financiera ·
+ * Mapeo web→/m: Centro de mando→/m (en el móvil se llama "Inicio") · Mis acciones→
+ * /m/mis-acciones · Mi Base Financiera→/m/mi-base-financiera ·
  * Ingresos→/m/ingresos · Gastos→/m/gastos · Transacciones→/m/transacciones ·
  * Ahorro→/m/metas · Deudas y Préstamos→/m/deudas · Portafolio de inversiones→
  * /m/inversiones · Defensa Patrimonial→/m/proteccion · Patrimonio→/m/patrimonio ·
@@ -25,7 +26,13 @@ import { useEdgeSwipe } from "../lib/use-edge-swipe";
 type MenuGroup = { label: string; items: { name: string; href: string }[] };
 
 const MENU: MenuGroup[] = [
-  { label: "Resumen", items: [{ name: "Inicio", href: "/m" }] },
+  {
+    label: "Resumen",
+    items: [
+      { name: "Inicio", href: "/m" },
+      { name: "Mis acciones", href: "/m/mis-acciones" },
+    ],
+  },
   {
     label: "Presupuesto",
     items: [
