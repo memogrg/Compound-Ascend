@@ -15,6 +15,7 @@ import {
   getDisplayCurrency,
   getPrimaryCurrency,
   getLiquidityBalance,
+  ingresoPasivoDerivadoPromedio,
 } from "@/modules/financial-base";
 import { computeProtection, computePortfolio, investmentsInCurrency } from "@/modules/wealth";
 import { getCurrentDebtBalances } from "@/modules/control";
@@ -280,24 +281,18 @@ export async function aggregateNetWorth(
       .select("id,name,current_amount,stored_in,status,currency")
       .eq("user_id", userId),
     // Renta/intereses DERIVADOS de las inversiones (alquiler, bonos, CDP, préstamos)
-    // MÁS los pagos periódicos configurados (dividendos y cupones): líneas de ingreso
-    // del presupuesto con source_kind 'rental' o 'dividend'. Es ingreso pasivo real y
-    // NO está en `income_sources` a propósito — rental-service registra el cobro como
-    // transacción vinculada "sin duplicar en income_sources". Sin esto, la cobertura
-    // pasiva daba 0% para quien tiene toda su renta en entidades y no en la lista manual.
+    // MÁS los pagos periódicos configurados (dividendos y cupones). Es ingreso pasivo
+    // real y NO está en `income_sources` a propósito — rental-service registra el cobro
+    // como transacción vinculada "sin duplicar en income_sources". Sin esto, la
+    // cobertura pasiva daba 0% para quien tiene toda su renta en entidades.
     //
-    // 'dividend' faltaba: el tooltip del wizard promete desde siempre que el dividendo
-    // "entra en la cobertura de ingreso pasivo", pero la consulta sólo contaba 'rental'.
-    // Las dos fuentes son disjuntas (una línea tiene un solo source_kind), así que
-    // sumarlas no duplica.
-    db
-      .from("budget_items")
-      .select("amount,currency")
-      .in("user_id", memberIds)
-      .eq("type", "income")
-      .in("source_kind", ["rental", "dividend"])
-      .eq("period_month", periodoActual.month)
-      .eq("period_year", periodoActual.year),
+    // PROMEDIO mensual, NO la línea del presupuesto del mes. Antes esto leía
+    // `budget_items` del periodo, y desde que esa línea va por CALENDARIO (#767) un
+    // cupón trimestral hacía que la cobertura dijera 0% dos meses y el triple el
+    // tercero. La cobertura responde "¿cuánto de mi vida pagan mis activos?", y esa
+    // respuesta no cambia porque el emisor pague en marzo y no en abril. El flujo del
+    // mes sí cambia, y por eso son dos números: el mismo corte de #740.
+    ingresoPasivoDerivadoPromedio(),
   ]);
 
   // Los dos últimos cierres, del más reciente al más viejo.
@@ -424,14 +419,14 @@ export async function aggregateNetWorth(
   // Ingreso pasivo mensual (normalizado a la moneda principal): la lista manual de
   // ingresos marcados "pasivo" MÁS la renta/intereses derivados de las inversiones.
   // Las dos fuentes son disjuntas por diseño (la renta no se escribe en income_sources),
-  // así que sumarlas no duplica. Ojo: un bono anual/semestral aporta el PAGO COMPLETO en
-  // su mes ancla y 0 en los demás — la cobertura pasiva se mueve con el calendario de
-  // cobro, igual que el presupuesto del que sale.
+  // así que sumarlas no duplica. Un bono semestral o un cupón trimestral aportan su
+  // PROMEDIO mensual, estable los doce meses: la cobertura pasiva es un indicador
+  // longitudinal y no sigue el calendario de cobro (eso es el flujo del mes).
   const manualPassive = base.incomes
     .filter((i) => i.incomeType === "pasivo" && i.includeInBudget)
     .reduce((s, i) => s + convertCurrency(i.amountMonthly, i.currency, currency, rates), 0);
-  const derivedPassive = (rentalIncomeRows.data ?? []).reduce(
-    (s, r) => s + convertCurrency(Number(r.amount), r.currency, currency, rates),
+  const derivedPassive = (rentalIncomeRows ?? []).reduce(
+    (s, r) => s + convertCurrency(r.monthly, r.currency, currency, rates),
     0,
   );
   const passiveIncomeMonthly = manualPassive + derivedPassive;

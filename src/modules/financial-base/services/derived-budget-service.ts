@@ -41,6 +41,11 @@ import type { Frequency } from "@/modules/financial-base/engine/monthlyize";
 // donde vive la etiqueta del pago por tipo de activo: acá NO se decide si se
 // dice "Dividendos" o "Cupones".
 import { etiquetaPayout } from "@/modules/wealth/constants";
+import {
+  promedioMensualPayout,
+  promedioMensualRenta,
+  promedioMensualHistorial,
+} from "@/modules/financial-base/engine/ingreso-derivado";
 import type { Period } from "@/modules/financial-base/types";
 
 const POLICY_LABEL: Record<string, string> = {
@@ -54,6 +59,93 @@ const POLICY_LABEL: Record<string, string> = {
   familiar: "Seguro familiar",
   otro: "Seguro",
 };
+
+/** Una fuente de ingreso pasivo derivada de una inversión, PROMEDIADA al mes. */
+export type IngresoPasivoPromedio = {
+  /** Id del holding: es el `source_id` de la línea derivada del presupuesto. */
+  sourceId: string;
+  /** Promedio mensual neto, en la moneda del holding (sin convertir). */
+  monthly: number;
+  currency: string;
+};
+
+/**
+ * Ingreso pasivo derivado de inversiones, PROMEDIADO al mes (`monthlyize`).
+ *
+ * Es el número para los indicadores LONGITUDINALES —cobertura de ingreso pasivo,
+ * score de salud, snapshots de patrimonio, los tres números—, y es distinto del
+ * que escribe `syncDerivedBudget`, que va por CALENDARIO porque describe el flujo
+ * de un mes concreto. El mismo corte de #740: el promedio responde "¿cuánto de mi
+ * vida pagan mis activos?" y no puede cambiar porque el emisor pague en marzo y
+ * no en abril.
+ *
+ * No depende del periodo: es estable los doce meses del año, por construcción.
+ */
+export async function ingresoPasivoDerivadoPromedio(): Promise<IngresoPasivoPromedio[]> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const hace12Meses = new Date(new Date().getFullYear(), new Date().getMonth() - 12, 1)
+    .toISOString()
+    .slice(0, 10);
+
+  // Los literales van INLINE: el cliente tipado sólo infiere la fila desde un
+  // string literal (con una variable devuelve GenericStringError).
+  const [configurados, rentas, historial] = await Promise.all([
+    supabase
+      .from("investment_holdings")
+      .select(
+        "id,currency,quantity,average_cost,current_value_manual,payout_enabled,payout_mode,payout_rate_pct,payout_amount,payout_frequency,payout_withholding_pct",
+      )
+      .eq("user_id", user.id)
+      .eq("payout_enabled", true),
+    supabase
+      .from("investment_holdings")
+      .select("id,currency,rental_income,rental_frequency")
+      .eq("user_id", user.id)
+      .gt("rental_income", 0),
+    supabase
+      .from("dividends")
+      .select("holding_id,amount,currency")
+      .eq("user_id", user.id)
+      .gte("payment_date", hace12Meses),
+  ]);
+
+  const porHolding = new Map<string, IngresoPasivoPromedio>();
+
+  for (const h of configurados.data ?? []) {
+    const monthly = promedioMensualPayout(h);
+    if (monthly > 0) porHolding.set(h.id, { sourceId: h.id, monthly, currency: h.currency });
+  }
+
+  // El historial sólo entra si NO hay configuración: la config manda, igual que
+  // en la línea del presupuesto, y así un holding no cuenta dos veces.
+  const totalHistorial = new Map<string, { total: number; currency: string }>();
+  for (const d of historial.data ?? []) {
+    const acc = totalHistorial.get(d.holding_id) ?? { total: 0, currency: d.currency };
+    acc.total += Number(d.amount);
+    totalHistorial.set(d.holding_id, acc);
+  }
+  for (const [id, acc] of totalHistorial) {
+    if (porHolding.has(id)) continue;
+    const monthly = promedioMensualHistorial(acc.total);
+    if (monthly > 0) porHolding.set(id, { sourceId: id, monthly, currency: acc.currency });
+  }
+
+  // La renta es una fuente distinta del payout y puede convivir con él en teoría;
+  // se suma, que es lo honesto.
+  for (const h of rentas.data ?? []) {
+    const monthly = promedioMensualRenta(h);
+    if (monthly <= 0) continue;
+    const previo = porHolding.get(h.id);
+    porHolding.set(h.id, {
+      sourceId: h.id,
+      monthly: (previo?.monthly ?? 0) + monthly,
+      currency: previo?.currency ?? h.currency,
+    });
+  }
+
+  return [...porHolding.values()];
+}
 
 export async function syncDerivedBudget(period: Period): Promise<void> {
   const user = await requireUser();
