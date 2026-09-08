@@ -24,7 +24,9 @@ import {
   allocationByCategory,
   periodReturnFromBaseline,
   cashflowMonthlyIncome,
+  monthlyIncomeOf,
 } from "@/modules/wealth/engine/portfolio-engine";
+import { proximaFechaPago, esFrecuenciaPago } from "@/lib/finance/rendimiento-periodico";
 import { holdingDisplayCurrency } from "@/modules/wealth/engine/quote-currency";
 import { CATEGORY_META } from "@/modules/wealth/constants";
 import {
@@ -625,12 +627,28 @@ function InvRow({
 }) {
   const [menu, setMenu] = useState(false);
   const [modal, setModal] = useState<RowModal>(null);
+  const hoy = useCaptureToday()();
   const editHolding = raw ?? h;
 
   const isCashflow =
     h.nature === "cashflow" ||
     (h.category ? CATEGORY_META[h.category]?.nature === "cashflow" : false);
   const natureLabel = isCashflow ? "Flujo de caja" : "Crecimiento patrimonial";
+  // Lo que genera por mes (renta declarada o pago periódico configurado), en la
+  // moneda nativa de la fila.
+  const ingresoMensual = monthlyIncomeOf(raw ?? h);
+  // Debajo del monto: cuándo cobra y, si vence, cuándo vence. Es lo que se
+  // pregunta de un instrumento de flujo, y hasta ahora no estaba en ningún lado
+  // de la lista.
+  const detalleCobro = (() => {
+    const partes: string[] = [];
+    const prox = esFrecuenciaPago(h.payoutFrequency)
+      ? proximaFechaPago(h.payoutNextDate, h.payoutFrequency, hoy)
+      : null;
+    if (prox) partes.push(`próx. ${fechaCortaDia(prox)}`);
+    if (h.maturityDate) partes.push(`vence ${fechaCortaDia(h.maturityDate)}`);
+    return partes.join(" · ");
+  })();
   const natureColor = isCashflow ? "var(--c-income)" : "var(--c-invest)";
   const catLabel = h.category ? CATEGORY_META[h.category]?.label : null;
 
@@ -713,8 +731,18 @@ function InvRow({
             formatMoney(nativeCurrentValue, rowCurrency)
           )}
         </div>
+        {/* En un activo de CRECIMIENTO esta columna es el aporte mensual; en uno
+            de FLUJO, ese número no significa nada (a un bono o a una nota no se
+            le aporta todos los meses) y lo que importa es lo contrario: cuánto
+            genera. Misma celda, misma fila, dato correcto para cada naturaleza. */}
         <div className="inv-amt c-aporte">
-          {h.isRecurring && h.monthlyContribution ? (
+          {isCashflow && ingresoMensual > 0 ? (
+            <>
+              <span className="pos">{formatMoney(ingresoMensual, rowCurrency)}</span>
+              <span className="s">/mes</span>
+              {detalleCobro ? <div className="cell-sub">{detalleCobro}</div> : null}
+            </>
+          ) : h.isRecurring && h.monthlyContribution ? (
             <>
               {formatMoney(h.monthlyContribution, rowCurrency)}
               <span className="s">/mes</span>
@@ -1017,4 +1045,10 @@ function TipQ({ text }: { text: string }) {
       ?
     </span>
   );
+}
+
+/** `YYYY-MM-DD` → `DD/MM/AA`, que es lo que cabe en la sub-línea de la fila. */
+function fechaCortaDia(iso: string): string {
+  const [y, m, d] = String(iso).split("-");
+  return d && m && y ? `${d}/${m}/${y.slice(2)}` : String(iso);
 }

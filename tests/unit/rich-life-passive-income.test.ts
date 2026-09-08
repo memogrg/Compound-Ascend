@@ -30,6 +30,10 @@ const rowsByTable: Record<string, unknown[]> = {
   ],
 };
 
+/** Filtros `.in(col, valores)` aplicados a budget_items, para poder afirmar
+ *  QUÉ source_kind cuenta como ingreso pasivo (el mock no filtra nada). */
+export const filtrosBudgetItems: { col: string; vals: unknown[] }[] = [];
+
 function fakeDb() {
   return {
     from(table: string) {
@@ -37,7 +41,10 @@ function fakeDb() {
       const builder = {
         select: () => builder,
         eq: () => builder,
-        in: () => builder,
+        in: (col: string, vals: unknown[]) => {
+          if (table === "budget_items") filtrosBudgetItems.push({ col, vals });
+          return builder;
+        },
         lt: () => builder,
         order: () => builder,
         limit: () => builder,
@@ -101,6 +108,16 @@ describe("aggregateNetWorth · ingreso pasivo", () => {
     const agg = await aggregateNetWorth();
     // 100 (manual) + 1.445,75 (alquiler USD) + 114.500/500 = 229 (cupón CRC) = 1.774,75
     expect(agg.passiveIncomeMonthly).toBeCloseTo(1_774.75, 2);
+  });
+
+  it("cuenta la renta Y el pago periódico configurado (dividendo/cupón)", async () => {
+    // El tooltip del wizard promete desde siempre que el dividendo "entra en la
+    // cobertura de ingreso pasivo", pero la consulta sólo contaba 'rental'.
+    await aggregateNetWorth();
+    const porTipo = filtrosBudgetItems.find((f) => f.col === "source_kind");
+    expect(porTipo, "la consulta ya no filtra por source_kind").toBeDefined();
+    expect(porTipo!.vals).toContain("rental");
+    expect(porTipo!.vals).toContain("dividend");
   });
 
   it("el compromiso viaja en el agregado para que todos usen el mismo denominador", async () => {

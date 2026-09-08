@@ -279,17 +279,23 @@ export async function aggregateNetWorth(
       .from("savings_goals")
       .select("id,name,current_amount,stored_in,status,currency")
       .eq("user_id", userId),
-    // Renta/intereses DERIVADOS de las inversiones (alquiler, bonos, CDP, préstamos):
-    // líneas de ingreso del presupuesto con source_kind='rental'. Es ingreso pasivo real
-    // y NO está en `income_sources` a propósito — rental-service registra el cobro como
+    // Renta/intereses DERIVADOS de las inversiones (alquiler, bonos, CDP, préstamos)
+    // MÁS los pagos periódicos configurados (dividendos y cupones): líneas de ingreso
+    // del presupuesto con source_kind 'rental' o 'dividend'. Es ingreso pasivo real y
+    // NO está en `income_sources` a propósito — rental-service registra el cobro como
     // transacción vinculada "sin duplicar en income_sources". Sin esto, la cobertura
     // pasiva daba 0% para quien tiene toda su renta en entidades y no en la lista manual.
+    //
+    // 'dividend' faltaba: el tooltip del wizard promete desde siempre que el dividendo
+    // "entra en la cobertura de ingreso pasivo", pero la consulta sólo contaba 'rental'.
+    // Las dos fuentes son disjuntas (una línea tiene un solo source_kind), así que
+    // sumarlas no duplica.
     db
       .from("budget_items")
       .select("amount,currency")
       .in("user_id", memberIds)
       .eq("type", "income")
-      .eq("source_kind", "rental")
+      .in("source_kind", ["rental", "dividend"])
       .eq("period_month", periodoActual.month)
       .eq("period_year", periodoActual.year),
   ]);

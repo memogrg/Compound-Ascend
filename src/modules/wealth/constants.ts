@@ -49,6 +49,16 @@ export const CATEGORY_META: Record<InvestmentCategory, CategoryMeta> = {
     defaultAssetType: "bono",
     quoted: false,
   },
+  nota_estructurada_flujo: {
+    nature: "cashflow",
+    label: "Nota estructurada (con cupón)",
+    icon: "networth",
+    // MISMO asset_type que la de crecimiento: mismos términos, misma lectura de
+    // riesgo, mismo detalle. Lo único que cambia es que ésta paga cupón
+    // periódico, así que su naturaleza es flujo y entra en el ingreso pasivo.
+    defaultAssetType: "nota_estructurada",
+    quoted: false,
+  },
   fondo_conservador: {
     nature: "cashflow",
     label: "Fondos conservadores",
@@ -157,7 +167,7 @@ export const CATEGORY_META: Record<InvestmentCategory, CategoryMeta> = {
   },
   nota_estructurada: {
     nature: "growth",
-    label: "Notas estructuradas",
+    label: "Nota estructurada (al vencimiento)",
     icon: "invest",
     // NO cotiza: su valor lo pone el usuario (o el estado de cuenta del emisor),
     // así que hereda el aviso de "valuada por vos" que ya existe.

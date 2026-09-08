@@ -16,21 +16,33 @@ export type AssetType =
   | "nota_estructurada"
   | "otro";
 
-/** Taxonomía de inversiones (PLAN §2.1): 2 naturalezas × 20 categorías.
- *  Fuente única de los slugs; la usan el schema (enum) y CATEGORY_META. */
+/**
+ * Taxonomía de inversiones (PLAN §2.1). El plan hablaba de 2 naturalezas × 20
+ * categorías; el catálogo creció desde entonces (plan a plazo y notas) y hoy son
+ * 11 de flujo + 12 de crecimiento. El número no es un límite: lo que importa es
+ * que cada slug tenga su entrada en CATEGORY_META, que es donde vive la
+ * naturaleza. Fuente única de los slugs; la usan el schema (enum) y CATEGORY_META.
+ *
+ * UN MISMO ASSET_TYPE PUEDE VIVIR EN LAS DOS NATURALEZAS. Una nota estructurada
+ * puede pagar cupón periódico (flujo) o acumular hasta el vencimiento
+ * (crecimiento): es el mismo instrumento, los mismos términos y la misma lectura
+ * de riesgo, y lo único que cambia es cómo entra en el flujo de caja. Eso se
+ * resuelve con DOS CATEGORÍAS sobre el mismo `asset_type`, no con un tipo nuevo.
+ */
 export const INVESTMENT_CATEGORIES = [
-  // cashflow (10)
+  // cashflow (11)
   "cuenta_remunerada",
   "deposito_plazo",
   "bono_gobierno",
   "bono_empresa",
+  "nota_estructurada_flujo",
   "fondo_conservador",
   "prestamo_interes",
   "propiedad_alquiler",
   "reit",
   "accion_dividendo",
   "negocio_ingreso",
-  // growth (10)
+  // growth (12)
   "accion_crecimiento",
   "etf_crecimiento",
   "indexado_global",

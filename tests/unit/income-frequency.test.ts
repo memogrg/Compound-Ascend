@@ -7,6 +7,7 @@ import {
 } from "@/modules/financial-base/engine/monthlyize";
 import {
   caeEnElPeriodo,
+  cabePagoUnicoEnElPeriodo,
   requiereAncla,
   proximosPeriodos,
   mesesEntre,
@@ -200,5 +201,31 @@ describe("agenda: casos de borde", () => {
       { year: 2026, month: 9 },
       { year: 2027, month: 3 },
     ]);
+  });
+});
+
+describe("pago único al vencimiento", () => {
+  // Un bono, un CDP o una nota que liquida al final no tienen frecuencia: pagan
+  // una vez. Sin este corte, el presupuesto derivado proyectaría todos los meses
+  // un ingreso que llega una sola vez.
+  it("cae sólo en el mes del vencimiento", () => {
+    expect(cabePagoUnicoEnElPeriodo("2029-06-30", { year: 2029, month: 6 })).toBe(true);
+  });
+
+  it("no cae en el mes anterior ni en el siguiente", () => {
+    expect(cabePagoUnicoEnElPeriodo("2029-06-30", { year: 2029, month: 5 })).toBe(false);
+    expect(cabePagoUnicoEnElPeriodo("2029-06-30", { year: 2029, month: 7 })).toBe(false);
+  });
+
+  it("no confunde el mismo mes de otro año", () => {
+    expect(cabePagoUnicoEnElPeriodo("2029-06-30", { year: 2026, month: 6 })).toBe(false);
+  });
+
+  it("sin fecha de vencimiento no agenda nada", () => {
+    // `false`, no "todos los meses": lo contrario convertiría un dato faltante
+    // en un ingreso recurrente inventado.
+    expect(cabePagoUnicoEnElPeriodo(null, { year: 2029, month: 6 })).toBe(false);
+    expect(cabePagoUnicoEnElPeriodo("", { year: 2029, month: 6 })).toBe(false);
+    expect(cabePagoUnicoEnElPeriodo("no-es-fecha", { year: 2029, month: 6 })).toBe(false);
   });
 });

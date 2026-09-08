@@ -20,6 +20,13 @@ import type {
 } from "@/modules/wealth/types";
 import { CATEGORY_META } from "@/modules/wealth/constants";
 import { holdingDisplayCurrency } from "@/modules/wealth/engine/quote-currency";
+// Motor compartido del rendimiento periódico: el mismo que usan la vista previa
+// del wizard y la proyección de ingreso pasivo.
+import {
+  calcularRendimiento,
+  esFrecuenciaPago,
+  esPagoAlVencimiento,
+} from "@/lib/finance/rendimiento-periodico";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -506,21 +513,89 @@ export function concentrations(holds: HoldingPerformance[]): Concentrations {
 
 // ── Ingreso de flujo de caja (renta normalizada a mes) ───────────────
 
+/**
+ * Meses que cubre UN pago de cada frecuencia de RENTA (`RentalFrequency`). La
+ * tabla tiene que cubrirlas todas: un valor ausente caía en `?? 1` y trataba el
+ * pago como MENSUAL. Le faltaba `semanal`, que se contaba 4,33 veces de menos.
+ *
+ * `al_vencimiento` es la sexta y no debe estar acá: un pago único no es ingreso
+ * recurrente, y se excluye ANTES del lookup (si entrara, el `?? 1` lo convertiría
+ * en mensual, que es justo lo contrario).
+ */
 const FREQ_MONTHS: Record<string, number> = {
+  semanal: 12 / 52,
   mensual: 1,
   trimestral: 3,
   semestral: 6,
   anual: 12,
 };
 
-/** Ingreso mensual estimado por holding con renta (id → monto/mes). */
+/**
+ * Ingreso mensual estimado por holding (id → monto/mes). Dos fuentes:
+ *
+ *  · la renta declarada (`rentalIncome` + su frecuencia): alquiler, bono, CDP;
+ *  · el pago periódico CONFIGURADO (`payoutEnabled`): dividendo de una acción o
+ *    cupón de una nota, neto de retención, por el motor compartido.
+ *
+ * Es un promedio mensual —lo que sirve para un KPI de "cuánto genera esto por
+ * mes"—, no el calendario de cobro: en qué meses cae cada pago lo decide
+ * `syncDerivedBudget`, que escribe el pago COMPLETO en sus meses.
+ *
+ * Un holding tiene una fuente o la otra, nunca las dos; si tuviera ambas se
+ * suman, que es lo honesto.
+ */
+export type ConIngreso = Pick<
+  Holding,
+  | "quantity"
+  | "averageCost"
+  | "currentValueManual"
+  | "rentalIncome"
+  | "rentalFrequency"
+  | "payoutEnabled"
+  | "payoutMode"
+  | "payoutRatePct"
+  | "payoutAmount"
+  | "payoutFrequency"
+  | "payoutWithholdingPct"
+>;
+
+/**
+ * Acepta la forma estructural y no `HoldingPerformance` entero: la fila de la
+ * lista lo llama con el holding NATIVO (importes en su propia moneda), que es la
+ * moneda en la que esa fila muestra todo lo demás.
+ */
+export function monthlyIncomeOf(h: ConIngreso): number {
+  let mensual = 0;
+
+  if (h.rentalIncome && h.rentalIncome > 0 && !esPagoAlVencimiento(h.rentalFrequency)) {
+    const months = FREQ_MONTHS[h.rentalFrequency ?? "mensual"] ?? 1;
+    mensual += h.rentalIncome / months;
+  }
+
+  // El pago único al vencimiento no entra: no es un ingreso mensual.
+  if (h.payoutEnabled && esFrecuenciaPago(h.payoutFrequency)) {
+    const invertido = h.quantity * h.averageCost;
+    const base = (h.currentValueManual ?? 0) || invertido;
+    mensual += calcularRendimiento(
+      {
+        modo: h.payoutMode === "manual" ? "manual" : "yield",
+        yieldPct: h.payoutRatePct ?? 0,
+        montoPorPago: h.payoutAmount ?? 0,
+        frecuencia: h.payoutFrequency,
+        retencionPct: h.payoutWithholdingPct ?? 0,
+      },
+      base,
+    ).netoMensual;
+  }
+
+  return mensual;
+}
+
 export function monthlyIncomeByHolding(holds: HoldingPerformance[]): Map<string, number> {
   const m = new Map<string, number>();
   for (const h of holds) {
-    if (h.rentalIncome && h.rentalIncome > 0) {
-      const months = FREQ_MONTHS[h.rentalFrequency ?? "mensual"] ?? 1;
-      m.set(h.id, h.rentalIncome / months);
-    }
+    const mensual = monthlyIncomeOf(h);
+    if (mensual > 0) m.set(h.id, mensual);
   }
   return m;
 }

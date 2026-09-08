@@ -11,7 +11,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { formatPercent } from "@/lib/format";
+import { formatMoney, formatPercent } from "@/lib/format";
+import { useCaptureToday } from "@/components/tz/timezone-context";
+import { monthlyIncomeOf } from "@/modules/wealth/engine/portfolio-engine";
+import { proximaFechaPago, esFrecuenciaPago } from "@/lib/finance/rendimiento-periodico";
 import { removeHoldingAction } from "@/modules/wealth/api/actions";
 import { holdingDisplayCurrency } from "@/modules/wealth/engine/quote-currency";
 import type { HoldingNativo, HoldingPerformance } from "@/modules/wealth/types";
@@ -56,6 +59,7 @@ export function InversionesManager({
   const contribByHolding = new Map(openContributions.map((c) => [c.holdingId, c]));
   const rawById = new Map(rawHoldings.map((h) => [h.id, h]));
 
+  const hoy = useCaptureToday()();
   const [adding, setAdding] = useState(false);
   const [editH, setEditH] = useState<HoldingNativo | null>(null);
   const [sellH, setSellH] = useState<HoldingPerformance | null>(null);
@@ -109,6 +113,24 @@ export function InversionesManager({
             // Cotizados (etf/accion/cripto) → USD (cotizan en dólares); el resto en su moneda registrada.
             const rowCurrency = holdingDisplayCurrency(h.assetType, rw?.currency ?? currency);
             const rowValue = rw ? rw.quantity * rw.averageCost * (1 + h.returnPct) : h.currentValue;
+            // Activo de FLUJO: lo que importa en la lista no es su naturaleza
+            // (que ya se deduce) sino cuánto genera y cuándo cobra. Mismo motor
+            // y mismos datos que la fila de la web.
+            const ingresoMensual = rw ? monthlyIncomeOf(rw) : 0;
+            const proximoCobro = esFrecuenciaPago(rw?.payoutFrequency)
+              ? proximaFechaPago(rw?.payoutNextDate, rw.payoutFrequency, hoy)
+              : null;
+            const vence = rw?.maturityDate ?? null;
+            const subtitulo =
+              ingresoMensual > 0
+                ? [
+                    `${formatMoney(ingresoMensual, rowCurrency)}/mes`,
+                    proximoCobro ? `próx. ${fechaCortaDia(proximoCobro)}` : null,
+                    !proximoCobro && vence ? `vence ${fechaCortaDia(vence)}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
+                : nature;
             return (
               <SwipeRow
                 key={h.id}
@@ -149,7 +171,7 @@ export function InversionesManager({
                       }
                     : { icon: "investment" as const })}
                   title={name}
-                  subtitle={nature}
+                  subtitle={subtitulo}
                   value={
                     h.priceUnavailable ? (
                       // Cotizable sin precio: no mostramos valor/retorno inventados al costo.
@@ -326,4 +348,10 @@ export function InversionesManager({
       />
     </>
   );
+}
+
+/** `YYYY-MM-DD` → `DD/MM/AA`, que es lo que cabe en el subtítulo de la fila. */
+function fechaCortaDia(iso: string): string {
+  const [y, m, d] = String(iso).split("-");
+  return d && m && y ? `${d}/${m}/${y.slice(2)}` : String(iso);
 }
