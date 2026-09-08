@@ -27,7 +27,7 @@ import {
 } from "@/modules/wealth/api/actions";
 import { HelpTip } from "@/components/shared/help-tip";
 import { EditHoldingButton } from "@/modules/wealth/components/add-holding-wizard";
-import { etiquetaPayout } from "@/modules/wealth/constants";
+import { CATEGORY_META, etiquetaPayout } from "@/modules/wealth/constants";
 import { lecturaDeRiesgo } from "@/modules/wealth/engine/nota-estructurada";
 // Motor compartido con el detalle móvil: los términos, la lectura de riesgo y
 // el cupón configurado se arman una sola vez.
@@ -38,7 +38,8 @@ import {
   payoutConfigurado,
 } from "@/modules/wealth/engine/detalle-instrumento";
 import { AlertManager } from "@/modules/wealth/components/alert-manager";
-import { monthlyValuations } from "@/modules/wealth/engine/portfolio-engine";
+import { monthlyValuations, monthlyIncomeOf } from "@/modules/wealth/engine/portfolio-engine";
+import { categoryFromAssetType } from "@/modules/wealth/engine/holding-payload";
 import type { PlanPeriod } from "@/modules/wealth/engine/premiums";
 import type { Holding, Dividend, RentalPayment, HoldingNativo } from "@/modules/wealth/types";
 import type {
@@ -156,6 +157,18 @@ export function HoldingDetailModal({
     currentPrice !== null
       ? holding.quantity * currentPrice
       : (holding.currentValueManual ?? costBasis);
+  // QUÉ ES ESTO: naturaleza y categoría. El modal no las leía nunca — ramificaba
+  // sólo por tipo de activo—, así que una nota de FLUJO se presentaba igual que
+  // una de crecimiento y su `sub` mostraba el slug crudo ("nota_estructurada").
+  const categoria = holding.category ?? categoryFromAssetType(holding.assetType);
+  const metaCategoria = CATEGORY_META[categoria];
+  const esFlujo = metaCategoria?.nature === "cashflow";
+  const etiquetaNaturaleza = esFlujo ? "Flujo de caja" : "Crecimiento patrimonial";
+  const colorNaturaleza = esFlujo ? "var(--c-income)" : "var(--c-invest)";
+  // Lo que GENERA por mes: es el número de cabecera de un activo de flujo, donde
+  // el ROI es secundario (el retorno llega como pago, no como plusvalía).
+  const ingresoMensual = monthlyIncomeOf(holding);
+
   // Lo que firmó: términos, lectura de riesgo y rendimiento configurado.
   const esNotaEstructurada = esNota(holding);
   const lectura = esNotaEstructurada ? lecturaDeRiesgo(terminosDeNota(holding)) : null;
@@ -207,8 +220,10 @@ export function HoldingDetailModal({
 
   // Load rental payments (solo activos no cotizados)
   useEffect(() => {
-    if (isRental) void listRentalPaymentsAction(holding.id).then(setRentals);
-  }, [holding.id, isRental]);
+    // La nota no tiene sección de renta desde #766: pedir sus pagos era una
+    // consulta que nadie leía.
+    if (isRental && !esNotaEstructurada) void listRentalPaymentsAction(holding.id).then(setRentals);
+  }, [holding.id, isRental, esNotaEstructurada]);
 
   // Load compras (historial DCA, solo cotizados)
   useEffect(() => {
@@ -278,7 +293,7 @@ export function HoldingDetailModal({
   return (
     <Modal
       title={holding.label ?? holding.symbol}
-      sub={holding.label ? holding.symbol : holding.assetType}
+      sub={holding.label ? holding.symbol : (metaCategoria?.label ?? holding.assetType)}
       onClose={onClose}
     >
       <div className="modal-body" style={{ padding: 0 }}>
@@ -286,6 +301,44 @@ export function HoldingDetailModal({
           style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "10px 22px 0" }}
         >
           <EditHoldingButton holding={editHolding ?? holding} currency={currency} />
+        </div>
+        {/* Qué es esto. Un instrumento de flujo y uno de crecimiento se leen
+            distinto, y hasta acá el modal los presentaba igual. */}
+        <div
+          style={{
+            padding: "2px 22px 0",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              fontSize: 11.5,
+              fontWeight: 600,
+              color: colorNaturaleza,
+            }}
+          >
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: 999,
+                background: colorNaturaleza,
+                display: "inline-block",
+              }}
+            />
+            {etiquetaNaturaleza}
+          </span>
+          {metaCategoria?.label ? (
+            <span className="muted" style={{ fontSize: 11.5 }}>
+              · {metaCategoria.label}
+            </span>
+          ) : null}
         </div>
         {linkedDebt ? (
           <div
@@ -316,6 +369,15 @@ export function HoldingDetailModal({
             gap: 12,
           }}
         >
+          {/* En un activo de FLUJO lo primero es cuánto genera; el valor y el
+              ROI vienen después (el retorno llega como pago, no como plusvalía). */}
+          {esFlujo && ingresoMensual > 0 ? (
+            <Metric
+              label={`${capitalizar(etiquetaPagos.singular)} neto / mes`}
+              value={formatMoney(ingresoMensual, currency)}
+              accent="var(--pos)"
+            />
+          ) : null}
           <Metric
             label="Valor actual"
             value={formatMoney(currentValue, currency)}
