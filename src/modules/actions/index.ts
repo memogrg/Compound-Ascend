@@ -20,6 +20,9 @@ export {
   getEffectivePriority,
 } from "./services/actions-service";
 export type { DecisionsView, DebtRowVM, PauseComparisonVM } from "./services/actions-service";
+export { ActionsView, type ActionsTab } from "./components/actions-view";
+export { DecisionsTab } from "./components/decisions-tab";
+export type { MiniComparison } from "./components/action-hero";
 export {
   markActionDone,
   snoozeAction,

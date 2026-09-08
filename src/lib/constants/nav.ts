@@ -24,6 +24,8 @@ export const NAV: NavGroup[] = [
     label: "Resumen",
     items: [
       { id: "dashboard", name: "Centro de mando", icon: "dashboard", href: "/dashboard" },
+      // Va justo después del panel: el panel dice cómo estás, y esto qué hacer al respecto.
+      { id: "actions", name: "Mis acciones", icon: "check", href: "/mis-acciones" },
       { id: "assistant", name: "Asistente", icon: "spark", href: "/asistente" },
     ],
   },
