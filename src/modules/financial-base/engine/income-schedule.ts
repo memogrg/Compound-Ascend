@@ -88,3 +88,22 @@ export function proximosPeriodos(
   }
   return out;
 }
+
+/**
+ * ¿El pago ÚNICO al vencimiento cae en este periodo?
+ *
+ * Un instrumento `al_vencimiento` (bono, CDP o nota que liquida al final) no
+ * tiene frecuencia: paga una sola vez, en el mes de su vencimiento. Sin este
+ * corte se proyectaría todos los meses un ingreso que llega una vez sola.
+ *
+ * Sin fecha de vencimiento no hay nada que agendar: `false`, no "todos los
+ * meses" — lo contrario convertiría un dato faltante en ingreso recurrente.
+ */
+export function cabePagoUnicoEnElPeriodo(
+  maturityDate: string | null | undefined,
+  periodo: PeriodoRef,
+): boolean {
+  const vence = periodoDeAncla(maturityDate);
+  if (!vence) return false;
+  return vence.year === periodo.year && vence.month === periodo.month;
+}

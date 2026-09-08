@@ -20,8 +20,10 @@ import { formatMoney, currencySymbol, captureCurrencyDefault } from "@/lib/forma
 import {
   calcularRendimiento,
   esFrecuenciaPago,
+  esPagoAlVencimiento,
   textoRendimiento,
   FRECUENCIAS_PAGO,
+  PAGO_AL_VENCIMIENTO,
 } from "@/lib/finance/rendimiento-periodico";
 import { lecturaDeRiesgo } from "@/modules/wealth/engine/nota-estructurada";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
@@ -33,7 +35,12 @@ import {
   listLinkableDebtsAction,
   type LinkableDebt,
 } from "@/modules/wealth/api/actions";
-import { CATEGORY_META, CASHFLOW_CATEGORIES, GROWTH_CATEGORIES } from "@/modules/wealth/constants";
+import {
+  CATEGORY_META,
+  CASHFLOW_CATEGORIES,
+  GROWTH_CATEGORIES,
+  etiquetaPayout,
+} from "@/modules/wealth/constants";
 import { computeRentalRoi } from "@/modules/wealth/engine/rental-roi";
 // buildPayload + helpers viven en el engine (compartidos con el wizard móvil).
 import {
@@ -444,6 +451,10 @@ export function AddHoldingModal({
 
   function chooseCategory(c: InvestmentCategory) {
     setCategory(c);
+    // Una nota de FLUJO sin cupón no tiene sentido: es lo que la distingue de la
+    // de crecimiento. Arranca abierta; en la de crecimiento el cupón es opcional
+    // y queda cerrado.
+    if (c === "nota_estructurada_flujo") setPagaDividendos(true);
     setStep(2);
   }
 
@@ -836,13 +847,33 @@ function Step2Fields(props: {
   // El tipo de activo sale de la categoría (CATEGORY_META), no de una prop
   // nueva: la categoría ya es la fuente única de esa relación.
   const tipoActivo = props.category ? CATEGORY_META[props.category].defaultAssetType : null;
+  // Cómo se llama el pago de ESTE activo: dividendo, cupón, interés…
+  const etiquetaPagoActivo = etiquetaPayout(tipoActivo);
+  // El pago único al vencimiento sólo se ofrece en la nota de CRECIMIENTO: en la
+  // de flujo el cupón es lo que la define, y "al vencimiento" no es un flujo.
+  const frecuenciasDisponibles =
+    props.category === "nota_estructurada"
+      ? [
+          ...FRECUENCIAS_DIVIDENDO,
+          { value: PAGO_AL_VENCIMIENTO, label: "Al vencimiento (pago único)" },
+        ]
+      : FRECUENCIAS_DIVIDENDO;
 
   // Vista previa del dividendo. El cálculo viene del motor compartido
   // (`lib/finance`) — el MISMO que usa la proyección de ingreso pasivo, así que
   // lo que el usuario ve acá es exactamente lo que va a entrar en su flujo.
   // Base: el valor manual si lo cargó, si no lo invertido.
   const vistaPreviaDividendo = (() => {
-    if (!props.pagaDividendos || !esFrecuenciaPago(props.dividendoFrecuencia)) return null;
+    if (!props.pagaDividendos) return null;
+    const alVencimiento = esPagoAlVencimiento(props.dividendoFrecuencia);
+    // Al vencimiento el % se lee como anual y se cobra una sola vez: el cálculo
+    // del pago es el de una frecuencia anual, sin repetirse.
+    const frecuencia = alVencimiento
+      ? ("anual" as const)
+      : esFrecuenciaPago(props.dividendoFrecuencia)
+        ? props.dividendoFrecuencia
+        : null;
+    if (!frecuencia) return null;
     const base = parseFloat(props.currentValue) || parseFloat(props.invested) || 0;
     const retencion = parseFloat(props.dividendoRetencionPct) || 0;
     const r = calcularRendimiento(
@@ -850,12 +881,15 @@ function Step2Fields(props: {
         modo: props.dividendoModo,
         yieldPct: parseFloat(props.dividendoYieldPct) || 0,
         montoPorPago: parseFloat(props.dividendoMonto) || 0,
-        frecuencia: props.dividendoFrecuencia,
+        frecuencia,
         retencionPct: retencion,
       },
       base,
     );
-    return textoRendimiento(r, retencion, (n) => formatMoney(n, cur));
+    return textoRendimiento(r, retencion, (n) => formatMoney(n, cur), {
+      etiqueta: etiquetaPagoActivo.singular,
+      alVencimiento,
+    });
   })();
 
   // Lectura de riesgo en vivo: mientras se cargan los términos, la persona ya ve
@@ -1422,10 +1456,11 @@ function Step2Fields(props: {
         </div>
       ) : null}
 
-      {/* Dividendos · solo acciones y ETF (los que reparten). El cálculo y la
-          vista previa salen del motor compartido, así que web y móvil dicen lo
-          mismo y la proyección de ingreso pasivo usa exactamente este número. */}
-      {tipoActivo === "accion" || tipoActivo === "etf" ? (
+      {/* Pago periódico · acciones/ETF (dividendo) y notas estructuradas (cupón).
+          Es EL MISMO bloque: mismo motor, misma vista previa, mismas columnas
+          payout_*. Lo único que cambia por tipo de activo es cómo se llama el
+          pago (`etiquetaPayout`) y si se ofrece el pago único al vencimiento. */}
+      {tipoActivo === "accion" || tipoActivo === "etf" || tipoActivo === "nota_estructurada" ? (
         <>
           <label
             style={{
@@ -1443,13 +1478,19 @@ function Step2Fields(props: {
               checked={props.pagaDividendos}
               onChange={(e) => props.onPagaDividendos(e.target.checked)}
             />
-            ¿Paga dividendos?
-            <HelpTip text="Si esta posición reparte dividendos, configuralos acá: el ingreso entra solo en tu flujo del mes y en la cobertura de ingreso pasivo, sin que registres cada pago." />
+            ¿Paga {etiquetaPagoActivo.singular}?
+            <HelpTip
+              text={`Si esta posición paga ${etiquetaPagoActivo.plural}, configuralos acá: el ingreso entra solo en tu flujo del mes y en la cobertura de ingreso pasivo, sin que registres cada pago.`}
+            />
           </label>
 
           {props.pagaDividendos ? (
             <div className="fld" style={{ marginTop: 6, display: "grid", gap: 10 }}>
-              <div className="seg" role="radiogroup" aria-label="Modo de dividendo">
+              <div
+                className="seg"
+                role="radiogroup"
+                aria-label={`Modo de ${etiquetaPagoActivo.singular}`}
+              >
                 {(
                   [
                     ["yield", "% anual"],
@@ -1511,7 +1552,7 @@ function Step2Fields(props: {
                     value={props.dividendoFrecuencia}
                     onChange={(e) => props.onDividendoFrecuencia(e.target.value)}
                   >
-                    {FRECUENCIAS_DIVIDENDO.map((f) => (
+                    {frecuenciasDisponibles.map((f) => (
                       <option key={f.value} value={f.value}>
                         {f.label}
                       </option>

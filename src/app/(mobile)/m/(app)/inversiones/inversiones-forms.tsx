@@ -17,8 +17,10 @@ import { formatMoney, currencySymbol } from "@/lib/format";
 import {
   calcularRendimiento,
   esFrecuenciaPago,
+  esPagoAlVencimiento,
   textoRendimiento,
   FRECUENCIAS_PAGO,
+  PAGO_AL_VENCIMIENTO,
 } from "@/lib/finance/rendimiento-periodico";
 import { lecturaDeRiesgo } from "@/modules/wealth/engine/nota-estructurada";
 import { useCaptureToday } from "@/components/tz/timezone-context";
@@ -32,7 +34,12 @@ import {
   listLinkableDebtsAction,
   type LinkableDebt,
 } from "@/modules/wealth/api/actions";
-import { CATEGORY_META, CASHFLOW_CATEGORIES, GROWTH_CATEGORIES } from "@/modules/wealth/constants";
+import {
+  CATEGORY_META,
+  CASHFLOW_CATEGORIES,
+  GROWTH_CATEGORIES,
+  etiquetaPayout,
+} from "@/modules/wealth/constants";
 import { computeRentalRoi } from "@/modules/wealth/engine/rental-roi";
 import {
   buildHoldingPayload,
@@ -366,6 +373,9 @@ export function HoldingWizardSheet({
         <Step1Categories
           onChoose={(c) => {
             setCategory(c);
+            // Una nota de FLUJO sin cupón no tiene sentido: es lo que la
+            // distingue de la de crecimiento. Arranca abierta.
+            if (c === "nota_estructurada_flujo") setPagaDividendos(true);
             setStep(2);
           }}
         />
@@ -630,6 +640,17 @@ function Step2Fields(p: Step2Props) {
   const { profile, cur } = p;
   // El tipo de activo sale de la categoría (CATEGORY_META), igual que en la web.
   const tipoActivo = p.category ? CATEGORY_META[p.category].defaultAssetType : null;
+  // Cómo se llama el pago de ESTE activo: dividendo, cupón, interés…
+  const etiquetaPagoActivo = etiquetaPayout(tipoActivo);
+  // El pago único al vencimiento sólo se ofrece en la nota de CRECIMIENTO: en la
+  // de flujo el cupón es lo que la define, y "al vencimiento" no es un flujo.
+  const frecuenciasDisponibles: Opt[] =
+    p.category === "nota_estructurada"
+      ? [
+          ...FRECUENCIA_DIV_OPTS,
+          { value: PAGO_AL_VENCIMIENTO, label: "Al vencimiento (pago único)" },
+        ]
+      : FRECUENCIA_DIV_OPTS;
 
   // Lectura de riesgo de la nota, con el mismo motor que la web.
   const lecturaNota = lecturaDeRiesgo({
@@ -645,7 +666,15 @@ function Step2Fields(p: Step2Props) {
   // Vista previa del dividendo con el MISMO motor que la web y que la proyección
   // de ingreso pasivo: un solo cálculo, tres superficies.
   const vistaPreviaDividendo = (() => {
-    if (!p.pagaDividendos || !esFrecuenciaPago(p.dividendoFrecuencia)) return null;
+    if (!p.pagaDividendos) return null;
+    const alVencimiento = esPagoAlVencimiento(p.dividendoFrecuencia);
+    // Al vencimiento el % se lee como anual y se cobra una sola vez.
+    const frecuencia = alVencimiento
+      ? ("anual" as const)
+      : esFrecuenciaPago(p.dividendoFrecuencia)
+        ? p.dividendoFrecuencia
+        : null;
+    if (!frecuencia) return null;
     const base = p.currentValue ?? p.invested ?? 0;
     const retencion = p.dividendoRetencionPct ?? 0;
     const r = calcularRendimiento(
@@ -653,12 +682,15 @@ function Step2Fields(p: Step2Props) {
         modo: p.dividendoModo,
         yieldPct: p.dividendoYieldPct ?? 0,
         montoPorPago: p.dividendoMonto ?? 0,
-        frecuencia: p.dividendoFrecuencia,
+        frecuencia,
         retencionPct: retencion,
       },
       base,
     );
-    return textoRendimiento(r, retencion, (n) => formatMoney(n, cur));
+    return textoRendimiento(r, retencion, (n) => formatMoney(n, cur), {
+      etiqueta: etiquetaPagoActivo.singular,
+      alVencimiento,
+    });
   })();
 
   return (
@@ -962,13 +994,15 @@ function Step2Fields(p: Step2Props) {
         </>
       ) : null}
 
-      {/* Dividendos · solo acciones y ETF. Mismo motor que la web: la vista previa
-          y la proyección de ingreso pasivo salen del mismo cálculo. */}
-      {tipoActivo === "accion" || tipoActivo === "etf" ? (
+      {/* Pago periódico · acciones/ETF (dividendo) y notas estructuradas (cupón).
+          Es EL MISMO bloque que la web, con el mismo motor: lo único que cambia
+          por tipo de activo es cómo se llama el pago y si se ofrece el pago
+          único al vencimiento. */}
+      {tipoActivo === "accion" || tipoActivo === "etf" || tipoActivo === "nota_estructurada" ? (
         <>
           <Toggle
             name="pagaDividendos"
-            label="¿Paga dividendos?"
+            label={`¿Paga ${etiquetaPagoActivo.singular}?`}
             value={p.pagaDividendos}
             onChange={p.onPagaDividendos}
             hint="El ingreso entra solo en tu flujo del mes; no hace falta registrar cada pago."
@@ -1008,8 +1042,8 @@ function Step2Fields(p: Step2Props) {
                 label="Frecuencia"
                 value={p.dividendoFrecuencia}
                 onChange={p.onDividendoFrecuencia}
-                options={FRECUENCIA_DIV_OPTS}
-                sheetTitle="Frecuencia del dividendo"
+                options={frecuenciasDisponibles}
+                sheetTitle={`Frecuencia del ${etiquetaPagoActivo.singular}`}
               />
               <MoneyField
                 name="dividendoRetencionPct"

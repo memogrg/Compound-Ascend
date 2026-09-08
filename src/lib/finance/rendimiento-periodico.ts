@@ -40,6 +40,25 @@ export function esFrecuenciaPago(v: string | null | undefined): v is FrecuenciaP
 }
 
 /**
+ * Pago ÚNICO al vencimiento (una nota que capitaliza y liquida al final).
+ *
+ * Se guarda en la misma columna que la frecuencia porque responde la misma
+ * pregunta —cuándo se cobra—, pero a propósito NO es una `FrecuenciaPago`:
+ * `esFrecuenciaPago` devuelve false para él, y de ahí sale gratis que un pago
+ * único no se proyecte como ingreso mensual en el presupuesto derivado ni
+ * dispare el recordatorio periódico de cobro. Lo que sí tiene es su aviso por
+ * fecha: el vencimiento ya genera una alerta `price_alerts kind='vesting'`.
+ *
+ * O sea: preguntar `esFrecuenciaPago` es preguntar "¿esto se repite?", y esa es
+ * exactamente la pregunta que hace cada consumidor del rendimiento.
+ */
+export const PAGO_AL_VENCIMIENTO = "al_vencimiento";
+
+export function esPagoAlVencimiento(v: string | null | undefined): boolean {
+  return v === PAGO_AL_VENCIMIENTO;
+}
+
+/**
  * Pagos por año de una frecuencia. Sale del factor mensual de `monthlyize`
  * (×12), no de una tabla nueva: `bimensual` es 0.5/mes → 6 al año.
  *
@@ -175,12 +194,23 @@ export function textoRendimiento(
   r: Rendimiento,
   retencionPct: number | null | undefined,
   formatear: (n: number) => string,
+  opciones?: {
+    /** Cómo se llama el pago ("dividendo", "cupón"…). Por defecto, "pago". */
+    etiqueta?: string;
+    /** Pago único al vencimiento: no se enuncia equivalente mensual. */
+    alVencimiento?: boolean;
+  },
 ): string | null {
   if (r.brutoPorPago <= 0) return null;
   const retencion = Math.min(100, Math.max(0, finito(retencionPct)));
-  const bruto = `≈ ${formatear(r.brutoPorPago)} brutos por pago`;
+  const bruto = `≈ ${formatear(r.brutoPorPago)} brutos por ${opciones?.etiqueta ?? "pago"}`;
   // Sin retención no se menciona el impuesto: una línea que dice "−0%" es ruido.
   const impuesto =
     retencion > 0 ? ` · −${retencion}% impuestos = ${formatear(r.netoPorPago)} netos` : "";
-  return `${bruto}${impuesto} · ≈ ${formatear(r.netoMensual)} netos/mes`;
+  // Un pago ÚNICO no tiene equivalente mensual. Decir "≈ $X netos/mes" de algo
+  // que llega una sola vez es justamente la confusión que se quiere evitar.
+  const cierre = opciones?.alVencimiento
+    ? " · en un único pago al vencimiento"
+    : ` · ≈ ${formatear(r.netoMensual)} netos/mes`;
+  return `${bruto}${impuesto}${cierre}`;
 }

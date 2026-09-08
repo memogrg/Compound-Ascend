@@ -7,7 +7,7 @@ import "server-only";
  *   · metas con aporte      → gasto "Aporte — {meta}"       (source_kind 'goal')
  *   · pólizas con prima     → gasto "Prima — {seguro}"      (source_kind 'policy')
  *   · recurrentes activos   → ingreso/gasto según su kind   (source_kind 'recurring')
- *   · dividendos (12 meses) → ingreso "Dividendos — {pos.}" (source_kind 'dividend')
+ *   · pago periódico        → ingreso "{Dividendos|Cupones} — {pos.}" (source_kind 'dividend')
  *   · renta de inversiones  → ingreso "Ingreso — {posición}" (source_kind 'rental')
  *
  * Las líneas derivadas se editan en su entidad (candado en la UI); las
@@ -27,7 +27,20 @@ import {
 import { getSystemCategoryId } from "@/modules/financial-base/services/linked-transaction-service";
 // Motor compartido: vive en `lib/finance` justamente para que financial-base
 // pueda usarlo sin importar de wealth (la dirección es wealth → financial-base).
-import { calcularRendimiento, esFrecuenciaPago } from "@/lib/finance/rendimiento-periodico";
+import {
+  calcularRendimiento,
+  esFrecuenciaPago,
+  esPagoAlVencimiento,
+} from "@/lib/finance/rendimiento-periodico";
+import {
+  caeEnElPeriodo,
+  cabePagoUnicoEnElPeriodo,
+} from "@/modules/financial-base/engine/income-schedule";
+import type { Frequency } from "@/modules/financial-base/engine/monthlyize";
+// `constants` es la única ruta que el lint permite importar entre módulos, y es
+// donde vive la etiqueta del pago por tipo de activo: acá NO se decide si se
+// dice "Dividendos" o "Cupones".
+import { etiquetaPayout } from "@/modules/wealth/constants";
 import type { Period } from "@/modules/financial-base/types";
 
 const POLICY_LABEL: Record<string, string> = {
@@ -170,7 +183,7 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
   const configurados = await supabase
     .from("investment_holdings")
     .select(
-      "id,label,symbol,currency,quantity,average_cost,current_value_manual,payout_enabled,payout_mode,payout_rate_pct,payout_amount,payout_frequency,payout_withholding_pct",
+      "id,label,symbol,currency,asset_type,quantity,average_cost,current_value_manual,payout_enabled,payout_mode,payout_rate_pct,payout_amount,payout_frequency,payout_withholding_pct,payout_next_date,maturity_date",
     )
     .eq("user_id", user.id)
     .eq("payout_enabled", true);
@@ -179,7 +192,7 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
       ? await supabase
           .from("investment_holdings")
           .select(
-            "id,label,symbol,currency,quantity,average_cost,current_value_manual,payout_enabled,payout_mode,payout_rate_pct,payout_amount,payout_frequency,payout_withholding_pct",
+            "id,label,symbol,currency,asset_type,quantity,average_cost,current_value_manual,payout_enabled,payout_mode,payout_rate_pct,payout_amount,payout_frequency,payout_withholding_pct,payout_next_date,maturity_date",
           )
           .eq("user_id", user.id)
           .in("id", idsConHistorial)
@@ -192,15 +205,58 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
 
   for (const h of divHoldings.values()) {
     const nombre = h.label ?? h.symbol ?? "posición";
+    // Cómo se llama el pago de este activo: "Dividendos" o "Cupones".
+    // El tipo del parámetro se deriva de la propia función: `AssetType` vive en
+    // `wealth/types`, y entre módulos sólo se permite importar `constants`.
+    const tipo = h.asset_type as Parameters<typeof etiquetaPayout>[0];
+    const etiqueta = capitalizar(etiquetaPayout(tipo).plural);
     let monthly = 0;
     let currency = h.currency;
 
-    if (h.payout_enabled && esFrecuenciaPago(h.payout_frequency)) {
+    if (h.payout_enabled) {
       // Base del yield: el valor manual si lo hay, si no lo invertido. El valor
       // de MERCADO no se usa acá a propósito — esto corre en cada carga y no
       // puede depender de una llamada de precios que puede fallar o tardar.
       const invertido = Number(h.quantity ?? 0) * Number(h.average_cost ?? 0);
       const base = Number(h.current_value_manual ?? 0) || invertido;
+
+      // PAGO ÚNICO AL VENCIMIENTO: no es un flujo recurrente. Aparece una sola
+      // vez, en el mes del vencimiento, igual que un bono `al_vencimiento`. Sin
+      // este corte se proyectaría todos los meses un ingreso que llega una vez.
+      if (esPagoAlVencimiento(h.payout_frequency)) {
+        if (!cabePagoUnicoEnElPeriodo(h.maturity_date, period)) continue;
+        const pago = calcularRendimiento(
+          {
+            modo: (h.payout_mode as "yield" | "manual") ?? "yield",
+            yieldPct: h.payout_rate_pct,
+            montoPorPago: h.payout_amount,
+            frecuencia: "anual",
+            retencionPct: h.payout_withholding_pct,
+          },
+          base,
+        ).netoPorPago;
+        if (pago <= 0) continue;
+        desired.push({
+          type: "income",
+          name: `${etiqueta} — ${nombre}`,
+          amount: Math.round(pago * 100) / 100,
+          currency,
+          categoryId: null,
+          sourceKind: "dividend",
+          sourceId: h.id,
+        });
+        continue;
+      }
+
+      if (!esFrecuenciaPago(h.payout_frequency)) continue;
+
+      // CALENDARIO, no promedio. Un cupón trimestral llega cuatro veces al año,
+      // no un tercio cada mes: la línea es el PAGO COMPLETO y sólo aparece en
+      // los meses que toca, en fase con el ancla (`payout_next_date`). Es la
+      // misma regla que ya usan los bonos/CDP de renta más abajo, y de la que
+      // depende la cobertura de ingreso pasivo, que lee estas filas.
+      if (!caeEnElPeriodo(h.payout_frequency as Frequency, h.payout_next_date, period)) continue;
+
       monthly = calcularRendimiento(
         {
           modo: (h.payout_mode as "yield" | "manual") ?? "yield",
@@ -210,8 +266,10 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
           retencionPct: h.payout_withholding_pct,
         },
         base,
-      ).netoMensual;
+      ).netoPorPago;
     } else {
+      // Sin configuración sólo hay historial: promedio de 12 meses, que no tiene
+      // calendario conocido y por eso sí se reparte todos los meses.
       const acc = divByHolding.get(h.id);
       if (!acc) continue;
       monthly = Math.round((acc.total / 12) * 100) / 100;
@@ -221,8 +279,8 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
     if (monthly <= 0) continue;
     desired.push({
       type: "income",
-      name: `Dividendos — ${nombre}`,
-      amount: monthly,
+      name: `${etiqueta} — ${nombre}`,
+      amount: Math.round(monthly * 100) / 100,
       currency,
       categoryId: null,
       sourceKind: "dividend",
@@ -279,9 +337,7 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
     if (perPayment <= 0) continue;
     // Al vencimiento: pago ÚNICO en el mes+año de vencimiento (no se repite).
     if (h.rental_frequency === "al_vencimiento") {
-      if (!h.maturity_date) continue;
-      const [my, mm] = String(h.maturity_date).split("-").map(Number);
-      if (period.year !== my || period.month !== mm) continue;
+      if (!cabePagoUnicoEnElPeriodo(h.maturity_date, period)) continue;
       desired.push({
         type: "income",
         name: `Ingreso — ${h.label ?? h.symbol}`,
@@ -497,4 +553,8 @@ async function sweepOrphanedDerived(
   if (orphanIds.length > 0) {
     await supabase.from("budget_items").delete().in("id", orphanIds).eq("user_id", userId);
   }
+}
+
+function capitalizar(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
