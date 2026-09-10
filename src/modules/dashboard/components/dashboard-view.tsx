@@ -122,13 +122,15 @@ function NorteBand({ norte, currency }: { norte: NorteVM; currency: string }) {
 
       <div className="norte-cell">
         <div className="label">Libertad financiera</div>
+        {/* `null` = la fuente no cargó. Pintar "0%" ahí era afirmar que no hay ingreso
+            pasivo cuando lo que pasó es que no se pudo leer. */}
         <div className="num-xl" style={{ fontSize: 28, marginTop: 12 }}>
-          {formatPercent(norte.freedomPct)}
+          {norte.freedomPct === null ? "—" : formatPercent(norte.freedomPct)}
         </div>
         <div className="freedom-bar">
           <div
             className="freedom-fill"
-            style={{ width: `${Math.min(norte.freedomPct * 100, 100)}%` }}
+            style={{ width: `${Math.min((norte.freedomPct ?? 0) * 100, 100)}%` }}
           />
         </div>
         <p className="muted" style={{ fontSize: 11.5, marginTop: 9, lineHeight: 1.5 }}>
@@ -170,7 +172,10 @@ function PillarCard({ pillar: p }: { pillar: PillarVM }) {
         </span>
         <span className="label">{p.label}</span>
       </div>
-      <div className="num-xl" style={{ fontSize: 26, marginTop: 12 }}>
+      <div
+        className="num-xl"
+        style={{ fontSize: 26, marginTop: 12, color: p.sinDato ? "var(--muted)" : undefined }}
+      >
         {p.value}
       </div>
       <div className="muted" style={{ fontSize: 11.5, marginTop: 7 }}>

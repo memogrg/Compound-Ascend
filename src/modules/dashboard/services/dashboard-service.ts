@@ -1,6 +1,13 @@
 import "server-only";
 
-/** Reúne los datos del panel desde los módulos disponibles. */
+/**
+ * Reúne los datos del Centro de mando desde los MOTORES UNIFICADOS.
+ *
+ * Principio: el panel no calcula nada. Pide los mismos reports que alimentan a las otras
+ * pantallas y al chat (`getMonthFlow`, `getPatrimonioReport`, `getRichLifeSummary`,
+ * `getPortfolioReport`, `getDebtsOverview`), los normaliza a UNA moneda con un solo
+ * `Conversor` y se los pasa a `buildDashboardKpis`. Ver `engine/kpis.ts` para el porqué.
+ */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
@@ -9,20 +16,34 @@ import { getMonthFlow, type MonthFlow } from "@/modules/financial-base";
 import { userCurrentPeriod } from "@/lib/time/user-time";
 import { computeHealthScore, type HealthScore } from "@/modules/financial-base";
 import { buildInsights, type DashboardInsights } from "@/modules/dashboard/engine/insights";
-import { getControlSummary, type ControlSummary } from "@/modules/control";
+import { getControlSummary, getDebtsOverview } from "@/modules/control";
 import {
   getRichLifeSummary,
   buildDemoRichLifeSummary,
   type RichLifeSummary,
 } from "@/modules/rich-life";
-import { getWealthSummary, buildDemoWealthSummary, type WealthSummary } from "@/modules/wealth";
+import { getPatrimonioReport, getPortfolioReport } from "@/modules/wealth";
+import { crearConversor, type Conversor } from "@/lib/fx";
+import { getFxRates } from "@/lib/market-data/fx-rates";
 import { buildPanel, type PanelVM } from "@/modules/dashboard/engine/pillars";
+import {
+  buildDashboardKpis,
+  type DashboardKpis,
+  type PortafolioSource,
+} from "@/modules/dashboard/engine/kpis";
 import type { BaseSummary } from "@/modules/financial-base";
 import type { IncomeSource, ExpenseItem } from "@/modules/financial-base";
 
-/** Qué resúmenes best-effort NO llegaron (fallo o techo de tiempo). Lo consume la UI
+/** Qué reports best-effort NO llegaron (fallo o techo de tiempo). Lo consume la UI
  *  para no confundir "esta vez no cargó" con "no tienes nada registrado". */
-export type Degradado = { control: boolean; richLife: boolean; wealth: boolean };
+export type Degradado = {
+  control: boolean;
+  richLife: boolean;
+  patrimonio: boolean;
+  portafolio: boolean;
+  deudas: boolean;
+  flujo: boolean;
+};
 
 export type DashboardData = {
   name: string;
@@ -31,30 +52,38 @@ export type DashboardData = {
   health: HealthScore;
   insights: DashboardInsights;
   panel: PanelVM;
+  /** Los KPIs canónicos del panel (una fuente por métrica). La UI lee de aquí. */
+  kpis: DashboardKpis;
   configured: boolean;
   degradado: Degradado;
   /** A-01: flujo del mes canónico (real operativo). null en demo/degradado. */
   monthFlow: MonthFlow | null;
 };
 
-/** Techo de tiempo para los resúmenes best-effort del panel (ms). Corto a propósito:
- *  son consultas a BD, y si una tarda más que esto ya arruinó el arranque. */
-const LIMITE_RESUMEN_MS = 1000;
+/**
+ * Techo de tiempo para los reports best-effort del panel (ms).
+ *
+ * Era 1 s, y ese número —no un bug de cálculo— producía la mitad de las contradicciones
+ * del panel: `getRichLifeSummary`, `getControlSummary` y el portafolio agregan decenas de
+ * filas y tasas FX, tardan varios segundos en frío y degradaban CASI SIEMPRE. El panel
+ * entonces presentaba el estado degradado como si fuera la realidad del usuario ("0% de
+ * libertad", "registrá tu patrimonio") y, peor, de forma NO DETERMINISTA: la misma pantalla
+ * daba números distintos en dos recargas según cuál ganara la carrera.
+ *
+ * La página ya hace streaming bajo `Suspense` con su esqueleto, así que esperar no bloquea
+ * el arranque: lo que se ve primero es el esqueleto, no una cifra falsa. El techo sigue
+ * existiendo para que una cadena colgada no deje la página cargando para siempre.
+ */
+const LIMITE_RESUMEN_MS = 8000;
 
-/** Resultado de un resumen best-effort: el valor, y si hubo que degradar.
- *  `degradado` distingue "no cargó" de "no hay nada registrado", que son cosas
- *  distintas y la UI las contaba como la misma. */
+/** Resultado de un report best-effort: el valor, y si hubo que degradar. */
 type Intento<T> = { valor: T | null; degradado: boolean };
 
 /**
- * Presupuesto de tiempo DURO. El `.catch` que había antes acotaba los ERRORES pero no
- * la LENTITUD: una cadena de proveedores lenta pero exitosa bloqueaba igual, porque
- * nadie la interrumpía. Esto pone el techo.
- *
- * No cancela el trabajo de fondo (una promesa no se puede abortar): simplemente deja de
- * esperarlo y el panel degrada, exactamente igual que cuando la pieza falla. Pero ahora
- * lo REPORTA: sin ese dato, una pantalla que no cargó y un usuario sin datos se veían
- * igual, y a alguien con ₡278,9 M registrados se le decía "registra tu patrimonio".
+ * Presupuesto de tiempo DURO. No cancela el trabajo de fondo (una promesa no se puede
+ * abortar): deja de esperarlo y el panel degrada. Pero lo REPORTA, porque sin ese dato una
+ * pantalla que no cargó y un usuario sin datos se veían igual, y a alguien con ₡278,9 M
+ * registrados se le decía "registrá tu patrimonio".
  */
 function conLimite<T>(p: Promise<T>): Promise<Intento<T>> {
   return Promise.race([
@@ -73,19 +102,16 @@ export async function getDashboardData(
   opts: { previewDemo?: boolean } = {},
 ): Promise<DashboardData> {
   // previewDemo (solo para vistas de PREVIEW sin sesión, p. ej. el móvil en dev):
-  // fuerza el mismo camino de DEMO que cuando Supabase no está configurado, sin
-  // tocar el resto de la lógica. Opt-in y off por defecto → la web no cambia.
+  // fuerza el mismo camino de DEMO que cuando Supabase no está configurado.
   const configured = isSupabaseConfigured() && !opts.previewDemo;
   const user = opts.previewDemo ? null : await getUser();
 
   let summary: BaseSummary;
   let currency = "CRC";
   // Nombre del perfil (el del wizard "¿Cómo querés que te llamemos?"). Prioriza
-  // la tabla profiles porque user_metadata puede venir vacío aunque el usuario
-  // sí lo haya configurado.
+  // la tabla profiles porque user_metadata puede venir vacío.
   let profileName: string | null = null;
   if (configured) {
-    // El nombre del perfil no depende del summary: va en el mismo lote.
     const profilePromise = user
       ? (async () => {
           const supabase = await createSupabaseServerClient();
@@ -103,9 +129,6 @@ export async function getDashboardData(
       profilePromise,
     ]);
   } else {
-    // Modo demostración (sin Supabase): datos de ejemplo claramente etiquetados
-    // en la UI, para previsualizar el panel premium. Se reemplazan por datos
-    // reales al conectar Supabase y capturar tu base.
     summary = buildDemoSummary();
   }
 
@@ -115,53 +138,192 @@ export async function getDashboardData(
     user?.email?.split("@")[0] ??
     "tu perfil";
 
-  // Pasa la tasa de inversión activa para que contribuya al health score.
-  const health = computeHealthScore(summary.indicators, summary.indicators.investmentRate);
-  const insights = buildInsights(summary.indicators, health, currency);
+  // ── Reports unificados, en paralelo y best-effort ──────────────────────────
+  // Los precios van desde la CACHÉ persistida: el panel es un RESUMEN y esperar a un
+  // proveedor externo cuesta más de lo que vale la frescura. Patrimonio y Portafolio
+  // (sus pantallas) siguen en vivo y son quienes mantienen la caché al día.
+  const degradado: Degradado = {
+    control: false,
+    richLife: false,
+    patrimonio: false,
+    portafolio: false,
+    deudas: false,
+    flujo: false,
+  };
+  let kpis: DashboardKpis;
+  let monthFlow: MonthFlow | null = null;
+  let nextBestAction: string | null = null;
 
-  // Resúmenes de los otros pilares para la franja Norte y los 4 pilares.
-  // Best-effort y en paralelo: si un módulo falla, el panel degrada con gracia.
-  let control: ControlSummary | null = null;
-  let richLife: RichLifeSummary | null = null;
-  let wealth: WealthSummary | null = null;
-  const degradado: Degradado = { control: false, richLife: false, wealth: false };
   if (configured && user) {
-    const [c, r, w] = await Promise.all([
+    const period = await userCurrentPeriod();
+    const [flujo, control, deudas, rl, patrimonio, portafolio, rates] = await Promise.all([
+      conLimite(getMonthFlow(period)),
       conLimite(getControlSummary()),
-      // Precios desde la caché persistida: esta pantalla es un RESUMEN, y esperar a un
-      // proveedor externo cuesta más de lo que vale la frescura. Patrimonio y Portafolio
-      // siguen en vivo, y son ellos quienes mantienen la caché al día.
+      conLimite(getDebtsOverview({})),
       conLimite(getRichLifeSummary({ precios: "cache" })),
-      conLimite(getWealthSummary()),
+      conLimite(getPatrimonioReport(undefined, { precios: "cache" })),
+      conLimite(getPortfolioReport()),
+      getFxRates().catch(() => ({}) as Record<string, number>),
     ]);
-    control = c.valor;
-    richLife = r.valor;
-    wealth = w.valor;
-    degradado.control = c.degradado;
-    degradado.richLife = r.degradado;
-    degradado.wealth = w.degradado;
+    degradado.flujo = flujo.degradado;
+    degradado.control = control.degradado;
+    degradado.deudas = deudas.degradado;
+    degradado.richLife = rl.degradado;
+    degradado.patrimonio = patrimonio.degradado;
+    degradado.portafolio = portafolio.degradado;
+
+    monthFlow = flujo.valor;
+    nextBestAction =
+      control.valor?.diagnosis.nextBestAction ?? rl.valor?.snapshot.nextBestAction ?? null;
+
+    // UN solo conversor para todo el panel (fix 6). Los reports que ya vienen en la moneda
+    // de visualización pasan por él sin cambio (from === to); los que vienen en la
+    // PRIMARIA del motor (el portafolio) se convierten aquí, una vez y en un solo lugar.
+    const convertir = crearConversor(currency, rates);
+
+    kpis = buildDashboardKpis({
+      currency,
+      monthFlow: flujo.valor,
+      patrimonio: patrimonio.valor
+        ? {
+            coberturaPasiva: patrimonio.valor.report.coberturaPasiva,
+            passiveIncomeMonthly: patrimonio.valor.passiveIncomeMonthly,
+            gastoReferenciaMensual: patrimonio.valor.report.gastoReferenciaMensual,
+            progresoIndependencia: patrimonio.valor.report.progresoIndependencia,
+            hitoAlcanzado: patrimonio.valor.report.hitoAlcanzado,
+            netMonthlyIncome: patrimonio.valor.netMonthlyIncome,
+            aporteMetasMensual: patrimonio.valor.commitmentBreakdown?.byOrigin.goals ?? 0,
+            aporteDcaMensual: patrimonio.valor.commitmentBreakdown?.byOrigin.dca ?? 0,
+            mesesDeColchon: patrimonio.valor.report.mesesDeColchon,
+          }
+        : null,
+      richLife: rl.valor
+        ? {
+            netWorth: rl.valor.snapshot.indicators.netWorth,
+            totalAssets: rl.valor.snapshot.indicators.totalAssets,
+            totalLiabilities: rl.valor.snapshot.indicators.totalLiabilities,
+            productiveAssetsPct: rl.valor.snapshot.indicators.productiveAssetsPct,
+            trend: rl.valor.snapshot.indicators.trend,
+            wealthVelocity: rl.valor.snapshot.indicators.wealthVelocity,
+            velocityIsPartial: rl.valor.snapshot.indicators.velocityIsPartial,
+          }
+        : null,
+      deudas: deudas.valor
+        ? {
+            // `getDebtsOverview` ya entrega saldos y cuotas en la moneda de visualización.
+            saldos: deudas.valor.debts.map((d) => d.balance),
+            incomeMonthly: deudas.valor.incomeMonthly,
+            pagoMensual: deudas.valor.debts.reduce(
+              (s, d) => s + (d.monthlyPayment || d.minPayment || 0),
+              0,
+            ),
+            metodo: control.valor?.diagnosis.debtMethod?.method ?? null,
+          }
+        : null,
+      portafolio: portafolio.valor ? portafolioEnMoneda(portafolio.valor, convertir) : null,
+    });
   } else if (!configured) {
     // Demo: previsualiza el panel premium completo sin Supabase.
-    richLife = buildDemoRichLifeSummary();
-    wealth = buildDemoWealthSummary();
-  }
-  // A-01: flujo del mes canónico (real operativo) para el pilar "Flujo del mes".
-  // Best-effort: si falla, el pilar cae al plan (comportamiento anterior).
-  let monthFlow: MonthFlow | null = null;
-  if (configured && user) {
-    monthFlow = (await conLimite(getMonthFlow(await userCurrentPeriod()))).valor;
+    kpis = buildDashboardKpis({ currency, ...demoKpiSources(buildDemoRichLifeSummary()) });
+  } else {
+    kpis = buildDashboardKpis({
+      currency,
+      monthFlow: null,
+      patrimonio: null,
+      richLife: null,
+      deudas: null,
+      portafolio: null,
+    });
   }
 
-  const panel = buildPanel({
-    ind: summary.indicators,
+  // La tasa de ahorro del score de salud es la MISMA que muestra el pilar: aportes ÷
+  // ingreso. Sin ese override el score usaba `(gasto de ahorro + flujo libre) ÷ ingreso`,
+  // que con un presupuesto parcial daba 98% y un score de 100 para cualquiera.
+  const health = computeHealthScore(
+    summary.indicators,
+    summary.indicators.investmentRate,
+    kpis.ahorro?.tasa,
+  );
+  const insights = buildInsights(summary.indicators, health, currency, kpis);
+
+  const panel = buildPanel({ ind: summary.indicators, kpis, nextBestAction });
+
+  return {
+    name,
     currency,
-    control,
-    richLife,
-    wealth,
+    summary,
+    health,
+    insights,
+    panel,
+    kpis,
+    configured,
+    degradado,
     monthFlow,
-  });
+  };
+}
 
-  return { name, currency, summary, health, insights, panel, configured, degradado, monthFlow };
+/**
+ * Pasa el reporte de portafolio a la moneda de VISUALIZACIÓN. `getPortfolioReport` entrega
+ * sus cifras en la moneda PRIMARIA del motor; cuando el usuario mira el panel en otra
+ * moneda (el switch rápido), mostrarlas sin convertir sería el mismo bug de rotular ₡
+ * con "$" que este cambio elimina en las otras tarjetas.
+ */
+function portafolioEnMoneda(
+  report: Awaited<ReturnType<typeof getPortfolioReport>>,
+  convertir: Conversor,
+): PortafolioSource {
+  const desde = report.currency;
+  const a = report.analytics;
+  return {
+    valorTotal: convertir(a.totalPortfolioValue, desde),
+    costoTotal: convertir(a.totalCostBasis, desde),
+    plTotal: convertir(a.totalProfitLoss, desde),
+    posiciones: a.holdingsWithPerformance.map((h) => ({
+      ...h,
+      currentValue: convertir(h.currentValue, desde),
+      costBasis: convertir(h.costBasis, desde),
+      profitLoss: convertir(h.profitLoss, desde),
+      currentValueManual:
+        h.currentValueManual == null
+          ? h.currentValueManual
+          : convertir(h.currentValueManual, desde),
+    })),
+  };
+}
+
+/** Fuentes de KPI para la vista DEMO (sin Supabase): mismo motor, datos de ejemplo. */
+function demoKpiSources(richLife: RichLifeSummary) {
+  const ind = richLife.snapshot.indicators;
+  return {
+    monthFlow: null,
+    patrimonio: {
+      coberturaPasiva: ind.passiveIncomeCoverage,
+      passiveIncomeMonthly: 250_000,
+      gastoReferenciaMensual: 925_000,
+      progresoIndependencia: 0.2,
+      hitoAlcanzado: "seguridad" as const,
+      netMonthlyIncome: 1_100_000,
+      aporteMetasMensual: 150_000,
+      aporteDcaMensual: 120_000,
+      mesesDeColchon: ind.monthsOfIndependence,
+    },
+    richLife: {
+      netWorth: ind.netWorth,
+      totalAssets: ind.totalAssets,
+      totalLiabilities: ind.totalLiabilities,
+      productiveAssetsPct: ind.productiveAssetsPct,
+      trend: ind.trend,
+      wealthVelocity: ind.wealthVelocity,
+      velocityIsPartial: ind.velocityIsPartial,
+    },
+    deudas: {
+      saldos: richLife.liabilities.map((l) => l.balance),
+      incomeMonthly: 1_100_000,
+      pagoMensual: 165_000,
+      metodo: "avalancha",
+    },
+    portafolio: null,
+  };
 }
 
 function demoIncome(name: string, type: IncomeSource["incomeType"], m: number): IncomeSource {
