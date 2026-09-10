@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { householdMemberIds, householdWriteScope } from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 
@@ -216,11 +217,32 @@ export type NetWorthAggregate = {
   closedWealthDelta: number | null;
 };
 
+/**
+ * Agregación de patrimonio, DEDUPLICADA por request.
+ *
+ * `getRichLifeSummary` y `getPatrimonioReport` la piden los dos, y el Centro de mando los
+ * pide a los dos: sin este `cache` el panel corría el agregado —decenas de filas, tasas FX
+ * y precios— DOS veces por render, y era una de las razones por las que no llegaba a
+ * tiempo. La clave es (ctx, precios): dos primitivos, para que `cache` (que compara por
+ * identidad) pueda deduplicar de verdad. Un objeto `opts` literal nunca dedupearía.
+ */
 export async function aggregateNetWorth(
   ctx?: AuthContext,
   /** Cómo resolver los precios de mercado. `"cache"` evita la red externa; lo usan las
    *  pantallas de resumen. Patrimonio y Portafolio se quedan en vivo. */
   opts: { precios?: "vivo" | "cache" } = {},
+): Promise<NetWorthAggregate> {
+  return _aggregateNetWorth(ctx, opts.precios ?? "vivo");
+}
+
+const _aggregateNetWorth = cache(
+  async (ctx: AuthContext | undefined, precios: "vivo" | "cache"): Promise<NetWorthAggregate> =>
+    aggregarPatrimonio(ctx, { precios }),
+);
+
+async function aggregarPatrimonio(
+  ctx: AuthContext | undefined,
+  opts: { precios?: "vivo" | "cache" },
 ): Promise<NetWorthAggregate> {
   // ctx undefined → sesión (requireUser + cliente por cookies), idéntico a hoy.
   // ctx presente → cliente service-role + userId explícito (cron/push).
@@ -292,7 +314,7 @@ export async function aggregateNetWorth(
     // tercero. La cobertura responde "¿cuánto de mi vida pagan mis activos?", y esa
     // respuesta no cambia porque el emisor pague en marzo y no en abril. El flujo del
     // mes sí cambia, y por eso son dos números: el mismo corte de #740.
-    ingresoPasivoDerivadoPromedio(),
+    ingresoPasivoDerivadoPromedio(ctx),
   ]);
 
   // Los dos últimos cierres, del más reciente al más viejo.

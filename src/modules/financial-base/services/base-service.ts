@@ -283,7 +283,7 @@ async function _getBaseSummary(ctx?: AuthContext): Promise<BaseSummary> {
       baseItemsDelPeriodo(decision.periodo, ctx),
       getDisplayCurrency(ctx),
       getFxRates(),
-      ingresoPasivoDerivadoPromedio(),
+      ingresoPasivoDerivadoPromedio(ctx),
     ]);
   // Los indicadores agregan dinero, así que normalizamos cada ítem a la moneda
   // de visualización antes de sumar. Los montos por ítem se conservan en su moneda
