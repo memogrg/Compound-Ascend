@@ -21,7 +21,7 @@ import {
 } from "@/modules/financial-base";
 import { userCurrentPeriod } from "@/lib/time/user-time";
 import type { AuthContext } from "@/lib/auth/auth-context";
-import { convertCurrency } from "@/lib/fx";
+import { convertCurrency, crearConversor } from "@/lib/fx";
 import { getControlSummary, getDebtsOverview } from "@/modules/control";
 import {
   getPortfolioReport,
@@ -96,6 +96,11 @@ export async function getHomeCardsData(ctx?: AuthContext): Promise<HomeCards> {
   const prevPeriod = previousMonthPeriod(period);
   const convert = (amount: number, from: string) =>
     convertCurrency(amount, from, currency, control?.fxRates ?? {});
+  // El MISMO conversor para todas las fichas (fix de moneda). `ControlSummary.goals` y el
+  // reporte de portafolio NO vienen en la moneda de visualización —las metas conservan su
+  // moneda nativa y el portafolio habla en la PRIMARIA del motor—, y sumarlos crudos daba
+  // "ahorrado $19.685.592" y "protegido $22.001.000" con ₡ rotulados "$".
+  const convertir = crearConversor(currency, control?.fxRates ?? {});
   // Los movimientos de meta/deuda son ingreso o gasto (el aporte es gasto, el retiro ingreso);
   // una transferencia no debería venir vinculada, pero la excluimos para no contarla mal.
   const asMov = (m: { kind: string }) =>
@@ -155,8 +160,16 @@ export async function getHomeCardsData(ctx?: AuthContext): Promise<HomeCards> {
   const gastos =
     mf && real && budget ? selectGastos(mf, real.expenseByKey, budget.expenseByKey) : null;
 
-  // 4 · Ahorros — metas + neto aportado/retirado del mes (vsMes).
-  const ahorros = control ? selectAhorros(control.goals, ahorrosVsMes) : null;
+  // 4 · Ahorros — metas + neto aportado/retirado del mes (vsMes). Las metas llegan en SU
+  // moneda (una en ₡, otra en $): se normalizan antes de que el selector las sume.
+  const goalsEnDisplay = (control?.goals ?? []).map((g) => ({
+    ...g,
+    targetAmount: convertir(g.targetAmount, g.currency),
+    currentAmount: convertir(g.currentAmount, g.currency),
+    monthlyContribution: convertir(g.monthlyContribution, g.currency),
+    currency,
+  }));
+  const ahorros = control ? selectAhorros(goalsEnDisplay, ahorrosVsMes) : null;
 
   // 5 · Deudas — saldos normalizados (getDebtsOverview) + método + neto pagado/adquirido (vsMes).
   const deudas = debts
@@ -177,10 +190,21 @@ export async function getHomeCardsData(ctx?: AuthContext): Promise<HomeCards> {
   // 6 · Inversiones — analytics + naturaleza + ±% vs cierre del mes anterior (vsMes).
   const inversiones = portfolio
     ? selectInversiones(
-        portfolio.analytics,
+        {
+          ...portfolio.analytics,
+          // `getPortfolioReport` entrega en la moneda PRIMARIA del motor; la ficha se
+          // rotula con la de visualización. Con el switch rápido activo eran monedas
+          // distintas y el número salía mal rotulado.
+          totalPortfolioValue: convertir(
+            portfolio.analytics.totalPortfolioValue,
+            portfolio.currency,
+          ),
+          totalCostBasis: convertir(portfolio.analytics.totalCostBasis, portfolio.currency),
+          totalProfitLoss: convertir(portfolio.analytics.totalProfitLoss, portfolio.currency),
+        },
         portfolio.analytics.holdingsWithPerformance.map((h) => ({
           nature: h.nature ?? null,
-          value: h.currentValue,
+          value: convertir(h.currentValue, portfolio.currency),
         })),
         inversionesVsMes,
       )
@@ -190,8 +214,10 @@ export async function getHomeCardsData(ctx?: AuthContext): Promise<HomeCards> {
   const proteccion = wealth
     ? selectProteccion(
         wealth.protection,
+        // Ya convertidas: el fondo de paz vive en ₡ y la ficha rotula en la moneda de
+        // visualización — sumarlo crudo daba "protegido $22.001.000".
         deriveFundAmounts(
-          (control?.goals ?? []).map((g) => ({
+          goalsEnDisplay.map((g) => ({
             goalType: g.goalType,
             name: g.name,
             currentAmount: g.currentAmount,

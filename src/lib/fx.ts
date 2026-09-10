@@ -90,3 +90,28 @@ export function convertCurrency(
   if (!f || !t) return amount;
   return (amount / f) * t;
 }
+
+/**
+ * Convierte de la moneda `from` a una moneda de destino FIJA. Un helper, no una
+ * conversión suelta por tarjeta.
+ *
+ * Existe porque el bug que más veces volvió no fue una tasa mala: fue OLVIDAR convertir.
+ * Un panel que suma `goal.monthlyContribution` de metas en ₡ y en $ y rotula el total con
+ * la moneda de visualización no da un número aproximado — da uno inventado (₡68.000 + $15
+ * = "$68.015"). Con un conversor creado UNA vez por render y aplicado a cada monto con su
+ * moneda de origen, esa suma no se puede escribir sin pasar por acá.
+ */
+export type Conversor = (amount: number, from: string) => number;
+
+/** Crea el conversor a `to` con la tabla `rates`. Ver `Conversor`. */
+export function crearConversor(to: string, rates: Record<string, number> = FX_PER_USD): Conversor {
+  return (amount, from) => convertCurrency(amount, from, to, rates);
+}
+
+/** Suma montos en monedas distintas convirtiéndolos primero. Nunca suma monedas crudas. */
+export function sumarEnMoneda(
+  items: readonly { amount: number; currency: string }[],
+  convertir: Conversor,
+): number {
+  return items.reduce((s, i) => s + convertir(i.amount, i.currency), 0);
+}

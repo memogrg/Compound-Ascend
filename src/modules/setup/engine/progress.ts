@@ -17,6 +17,7 @@
  * paralelo que este módulo se prohíbe.
  */
 import { formatMoney } from "@/lib/format";
+import { crearConversor, sumarEnMoneda } from "@/lib/fx";
 import type {
   SetupSnapshot,
   SetupStepStatus,
@@ -36,6 +37,20 @@ function money(v: number, currency: string): string {
 
 function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
+}
+
+/**
+ * Suma en la moneda de agregación del snapshot. TODO total del hub pasa por acá.
+ *
+ * El detalle de "Control" decía "19 metas · $395.710/mes" con un aporte real de $3.625:
+ * era `Σ monthly_contribution` sobre metas en ₡ y en $, rotulado con la moneda de
+ * agregación. El número no era aproximado — era inventado.
+ */
+function totalEnMoneda(
+  s: SetupSnapshot,
+  items: readonly { amount: number; currency: string }[],
+): number {
+  return sumarEnMoneda(items, crearConversor(s.currency, s.rates));
 }
 
 function step(
@@ -92,11 +107,17 @@ export function presupuestoSteps(s: SetupSnapshot): SetupStepStatus[] {
 
 /** Pasos del asistente de CONTROL (deudas + metas). */
 export function controlSteps(s: SetupSnapshot): SetupStepStatus[] {
-  const deuda = s.debts.reduce((t, d) => t + d.balance, 0);
+  const deuda = totalEnMoneda(
+    s,
+    s.debts.map((d) => ({ amount: d.balance, currency: d.currency })),
+  );
   // Los fondos de defensa son savings_goals también, pero se configuran en su
   // propio asistente: aquí solo cuentan las metas de vida, para no contar doble.
   const metas = s.goals.filter((g) => !(g.goalType ?? "").startsWith("defensa:"));
-  const aporte = metas.reduce((t, g) => t + g.monthlyContribution, 0);
+  const aporte = totalEnMoneda(
+    s,
+    metas.map((g) => ({ amount: g.monthlyContribution, currency: g.currency })),
+  );
   return [
     step(
       "deudas",
@@ -155,7 +176,10 @@ export function defensaSteps(s: SetupSnapshot): SetupStepStatus[] {
 
 /** Pasos del asistente de CRECIMIENTO (inversiones -> DCA -> número de Libertad). */
 export function crecimientoSteps(s: SetupSnapshot): SetupStepStatus[] {
-  const dca = s.holdings.reduce((t, h) => t + h.monthlyContribution, 0);
+  const dca = totalEnMoneda(
+    s,
+    s.holdings.map((h) => ({ amount: h.monthlyContribution, currency: h.currency })),
+  );
   const conDca = s.holdings.filter((h) => h.monthlyContribution > 0).length;
   const life = s.desiredLifestyle;
   return [
@@ -181,7 +205,9 @@ export function crecimientoSteps(s: SetupSnapshot): SetupStepStatus[] {
       "libertad",
       "Estilo de vida deseado",
       Boolean(life && life.amount > 0),
-      life && life.amount > 0 ? `${money(life.amount, s.currency)}/mes` : "Sin definir",
+      life && life.amount > 0
+        ? `${money(totalEnMoneda(s, [{ amount: life.amount, currency: life.currency }]), s.currency)}/mes`
+        : "Sin definir",
     ),
   ];
 }

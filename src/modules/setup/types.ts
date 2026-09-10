@@ -113,7 +113,18 @@ export type SetupFund = {
  * muestran sale de aquí; todo lo que escriben va por los actions de siempre.
  */
 export type SetupSnapshot = {
+  /** Moneda en la que se AGREGA (y en la que se capturan los ítems nuevos). */
   currency: string;
+  /**
+   * Tasas de cambio del momento de la lectura.
+   *
+   * Van en la proyección porque los ítems conservan su moneda NATIVA —una meta en ₡ y otra
+   * en $ conviven, y cada fila se muestra tal cual el usuario la registró— pero los TOTALES
+   * del hub y de los asistentes son una sola moneda. Sin esto, `Σ monthly_contribution`
+   * sumaba ₡68.000 con $15 y rotulaba el resultado "$395.710". El motor de progreso es puro:
+   * las tasas tienen que viajar con el dato, no leerse ahí.
+   */
+  rates: Record<string, number>;
   period: { year: number; month: number };
 
   // ── Presupuesto ──

@@ -29,6 +29,7 @@ import {
   TextInput,
 } from "@/modules/setup/components/setup-fields";
 import type { SetupSnapshot } from "@/modules/setup/types";
+import { crearConversor, sumarEnMoneda } from "@/lib/fx";
 
 /**
  * Asistente de CONTROL: deudas -> metas de ahorro.
@@ -97,7 +98,12 @@ function DeudasStep({ snapshot }: { snapshot: SetupSnapshot }) {
   const [apr, setApr] = useState<number | null>(null);
   const currency = snapshot.currency;
 
-  const total = snapshot.debts.reduce((t, d) => t + d.balance, 0);
+  // Cada fila se muestra en SU moneda; el total es una sola, así que se convierte.
+  // Sumar ₡ con $ y rotular el resultado con la moneda de agregación da un número inventado.
+  const total = sumarEnMoneda(
+    snapshot.debts.map((d) => ({ amount: d.balance, currency: d.currency })),
+    crearConversor(currency, snapshot.rates),
+  );
 
   return (
     <div className="setup-step">
