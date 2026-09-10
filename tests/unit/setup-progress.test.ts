@@ -24,6 +24,7 @@ import type { SetupSnapshot, SetupSobre } from "@/modules/setup/types";
 
 const VACIO: SetupSnapshot = {
   currency: "CRC",
+  rates: { USD: 1, CRC: 500 },
   period: { year: 2026, month: 8 },
   incomes: [],
   incomeMonthly: 0,

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildPanel } from "@/modules/dashboard/engine/pillars";
+import { buildDashboardKpis } from "@/modules/dashboard/engine/kpis";
 import type { BaseIndicators } from "@/modules/financial-base";
 
 const ind = {
@@ -17,29 +18,41 @@ const ind = {
   expenseByNature: {},
 } as unknown as BaseIndicators;
 
+const sinFuentes = buildDashboardKpis({
+  currency: "CRC",
+  monthFlow: null,
+  patrimonio: null,
+  richLife: null,
+  deudas: null,
+  portafolio: null,
+});
+
 describe("buildPanel", () => {
-  it("devuelve los 4 pilares en orden y degrada sin módulos", () => {
-    const { norte, pillars } = buildPanel({
-      ind,
-      currency: "CRC",
-      control: null,
-      richLife: null,
-      wealth: null,
-    });
+  it("devuelve los 4 pilares en orden y degrada sin motores", () => {
+    const { norte, pillars } = buildPanel({ ind, kpis: sinFuentes });
     expect(pillars.map((p) => p.key)).toEqual(["flujo", "ahorro", "deudas", "inversiones"]);
     expect(norte.trend).toBe("sin_historico");
-    expect(pillars[3]!.value).toBe("—"); // sin wealth → inversiones sin dato
+    // Sin fuentes NADA se pinta como cero: los cuatro dicen "no cargó".
+    expect(pillars.every((p) => p.value === "—" && p.sinDato)).toBe(true);
   });
 
-  it("la deuda alta dispara la lectura de presión", () => {
-    const { pillars } = buildPanel({
-      ind,
+  it("sin fuente de libertad el porcentaje es null, nunca 0%", () => {
+    const { norte } = buildPanel({ ind, kpis: sinFuentes });
+    expect(norte.freedomPct).toBeNull();
+    expect(norte.freedomText).not.toMatch(/0\s*%/);
+  });
+
+  it("la deuda alta dispara la lectura de presión, con el DTI de la tabla debts", () => {
+    const kpis = buildDashboardKpis({
       currency: "CRC",
-      control: null,
+      monthFlow: null,
+      patrimonio: null,
       richLife: null,
-      wealth: null,
+      deudas: { saldos: [500_000], incomeMonthly: 1000, pagoMensual: 350, metodo: "avalancha" },
+      portafolio: null,
     });
-    const deudas = pillars.find((p) => p.key === "deudas")!;
+    const deudas = buildPanel({ ind, kpis }).pillars.find((p) => p.key === "deudas")!;
     expect(deudas.ai).toMatch(/libera flujo/);
+    expect(deudas.meta).toMatch(/Avalancha/);
   });
 });

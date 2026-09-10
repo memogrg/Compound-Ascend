@@ -3,7 +3,22 @@ export { DashboardView } from "./components/dashboard-view";
 export { getDashboardData } from "./services/dashboard-service";
 export { buildInsights } from "./engine/insights";
 export { buildPanel } from "./engine/pillars";
-export type { DashboardData } from "./services/dashboard-service";
+export { buildDashboardKpis } from "./engine/kpis";
+export type {
+  DashboardKpis,
+  KpisInput,
+  FlujoKpi,
+  AhorroKpi,
+  DeudasKpi,
+  InversionesKpi,
+  LibertadKpi,
+  PatrimonioKpi,
+  PatrimonioSource,
+  RichLifeSource,
+  DeudasSource,
+  PortafolioSource,
+} from "./engine/kpis";
+export type { DashboardData, Degradado } from "./services/dashboard-service";
 export type { DashboardInsights, Insight } from "./engine/insights";
 export type { PanelVM, NorteVM, PillarVM } from "./engine/pillars";
 

@@ -54,6 +54,15 @@ export type PatrimonioServiceResult = {
    */
   protectionGaps: ProtectionGap[];
   activePolicies: number;
+  /**
+   * Ingreso pasivo mensual (promedio mensualizado: dividendos + cupones + rentas + CDP +
+   * los ingresos marcados "pasivo"), ya en la moneda del reporte. Es el NUMERADOR de
+   * `report.coberturaPasiva`; se surfacea para que el panel pueda decir el monto y no
+   * solo el porcentaje. Coste cero: `aggregateNetWorth` ya lo calculó.
+   */
+  passiveIncomeMonthly: number;
+  /** Ingreso mensual neto (denominador de `report.tasaInversion`), en la moneda del reporte. */
+  netMonthlyIncome: number;
   currency: string;
 };
 
@@ -67,9 +76,14 @@ export async function getPatrimonioReportForUser(userId: string): Promise<Patrim
   return getPatrimonioReport({ db: createServiceRoleClient(), userId });
 }
 
-export async function getPatrimonioReport(ctx?: AuthContext): Promise<PatrimonioServiceResult> {
+export async function getPatrimonioReport(
+  ctx?: AuthContext,
+  /** Cómo resolver los precios de mercado; se pasa tal cual a `aggregateNetWorth`.
+   *  `"cache"` evita la red externa (pantallas de RESUMEN, como el panel). */
+  opts: { precios?: "vivo" | "cache" } = {},
+): Promise<PatrimonioServiceResult> {
   // ctx undefined → sesión, idéntico a hoy; ctx presente → service-role + userId.
-  const agg = await aggregateNetWorth(ctx);
+  const agg = await aggregateNetWorth(ctx, opts);
   const { db, userId } = await resolveAuth(ctx);
   const memberIds = await householdMemberIds(db, userId);
   // ctx threaded: sin ctx = sesión (idéntico a prod); con ctx = service-role/userId inyectados.
@@ -212,6 +226,8 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
     commitmentBreakdown,
     protectionGaps: agg.protection.gaps,
     activePolicies: agg.protection.activePolicies,
+    passiveIncomeMonthly: agg.passiveIncomeMonthly,
+    netMonthlyIncome: agg.netMonthlyIncome,
     currency,
   };
 }

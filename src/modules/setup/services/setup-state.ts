@@ -8,6 +8,7 @@ import {
   listCategoryTree,
   monthPeriod,
 } from "@/modules/financial-base";
+import { getFxRates } from "@/lib/market-data/fx-rates";
 import { listDebts, listGoals } from "@/modules/control";
 import {
   getDefenseFundsReport,
@@ -50,9 +51,12 @@ async function _getSetupSnapshot(): Promise<SetupSnapshot> {
   // Todo best-effort e independiente: que Patrimonio falle no debe dejar sin
   // asistente al Presupuesto. Un módulo caído se lee como "sin datos", que es
   // exactamente lo que el progreso derivado debe reportar.
-  const [currency, budget, tree, debts, goals, defense, policies, holdings, lifestyle] =
+  const [currency, rates, budget, tree, debts, goals, defense, policies, holdings, lifestyle] =
     await Promise.all([
       getPrimaryCurrency().catch(() => "CRC"),
+      // Las tasas viajan con la proyección: los ítems se guardan en su moneda nativa y los
+      // totales del hub son una sola. Ver `SetupSnapshot.rates`.
+      getFxRates().catch(() => ({}) as Record<string, number>),
       getBudgetTotals(period).catch(() => null),
       listCategoryTree("expense").catch(() => []),
       listDebts().catch(() => []),
@@ -113,6 +117,7 @@ async function _getSetupSnapshot(): Promise<SetupSnapshot> {
 
   return {
     currency,
+    rates,
     period: { year: period.year, month: period.month },
 
     incomes: incomeItems.map((i) => ({

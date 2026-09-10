@@ -17,6 +17,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import {
   diffDerived,
@@ -81,9 +82,20 @@ export type IngresoPasivoPromedio = {
  *
  * No depende del periodo: es estable los doce meses del año, por construcción.
  */
-export async function ingresoPasivoDerivadoPromedio(): Promise<IngresoPasivoPromedio[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function ingresoPasivoDerivadoPromedio(
+  /**
+   * ctx inyectable (cron/push con service-role). NO era opcional antes: la función pedía
+   * `requireUser()` a secas, así que TODA ruta sin sesión que la alcanzara reventaba —
+   * y la alcanzan `getBaseSummary(ctx)` y `aggregateNetWorth(ctx)`, o sea el cron mensual
+   * de patrimonio (`/api/base/snapshot` → generateNetWorthSnapshotsForAllUsers). El
+   * resultado: la serie `net_worth_snapshots` nunca cerraba un mes, `closedWealthDelta`
+   * quedaba en null y la tarjeta "Tendencia patrimonial" del panel decía "Aún sin
+   * histórico" para siempre, sin que nada lo reportara (el cron lo tragaba en un catch).
+   */
+  ctx?: AuthContext,
+): Promise<IngresoPasivoPromedio[]> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const user = { id: userId };
   const hace12Meses = new Date(new Date().getFullYear(), new Date().getMonth() - 12, 1)
     .toISOString()
     .slice(0, 10);

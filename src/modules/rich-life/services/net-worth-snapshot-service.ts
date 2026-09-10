@@ -106,6 +106,11 @@ export async function computeNetWorth(
     liabilities: agg.liabilities,
     passiveIncomeMonthly: agg.passiveIncomeMonthly,
     monthlyExpenses: agg.monthlyExpenses,
+    // El MISMO denominador que `getRichLifeSummary`: sin el compromiso, la cobertura y
+    // los meses de colchón de este cálculo salían distintos de los de las pantallas para
+    // los mismos datos (49% contra 40%). El snapshot solo persiste patrimonio, así que
+    // hoy no se veía — pero eran dos verdades para la misma métrica.
+    monthlyCommitment: agg.commitment?.total ?? null,
     freeCashflow: agg.freeCashflow,
     protectionScore: agg.protection.score,
     diversification: agg.portfolio.diversification,

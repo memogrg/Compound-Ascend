@@ -1,15 +1,22 @@
 /**
  * Construye la franja "Norte" (¿me hago más rico o más pobre?, libertad
  * financiera, próxima mejor decisión) y los 4 pilares del panel, cada uno con
- * su lectura de My Agent C+. Determinista: solo cadenas en español a partir de
- * datos ya calculados por los módulos. No hace fetch ni cálculos pesados.
+ * su lectura de My Agent C+.
+ *
+ * Determinista y SIN cálculo propio: recibe los `DashboardKpis` —que ya son los números
+ * de los motores unificados, en la moneda de visualización— y solo elige cómo se leen.
+ * Antes calculaba por su cuenta (`ind.savingsRate`, `ind.debtWeight`,
+ * `wealth.portfolio.totalInvested`) y por eso podía contradecir al resto de la app;
+ * ver la cabecera de `engine/kpis.ts`.
+ *
+ * Cuando un KPI es `null` (su fuente no cargó) la tarjeta lo DICE. No cae a un cero que
+ * se lee como un dato: "Inversiones $0" y "no pude leer tus inversiones" son cosas
+ * distintas, y el panel decía la primera queriendo decir la segunda.
  */
 import type { IconName } from "@/components/ui/icon";
-import type { BaseIndicators, MonthFlow } from "@/modules/financial-base";
-import type { ControlSummary } from "@/modules/control";
-import type { RichLifeSummary } from "@/modules/rich-life";
-import type { WealthSummary } from "@/modules/wealth";
+import type { BaseIndicators } from "@/modules/financial-base";
 import { formatMoney, formatPercent } from "@/lib/format";
+import type { DashboardKpis } from "@/modules/dashboard/engine/kpis";
 
 export type PanelTrend = "mas_rico" | "estable" | "mas_pobre" | "en_curso" | "sin_historico";
 
@@ -18,12 +25,11 @@ export type NorteVM = {
   trendLabel: string;
   velocity: number | null; // Δ patrimonio neto del mes
   velocityText: string;
-  freedomPct: number; // 0-1 (ingreso pasivo / gastos)
+  /** 0-1 (ingreso pasivo ÷ gasto de referencia). `null` = la fuente no cargó, NO "0%". */
+  freedomPct: number | null;
   freedomText: string;
   netWorth: number | null;
-  /** De qué está hecho el patrimonio neto. Ya vienen calculados y normalizados a la
-   *  moneda principal en el mismo indicador que da `netWorth`: exponerlos no añade
-   *  ninguna consulta, solo deja de descartarlos. */
+  /** De qué está hecho el patrimonio neto (ya normalizados a la moneda de visualización). */
   totalAssets: number | null;
   totalLiabilities: number | null;
   nextBestAction: string;
@@ -41,46 +47,18 @@ export type PillarVM = {
   barColor: string;
   href: string;
   ai: string; // lectura My Agent C+ del pilar
+  /** true = la fuente de este pilar no cargó; la UI lo marca en vez de mostrar un cero. */
+  sinDato?: boolean;
 };
 
-/**
- * Las cifras CRUDAS detrás de los pilares.
- *
- * `PillarVM.value`/`meta` vienen ya formateados con `formatMoney`/`formatPercent`, o sea
- * pensados para el ancho de la web. El carrusel del móvil necesita los números para
- * elegir su propia representación compacta (`mAmount`, que acorta según los caracteres
- * que caben): reusar los strings ahí los truncaría.
- *
- * Salen de los mismos `richLife`/`wealth` que el panel YA pide, así que exponerlos no
- * añade ninguna consulta — solo deja de descartarlos, igual que se hizo con
- * totalAssets/totalLiabilities.
- */
-export type PanelCifras = {
-  /** Meses de gastos que cubre el respaldo (richLife). */
-  monthsOfIndependence: number | null;
-  /** Parte del patrimonio que produce ingresos, 0-1 (richLife). */
-  productiveAssetsPct: number | null;
-  totalInvested: number | null;
-  monthlyContribution: number | null;
-  /** Diagnóstico de protección; ya viene normalizado a la moneda principal. */
-  proteccion: {
-    score: number; // 0-100
-    activePolicies: number;
-    totalCoverage: number;
-    annualPremium: number;
-  } | null;
-};
-
-export type PanelVM = { norte: NorteVM; pillars: PillarVM[]; cifras: PanelCifras };
+export type PanelVM = { norte: NorteVM; pillars: PillarVM[] };
 
 export type PanelInputs = {
+  /** Indicadores de la base: solo para la próxima acción de respaldo (no para los pilares). */
   ind: BaseIndicators;
-  currency: string;
-  control: ControlSummary | null;
-  richLife: RichLifeSummary | null;
-  wealth: WealthSummary | null;
-  /** A-01: flujo del mes canónico (real operativo). Si falta (demo), cae al plan. */
-  monthFlow?: MonthFlow | null;
+  kpis: DashboardKpis;
+  /** Próxima mejor acción de los módulos (control → rich-life). */
+  nextBestAction?: string | null;
 };
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
@@ -99,52 +77,42 @@ const METHOD_LABEL: Record<string, string> = {
   hibrido: "Híbrido",
 };
 
+/** Lo que se muestra cuando la fuente de una tarjeta no respondió. Nunca un número. */
+const SIN_DATO = "—";
+const SIN_DATO_META = "No se pudo cargar ahora";
+
 export function buildPanel(inp: PanelInputs): PanelVM {
-  return { norte: buildNorte(inp), pillars: buildPillars(inp), cifras: buildCifras(inp) };
+  return { norte: buildNorte(inp), pillars: buildPillars(inp) };
 }
 
-function buildCifras({ richLife, wealth }: PanelInputs): PanelCifras {
-  const rl = richLife?.snapshot.indicators ?? null;
-  const prot = wealth?.protection ?? null;
-  return {
-    monthsOfIndependence: rl?.monthsOfIndependence ?? null,
-    productiveAssetsPct: rl?.productiveAssetsPct ?? null,
-    totalInvested: wealth?.portfolio.totalInvested ?? null,
-    monthlyContribution: wealth?.portfolio.monthlyContribution ?? null,
-    proteccion: prot
-      ? {
-          score: prot.score,
-          activePolicies: prot.activePolicies,
-          totalCoverage: prot.totalCoverage,
-          annualPremium: prot.annualPremium,
-        }
-      : null,
-  };
-}
+function buildNorte({ ind, kpis, nextBestAction }: PanelInputs): NorteVM {
+  const currency = kpis.currency;
+  const pat = kpis.patrimonio;
+  const lib = kpis.libertad;
 
-function buildNorte({ ind, currency, control, richLife }: PanelInputs): NorteVM {
-  const rl = richLife?.snapshot.indicators ?? null;
-  const trend: PanelTrend = rl?.trend ?? "sin_historico";
-  const velocity = rl?.wealthVelocity ?? null;
-  const freedomPct = clamp01(rl?.passiveIncomeCoverage ?? 0);
-  const netWorth = rl?.netWorth ?? null;
+  const trend: PanelTrend = pat?.trend ?? "sin_historico";
+  const velocity = pat?.velocidad ?? null;
+  const netWorth = pat?.neto ?? null;
 
   const velocityText =
-    velocity == null
-      ? "Registra tu patrimonio para ver tu velocidad mes a mes."
-      : velocity >= 0
-        ? `Tu patrimonio subió ${formatMoney(velocity, currency)} en lo que va del mes.`
-        : `Tu patrimonio bajó ${formatMoney(Math.abs(velocity), currency)} en lo que va del mes.`;
+    pat === null
+      ? "No pude leer tu patrimonio ahora mismo; volvé a intentarlo en un momento."
+      : velocity == null
+        ? "Registrá tu patrimonio para ver tu velocidad mes a mes."
+        : velocity >= 0
+          ? `Tu patrimonio subió ${formatMoney(velocity, currency)} en lo que va del mes.`
+          : `Tu patrimonio bajó ${formatMoney(Math.abs(velocity), currency)} en lo que va del mes.`;
 
+  // La cobertura pasiva es el promedio mensualizado de dividendos, cupones, rentas y CDP
+  // (#769), el MISMO número que los tres números de Patrimonio. Sin fuente es `null`:
+  // decir "0%" con payouts configurados era afirmar algo falso.
+  const freedomPct = lib ? clamp01(lib.cobertura) : null;
   const freedomText =
-    freedomPct > 0
-      ? `Tus ingresos pasivos cubren el ${formatPercent(freedomPct)} de tus gastos.`
-      : "Aún no tienes ingresos pasivos; cada activo productivo te acerca a la libertad.";
-
-  const nextBestAction =
-    control?.diagnosis.nextBestAction ??
-    richLife?.snapshot.nextBestAction ??
-    baseNextAction(ind, currency);
+    lib === null
+      ? "No pude leer tu ingreso pasivo ahora mismo."
+      : lib.cobertura > 0
+        ? `Tus ingresos pasivos (${formatMoney(lib.ingresoPasivo, currency)}/mes) cubren el ${formatPercent(clamp01(lib.cobertura))} de tu compromiso mensual de ${formatMoney(lib.gastoReferencia, currency)}.`
+        : "Aún no tenés ingresos pasivos; cada activo productivo te acerca a la libertad.";
 
   return {
     trend,
@@ -154,124 +122,233 @@ function buildNorte({ ind, currency, control, richLife }: PanelInputs): NorteVM 
     freedomPct,
     freedomText,
     netWorth,
-    totalAssets: rl?.totalAssets ?? null,
-    totalLiabilities: rl?.totalLiabilities ?? null,
-    nextBestAction,
+    totalAssets: pat?.activos ?? null,
+    totalLiabilities: pat?.pasivos ?? null,
+    nextBestAction: nextBestAction ?? baseNextAction(ind, kpis),
   };
 }
 
-function baseNextAction(ind: BaseIndicators, currency: string): string {
-  if (ind.freeCashflow < 0)
-    return "Vuelve a flujo positivo: revisa tus gastos flexibles antes de cualquier otra meta.";
-  if (ind.debtWeight >= 0.3)
-    return `Dirige parte de tus ${formatMoney(ind.freeCashflow, currency)} libres a tu deuda más cara este mes.`;
-  if (ind.savingsRate < 0.1)
-    return `Automatiza un ahorro con parte de tus ${formatMoney(ind.freeCashflow, currency)} libres para tu fondo de paz.`;
-  return "Vas bien: considera convertir parte de tu ahorro en inversión de largo plazo.";
+function baseNextAction(ind: BaseIndicators, kpis: DashboardKpis): string {
+  const currency = kpis.currency;
+  const libre = kpis.flujo?.real ?? ind.freeCashflow;
+  if (libre < 0)
+    return "Volvé a flujo positivo: revisá tus gastos flexibles antes de cualquier otra meta.";
+  if ((kpis.deudas?.dti ?? 0) >= 0.3)
+    return `Dirigí parte de tus ${formatMoney(libre, currency)} libres a tu deuda más cara este mes.`;
+  if ((kpis.ahorro?.tasa ?? 0) < 0.1)
+    return `Automatizá un ahorro con parte de tus ${formatMoney(libre, currency)} libres para tu fondo de paz.`;
+  return "Vas bien: considerá convertir parte de tu ahorro en inversión de largo plazo.";
 }
 
-function buildPillars({
-  ind,
-  currency,
-  control,
-  richLife,
-  wealth,
-  monthFlow,
-}: PanelInputs): PillarVM[] {
-  // 1 · Flujo del mes (Base Financiera). A-01: el valor es el REAL operativo (lo que de
-  // verdad te quedó); el PLAN (presupuesto) va en la meta, con el gap. Antes mostraba el
-  // plan como si fuera el flujo — de ahí la contradicción con Mi Base/Transacciones.
-  const planFree = ind.freeCashflow;
-  const realFlow = monthFlow ? monthFlow.real.operatingFlow : planFree;
-  const opIncome = monthFlow ? monthFlow.real.operatingIncome : ind.incomeMonthly;
-  const gap = Math.round((realFlow - planFree) * 100) / 100;
-  const flujo: PillarVM = {
-    key: "flujo",
+function buildPillars({ kpis }: PanelInputs): PillarVM[] {
+  return [flujoPillar(kpis), ahorroPillar(kpis), deudasPillar(kpis), inversionesPillar(kpis)];
+}
+
+/**
+ * 1 · Flujo del mes — la MISMA definición que Mi Base: ingreso operativo − gasto operativo
+ * del mes, en la moneda de visualización. El plan (presupuesto) va en la meta con su gap, y
+ * cuando el real supera al plan la tarjeta lo EXPLICA (`flujo.explicacion`) en vez de dejar
+ * un número que se lee imposible.
+ */
+function flujoPillar(kpis: DashboardKpis): PillarVM {
+  const base = {
+    key: "flujo" as const,
     label: "Flujo del mes",
-    icon: "income",
+    icon: "income" as IconName,
     accent: "var(--pos)",
     soft: "var(--pos-soft)",
-    value: formatMoney(realFlow, currency),
-    meta: `Plan ${formatMoney(planFree, currency)} · Real ${formatMoney(realFlow, currency)} (${gap >= 0 ? "+" : ""}${formatMoney(gap, currency)})`,
-    ratio: opIncome > 0 ? clamp01(realFlow / opIncome) : 0,
-    barColor: realFlow >= 0 ? "var(--pos)" : "var(--neg)",
     href: "/mi-base-financiera",
-    ai:
-      realFlow >= 0
-        ? `Te quedan ${formatMoney(realFlow, currency)} libres este mes (flujo operativo real).`
-        : `Gastas ${formatMoney(Math.abs(realFlow), currency)} más de lo que entra. Pausar gastos flexibles te devuelve el control.`,
   };
+  const f = kpis.flujo;
+  if (!f) {
+    return {
+      ...base,
+      value: SIN_DATO,
+      meta: SIN_DATO_META,
+      ratio: 0,
+      barColor: "var(--muted-2)",
+      ai: "No pude leer tus movimientos del mes ahora mismo.",
+      sinDato: true,
+    };
+  }
+  const c = kpis.currency;
+  const lectura =
+    f.real >= 0
+      ? `Te quedan ${formatMoney(f.real, c)} libres este mes: entraron ${formatMoney(f.realIngreso, c)} y salieron ${formatMoney(f.realGasto, c)}.`
+      : `Gastás ${formatMoney(Math.abs(f.real), c)} más de lo que entra. Pausar gastos flexibles te devuelve el control.`;
+  return {
+    ...base,
+    value: formatMoney(f.real, c),
+    meta: `Plan ${formatMoney(f.plan, c)} · Real ${formatMoney(f.real, c)} (${f.gap >= 0 ? "+" : ""}${formatMoney(f.gap, c)})`,
+    ratio: f.realIngreso > 0 ? clamp01(f.real / f.realIngreso) : 0,
+    barColor: f.real >= 0 ? "var(--pos)" : "var(--neg)",
+    ai: f.explicacion ? `${lectura} ${f.explicacion}` : lectura,
+  };
+}
 
-  // 2 · Ahorro y emergencia (Control)
-  const months = richLife?.snapshot.indicators.monthsOfIndependence ?? null;
-  const ahorro: PillarVM = {
-    key: "ahorro",
+/**
+ * 2 · Ahorro y emergencia — la tasa es APORTES ÷ INGRESO (el aporte mensual a metas del
+ * compromiso, ya mensualizado y convertido), la misma que alimenta el score de salud.
+ * Antes era `(gasto de naturaleza ahorro + flujo libre) ÷ ingreso`, o sea "todo lo que no
+ * presupuesté": con un presupuesto que cubría una quinta parte del ingreso, decía 98%.
+ */
+function ahorroPillar(kpis: DashboardKpis): PillarVM {
+  const base = {
+    key: "ahorro" as const,
     label: "Ahorro y emergencia",
-    icon: "savings",
+    icon: "savings" as IconName,
     accent: "var(--c-savings)",
     soft: "color-mix(in srgb, var(--c-savings) 16%, transparent)",
-    value: formatPercent(ind.savingsRate),
-    // "Respaldo de liquidez" = runway derivado (liquidez ÷ gasto), NO el fondo de emergencia
-    // formal (ese vive en Protección con su objetivo). Tope de display a 12+: un runway mayor
-    // se lee absurdo (p. ej. 57.6 meses) y no aporta más que "holgado".
-    meta:
-      months != null
-        ? `Respaldo de liquidez: ${months >= 12 ? "12+" : months.toFixed(1)} meses`
-        : `Provisión anual ${formatMoney(ind.annualCoverage, currency)}/mes`,
-    ratio: clamp01(ind.savingsRate / 0.2),
-    barColor: "var(--c-savings)",
     href: "/control-financiero",
-    ai:
-      ind.savingsRate >= 0.1
-        ? `Ahorras el ${formatPercent(ind.savingsRate)} de tu ingreso. Mantén el ritmo y tus metas llegan antes.`
-        : `Ahorras el ${formatPercent(ind.savingsRate)}. Subirlo de forma gradual fortalece tu fondo de paz.`,
   };
+  const a = kpis.ahorro;
+  if (!a) {
+    return {
+      ...base,
+      value: SIN_DATO,
+      meta: SIN_DATO_META,
+      ratio: 0,
+      barColor: "var(--muted-2)",
+      ai: "No pude leer tus metas de ahorro ahora mismo.",
+      sinDato: true,
+    };
+  }
+  const c = kpis.currency;
+  // Tope de display a 12+: un runway mayor se lee absurdo (57,6 meses) y no aporta
+  // más que "holgado". Es el respaldo de LIQUIDEZ, no el fondo formal de emergencia.
+  const meses = a.mesesDeColchon;
+  return {
+    ...base,
+    value: formatPercent(a.tasa),
+    meta:
+      meses != null
+        ? `${formatMoney(a.aporteMetas, c)}/mes · respaldo ${meses >= 12 ? "12+" : meses.toFixed(1)} meses`
+        : `${formatMoney(a.aporteMetas, c)}/mes a tus metas`,
+    ratio: clamp01(a.tasa / 0.2),
+    barColor: "var(--c-savings)",
+    ai:
+      a.tasa >= 0.1
+        ? `Aportás ${formatMoney(a.aporteMetas, c)}/mes a tus metas, el ${formatPercent(a.tasa)} de tu ingreso. Mantené el ritmo y tus metas llegan antes.`
+        : `Aportás ${formatMoney(a.aporteMetas, c)}/mes a tus metas, el ${formatPercent(a.tasa)} de tu ingreso. Subirlo de forma gradual fortalece tu fondo de paz.`,
+  };
+}
 
-  // 3 · Deudas — carga sobre el ingreso (ratio, neutra a la moneda)
-  const method = control?.diagnosis.debtMethod;
-  const deudas: PillarVM = {
-    key: "deudas",
+/** 3 · Deudas — saldo y DTI de la tabla `debts` (la MISMA lectura que /deudas). */
+function deudasPillar(kpis: DashboardKpis): PillarVM {
+  const base = {
+    key: "deudas" as const,
     label: "Deudas",
-    icon: "debt",
+    icon: "debt" as IconName,
     accent: "var(--neg)",
     soft: "var(--neg-soft)",
-    value: formatPercent(ind.debtWeight),
-    meta: method
-      ? `Método ${METHOD_LABEL[method.method] ?? method.method}`
-      : "de tu ingreso mensual",
-    ratio: clamp01(ind.debtWeight / 0.4),
-    barColor: "var(--c-debt)",
     href: "/deudas",
-    ai: method
-      ? method.reason
-      : ind.debtWeight >= 0.3
-        ? `Tu deuda consume el ${formatPercent(ind.debtWeight)} de tu ingreso. Reducirla libera flujo y baja tu presión.`
-        : "Tu deuda está en un nivel manejable. Evita sumar deuda cara.",
   };
+  const d = kpis.deudas;
+  if (!d) {
+    return {
+      ...base,
+      value: SIN_DATO,
+      meta: SIN_DATO_META,
+      ratio: 0,
+      barColor: "var(--muted-2)",
+      ai: "No pude leer tus deudas ahora mismo.",
+      sinDato: true,
+    };
+  }
+  const c = kpis.currency;
+  if (d.numDeudas === 0) {
+    return {
+      ...base,
+      value: formatMoney(0, c),
+      meta: "Sin deudas registradas",
+      ratio: 0,
+      barColor: "var(--c-debt)",
+      ai: "No tenés deudas registradas. Evitá sumar deuda cara.",
+    };
+  }
+  return {
+    ...base,
+    value: formatMoney(d.total, c),
+    meta: d.metodo
+      ? `${d.numDeudas} ${d.numDeudas === 1 ? "deuda" : "deudas"} · método ${METHOD_LABEL[d.metodo] ?? d.metodo} · ${formatPercent(d.dti)} de tu ingreso`
+      : `${d.numDeudas} ${d.numDeudas === 1 ? "deuda" : "deudas"} · ${formatPercent(d.dti)} de tu ingreso`,
+    ratio: clamp01(d.dti / 0.4),
+    barColor: "var(--c-debt)",
+    ai:
+      d.dti >= 0.3
+        ? `Tus cuotas consumen el ${formatPercent(d.dti)} de tu ingreso. Reducirlas libera flujo y baja tu presión.`
+        : `Tu deuda está en un nivel manejable (${formatPercent(d.dti)} de tu ingreso). Evitá sumar deuda cara.`,
+  };
+}
 
-  // 4 · Inversiones y patrimonio productivo (Patrimonio)
-  const productive = richLife?.snapshot.indicators.productiveAssetsPct ?? null;
-  const invested = wealth?.portfolio.totalInvested ?? null;
-  const contribution = wealth?.portfolio.monthlyContribution ?? 0;
-  const inversiones: PillarVM = {
-    key: "inversiones",
+/**
+ * 4 · Inversiones — VALOR DE MERCADO de tus posiciones (`investment_holdings`), el mismo
+ * número que da Patrimonio y que responde "¿cómo van mis inversiones?". Antes leía
+ * `investments.invested_amount`, una tabla que en cuentas migradas está vacía: por eso
+ * decía "$0 · configurá tu patrimonio" al lado de "18 posiciones".
+ *
+ * El corte mercado/manual viaja en la meta: un valor escrito a mano no se presenta como
+ * un resultado de mercado.
+ */
+function inversionesPillar(kpis: DashboardKpis): PillarVM {
+  const base = {
+    key: "inversiones" as const,
     label: "Inversiones",
-    icon: "invest",
+    icon: "invest" as IconName,
     accent: "var(--info)",
     soft: "var(--info-soft)",
-    value: invested != null ? formatMoney(invested, currency) : "—",
-    meta:
-      productive != null
-        ? `${formatPercent(productive)} productivo · +${formatMoney(contribution, currency)}/mes`
-        : "Configura tu patrimonio",
-    ratio: clamp01(productive ?? 0),
-    barColor: "var(--c-invest)",
     href: "/patrimonio",
-    ai:
-      productive != null
-        ? `El ${formatPercent(clamp01(1 - productive))} de tu patrimonio aún no genera ingresos. Subir tu aporte acelera tu libertad.`
-        : "Empieza a invertir para que tu dinero trabaje por ti.",
   };
+  const i = kpis.inversiones;
+  if (!i) {
+    return {
+      ...base,
+      value: SIN_DATO,
+      meta: kpis.patrimonio ? "Aún no registrás posiciones" : SIN_DATO_META,
+      ratio: 0,
+      barColor: "var(--muted-2)",
+      ai: kpis.patrimonio
+        ? "Empezá a invertir para que tu dinero trabaje por vos."
+        : "No pude leer tu portafolio ahora mismo.",
+      sinDato: !kpis.patrimonio,
+    };
+  }
+  const c = kpis.currency;
+  const avisos: string[] = [];
+  if (i.manual.posiciones > 0) {
+    avisos.push(
+      `${i.manual.posiciones} ${i.manual.posiciones === 1 ? "valuada" : "valuadas"} por vos (${formatMoney(i.manual.valor, c)})`,
+    );
+  }
+  if (i.sinPrecio.posiciones > 0) {
+    avisos.push(`${i.sinPrecio.posiciones} sin precio hoy`);
+  }
+  // El signo va UNA vez, delante: `formatPercent` emite el guion ASCII y el monto lleva el
+  // menos tipográfico, así que dejarlos a los dos mezclaba dos signos distintos en la misma
+  // frase ("−$7.707 (-2%)").
+  const signo = i.conPrecio.pl >= 0 ? "+" : "−";
+  const resultado =
+    i.conPrecio.plPct != null
+      ? `${signo}${formatMoney(Math.abs(i.conPrecio.pl), c)} (${signo}${formatPercent(Math.abs(i.conPrecio.plPct))}) en lo que cotiza`
+      : null;
 
-  return [flujo, ahorro, deudas, inversiones];
+  return {
+    ...base,
+    value: formatMoney(i.valorMercado, c),
+    meta: [
+      `${i.posiciones} ${i.posiciones === 1 ? "posición" : "posiciones"}`,
+      resultado,
+      ...avisos,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    // La barra mide qué parte del valor tiene precio de mercado: es la parte del número
+    // que el mercado respalda, y era exactamente lo que no se distinguía.
+    ratio: i.valorMercado > 0 ? clamp01(i.conPrecio.valor / i.valorMercado) : 0,
+    barColor: "var(--c-invest)",
+    ai:
+      i.manual.posiciones > 0
+        ? `Tu portafolio vale ${formatMoney(i.valorMercado, c)}; ${formatMoney(i.manual.valor, c)} de eso está valuado por vos, no por el mercado.`
+        : `Tu portafolio vale ${formatMoney(i.valorMercado, c)} sobre ${formatMoney(i.invertido, c)} invertidos.`,
+  };
 }

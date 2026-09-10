@@ -27,12 +27,27 @@ function clamp01(n: number): number {
  *                         aporta hasta +5 pts bonus al score (capeado en 100).
  *                         Implementa la dimensión patrimonial descrita en el
  *                         comentario original de este motor.
+ * @param savingsRate      Tasa de ahorro CANÓNICA (aportes a metas ÷ ingreso), la misma
+ *                         que muestra el panel. Cuando se pasa, manda sobre
+ *                         `ind.savingsRate`.
+ *
+ *                         `ind.savingsRate` es `(gasto de naturaleza ahorro + flujo libre)
+ *                         ÷ ingreso`, o sea "todo lo que no presupuesté": con un
+ *                         presupuesto que cubre una quinta parte del ingreso da 98% y un
+ *                         score de 100 para alguien que aporta el 17%. El panel y el score
+ *                         tienen que decir el MISMO número, así que el número entra por
+ *                         aquí en vez de calcularse dos veces.
  */
-export function computeHealthScore(ind: BaseIndicators, investmentRate?: number): HealthScore {
+export function computeHealthScore(
+  ind: BaseIndicators,
+  investmentRate?: number,
+  savingsRate?: number,
+): HealthScore {
   const hasData = ind.incomeMonthly > 0 || ind.expenseMonthly > 0;
+  const tasaAhorro = savingsRate ?? ind.savingsRate;
 
   // Tasa de ahorro: meta 20% → 30 pts.
-  const savingsPts = clamp01(ind.savingsRate / 0.2) * 30;
+  const savingsPts = clamp01(tasaAhorro / 0.2) * 30;
   // Ratio de deuda: menor es mejor; 0% → 25 pts, ≥50% → 0.
   const debtPts = (1 - clamp01(ind.debtWeight / 0.5)) * 25;
   // Flujo libre positivo: 25 pts si positivo, proporcional si negativo.
@@ -53,8 +68,8 @@ export function computeHealthScore(ind: BaseIndicators, investmentRate?: number)
   const bars: HealthBar[] = [
     {
       label: "Tasa de ahorro",
-      ratio: clamp01(ind.savingsRate / 0.3),
-      display: `${Math.round(ind.savingsRate * 100)}%`,
+      ratio: clamp01(tasaAhorro / 0.3),
+      display: `${Math.round(tasaAhorro * 100)}%`,
       color: "var(--c-savings)",
     },
     {
