@@ -1314,6 +1314,12 @@ export function Faqs({ conSesion = false }: { conSesion?: boolean }) {
                       que cuelga de ella: movimientos, deudas, metas, inversiones, conversaciones y
                       el historial.
                     </p>
+                    <p>
+                      Si tenés suscripción activa, se cancela en el mismo paso — no hay que
+                      acordarse de darla de baja aparte — y se elimina tu cliente en Stripe con los
+                      métodos de pago guardados. Los recibos de los pagos que ya se hicieron se
+                      conservan: son registro contable y no se pueden borrar.
+                    </p>
                   </div>
                 </details>
               </div>
