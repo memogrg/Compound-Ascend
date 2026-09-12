@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Equivalente de data_extraction_rules.xml para API < 31, donde el sistema todavía lee
+  android:fullBackupContent. Mismo criterio: ni las cookies de sesión de Supabase
+  (app_webview) ni el snapshot financiero de los widgets (shared_prefs "cartera_widget")
+  deben viajar a la nube de Google ni a otro dispositivo.
+
+  Con android:allowBackup="false" es redundante, pero documenta la intención y protege
+  si alguien reactiva el backup. Mantener los dos archivos en sincronía.
+-->
+<full-backup-content>
+  <exclude domain="sharedpref" path="." />
+  <exclude domain="database" path="." />
+  <exclude domain="file" path="." />
+  <exclude domain="root" path="app_webview/" />
+</full-backup-content>

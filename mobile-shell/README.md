@@ -73,6 +73,26 @@ npm run sync
 npm run open:android   # cap open android  → abre el proyecto en Android Studio
 ```
 
+### targetSdk 36 y reglas de backup
+
+El target es **API 36 (Android 16)**, el mínimo que Play exige para publicar. Lo que trae 36 y
+ya está resuelto: el **edge-to-edge es forzado** (la app siempre dibuja bajo las barras de
+sistema, sin opt-out). No hay nada que hacer del lado nativo porque los safe-areas los maneja
+el CSS con `env(safe-area-inset-*)` + `viewport-fit=cover` — un solo criterio para las dos
+plataformas, como explica `capacitor.config.ts`.
+
+El `AndroidManifest.xml` declara **`allowBackup="false"`** más `data_extraction_rules.xml`
+(API 31+) y `backup_rules.xml` (API < 31), que excluyen `shared_prefs`, bases de datos,
+archivos y `app_webview/`. El motivo es concreto: ahí viven las **cookies de sesión de
+Supabase** y el **snapshot financiero de los widgets** (`cartera_widget`). Restaurar ese backup
+en otro teléfono equivale a clonar la sesión. Con `allowBackup="false"` los dos XML son
+redundantes, pero documentan la intención y protegen si alguien reactiva el backup — si lo
+hace, que sea una decisión, no un descuido. **Mantener los dos archivos en sincronía.**
+
+También hay un permiso de `CAMERA`: el escáner de recibos de `/m/asistente` usa un
+`<input type="file" capture="environment">` y sin el permiso Capacitor no ofrece la cámara en
+`onShowFileChooser` — cae al selector de archivos, en silencio.
+
 ## iOS
 
 Requiere **Xcode completo** (no solo Command Line Tools) y **CocoaPods** (ya instalado: 1.16.2).
