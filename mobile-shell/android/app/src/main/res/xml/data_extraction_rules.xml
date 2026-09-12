@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Nada de esta app viaja a la nube de Google ni a otro dispositivo (Android 12+, API 31+).
+
+  Qué se excluye y por qué:
+  - sharedpref  → "cartera_widget" guarda el snapshot financiero de los widgets
+                  (patrimonio neto, presupuesto del mes, próximo pago, indicador).
+  - root/app_webview/ → cookies de sesión de Supabase: restaurarlas en otro equipo
+                  equivale a clonar la sesión.
+  - database, file → por si algún plugin persiste algo en el futuro.
+
+  Con android:allowBackup="false" estas reglas son redundantes, pero documentan la
+  intención y protegen si alguien reactiva el backup.
+-->
+<data-extraction-rules>
+  <cloud-backup>
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="root" path="app_webview/" />
+  </cloud-backup>
+  <device-transfer>
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="root" path="app_webview/" />
+  </device-transfer>
+</data-extraction-rules>

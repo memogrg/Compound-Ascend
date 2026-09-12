@@ -1,15 +1,21 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+        <!-- windowSoftInputMode explícito: capacitor.config.ts (Keyboard.resize) da por sentado
+             que en Android el teclado lo resuelve el adjustResize del manifest. Sin declararlo
+             queda en ADJUST_UNSPECIFIED y lo decide el sistema. -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
             android:name=".MainActivity"
+            android:windowSoftInputMode="adjustResize"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
@@ -96,6 +102,9 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Escáner de recibos: sin este permiso Capacitor no ofrece la cámara en onShowFileChooser (capture=environment) y cae al selector de archivos. -->
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <!-- Candado local con biometría (@aparajita/capacitor-biometric-auth → androidx.biometric).
          Se declara explícito además del merge del AAR, para BiometricPrompt (API 28+). -->
