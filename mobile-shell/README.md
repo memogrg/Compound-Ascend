@@ -20,12 +20,19 @@ Se decide al correr `cap sync`/`cap copy`, que evalúan `capacitor.config.ts`:
 **El default es producción a propósito.** Antes el default era el modo bundled y `www/`
 contenía el prototipo estático de diseño: quien olvidara exportar `CAP_SERVER_URL` compilaba
 un binario que abría una cuenta ficticia con datos verosímiles, sin ningún aviso. Ahora
-olvidar la variable produce el comportamiento correcto, y `www/` es solo una **página de
-diagnóstico** que dice claramente que la app está mal configurada — imposible de confundir
-con la app real.
+olvidar la variable produce el comportamiento correcto.
 
-El prototipo de diseño se conserva en **`design-prototipo/`** como referencia; ya no viaja
-dentro del binario.
+`www/` es hoy la pantalla **«Sin conexión»**, y su trabajo principal no es el modo bundled
+sino ser el **`errorPath`** del modo servidor: lo que el WebView muestra cuando no logra
+cargar la URL — sin red, DNS caído o servidor abajo. Sin `errorPath`, iOS deja la pantalla
+en blanco y Android dibuja la página de error de Chrome; las dos cosas son rechazo de App
+Store (guía 2.1). Está escrita **para quien usa la app**, no para quien la compila: reintenta
+sola cuando vuelve la red, tiene un botón de reintento y no menciona ni `npm run sync` ni
+variables de entorno. La pista para el dev vive en un comentario HTML del archivo.
+
+Como es lo único que viaja dentro del binario, no tiene datos ni finanzas: nada que se pueda
+confundir con la app real. El prototipo de diseño se conserva en **`design-prototipo/`** como
+referencia; ya no viaja dentro del binario.
 
 ## Propagar cambios a los proyectos nativos
 
