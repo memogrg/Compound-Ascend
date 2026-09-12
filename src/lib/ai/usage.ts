@@ -44,9 +44,14 @@ export async function assertTokenBudget(userId: string): Promise<void> {
     if (!isWithinLimit(plan, used)) {
       throw new AppError(
         "RATE_LIMITED",
+        // Estos textos se muestran TAMBIÉN en /m/asistente (app nativa), donde no se
+        // puede dirigir a comprar fuera de la tienda (Apple 3.1.1). Por eso informan el
+        // estado y no invitan a pagar. El CTA de la web, si hace falta, va en su propio
+        // componente leyendo el código RATE_LIMITED — no en el mensaje del servidor, que
+        // es común a las dos plataformas.
         plan === "ninguno"
-          ? "Tu cuenta no tiene una suscripción activa. Elegí un plan para volver a conversar con My Agent C+."
-          : "Alcanzaste el uso de My Agent C+ de este mes en tu plan. Podés subir de plan para tener más.",
+          ? "Tu cuenta no tiene un plan activo, así que My Agent C+ está en pausa."
+          : "Alcanzaste el uso mensual de My Agent C+ incluido en tu cuenta. Se renueva el próximo mes.",
       );
     }
   } catch (err) {

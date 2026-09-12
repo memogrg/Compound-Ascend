@@ -51,7 +51,9 @@ const ESPEJO_MOVIL: Record<string, readonly string[]> = {
 
   // Perfil y cuenta.
   "/mi-perfil-financiero": ["/m/mi-perfil-financiero", "/m/perfil-financiero"],
-  "/configuracion": ["/m/perfil"],
+  // `/m/sin-plan` va acá porque es estado de CUENTA: si el plan se reactiva, la
+  // pantalla de bloqueo tiene que dejar de mostrarse sin esperar a que expire.
+  "/configuracion": ["/m/perfil", "/m/sin-plan"],
 };
 
 /** Rutas móviles de la app, para que el test de cobertura sepa qué exigir. */
@@ -70,6 +72,7 @@ export const RUTAS_MOVILES_APP = [
   "/m/patrimonio",
   "/m/perfil",
   "/m/proteccion",
+  "/m/sin-plan",
   "/m/transacciones",
 ] as const;
 
