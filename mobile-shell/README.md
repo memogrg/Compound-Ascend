@@ -85,6 +85,40 @@ cd ios/App && pod install && cd -                                  # instala las
 npm run open:ios                                                    # cap open ios → abre en Xcode
 ```
 
+## Requisitos de App Store
+
+Dos cosas que Apple revisa antes de aceptar el binario y que hay que mantener a mano:
+
+**`ios/App/App/PrivacyInfo.xcprivacy`** — el *privacy manifest*. Declara qué datos recolecta la
+app (correo, nombre, información financiera, historial de compra, fotos, contenido del usuario,
+ID de usuario, crashes y performance — todo con propósito `AppFunctionality`, sin tracking) y
+qué *required-reason APIs* usa (`UserDefaults`, timestamps de archivos, boot time). Está agregado
+al target **App** en la fase *Resources*: si no viaja dentro del bundle, no sirve de nada.
+
+> **Cada plugin nuevo que toque `UserDefaults`, archivos o APIs de sistema hay que reflejarlo acá.**
+> Las razones se declaran por API, no por plugin, así que revisá el `PrivacyInfo.xcprivacy` del
+> plugin al instalarlo y sumá al nuestro la categoría que falte. Un manifiesto incompleto es
+> rechazo automático en App Store Connect.
+
+**Usage descriptions en `Info.plist`** — iOS mata la app si pide un permiso sin su texto, y Apple
+rechaza los textos genéricos: tienen que decir para qué sirve el permiso en esta app concreta.
+
+| Clave | Por qué existe |
+|---|---|
+| `NSCameraUsageDescription` | el escáner de recibos de `/m/asistente` usa `<input type="file" capture="environment">`, que abre la cámara |
+| `NSPhotoLibraryUsageDescription` | ese mismo input permite elegir una foto ya guardada |
+| `NSFaceIDUsageDescription` | desbloqueo biométrico |
+
+También en `Info.plist`: `ITSAppUsesNonExemptEncryption = false` (evita el cuestionario de
+exportación en cada subida — solo usamos HTTPS estándar), `CFBundleDevelopmentRegion = es` +
+`CFBundleLocalizations` (la app es 100 % español), `UIRequiredDeviceCapabilities = arm64`
+(`armv7` es de 32 bits, muerto desde iOS 11) y **solo `UIInterfaceOrientationPortrait`**.
+
+El target es **iPhone solamente** (`TARGETED_DEVICE_FAMILY = "1"`): la web `/m` es phone-first y
+no tiene layout de landscape ni de tablet. Declarar iPad obliga a que la app se vea bien ahí, y
+hoy no se ve — es causa de rechazo. Si algún día hay layout de tablet, se vuelve a `"1,2"` y se
+reponen las orientaciones.
+
 ## Íconos y splash
 
 Por ahora se usan los **placeholders** del template de Capacitor (Android `ic_launcher*.png` +
