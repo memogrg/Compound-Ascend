@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getUser } from "@/lib/auth/session";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { debeRedirigirSinPlan } from "../lib/plan-guard";
 import { getPrimaryCurrency, getDisplayCurrency } from "@/modules/financial-base";
 import { getUserTimezone, knownUserTz } from "@/lib/time/user-time";
 import { TimezoneSync } from "@/components/tz/timezone-sync";
@@ -34,6 +37,29 @@ export default async function MobileAppLayout({ children }: { children: React.Re
   // por defecto: solo se muestra si MOBILE_DEMO_PREVIEW=1 (previsualización opcional).
   const demoAllowed = process.env.MOBILE_DEMO_PREVIEW === "1";
   if (!user && !demoAllowed) redirect("/m/login");
+
+  // Muro de plan del móvil. No lo puede hacer el middleware: `/m` es público ahí
+  // (su guarda de sesión vive acá) y además su muro manda a Stripe, prohibido dentro
+  // de la app (Apple 3.1.1). Una consulta, best-effort: si falla, NO se bloquea — un
+  // muro que se cae encerrando es peor que uno que deja pasar de más.
+  if (user) {
+    let plan: string | null = null;
+    try {
+      const supabase = await createSupabaseServerClient();
+      const { data } = await supabase
+        .from("profiles")
+        .select("plan")
+        .eq("id", user.id)
+        .maybeSingle();
+      plan = data?.plan ?? null;
+    } catch {
+      plan = null;
+    }
+    // El redirect() va FUERA del try: lanza una excepción de control de Next, y adentro
+    // el catch se la comería y la redirección no ocurriría nunca.
+    const pathname = (await headers()).get("x-pathname");
+    if (debeRedirigirSinPlan(plan, pathname)) redirect("/m/sin-plan");
+  }
 
   // Sin sesión (modo demo) no se consultan monedas del usuario: CRC/CRC de relleno. Con
   // sesión, las dos reales; best-effort para no tumbar el layout si el fetch falla.

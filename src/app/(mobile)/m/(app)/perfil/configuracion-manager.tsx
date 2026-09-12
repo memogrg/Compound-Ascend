@@ -70,13 +70,8 @@ const NOTIF_ROWS: {
 }[] = [
   { key: "inApp", label: "En la app", hint: 'Avisos del día en "Qué noté".' },
   { key: "email", label: "Correo", hint: "Resumen semanal por correo." },
-  {
-    key: "push",
-    label: "Notificaciones push",
-    hint: "Avisos en tu dispositivo.",
-    disabled: true,
-    badge: "Próximamente",
-  },
+  // push se agrega cuando exista @capacitor/push-notifications. Se quita del array en vez
+  // de deshabilitarse: una fila apagada con "Próximamente" ocupa lugar y no ofrece nada.
 ];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -764,8 +759,8 @@ function HouseholdSheet({
       {/* Sobre-límite: nadie se va, solo se bloquean invitaciones nuevas. */}
       {quota.overLimit ? (
         <div className="m-field-err" role="status" style={{ lineHeight: 1.5 }}>
-          Tu hogar tiene {quota.usedActive} personas y tu plan incluye {quota.limit}. Nadie pierde
-          acceso, pero no puedes invitar hasta subir de plan.
+          Tu hogar tiene {quota.usedActive} personas y tu cuenta incluye {quota.limit}. Nadie pierde
+          acceso, pero por ahora no se pueden enviar invitaciones nuevas.
         </div>
       ) : null}
 
