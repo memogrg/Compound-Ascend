@@ -250,6 +250,16 @@ export function ConfiguracionManager({
         <ExportDataButton variant="mobile" />
       </MContentCard>
 
+      {/* Legal. Antes de la zona de peligro a propósito: quien va a borrar la cuenta
+          suele querer leer primero qué pasa con sus datos. Son rutas públicas, así que
+          abren en la misma WebView sin sacar a nadie de la app. */}
+      <MSectionHeader title="Legal" />
+      <MContentCard style={{ marginBottom: 14 }}>
+        <MDataRow href="/privacidad" title="Política de privacidad" chevron />
+        <MDataRow href="/terminos" title="Términos y condiciones" chevron />
+        <MDataRow href="/eliminar-cuenta" title="Cómo eliminar tu cuenta" chevron />
+      </MContentCard>
+
       {/* Zona de peligro — separada y en tono de peligro; su ConfirmDialog de 2 pasos intacto. */}
       <MSectionHeader title="Zona de peligro" />
       <MContentCard style={{ marginBottom: 14, background: "var(--danger-soft)" }}>

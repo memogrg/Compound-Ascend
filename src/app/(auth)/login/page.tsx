@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { GoogleButton } from "@/components/auth/google-button";
 import { LoginForm } from "@/components/auth/login-form";
+import { PieLegal } from "@/components/legal/pie-legal";
 
 export const metadata = { title: "Iniciar sesión — CARTERA+" };
 
@@ -28,6 +29,9 @@ export default async function LoginPage({
       <GoogleButton />
       <div className="auth-divider">o con tu correo</div>
       <LoginForm next={next} />
+      <PieLegal
+        style={{ textAlign: "center", marginTop: 18, fontSize: 12, lineHeight: 1.5, opacity: 0.75 }}
+      />
     </AuthShell>
   );
 }
