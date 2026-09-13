@@ -48,22 +48,56 @@ describe("auth callback route", () => {
     expect(result2.headers.get("location")).toBe("https://example.com/dashboard");
   });
 
-  it("redirects to the safe next destination when authorization code is already used", async () => {
+  /**
+   * Un `code` ya consumido tiene dos lecturas, y antes se trataban igual: se redirigía
+   * a `next` sin comprobar nada. Eso convertía el callback en un trampolín — bastaba
+   * un `code` inventado y un `next` hostil para tener un enlace con nuestra pinta que
+   * termina en otro sitio. Ahora el pase lo da la SESIÓN.
+   */
+  function clienteConCodigoUsado(user: unknown) {
     const exchangeCodeForSession = vi.fn().mockResolvedValue({
-      error: {
-        status: 400,
-        message: "This authorization code has already been used",
-      },
+      error: { status: 400, message: "This authorization code has already been used" },
     });
-    const mockCreateServerClient = vi.mocked(createSupabaseServerClient);
-    mockCreateServerClient.mockReturnValue({
-      auth: { exchangeCodeForSession },
+    const getUser = vi.fn().mockResolvedValue({ data: { user } });
+    vi.mocked(createSupabaseServerClient).mockReturnValue({
+      auth: { exchangeCodeForSession, getUser },
     } as any);
+    return { exchangeCodeForSession, getUser };
+  }
 
-    const request = createRequest("used-code", "/dashboard");
-    const response = await callbackRoute.GET(request);
+  it("código ya usado CON sesión viva: sigue a next (abrir el enlace dos veces)", async () => {
+    clienteConCodigoUsado({ id: "u-1" });
+
+    const response = await callbackRoute.GET(createRequest("used-code", "/dashboard"));
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("https://example.com/dashboard");
+  });
+
+  it("código ya usado SIN sesión: a la pantalla de error, NUNCA a next", async () => {
+    clienteConCodigoUsado(null);
+
+    const response = await callbackRoute.GET(createRequest("used-code", "/dashboard"));
+
+    expect(response.headers.get("location")).toBe("https://example.com/login?error=auth");
+  });
+
+  it("un next hostil no sale del sitio ni siquiera con la sesión viva", async () => {
+    clienteConCodigoUsado({ id: "u-1" });
+
+    // `/\evil.com` pasaba el validador viejo y resolvía a https://evil.com/.
+    const response = await callbackRoute.GET(createRequest("used-code", "/\\evil.com"));
+
+    const destino = new URL(response.headers.get("location")!);
+    expect(destino.origin).toBe("https://example.com");
+    expect(destino.pathname).toBe("/dashboard");
+  });
+
+  it("el móvil cae en SU pantalla de entrada, no en la web", async () => {
+    clienteConCodigoUsado(null);
+
+    const response = await callbackRoute.GET(createRequest("used-code", "/m/gastos"));
+
+    expect(response.headers.get("location")).toBe("https://example.com/m/login?error=auth");
   });
 });

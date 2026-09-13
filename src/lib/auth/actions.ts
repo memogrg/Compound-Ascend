@@ -21,6 +21,7 @@ import {
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimit, RATE_LIMITS, clientIpFromHeaders } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { safeInternalPath } from "@/lib/security/safe-redirect";
 
 /** Mensaje genérico cuando se excede el rate limit (no revela detalles). */
 const TOO_MANY = "Demasiados intentos. Espera un momento e inténtalo de nuevo.";
@@ -50,13 +51,6 @@ function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 }
 
-/** Solo permite redirecciones internas (mismo sitio); evita open-redirects. */
-function safeRelative(next: FormDataEntryValue | null, fallback: string): string {
-  const value = typeof next === "string" ? next : "";
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return fallback;
-  return value;
-}
-
 export async function signInAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = signInSchema.safeParse({
     email: formData.get("email"),
@@ -84,7 +78,7 @@ export async function signInAction(_prev: ActionState, formData: FormData): Prom
     return { ok: false, message: "Correo o contraseña incorrectos." };
   }
 
-  redirect(safeRelative(formData.get("next"), "/dashboard"));
+  redirect(safeInternalPath(formData.get("next"), "/dashboard"));
 }
 
 export async function signUpAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -107,7 +101,7 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
 
   // Tras confirmar el correo, vuelve a `next` (p. ej. aceptar invitación) o al
   // onboarding. El valor va anidado, así que se codifica para el callback.
-  const next = safeRelative(formData.get("next"), "/bienvenida");
+  const next = safeInternalPath(formData.get("next"), "/bienvenida");
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
@@ -198,13 +192,13 @@ export async function updatePasswordAction(
 
   // `next` (interno) permite que el móvil regrese a /m/perfil en vez de saltar a la web.
   // Aditivo: sin `next` (flujo web de reset) sigue yendo a /dashboard.
-  redirect(safeRelative(formData.get("next"), "/dashboard"));
+  redirect(safeInternalPath(formData.get("next"), "/dashboard"));
 }
 
 export async function signInWithGoogleAction(formData?: FormData): Promise<void> {
   // `next` viaja en un campo oculto del <form>: así el botón de Google de /empezar
   // vuelve a /empezar/pagar con el plan, y no al panel. Solo rutas internas.
-  const next = safeRelative(formData?.get("next") ?? null, "/dashboard");
+  const next = safeInternalPath(formData?.get("next") ?? null, "/dashboard");
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -316,7 +310,7 @@ export async function signOutAction(next?: string | FormData): Promise<void> {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
   // `next` llega como string cuando se hace bind/llamada directa (móvil → "/m/login"); como
-  // FormData cuando es la acción de un <form> web → cae al fallback. safeRelative solo admite
+  // FormData cuando es la acción de un <form> web → cae al fallback. safeInternalPath solo admite
   // rutas internas (evita open-redirects a URLs absolutas/externas).
   //
   // El fallback web es la LANDING, no /login. Cerrar sesión te dejaba en una pantalla de
@@ -324,5 +318,5 @@ export async function signOutAction(next?: string | FormData): Promise<void> {
   // quien tuviera sesión, la página principal quedaba inalcanzable. La landing es la puerta
   // con las dos acciones: volver a entrar, o registrarse. Es también el default de Rails y
   // Laravel; YNAB manda al login, pero su login sí tiene por dónde salir.
-  redirect(safeRelative(typeof next === "string" ? next : null, "/"));
+  redirect(safeInternalPath(next, "/"));
 }

@@ -6,13 +6,16 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import { attributeReferralFromCookie } from "@/lib/referrals/service";
+import { safeInternalPath } from "@/lib/security/safe-redirect";
 
 export const runtime = "nodejs";
 
-/** Solo permitimos redirecciones internas (mismo sitio). */
-function safeNext(next: string | null): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/dashboard";
-  return next;
+/**
+ * A dónde mandar cuando la autenticación no prosperó. El móvil tiene su propia
+ * pantalla de entrada: mandarlo a `/login` lo sacaría del shell nativo.
+ */
+function rutaDeError(next: string): string {
+  return next === "/m" || next.startsWith("/m/") ? "/m/login?error=auth" : "/login?error=auth";
 }
 
 const pendingCallbackExchange = new Map<string, Promise<NextResponse>>();
@@ -20,10 +23,10 @@ const pendingCallbackExchange = new Map<string, Promise<NextResponse>>();
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const next = safeNext(url.searchParams.get("next"));
+  const next = safeInternalPath(url.searchParams.get("next"), "/dashboard");
 
   if (!code) {
-    return NextResponse.redirect(new URL("/login?error=auth", url.origin));
+    return NextResponse.redirect(new URL(rutaDeError(next), url.origin));
   }
 
   if (pendingCallbackExchange.has(code)) {
@@ -50,15 +53,24 @@ async function handleCallbackExchange(url: URL, code: string, next: string) {
       message: error.message,
     });
 
-    if (
+    // Código ya consumido: el caso LEGÍTIMO es abrir dos veces el enlace del correo
+    // —o el prefetch del cliente de correo adelantándose—, y ahí la sesión ya existe
+    // de la primera vez. Antes se redirigía a `next` sin comprobar nada, así que un
+    // `code` inventado con un `next` hostil servía de trampolín con la pinta de un
+    // enlace nuestro. Ahora el pase lo da la SESIÓN, no el mensaje de error.
+    const yaConsumido =
       error.status === 400 ||
       error.message?.toLowerCase().includes("already been used") ||
-      error.message?.toLowerCase().includes("invalid grant")
-    ) {
-      return NextResponse.redirect(new URL(next, url.origin));
+      error.message?.toLowerCase().includes("invalid grant");
+
+    if (yaConsumido) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) return NextResponse.redirect(new URL(next, url.origin));
     }
 
-    return NextResponse.redirect(new URL("/login?error=auth", url.origin));
+    return NextResponse.redirect(new URL(rutaDeError(next), url.origin));
   }
 
   // Atribución del referido: acá es donde converge TODO camino de alta (OAuth de
