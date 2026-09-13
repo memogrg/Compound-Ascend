@@ -22,6 +22,9 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 // ya hay sesión. NO va en AUTH_PAGES: con sesión y sin plan es justo donde hay
 // que estar (modo «reanudar pago»), y /empezar/pagar necesita la sesión viva
 // para abrir Stripe a nombre del usuario.
+// `/privacidad`, `/terminos` y `/eliminar-cuenta` son públicas por exigencia de las
+// tiendas: Play Console y App Store las revisan SIN instalar la app y sin sesión. Una
+// política detrás del login no cumple.
 const PUBLIC_PREFIXES = [
   "/login",
   "/signup",
@@ -31,6 +34,9 @@ const PUBLIC_PREFIXES = [
   "/faqs",
   "/empezar",
   "/m",
+  "/privacidad",
+  "/terminos",
+  "/eliminar-cuenta",
 ];
 /** Rutas de autenticación: si ya hay sesión, redirigir al panel. */
 const AUTH_PAGES = ["/login", "/signup", "/reset-password"];

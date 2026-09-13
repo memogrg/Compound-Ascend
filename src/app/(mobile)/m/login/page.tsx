@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PieLegal } from "@/components/legal/pie-legal";
 import { MobileLoginForm } from "../components/mobile-login-form";
 import { MobileGoogleButton } from "../components/mobile-google-button";
 
@@ -77,6 +78,17 @@ export default function MobileLogin() {
           Crea una
         </Link>
       </div>
+
+      <PieLegal
+        voz="tu"
+        style={{
+          textAlign: "center",
+          marginTop: 18,
+          fontSize: 12,
+          lineHeight: 1.5,
+          color: "var(--text-muted)",
+        }}
+      />
     </div>
   );
 }

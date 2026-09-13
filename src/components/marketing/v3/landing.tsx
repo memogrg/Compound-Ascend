@@ -1360,7 +1360,10 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
             </span>{" "}
             · Costa Rica
           </span>
-          <span>Es información y educación financiera, no asesoría formal. © 2026</span>
+          <span>
+            Es información y educación financiera, no asesoría formal. © 2026 ·{" "}
+            <a href="/privacidad">Privacidad</a> · <a href="/terminos">Términos</a>
+          </span>
         </div>
       </footer>
 

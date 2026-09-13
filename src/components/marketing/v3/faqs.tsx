@@ -1364,7 +1364,9 @@ export function Faqs({ conSesion = false }: { conSesion?: boolean }) {
             </span>{" "}
             · Costa Rica
           </span>
-          <span>Privacidad · Términos</span>
+          <span>
+            <Link href="/privacidad">Privacidad</Link> · <Link href="/terminos">Términos</Link>
+          </span>
         </div>
       </footer>
       <FaqsMotion />

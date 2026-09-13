@@ -263,6 +263,16 @@ export default async function Page() {
         <ExportDataButton />
       </SetRow>
 
+      {/* Legal. Antes de la zona de peligro a propósito: quien va a borrar la cuenta
+          suele querer leer primero qué pasa con sus datos. */}
+      <SetRow title="Legal" desc="Las condiciones del servicio y qué hacemos con tus datos.">
+        <div style={{ display: "grid", gap: 8 }}>
+          <Link href="/privacidad">Política de privacidad</Link>
+          <Link href="/terminos">Términos y condiciones</Link>
+          <Link href="/eliminar-cuenta">Cómo eliminar tu cuenta</Link>
+        </div>
+      </SetRow>
+
       <SetRow
         title="Zona de peligro"
         desc="Borrado permanente de tu cuenta. Descargá tus datos antes; no se puede deshacer."
