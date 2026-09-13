@@ -22,6 +22,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimit, RATE_LIMITS, clientIpFromHeaders } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import { safeInternalPath } from "@/lib/security/safe-redirect";
+import { registrarAceptacionConServicio } from "@/lib/legal/aceptacion";
 
 /** Mensaje genérico cuando se excede el rate limit (no revela detalles). */
 const TOO_MANY = "Demasiados intentos. Espera un momento e inténtalo de nuevo.";
@@ -87,9 +88,20 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
     email: formData.get("email"),
     password: formData.get("password"),
     confirm: formData.get("confirm"),
+    acepta_terminos: formData.get("acepta_terminos"),
   });
   if (!parsed.success) {
-    return { ok: false, fieldErrors: zodToFieldErrors(parsed.error.issues) };
+    // `values` devuelve lo re-sembrable: React 19 resetea el formulario al terminar la
+    // acción, y sin esto la casilla vuelve vacía y hay que volver a marcarla.
+    return {
+      ok: false,
+      fieldErrors: zodToFieldErrors(parsed.error.issues),
+      values: {
+        displayName: String(formData.get("displayName") ?? ""),
+        email: String(formData.get("email") ?? ""),
+        acepta_terminos: String(formData.get("acepta_terminos") ?? ""),
+      },
+    };
   }
 
   // Anti abuso: evita creación masiva de cuentas / bombardeo de correos por IP.
@@ -103,7 +115,7 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
   // onboarding. El valor va anidado, así que se codifica para el callback.
   const next = safeInternalPath(formData.get("next"), "/bienvenida");
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
@@ -111,6 +123,10 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
       data: { display_name: parsed.data.displayName },
     },
   });
+  // La aceptación se registra ACÁ, no al confirmar el correo: el consentimiento se dio
+  // en este momento, con el texto publicado ahora. Todavía no hay sesión —falta confirmar
+  // el correo— así que la escribe el service-role.
+  if (!error && data.user) await registrarAceptacionConServicio(data.user.id);
   if (error) {
     logger.warn("signUp fallido", { code: error.code });
     // Mensaje genérico para no revelar si el correo ya existe.
@@ -234,11 +250,13 @@ export async function empezarAction(_prev: ActionState, formData: FormData): Pro
     email: formData.get("email"),
     password: formData.get("password"),
     plan: formData.get("plan"),
+    acepta_terminos: formData.get("acepta_terminos"),
   });
   // Nunca la contraseña: `values` vuelve al navegador dentro del estado.
   const values = {
     email: String(formData.get("email") ?? ""),
     plan: String(formData.get("plan") ?? ""),
+    acepta_terminos: String(formData.get("acepta_terminos") ?? ""),
   };
   if (!parsed.success) {
     return { ok: false, fieldErrors: zodToFieldErrors(parsed.error.issues), values };
@@ -251,7 +269,7 @@ export async function empezarAction(_prev: ActionState, formData: FormData): Pro
 
   const supabase = await createSupabaseServerClient();
   const admin = createServiceRoleClient();
-  const { error: errCrear } = await admin.auth.admin.createUser({
+  const { data: creado, error: errCrear } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
@@ -267,7 +285,10 @@ export async function empezarAction(_prev: ActionState, formData: FormData): Pro
         values,
       };
     }
-    const { error: errEntrar } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: sesion, error: errEntrar } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
     if (errEntrar) {
       return {
         ok: false,
@@ -277,7 +298,11 @@ export async function empezarAction(_prev: ActionState, formData: FormData): Pro
         values,
       };
     }
+    // Cuenta que ya existía: acaba de marcar la casilla, así que su aceptación vale
+    // igual, y con la versión de hoy.
+    if (sesion.user) await registrarAceptacionConServicio(sesion.user.id);
   } else {
+    if (creado.user) await registrarAceptacionConServicio(creado.user.id);
     const { error: errEntrar } = await supabase.auth.signInWithPassword({ email, password });
     if (errEntrar) {
       logger.error("empezar: cuenta creada pero no se pudo abrir sesión", { code: errEntrar.code });

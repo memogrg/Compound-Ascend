@@ -13,6 +13,16 @@ export const passwordSchema = z
   .min(8, "La contraseña debe tener al menos 8 caracteres")
   .max(72, "La contraseña es demasiado larga");
 
+/**
+ * La casilla de aceptación. Un checkbox no marcado NO viaja en el FormData — llega
+ * `null`, no `"off"` — así que el mensaje tiene que salir de un `literal` que falla
+ * tanto con `null` como con cualquier otro valor. `z.boolean()` no sirve: FormData
+ * entrega strings.
+ */
+export const aceptaTerminosSchema = z.literal("on", {
+  message: "Necesitás aceptar los Términos y la Política de privacidad para crear tu cuenta.",
+});
+
 export const signInSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, "La contraseña es obligatoria"),
@@ -24,6 +34,7 @@ export const signUpSchema = z
     email: emailSchema,
     password: passwordSchema,
     confirm: z.string(),
+    acepta_terminos: aceptaTerminosSchema,
   })
   .refine((d) => d.password === d.confirm, {
     message: "Las contraseñas no coinciden",
@@ -39,6 +50,7 @@ export const empezarSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
   plan: z.enum(["esencial", "pro", "max"], { message: "Elegí un plan" }),
+  acepta_terminos: aceptaTerminosSchema,
 });
 
 export const requestResetSchema = z.object({ email: emailSchema });

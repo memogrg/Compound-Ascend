@@ -27,8 +27,18 @@ describe("auth callback route", () => {
 
     const exchangeCodeForSession = vi.fn(() => exchangeDeferred);
     const mockCreateServerClient = vi.mocked(createSupabaseServerClient);
+    // Tras un intercambio exitoso el callback registra la aceptación de términos, así
+    // que el doble tiene que responder también a getUser y a la lectura del perfil.
     mockCreateServerClient.mockReturnValue({
-      auth: { exchangeCodeForSession },
+      auth: {
+        exchangeCodeForSession,
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: "u-1" } } }),
+      },
+      from: () => ({
+        select: () => ({
+          eq: () => ({ maybeSingle: async () => ({ data: { terms_version: null } }) }),
+        }),
+      }),
     } as any);
 
     const request = createRequest("abc123", "/dashboard");

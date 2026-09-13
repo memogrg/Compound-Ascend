@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import { getUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { debeRedirigirSinPlan } from "../lib/plan-guard";
+import { AceptarTerminosBanner } from "@/components/legal/aceptar-terminos-banner";
+import { aceptacionPendiente } from "@/lib/legal/aceptacion";
 import { getPrimaryCurrency, getDisplayCurrency } from "@/modules/financial-base";
 import { getUserTimezone, knownUserTz } from "@/lib/time/user-time";
 import { TimezoneSync } from "@/components/tz/timezone-sync";
@@ -79,6 +81,9 @@ export default async function MobileAppLayout({ children }: { children: React.Re
     knownTz = effectiveTz;
   }
 
+  // Sin `.catch()` mudo: el helper ya degrada a false y lo LOGUEA.
+  const terminosPendientes = user ? await aceptacionPendiente(user.id) : false;
+
   return (
     <TimezoneProvider value={knownTz}>
       <CurrencyProvider value={currencies}>
@@ -96,6 +101,10 @@ export default async function MobileAppLayout({ children }: { children: React.Re
           {/* Ritmo del mes: ventana de configuración, cierre y recordatorio de registro.
           Un aviso a la vez, descartable, y se auto-oculta cuando no hay nada que decir. */}
           <MobileRhythmNudge />
+          {/* Aceptación de Términos: solo para cuentas anteriores al registro, o cuando
+              LEGAL_VERSION suba. Barra inferior, no modal: quien ya tiene sus datos adentro
+              no puede quedar encerrado por un aviso legal. */}
+          {terminosPendientes ? <AceptarTerminosBanner /> : null}
           {children}
         </ToastProvider>
       </CurrencyProvider>

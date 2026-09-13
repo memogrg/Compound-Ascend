@@ -5,8 +5,10 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import { LEGAL_VERSION } from "@/lib/legal/version";
 import { attributeReferralFromCookie } from "@/lib/referrals/service";
 import { safeInternalPath } from "@/lib/security/safe-redirect";
+import { registrarAceptacionConServicio } from "@/lib/legal/aceptacion";
 
 export const runtime = "nodejs";
 
@@ -83,6 +85,30 @@ async function handleCallbackExchange(url: URL, code: string, next: string) {
   // resultado, nunca throw— así que no arriesga el login.
   const attribution = await attributeReferralFromCookie();
   if (attribution === "atribuido") logger.info("referido atribuido");
+
+  // Aceptación por conducta, con aviso previo. Quien entra por Google no pasa por
+  // ningún formulario con casilla, pero el botón de Google lleva DEBAJO el pie «Al
+  // continuar aceptás los Términos y la Política de privacidad», con ambos enlaces, en
+  // las cuatro pantallas donde aparece: /empezar, /login, /m/login y /m/signup (T-07).
+  // Eso es lo que convierte el clic en consentimiento informado, y por eso se registra
+  // acá — el mismo punto donde converge TODO camino de alta.
+  //
+  // Solo si está pendiente: si ya aceptó esta versión, no se pisa la fecha original.
+  // Cada inicio de sesión con Google pasa por aquí, y sobrescribir convertiría la
+  // marca en «última vez que entró», que no es lo que el registro tiene que probar.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    const { data: perfil } = await supabase
+      .from("profiles")
+      .select("terms_version")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (perfil && perfil.terms_version !== LEGAL_VERSION) {
+      await registrarAceptacionConServicio(user.id);
+    }
+  }
 
   return NextResponse.redirect(new URL(next, url.origin));
 }
