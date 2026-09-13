@@ -63,6 +63,12 @@ export type ProfileRow = Timestamps & {
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
 
+  // ── Aceptación legal (migración 20260912000001) ───────────────────────
+  /** LEGAL_VERSION que la persona aceptó. `null` = pendiente (cuenta anterior al registro). */
+  terms_version: string | null;
+  /** Cuándo. Va con `terms_version`: la fecha sola no dice qué se aceptó. */
+  terms_accepted_at: string | null;
+
   /**
    * Prioridad declarada para ordenar "Mis acciones" (migración 20260909000001).
    * null = no la eligió a mano → se deriva del ranking `priorities` del onboarding.

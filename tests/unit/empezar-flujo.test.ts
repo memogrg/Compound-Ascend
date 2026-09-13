@@ -72,17 +72,32 @@ beforeEach(() => {
 });
 
 describe("empezarSchema", () => {
-  it("acepta correo, contraseña y un plan de pago", () => {
+  it("acepta correo, contraseña, un plan de pago y la casilla de términos", () => {
     const r = empezarSchema.safeParse({
       email: "vos@correo.com",
       password: "Sandbox123!",
       plan: "pro",
+      acepta_terminos: "on",
     });
     expect(r.success).toBe(true);
   });
+  it("sin la casilla de términos no se crea la cuenta", () => {
+    const r = empezarSchema.safeParse({
+      email: "vos@correo.com",
+      password: "Sandbox123!",
+      plan: "pro",
+      acepta_terminos: null,
+    });
+    expect(r.success).toBe(false);
+  });
   it("rechaza «ninguno» y planes inventados", () => {
     for (const plan of ["ninguno", "gratis", "", undefined]) {
-      const r = empezarSchema.safeParse({ email: "vos@correo.com", password: "Sandbox123!", plan });
+      const r = empezarSchema.safeParse({
+        email: "vos@correo.com",
+        password: "Sandbox123!",
+        plan,
+        acepta_terminos: "on",
+      });
       expect(r.success).toBe(false);
     }
   });

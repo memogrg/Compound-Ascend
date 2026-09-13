@@ -7,6 +7,8 @@ import {
 import { getUserTimezone, knownUserTz } from "@/lib/time/user-time";
 import { TimezoneSync } from "@/components/tz/timezone-sync";
 import { RhythmNudge } from "@/components/layout/rhythm-nudge";
+import { AceptarTerminosBanner } from "@/components/legal/aceptar-terminos-banner";
+import { aceptacionPendiente } from "@/lib/legal/aceptacion";
 
 /**
  * Layout del área autenticada. Obtiene el usuario (si Supabase está configurado)
@@ -64,6 +66,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
     // sidebar. El badge de `wealth` de arriba se queda porque es un `count(*)` de una tabla.
   }
 
+  // Una consulta de una columna, solo con sesión. El resultado decide si se monta la
+  // barra: la comparación con LEGAL_VERSION vive en el servidor para que subir la
+  // versión la haga reaparecer sola.
+  // Sin `.catch()` mudo: el helper ya degrada a false y lo LOGUEA.
+  const terminosPendientes = user ? await aceptacionPendiente(user.id) : false;
+
   return (
     <AppShell
       user={{ name, sub, initials }}
@@ -75,6 +83,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
       {/* Va en el layout, no en cada página: el ritmo del mes acompaña en toda la app.
           Se auto-oculta cuando no hay nada que decir (que es casi siempre). */}
       <RhythmNudge />
+      {/* Aceptación de Términos: solo para cuentas anteriores al registro, o cuando
+          LEGAL_VERSION suba. Barra inferior, no modal: quien ya tiene sus datos adentro
+          no puede quedar encerrado por un aviso legal. */}
+      {terminosPendientes ? <AceptarTerminosBanner /> : null}
       {children}
     </AppShell>
   );
