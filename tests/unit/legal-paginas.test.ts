@@ -65,7 +65,7 @@ describe("páginas legales", () => {
     // communications@ lo lee el poller IMAP: un mensaje de una persona quedaría
     // mezclado con los avisos bancarios reenviados, y probablemente sin respuesta.
     const version = leer("src/lib/legal/version.ts");
-    expect(version).toContain("privacidad@aitechumbrella.com");
+    expect(version).toContain("privacy@aitechumbrella.com");
     expect(version).not.toContain("communications@aitechumbrella.com");
   });
 

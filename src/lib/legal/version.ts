@@ -12,9 +12,11 @@ export const LEGAL_VERSION = "2026-09-12";
 /** La misma fecha, escrita para leer. */
 export const LEGAL_ACTUALIZADO = "12 de setiembre de 2026";
 
-/** Correo de privacidad. */
-// TODO(alias): privacidad@aitechumbrella.com todavía no existe en Workspace — hay que
-// crearlo antes de enviar a las tiendas. NO usar communications@: ése es el buzón de
-// ingesta que lee el poller IMAP, y los mensajes de gente quedarían mezclados con los
-// avisos bancarios reenviados.
-export const CORREO_PRIVACIDAD = "privacidad@aitechumbrella.com";
+/**
+ * Correo de privacidad, el que aparece en las tres páginas legales.
+ *
+ * NO cambiarlo por communications@: ése es el buzón de ingesta que lee el poller
+ * IMAP, y los mensajes de gente quedarían mezclados con los avisos bancarios
+ * reenviados — probablemente sin que nadie los lea.
+ */
+export const CORREO_PRIVACIDAD = "privacy@aitechumbrella.com";
