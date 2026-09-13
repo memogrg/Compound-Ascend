@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import { safeInternalPath } from "@/lib/security/safe-redirect";
 
 /**
  * LEGACY / FALLBACK: login Google por NAVEGADOR del sistema. Reemplazado por el login NATIVO por
@@ -27,14 +28,9 @@ export const runtime = "nodejs";
 
 const NATIVE_REDIRECT = "com.compoundascend.cartera://auth-callback";
 
-/** Solo rutas internas ("/algo"), nunca "//externo". Default /m para el móvil. */
-function safeNext(next: string | null): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/m";
-  return next;
-}
-
 export async function GET(request: Request) {
-  const next = safeNext(new URL(request.url).searchParams.get("next"));
+  // Default /m: este camino es el del móvil.
+  const next = safeInternalPath(new URL(request.url).searchParams.get("next"), "/m");
 
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
