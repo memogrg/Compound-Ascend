@@ -14,7 +14,8 @@ export function MEmptyState({
   actionHref,
   onAction,
 }: {
-  icon: MIconName;
+  /** `"none"` para las pantallas donde un ícono sobra (error, 404 sin metáfora útil). */
+  icon: MIconName | "none";
   title: string;
   description?: string;
   /** Etiqueta del CTA (verbo: "Registrar gasto", "Crear sobre"). */
@@ -25,9 +26,11 @@ export function MEmptyState({
 }) {
   return (
     <div className="m-empty">
-      <div className="m-empty-ic" aria-hidden>
-        <MIcon name={icon} size={26} />
-      </div>
+      {icon === "none" ? null : (
+        <div className="m-empty-ic" aria-hidden>
+          <MIcon name={icon} size={26} />
+        </div>
+      )}
       <div className="m-empty-t">{title}</div>
       {description ? <div className="m-empty-d">{description}</div> : null}
       {actionLabel && actionHref ? (

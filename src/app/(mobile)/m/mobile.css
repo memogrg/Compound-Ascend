@@ -4615,3 +4615,38 @@ body:has(.m-shell[data-theme="dark"]) {
   width: 100%;
   justify-content: center;
 }
+
+/* ── Esqueleto de carga (loading.tsx del grupo (app)) ─────────────────────────
+   Bloques del alto aproximado de lo que viene, para que la pantalla no salte
+   cuando llegan los datos. Usa la misma superficie de tarjeta que el contenido
+   real: el esqueleto es la tarjeta sin su contenido, no un gris ajeno.
+   El brillo recorre el bloque de izquierda a derecha; con
+   `prefers-reduced-motion` se apaga y queda el bloque quieto, que ya comunica
+   "esto se está cargando" sin movimiento. */
+.m-shell .m-skel {
+  border-radius: var(--radius-card);
+  background: var(--surface-2);
+  position: relative;
+  overflow: hidden;
+}
+
+.m-shell .m-skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--surface-3), transparent);
+  transform: translateX(-100%);
+  animation: m-skel-brillo 1.4s linear infinite;
+}
+
+@keyframes m-skel-brillo {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m-shell .m-skel::after {
+    animation: none;
+  }
+}
