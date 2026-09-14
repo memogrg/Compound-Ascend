@@ -54,10 +54,18 @@ function draftFrom(p: PendingProposalView): Draft {
   };
 }
 
+/**
+ * Lectura del monto tecleado en la propuesta: una sola coma pasa a punto. Extraída tal cual para el test
+ * de caracterización (T-16); el comportamiento no cambia.
+ */
+export function leerMontoPropuesta(amount: string): number {
+  return Number(amount.replace(",", "."));
+}
+
 /** Solo lo que cambió respecto a la propuesta viaja como override. */
 function diffOverrides(p: PendingProposalView, d: Draft, categoryId: string): ProposalOverrides {
   const ov: ProposalOverrides = {};
-  const amount = Number(d.amount.replace(",", "."));
+  const amount = leerMontoPropuesta(d.amount);
   if (Number.isFinite(amount) && amount > 0 && amount !== p.amount) ov.amount = amount;
   if (d.currency && d.currency !== p.currency) ov.currency = d.currency;
   if (d.occurredOn && d.occurredOn !== p.occurredOn) ov.occurredOn = d.occurredOn;
