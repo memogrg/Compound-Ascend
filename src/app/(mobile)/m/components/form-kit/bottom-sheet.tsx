@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { MobilePortal } from "../mobile-portal";
 import { lockBodyScroll, unlockBodyScroll } from "../../lib/scroll-lock";
+import { pushOverlay } from "../../lib/overlay-stack";
 import { useVisualViewportHeight } from "../../lib/use-visual-viewport";
 
 /**
@@ -31,13 +32,28 @@ export function BottomSheet({
   // entonces la hoja usa su alto de CSS de siempre.
   const visibleHeight = useVisualViewportHeight(open);
 
+  // Espejo de `onClose`: casi todos los callers pasan una arrow inline, que cambia de
+  // identidad en cada render. Con `onClose` en las dependencias del efecto de abajo, ese
+  // efecto se rearmaría constantemente —y con él el lockBodyScroll, que CUENTA
+  // anidamientos—. La dependencia se queda en `[open]`, como estaba.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   // Congela el documento mientras la hoja está abierta (scroll-lock endurecido para iOS):
   // impide que el teclado desplace la página bajo la barra de estado. Cuenta anidamientos
   // (el alta rápida abre pickers dentro de la hoja).
+  //
+  // De paso la registra en la pila de overlays: así el botón Atrás de Android la cierra
+  // en vez de navegar por detrás. Se da de baja al cerrar o al desmontar, en la misma
+  // limpieza, que es lo que garantiza que la pila no acumule hojas fantasma.
   useEffect(() => {
     if (!open) return;
     lockBodyScroll();
-    return () => unlockBodyScroll();
+    const bajaOverlay = pushOverlay(() => onCloseRef.current());
+    return () => {
+      unlockBodyScroll();
+      bajaOverlay();
+    };
   }, [open]);
 
   // Reinicia el desplazamiento de arrastre cada vez que se abre.

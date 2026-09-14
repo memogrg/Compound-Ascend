@@ -1,4 +1,7 @@
+import { useEffect, useRef } from "react";
+
 import { MobilePortal } from "../mobile-portal";
+import { pushOverlay } from "../../lib/overlay-stack";
 
 /**
  * ConfirmDialog (form kit): confirmación de una acción destructiva. La variante
@@ -31,6 +34,18 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  // Registro propio en la pila de overlays: a diferencia de PlusChoiceSheet, este diálogo
+  // NO se monta sobre BottomSheet — va por portal directo—, así que no hereda el registro.
+  // El hook va ANTES del return temprano: las reglas de hooks no admiten saltarlo.
+  // Espejo de `onCancel` por lo mismo que en BottomSheet: los callers pasan arrows
+  // inline y la dependencia debe ser solo `open`.
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
+  useEffect(() => {
+    if (!open) return;
+    return pushOverlay(() => onCancelRef.current());
+  }, [open]);
+
   if (!open) return null;
   return (
     <MobilePortal>

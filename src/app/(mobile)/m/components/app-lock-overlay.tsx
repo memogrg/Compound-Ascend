@@ -32,6 +32,7 @@ import {
   APP_LOCK_EVENT,
 } from "../lib/app-lock";
 import { isIntroActive, onIntroDone } from "../lib/app-intro";
+import { pushOverlay } from "../lib/overlay-stack";
 
 export function AppLockOverlay() {
   const [enabled, setEnabled] = useState(false); // ¿candado activo?
@@ -167,6 +168,16 @@ export function AppLockOverlay() {
       for (const h of handles) void h.remove();
     };
   }, [runUnlock]);
+
+  // Mientras el candado tapa la UI, ocupa el tope de la pila de overlays con un cierre
+  // que NO HACE NADA. Es a propósito: así `closeTopOverlay()` devuelve true y el botón
+  // Atrás de Android se consume ahí. Sin esto, Atrás navegaría por detrás del candado
+  // —la pantalla sigue montada debajo— y al desbloquear aparecería otra distinta.
+  // El candado NO se cierra con Atrás: se sale con biometría o cerrando sesión.
+  useEffect(() => {
+    if (!enabled || !locked) return;
+    return pushOverlay(() => {});
+  }, [enabled, locked]);
 
   const recover = useCallback(async () => {
     // Escape seguro: borra el flag y cierra sesión (destruye la sesión, no revela datos).

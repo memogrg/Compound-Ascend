@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { MobileBell } from "./mobile-bell";
 import { MobilePortal } from "./mobile-portal";
 import { useEdgeSwipe } from "../lib/use-edge-swipe";
+import { pushOverlay } from "../lib/overlay-stack";
 
 /**
  * Menú de navegación del móvil (botón ☰ + drawer), presente en el header de cada
@@ -80,6 +81,12 @@ export function MobileMenu() {
   // grande — y desde que no hay barra de pestañas, casi toda la navegación pasa por ahí.
   const abrir = useCallback(() => setOpen(true), []);
   useEdgeSwipe(abrir, !open);
+
+  // Con el menú abierto, el botón Atrás de Android lo cierra en vez de navegar.
+  useEffect(() => {
+    if (!open) return;
+    return pushOverlay(() => setOpen(false));
+  }, [open]);
 
   return (
     <>
