@@ -51,6 +51,7 @@ import type {
   AllocationSlice,
   HoldingNativo,
 } from "@/modules/wealth/types";
+import { parseMonto } from "@/lib/parse-monto";
 
 const MONTH_ABBR = [
   "Ene",
@@ -876,8 +877,11 @@ function ValuationModal({ holding, onClose }: { holding: Holding; onClose: () =>
   }, [holding]);
 
   const save = async () => {
-    const v = Number(value.replace(/[^0-9.]/g, ""));
-    if (!Number.isFinite(v) || v <= 0) return toast("Ingresa un valor.");
+    // parseMonto y no un replace: borrar la coma convertía «1500,50» en 150050, y este
+    // campo alimenta el patrimonio y la rentabilidad del activo. Un cero de más acá se
+    // ve en el patrimonio neto, no en este formulario.
+    const v = parseMonto(value);
+    if (v == null || !Number.isFinite(v) || v <= 0) return toast("Ingresa un valor.");
     setPending(true);
     const res = await editHoldingAction(holding.id, {
       assetType: holding.assetType,
