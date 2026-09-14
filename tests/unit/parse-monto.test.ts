@@ -57,6 +57,44 @@ describe("parseMonto", () => {
     expect(parseMonto("1,250,000.75")).toBe(1250000.75);
   });
 
+  /**
+   * El caso que obliga a mirar la longitud de la cola. «1.500» tecleado casi siempre es
+   * mil quinientos, no uno con medio — y con la regla anterior («el último separador es
+   * el decimal», sin mirar cuántos dígitos deja) se guardaba 1.5.
+   */
+  it("un separador ÚNICO con exactamente 3 dígitos detrás es de MILES", () => {
+    expect(parseMonto("1.500")).toBe(1500);
+    expect(parseMonto("1,500")).toBe(1500);
+    expect(parseMonto("12.345")).toBe(12345);
+  });
+
+  it("…pero con 1, 2 o 4+ dígitos detrás es decimal", () => {
+    expect(parseMonto("2,5")).toBe(2.5);
+    expect(parseMonto("1500,50")).toBe(1500.5);
+    expect(parseMonto("12.3456")).toBe(12.3456);
+  });
+
+  it("parte entera en cero → siempre decimal: «0,125» es una fracción, no 125", () => {
+    expect(parseMonto("0,125")).toBe(0.125);
+    expect(parseMonto("0.125")).toBe(0.125);
+  });
+
+  it("separador repetido con agrupación de a 3 → miles", () => {
+    expect(parseMonto("1.500.000")).toBe(1500000);
+    expect(parseMonto("1,500,000")).toBe(1500000);
+  });
+
+  it("signo y paréntesis contables", () => {
+    expect(parseMonto("-1500,50")).toBe(-1500.5);
+    expect(parseMonto("(1.234,56)")).toBe(-1234.56);
+  });
+
+  it("símbolos de moneda y espacio de miles", () => {
+    expect(parseMonto("US$ 1,500.50")).toBe(1500.5);
+    expect(parseMonto("CRC 1.500,50")).toBe(1500.5);
+    expect(parseMonto("1 500 000,25")).toBe(1500000.25);
+  });
+
   it("el bug viejo, explícito: borrar la coma multiplicaba por 100", () => {
     const viejo = (s: string) => Number(s.replace(/[^0-9.]/g, ""));
     expect(viejo("1500,50")).toBe(150050);
