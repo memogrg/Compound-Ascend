@@ -72,6 +72,7 @@ import {
   type ActionResult,
   type Opt,
 } from "../../components/form-kit";
+import { normalizarMontoTexto } from "../../lib/parse-monto";
 
 const numStr = (n: number | undefined): string => (n == null ? "" : String(n));
 
@@ -1313,7 +1314,14 @@ function RentalCostsBlock(props: {
   );
 }
 
-/** Input de dinero con string (para rc, que el engine espera como string). */
+/**
+ * Input de dinero con string (para rc, que el engine espera como string).
+ *
+ * Guarda TEXTO, no número, y lo consumen ~14 `parseFloat` más abajo. Por eso normaliza
+ * al escribir en vez de dejar pasar la coma: la cadena que queda ya viene con punto y
+ * todos esos lectores siguen funcionando sin tocarlos. Antes se BORRABA la coma, así que
+ * «1500,50» quedaba en 150050.
+ */
 function MoneyStr({
   label,
   value,
@@ -1334,7 +1342,7 @@ function MoneyStr({
           className="m-inp m-money-inp"
           inputMode="decimal"
           value={value}
-          onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))}
+          onChange={(e) => onChange(normalizarMontoTexto(e.target.value))}
           placeholder="0"
         />
       </div>
@@ -1358,7 +1366,7 @@ function PctStr({
           className="m-inp m-money-inp"
           inputMode="decimal"
           value={value}
-          onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))}
+          onChange={(e) => onChange(normalizarMontoTexto(e.target.value))}
           placeholder="0"
         />
         <span className="m-money-sym">%</span>
