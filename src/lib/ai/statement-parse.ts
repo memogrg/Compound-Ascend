@@ -9,6 +9,7 @@
  * Formato objetivo:  `246276  2026-07-17  SUBWAY LAGUNILLA  3,900.00  COL  D`
  * Tolera: sin referencia, fechas DD/MM/AAAA, montos 1.234,56 o 1,234.56, y D/C o DEB/CRE.
  */
+import { parseMonto } from "@/lib/parse-monto";
 
 /** Una fila del estado, ya normalizada. */
 export type StatementRow = {
@@ -56,26 +57,19 @@ const FILA = new RegExp(
   "i",
 );
 
-/** Normaliza separadores de miles/decimales: el ÚLTIMO separador manda si deja 1-2 decimales. */
-export function parseMonto(raw: string): number | null {
-  let s = raw.replace(/\s/g, "");
-  const neg = s.startsWith("-");
-  if (neg) s = s.slice(1);
-  const iPunto = s.lastIndexOf(".");
-  const iComa = s.lastIndexOf(",");
-  const iDec = Math.max(iPunto, iComa);
-  if (iDec >= 0) {
-    const decimales = s.length - iDec - 1;
-    if (decimales >= 1 && decimales <= 2) {
-      // Ese último separador ES el decimal; todo lo demás son miles.
-      const entero = s.slice(0, iDec).replace(/[.,]/g, "");
-      s = `${entero}.${s.slice(iDec + 1)}`;
-    } else {
-      s = s.replace(/[.,]/g, ""); // "3.900" / "1,234" → miles, sin decimales
-    }
-  }
-  const n = Number(s);
-  if (!Number.isFinite(n) || n === 0) return null;
+/**
+ * El monto de una fila del estado de cuenta.
+ *
+ * Usa el lector único con `decimalesMaximos: 2`: un estado SIEMPRE trae centavos, así que
+ * un separador que deje más de dos dígitos era de miles («3.900» es 3900, no 3.9).
+ *
+ * Devuelve la MAGNITUD y descarta el cero: en un estado el signo lo dice la columna de
+ * tipo, no el número, y una fila de cero no es un movimiento. Eso es validación de la
+ * fila, no lectura — por eso vive acá y no dentro de parseMonto.
+ */
+export function montoDeFila(raw: string): number | null {
+  const n = parseMonto(raw, { decimalesMaximos: 2 });
+  if (n === undefined || !Number.isFinite(n) || n === 0) return null;
   return Math.abs(n);
 }
 
@@ -129,7 +123,7 @@ export function parseStatement(text: string): { filas: StatementRow[]; ignoradas
     }
     const [, ref, fechaRaw, comercioRaw, montoRaw, monedaRaw, tipoRaw] = m;
     const fecha = parseFecha(fechaRaw!);
-    const monto = parseMonto(montoRaw!);
+    const monto = montoDeFila(montoRaw!);
     const comercio = limpiarComercio(comercioRaw ?? "");
     if (!fecha || monto === null || !comercio) {
       ignoradas.push(l);

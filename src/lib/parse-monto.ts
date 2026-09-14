@@ -38,6 +38,16 @@
 /** Lo único que puede formar parte de un número: dígitos y separadores. */
 const SOLO_NUMERICO = /[^0-9.,]/g;
 
+/**
+ * Separadores pegados al FINAL del número. Son ruido, no decimales: los captura la
+ * puntuación de la frase que sigue al monto — «…por CRC 12,444.00, fue aprobada» deja
+ * «12,444.00,» cuando el regex del emisor no ancla en dígito. Sin recortarlos, el último
+ * separador se leería como el decimal y 12 444 se convertiría en 1 244 400.
+ *
+ * Solo al final. Al inicio NO: «.5» es medio, y hay avisos que lo escriben así.
+ */
+const COLGANTE_FINAL = /[.,]+$/;
+
 /** Paréntesis con dígitos adentro: notación contable de negativo, «(1.234,56)». */
 const PARENTESIS_CONTABLE = /\(\s*[^()]*\d[^()]*\)/;
 
@@ -49,11 +59,55 @@ function decimalEnElUltimo(s: string): string {
   return `${entero}.${decimales}`;
 }
 
-/** Aplica la regla de arriba a una cadena que ya solo tiene dígitos y separadores. */
-function interpretarSeparadores(s: string): string {
+/**
+ * Opciones de lectura. Existen para EMISORES CONOCIDOS, no para gustos: cada una se
+ * justifica con quién manda el texto con ese formato.
+ */
+export type OpcionesMonto = {
+  /**
+   * `"en-US"`: la coma es SIEMPRE de miles y el punto SIEMPRE decimal, sin heurística.
+   *
+   * Lo justifica **BAC**, que emite sus avisos en formato estadounidense («5,000.00»).
+   * Con la regla automática, un «1,5» de BAC se leería 1.5 cuando significa 15.
+   */
+  formato?: "auto" | "en-US";
+  /**
+   * Cuántos decimales puede tener un monto de esta fuente. Si detrás del último separador
+   * quedan MÁS dígitos que eso, ninguno era decimal: todos son de miles. Vale para los
+   * tres casos, también para el de dos separadores distintos — «1.500,500» es 1500500,
+   * mientras que «1,500.50» y «1.500,50» siguen siendo 1500.5. La parte entera en 0 deja
+   * de ser excepción.
+   *
+   * Lo justifican los avisos de **BCR, BN, Davivienda y Promerica** y los estados de
+   * cuenta pegados en el chat, que siempre traen centavos: ahí «12.3456» es 123456 y
+   * «0,125» es 125, mientras que en un formulario son 12.3456 y 0.125.
+   */
+  decimalesMaximos?: number;
+};
+
+/** Aplica la regla a una cadena que ya solo tiene dígitos y separadores. */
+function interpretarSeparadores(s: string, opciones: OpcionesMonto = {}): string {
   const comas = (s.match(/,/g) ?? []).length;
   const puntos = (s.match(/\./g) ?? []).length;
   if (comas + puntos === 0) return s;
+
+  // Emisor de formato fijo: la coma es de miles y el punto decimal, sin preguntarse nada.
+  if (opciones.formato === "en-US") {
+    const sinMiles = s.replace(/,/g, "");
+    const i = sinMiles.lastIndexOf(".");
+    if (i === -1) return sinMiles;
+    return `${sinMiles.slice(0, i).replace(/\./g, "")}.${sinMiles.slice(i + 1).replace(/\./g, "")}`;
+  }
+
+  // El tope manda sobre los tres caminos: si detrás del último separador quedan más
+  // dígitos de los que esa fuente puede tener de decimales, ninguno de los separadores
+  // era decimal. Aplicarlo solo al caso de un separador único leería «1.500,500» como
+  // 1500.5 cuando un estado de cuenta con centavos lo escribe por 1500500.
+  const tope = opciones.decimalesMaximos;
+  if (tope !== undefined) {
+    const cola = s.slice(Math.max(s.lastIndexOf(","), s.lastIndexOf(".")) + 1);
+    if (cola.length > tope) return s.replace(/[.,]/g, "");
+  }
 
   // 1. Dos tipos distintos: no hay ambigüedad, el último es el decimal.
   if (comas > 0 && puntos > 0) return decimalEnElUltimo(s);
@@ -69,8 +123,9 @@ function interpretarSeparadores(s: string): string {
   // 3. Una sola vez: manda cuántos dígitos quedaron detrás.
   const entero = partes[0] ?? "";
   const cola = partes[1] ?? "";
-  const enteroEsCero = entero === "" || Number(entero) === 0;
-  const esDeMiles = !enteroEsCero && cola.length === 3;
+  // Con tope declarado, haber llegado hasta acá ya significa que la cola cabe en los
+  // decimales de la fuente: es decimal, y la parte entera en cero no cambia nada.
+  const esDeMiles = tope === undefined && Number(entero) !== 0 && cola.length === 3;
   return esDeMiles ? entero + cola : `${entero}.${cola}`;
 }
 
@@ -78,11 +133,11 @@ function interpretarSeparadores(s: string): string {
  * De lo que la persona escribió a una cadena que `Number` entiende.
  * Devuelve `""` si no quedó ningún dígito.
  */
-export function normalizarMontoTexto(input: string): string {
+export function normalizarMontoTexto(input: string, opciones: OpcionesMonto = {}): string {
   const negativo = input.includes("-") || PARENTESIS_CONTABLE.test(input);
-  const limpio = input.replace(SOLO_NUMERICO, "");
+  const limpio = input.replace(SOLO_NUMERICO, "").replace(COLGANTE_FINAL, "");
   if (!/\d/.test(limpio)) return "";
-  const cuerpo = interpretarSeparadores(limpio);
+  const cuerpo = interpretarSeparadores(limpio, opciones);
   return negativo ? `-${cuerpo}` : cuerpo;
 }
 
@@ -92,8 +147,8 @@ export function normalizarMontoTexto(input: string): string {
  * `undefined` y no 0: un campo vacío no es «cero colones», y confundirlos hace que un
  * formulario a medio llenar parezca completo.
  */
-export function parseMonto(input: string): number | undefined {
-  const normalizado = normalizarMontoTexto(input);
+export function parseMonto(input: string, opciones: OpcionesMonto = {}): number | undefined {
+  const normalizado = normalizarMontoTexto(input, opciones);
   if (normalizado === "") return undefined;
   const n = Number(normalizado);
   return Number.isFinite(n) ? n : undefined;

@@ -8,6 +8,7 @@
  * confianza como última red. Si no parece de BAC, devuelve [].
  */
 import type { IngestionSource, NotificationMeta, RawMovement } from "@/lib/ingestion/types";
+import { parseMonto } from "@/lib/parse-monto";
 import { isDeclinedNotification } from "@/lib/ingestion/sources/common";
 import { partyFromSubject } from "@/lib/ingestion/sources/cr-generic-notification";
 
@@ -30,13 +31,14 @@ const MONTHS: Record<string, string> = {
 };
 
 /**
- * "5,000.00" → 5000.00 (coma = miles, punto = decimal).
+ * "5,000.00" → 5000.00. Usa el lector único con `{ formato: "en-US" }` en vez de la
+ * heurística automática: con ella, un "1,5" de BAC se leería 1.5 cuando significa 15.
  *
- * Exportada SOLO para el test de caracterización (T-16): su cuerpo no cambia. BAC emite
- * siempre en formato estadounidense, por eso no usa el lector genérico.
+ * BAC emite formato en-US (5,000.00); un monto en formato tico se leería mal, igual que
+ * antes con parseFloat.
  */
 export function parseAmount(s: string): number {
-  return parseFloat(s.replace(/,/g, ""));
+  return parseMonto(s, { formato: "en-US" }) ?? NaN;
 }
 
 /** "Jun 27, 2026, 18:55" (mes inglés abreviado) → "2026-06-27". null si no calza. */
