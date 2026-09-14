@@ -17,6 +17,8 @@
  * Las filas resultantes se validan de nuevo en el servidor con csvTxnSchema
  * (importTransactionsAction) — este parser NO es la capa de seguridad.
  */
+import { parseMonto } from "@/lib/parse-monto";
+
 export type ParsedCsvRow = {
   kind: "ingreso" | "gasto";
   amount: number;
@@ -81,50 +83,14 @@ export function normalizeDate(s: string): string | null {
 }
 
 /**
- * El monto de una celda, con su signo. `NaN` si no hay número.
+ * El monto de una celda, con su signo. `NaN` si no hay número — `parseCsv` usa ese NaN
+ * para contar la fila como omitida, así que se conserva en vez de propagar `undefined`.
  *
- * Por qué no se reutiliza el parser del formulario móvil: la regla NO es la misma, y la
- * diferencia es deliberada. Quien TECLEA «1.500» en un campo puso un punto decimal y
- * quiere 1,5. Un banco que EXPORTA «1.500» quiere mil quinientos. El mismo texto
- * significa cosas distintas según de dónde venga, así que cada contexto lee lo suyo.
- *
- * La regla acá:
- *  · Hay coma Y punto  → el ÚLTIMO es el decimal, el otro es de miles.
- *  · Un solo tipo de separador, una vez, con EXACTAMENTE 3 dígitos detrás → es de miles
- *    («1.500» y «1,500» son 1500). Con 1, 2 o 4+ dígitos → es decimal («1500,50», «1.5»).
- *  · Repetido → de miles («1.500.000»).
- *
- * Antes esto era `Number(raw.replace(/[^0-9.\-]/g, ""))`, que borraba la coma:
- *  · «1500,50»  → 150050    (×100, silencioso)
- *  · «1.500,50» → 1.5005    (÷1000, silencioso)
- * En un formulario la persona ve el número raro antes de guardar. En una importación no
- * lo ve nadie: entra así al historial.
+ * La regla vive en `@/lib/parse-monto`, una sola para todo el repositorio. Este envoltorio
+ * existe solo para el contrato del engine: los callers no cambian.
  */
 export function montoDeCelda(raw: string): number {
-  // El signo se mira ANTES de limpiar. Los paréntesis son notación contable de negativo.
-  const negativo = raw.includes("-") || /\(.+\)/.test(raw);
-  const limpio = raw.replace(/[^0-9.,]/g, "");
-  if (limpio === "") return NaN;
-
-  const comas = (limpio.match(/,/g) ?? []).length;
-  const puntos = (limpio.match(/\./g) ?? []).length;
-  const ultimo = Math.max(limpio.lastIndexOf(","), limpio.lastIndexOf("."));
-
-  let texto: string;
-  if (ultimo === -1) {
-    texto = limpio;
-  } else {
-    const detras = limpio.length - ultimo - 1;
-    const unSoloTipo = comas === 0 || puntos === 0;
-    const deMiles = unSoloTipo && (comas + puntos > 1 || detras === 3);
-    texto = deMiles
-      ? limpio.replace(/[.,]/g, "")
-      : `${limpio.slice(0, ultimo).replace(/[.,]/g, "")}.${limpio.slice(ultimo + 1)}`;
-  }
-
-  const n = Number(texto);
-  if (!Number.isFinite(n)) return NaN;
-  return negativo ? -n : n;
+  return parseMonto(raw) ?? NaN;
 }
 
 export function parseCsv(
