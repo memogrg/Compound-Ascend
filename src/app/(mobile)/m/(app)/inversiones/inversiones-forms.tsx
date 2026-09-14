@@ -72,7 +72,7 @@ import {
   type ActionResult,
   type Opt,
 } from "../../components/form-kit";
-import { normalizarMontoTexto } from "@/lib/parse-monto";
+import { normalizarMontoTexto, parseMonto } from "@/lib/parse-monto";
 
 const numStr = (n: number | undefined): string => (n == null ? "" : String(n));
 
@@ -1315,12 +1315,44 @@ function RentalCostsBlock(props: {
 }
 
 /**
+ * Lo que el dedo escribió, tal cual, mientras el padre sigue recibiendo la cadena ya
+ * normalizada. Compartido por MoneyStr y PctStr.
+ *
+ * Normalizar EN EL VALOR DEL INPUT reescribía el campo bajo el dedo: al teclear «1.500»
+ * el padre guardaba «1500» y el input volvía a pintar «1500», así que el punto
+ * desaparecía y «1.5000» era IMPOSIBLE de escribir — el siguiente cero caía sobre
+ * «1500» y daba 15000—. Mismo patrón que MoneyField del form-kit: el texto vive local,
+ * el significado sale hacia afuera.
+ *
+ * La resiembra compara lo que el texto SIGNIFICA, no su forma. Mientras se teclea
+ * «1500,» ya significa 1500, que es lo que el padre tiene, así que el campo no se
+ * reescribe solo y no le arranca la coma al dedo que la acaba de poner. Cuando el valor
+ * cambia de verdad desde afuera (semilla del formulario, reinicio tras guardar), el
+ * significado difiere y el texto lo sigue.
+ *
+ * Compara con `parseMonto` y no encadenando `normalizarMontoTexto`, porque esa función
+ * NO es idempotente: «1.500,500» da «1500.500», y volver a pasarla da «1500500» (tres
+ * dígitos detrás del punto se leen como miles). Con un `rc` guardado así, la condición
+ * quedaría verdadera en cada render.
+ */
+function useTextoDeMonto(value: string, onChange: (v: string) => void) {
+  const [texto, setTexto] = useState(value);
+  if (parseMonto(texto) !== parseMonto(value)) setTexto(value);
+  return {
+    texto,
+    alEscribir: (bruto: string) => {
+      setTexto(bruto);
+      onChange(normalizarMontoTexto(bruto));
+    },
+  };
+}
+
+/**
  * Input de dinero con string (para rc, que el engine espera como string).
  *
- * Guarda TEXTO, no número, y lo consumen ~14 `parseFloat` más abajo. Por eso normaliza
- * al escribir en vez de dejar pasar la coma: la cadena que queda ya viene con punto y
- * todos esos lectores siguen funcionando sin tocarlos. Antes se BORRABA la coma, así que
- * «1500,50» quedaba en 150050.
+ * El padre guarda TEXTO, no número, y lo consumen ~14 `parseFloat` más abajo: por eso
+ * lo que sale de acá sigue viniendo normalizado, con punto, y ninguno de esos lectores
+ * se toca. Lo que cambió es que el input ya no muestra esa cadena, sino la tecleada.
  */
 function MoneyStr({
   label,
@@ -1333,6 +1365,7 @@ function MoneyStr({
   onChange: (v: string) => void;
   cur: string;
 }) {
+  const { texto, alEscribir } = useTextoDeMonto(value, onChange);
   return (
     <div className="m-qfield">
       <div className="m-qlabel">{label}</div>
@@ -1341,8 +1374,10 @@ function MoneyStr({
         <input
           className="m-inp m-money-inp"
           inputMode="decimal"
-          value={value}
-          onChange={(e) => onChange(normalizarMontoTexto(e.target.value))}
+          // En es-CR el decimal es la coma; se lo decimos al navegador, igual que MoneyField.
+          lang="es-CR"
+          value={texto}
+          onChange={(e) => alEscribir(e.target.value)}
           placeholder="0"
         />
       </div>
@@ -1358,6 +1393,7 @@ function PctStr({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const { texto, alEscribir } = useTextoDeMonto(value, onChange);
   return (
     <div className="m-qfield">
       <div className="m-qlabel">{label}</div>
@@ -1365,8 +1401,9 @@ function PctStr({
         <input
           className="m-inp m-money-inp"
           inputMode="decimal"
-          value={value}
-          onChange={(e) => onChange(normalizarMontoTexto(e.target.value))}
+          lang="es-CR"
+          value={texto}
+          onChange={(e) => alEscribir(e.target.value)}
           placeholder="0"
         />
         <span className="m-money-sym">%</span>
