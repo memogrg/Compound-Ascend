@@ -38,6 +38,16 @@
 /** Lo único que puede formar parte de un número: dígitos y separadores. */
 const SOLO_NUMERICO = /[^0-9.,]/g;
 
+/**
+ * Separadores pegados al FINAL del número. Son ruido, no decimales: los captura la
+ * puntuación de la frase que sigue al monto — «…por CRC 12,444.00, fue aprobada» deja
+ * «12,444.00,» cuando el regex del emisor no ancla en dígito. Sin recortarlos, el último
+ * separador se leería como el decimal y 12 444 se convertiría en 1 244 400.
+ *
+ * Solo al final. Al inicio NO: «.5» es medio, y hay avisos que lo escriben así.
+ */
+const COLGANTE_FINAL = /[.,]+$/;
+
 /** Paréntesis con dígitos adentro: notación contable de negativo, «(1.234,56)». */
 const PARENTESIS_CONTABLE = /\(\s*[^()]*\d[^()]*\)/;
 
@@ -125,7 +135,7 @@ function interpretarSeparadores(s: string, opciones: OpcionesMonto = {}): string
  */
 export function normalizarMontoTexto(input: string, opciones: OpcionesMonto = {}): string {
   const negativo = input.includes("-") || PARENTESIS_CONTABLE.test(input);
-  const limpio = input.replace(SOLO_NUMERICO, "");
+  const limpio = input.replace(SOLO_NUMERICO, "").replace(COLGANTE_FINAL, "");
   if (!/\d/.test(limpio)) return "";
   const cuerpo = interpretarSeparadores(limpio, opciones);
   return negativo ? `-${cuerpo}` : cuerpo;

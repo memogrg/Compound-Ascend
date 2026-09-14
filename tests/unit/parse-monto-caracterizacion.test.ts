@@ -9,14 +9,11 @@
  * Los de `src/lib/ai/` y `src/lib/ingestion/` procesan correos bancarios REALES. Un
  * cambio silencioso ahí corrompe gastos propuestos, así que cada valor queda fijado.
  *
- * El corpus son 79 cadenas: las 37 del encargo, 7 formatos nombrados, y el resto
- * extraído con grep de los fixtures que ya existían (cr-banks-real-samples,
- * bac-notification, cr-generic-notification). No se inventó ningún correo ni se copió
- * ninguno de una base real.
- *
- * `parseMonto` de statement-parse se importa con alias (`parseMontoEstado`) porque
- * colisiona con el de `@/lib/parse-monto`. Resolver esa colisión es parte del refactor,
- * no de este archivo.
+ * El corpus son 82 cadenas: las 37 del encargo, 7 formatos nombrados, el resto extraído
+ * con grep de los fixtures que ya existían (cr-banks-real-samples, bac-notification,
+ * cr-generic-notification), y 3 con separador colgante al final («12,444.00,») que salió
+ * de una regresión real: el regex de BCR, BN y Promerica se lleva la coma de la frase
+ * dentro de la captura. No se inventó ningún correo ni se copió ninguno de una base real.
  */
 import { describe, it, expect } from "vitest";
 
@@ -111,6 +108,9 @@ const CORPUS = [
   "19.99",
   "12.5",
   "79.95",
+  "12,444.00,",
+  "3.900,00,",
+  "441,60,",
 ] as const;
 
 /**
@@ -203,6 +203,9 @@ describe("#1 · formularios (web y móvil) — el canónico de hoy", () => {
     ["19.99"]: 19.99,
     ["12.5"]: 12.5,
     ["79.95"]: 79.95,
+    ["12,444.00,"]: 12444,
+    ["3.900,00,"]: 3900,
+    ["441,60,"]: 441.6,
   };
 
   it.each(CORPUS)('"parseMonto" → el valor de hoy', (entrada) => {
@@ -291,6 +294,9 @@ describe("#2 · importación de CSV", () => {
     ["19.99"]: 19.99,
     ["12.5"]: 12.5,
     ["79.95"]: 79.95,
+    ["12,444.00,"]: 12444,
+    ["3.900,00,"]: 3900,
+    ["441,60,"]: 441.6,
   };
 
   it.each(CORPUS)('"montoDeCelda" → el valor de hoy', (entrada) => {
@@ -379,6 +385,9 @@ describe("#3 · carril de acciones del chat (alertas, metas, gastos dictados)", 
     ["19.99"]: 19.99,
     ["12.5"]: 12.5,
     ["79.95"]: 79.95,
+    ["12,444.00,"]: 12444,
+    ["3.900,00,"]: 3900,
+    ["441,60,"]: 441.6,
   };
 
   it.each(CORPUS)('"extractMoney" → el valor de hoy', (entrada) => {
@@ -467,6 +476,9 @@ describe("#4 · guard de tendencia y grounding del audit", () => {
     ["19.99"]: 19.99,
     ["12.5"]: 12.5,
     ["79.95"]: 79.95,
+    ["12,444.00,"]: 12444,
+    ["3.900,00,"]: 3900,
+    ["441,60,"]: 441.6,
   };
 
   it.each(CORPUS)('"parseNumberToken" → el valor de hoy', (entrada) => {
@@ -555,6 +567,9 @@ describe("#5 · estados de cuenta pegados en el chat", () => {
     ["19.99"]: 19.99,
     ["12.5"]: 12.5,
     ["79.95"]: 79.95,
+    ["12,444.00,"]: 12444,
+    ["3.900,00,"]: 3900,
+    ["441,60,"]: 441.6,
   };
 
   it.each(CORPUS)('"parseMontoEstado" → el valor de hoy', (entrada) => {
@@ -643,6 +658,9 @@ describe("#6 · router de intents del chat", () => {
     ["19.99"]: 19.99, // bug
     ["12.5"]: 12.5, // bug
     ["79.95"]: 79.95, // bug
+    ["12,444.00,"]: 12444,
+    ["3.900,00,"]: 3900,
+    ["441,60,"]: 441.6,
   };
 
   it.each(CORPUS)('"parseMontoRouter" → el valor de hoy', (entrada) => {
@@ -731,6 +749,9 @@ describe("#7 · correos de BCR, BN, Davivienda y Promerica", () => {
     ["19.99"]: 19.99,
     ["12.5"]: 12.5,
     ["79.95"]: 79.95,
+    ["12,444.00,"]: 12444,
+    ["3.900,00,"]: 3900,
+    ["441,60,"]: 441.6,
   };
 
   it.each(CORPUS)('"parseAmountLoose" → el valor de hoy', (entrada) => {
@@ -819,6 +840,9 @@ describe("#8 · correos de BAC (formato estadounidense fijo)", () => {
     ["19.99"]: 19.99,
     ["12.5"]: 12.5,
     ["79.95"]: 79.95,
+    ["12,444.00,"]: 12444,
+    ["3.900,00,"]: 3.9,
+    ["441,60,"]: 44160,
   };
 
   it.each(CORPUS)('"parseAmountBac" → el valor de hoy', (entrada) => {
@@ -907,6 +931,9 @@ describe("#9 · pago vinculado y tarjeta «por revisar»", () => {
     ["19.99"]: 19.99,
     ["12.5"]: 12.5,
     ["79.95"]: 79.95,
+    ["12,444.00,"]: 12444,
+    ["3.900,00,"]: 3900,
+    ["441,60,"]: 441.6,
   };
 
   it.each(CORPUS)('"leerMontoTecleado" → el valor de hoy', (entrada) => {

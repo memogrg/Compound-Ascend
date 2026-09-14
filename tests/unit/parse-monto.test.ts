@@ -153,6 +153,29 @@ describe("opciones · decimalesMaximos (lo justifican BCR, BN, Davivienda, Prome
   });
 });
 
+describe("separador colgante al final · es puntuación de la frase, no un decimal", () => {
+  it("la coma de prosa que el emisor mete en la captura se descarta", () => {
+    // «…por CRC 12,444.00, fue aprobada» → el regex del banco captura «12,444.00,».
+    expect(parseMonto("12,444.00,")).toBe(12444);
+    expect(parseMonto("12,444.00,", { decimalesMaximos: 2 })).toBe(12444);
+    expect(parseMonto("3.900,00,", { decimalesMaximos: 2 })).toBe(3900);
+    expect(parseMonto("441,60,", { decimalesMaximos: 2 })).toBe(441.6);
+  });
+
+  it("también con formato fijo", () => {
+    expect(parseMonto("12,444.00.", { formato: "en-US" })).toBe(12444);
+  });
+
+  it("un separador solo al final ya se ignoraba; queda fijado", () => {
+    expect(parseMonto("1.500,")).toBe(1500);
+  });
+
+  it("al INICIO no se recorta: «.5» sigue siendo medio", () => {
+    expect(parseMonto(".5")).toBe(0.5);
+    expect(parseMonto(".5", { decimalesMaximos: 2 })).toBe(0.5);
+  });
+});
+
 describe("normalizarMontoTexto", () => {
   it("devuelve algo que Number entiende", () => {
     expect(normalizarMontoTexto("1.500,50")).toBe("1500.50");
