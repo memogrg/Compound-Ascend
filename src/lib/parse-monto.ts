@@ -29,10 +29,18 @@
  * Antes de todo eso se limpian el signo, los paréntesis contables, el espacio de miles y
  * los símbolos (₡, $, US$, USD, CRC…): lo que no sea dígito o separador se descarta.
  *
- * NO confundir con `montoDeCelda` (financial-base/engine/csv-parse), que lee montos de un
- * ARCHIVO. Hoy son dos implementaciones distintas; unificarlas está pendiente de decisión
- * y hay que hacerlo con tests de caracterización, porque `src/lib/ai/` tiene además tres
- * lectores propios con umbrales que no coinciden entre sí.
+ * Esta es la ÚNICA regla del repositorio. Los nueve lectores que existían por separado
+ * —formularios, CSV, carril de acciones del chat, guard de tendencia, estados de cuenta,
+ * router de intents, correos de BCR/BN/Davivienda/Promerica, correos de BAC y el monto
+ * tecleado en un pago vinculado— delegan acá. Cada uno se queda con lo que es suyo: el
+ * signo, el rechazo del cero y el tipo que su caller espera (`null`, `NaN` o `undefined`)
+ * son validación, no lectura, y viven en el envoltorio.
+ *
+ * Un emisor con formato fijo se declara con `OpcionesMonto`, nunca con una copia de la
+ * regla: una excepción tiene nombre y dueño, o no existe.
+ *
+ * `tests/unit/parse-monto-caracterizacion.test.ts` fija lo que devuelve cada uno de los
+ * nueve ante el mismo corpus. Si tocás esta función, ahí se ve a quién le cambió algo.
  */
 
 /** Lo único que puede formar parte de un número: dígitos y separadores. */
