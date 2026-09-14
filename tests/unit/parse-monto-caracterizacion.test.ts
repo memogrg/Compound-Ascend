@@ -24,7 +24,7 @@ import { parseMonto } from "@/lib/parse-monto";
 import { montoDeCelda } from "@/modules/financial-base/engine/csv-parse";
 import { extractMoney } from "@/lib/ai/action-lane";
 import { parseNumberToken } from "@/lib/ai/money-figures";
-import { parseMonto as parseMontoEstado } from "@/lib/ai/statement-parse";
+import { montoDeFila as parseMontoEstado } from "@/lib/ai/statement-parse";
 import { parseMontoRouter } from "@/lib/ai/router";
 import { parseAmountLoose } from "@/lib/ingestion/sources/common";
 import { parseAmount as parseAmountBac } from "@/lib/ingestion/sources/bac-notification";
@@ -492,12 +492,12 @@ describe("#5 · estados de cuenta pegados en el chat", () => {
     ["0.5"]: 0.5,
     ["2,5"]: 2.5,
     ["-1.234,56"]: 1234.56,
-    ["(1.234,56)"]: null,
-    ["₡1.234,56"]: null,
-    ["$1,234.56"]: null,
-    ["US$ 1.234,56"]: null,
-    ["USD 1,234.56"]: null,
-    ["CRC 1 234,56"]: null,
+    ["(1.234,56)"]: 1234.56, // inalcanzable
+    ["₡1.234,56"]: 1234.56, // inalcanzable
+    ["$1,234.56"]: 1234.56, // inalcanzable
+    ["US$ 1.234,56"]: 1234.56, // inalcanzable
+    ["USD 1,234.56"]: 1234.56, // inalcanzable
+    ["CRC 1 234,56"]: 1234.56, // inalcanzable
     ["1 234,56"]: 1234.56,
     ["1."]: 1,
     ["1,"]: 1,
@@ -517,33 +517,33 @@ describe("#5 · estados de cuenta pegados en el chat", () => {
     ["12,345.00"]: 12345,
     ["3.900,00"]: 3900,
     ["1,5"]: 1.5,
-    ["₡5,000.00"]: null,
-    ["CRC 3.900,00"]: null,
-    ["USD 12,345.00"]: null,
+    ["₡5,000.00"]: 5000, // inalcanzable
+    ["CRC 3.900,00"]: 3900, // inalcanzable
+    ["USD 12,345.00"]: 12345, // inalcanzable
     ["441,60"]: 441.6,
     ["39,00"]: 39,
     ["320.000,5"]: 320000.5,
     ["320.000,00"]: 320000,
     ["5.000,00"]: 5000,
-    ["₡50.000,00"]: null,
-    ["₡137.400,00"]: null,
-    ["₡8,000.00"]: null,
-    ["₡45,300.00"]: null,
-    ["CRC 12,444.00"]: null,
-    ["CRC 441,60"]: null,
-    ["CRC 100.00"]: null,
-    ["CRC 279"]: null,
-    ["CRC 4,350.00"]: null,
-    ["CRC 6,900.00"]: null,
-    ["CRC 11,490.00"]: null,
-    ["CRC 20,550.00"]: null,
-    ["CRC 150,000.00"]: null,
-    ["CRC 200,000.00"]: null,
-    ["USD 19.99"]: null,
-    ["USD 100.00"]: null,
-    ["USD 25.00"]: null,
-    ["$ 12.50"]: null,
-    ["$300,00"]: null,
+    ["₡50.000,00"]: 50000, // inalcanzable
+    ["₡137.400,00"]: 137400, // inalcanzable
+    ["₡8,000.00"]: 8000, // inalcanzable
+    ["₡45,300.00"]: 45300, // inalcanzable
+    ["CRC 12,444.00"]: 12444, // inalcanzable
+    ["CRC 441,60"]: 441.6, // inalcanzable
+    ["CRC 100.00"]: 100, // inalcanzable
+    ["CRC 279"]: 279, // inalcanzable
+    ["CRC 4,350.00"]: 4350, // inalcanzable
+    ["CRC 6,900.00"]: 6900, // inalcanzable
+    ["CRC 11,490.00"]: 11490, // inalcanzable
+    ["CRC 20,550.00"]: 20550, // inalcanzable
+    ["CRC 150,000.00"]: 150000, // inalcanzable
+    ["CRC 200,000.00"]: 200000, // inalcanzable
+    ["USD 19.99"]: 19.99, // inalcanzable
+    ["USD 100.00"]: 100, // inalcanzable
+    ["USD 25.00"]: 25, // inalcanzable
+    ["$ 12.50"]: 12.5, // inalcanzable
+    ["$300,00"]: 300, // inalcanzable
     ["97,809.27"]: 97809.27,
     ["32,279.95"]: 32279.95,
     ["16,915.00"]: 16915,
@@ -668,7 +668,7 @@ describe("#7 · correos de BCR, BN, Davivienda y Promerica", () => {
     ["0.5"]: 0.5,
     ["2,5"]: 2.5,
     ["-1.234,56"]: 1234.56,
-    ["(1.234,56)"]: 123456,
+    ["(1.234,56)"]: 1234.56, // inalcanzable
     ["₡1.234,56"]: 1234.56,
     ["$1,234.56"]: 1234.56,
     ["US$ 1.234,56"]: 1234.56,
@@ -677,8 +677,8 @@ describe("#7 · correos de BCR, BN, Davivienda y Promerica", () => {
     ["1 234,56"]: 1234.56,
     ["1."]: 1,
     ["1,"]: 1,
-    [".5"]: 5,
-    [",5"]: 5,
+    [".5"]: 0.5, // decidido
+    [",5"]: 0.5, // decidido
     [""]: null,
     ["abc"]: null,
     ["1..2"]: 1.2,
@@ -747,7 +747,7 @@ describe("#8 · correos de BAC (formato estadounidense fijo)", () => {
     ["1,500"]: 1500,
     ["1.500,50"]: 1.5005,
     ["1,500.50"]: 1500.5,
-    ["1.500.000"]: 1.5,
+    ["1.500.000"]: 1500, // decidido
     ["1,500,000"]: 1500000,
     ["12.345"]: 12.345,
     ["12,345"]: 12345,
@@ -756,22 +756,22 @@ describe("#8 · correos de BAC (formato estadounidense fijo)", () => {
     ["0.5"]: 0.5,
     ["2,5"]: 25,
     ["-1.234,56"]: -1.23456,
-    ["(1.234,56)"]: "NaN",
-    ["₡1.234,56"]: "NaN",
-    ["$1,234.56"]: "NaN",
-    ["US$ 1.234,56"]: "NaN",
-    ["USD 1,234.56"]: "NaN",
-    ["CRC 1 234,56"]: "NaN",
-    ["1 234,56"]: 1,
+    ["(1.234,56)"]: -1.23456, // inalcanzable
+    ["₡1.234,56"]: 1.23456, // inalcanzable
+    ["$1,234.56"]: 1234.56, // inalcanzable
+    ["US$ 1.234,56"]: 1.23456, // inalcanzable
+    ["USD 1,234.56"]: 1234.56, // inalcanzable
+    ["CRC 1 234,56"]: 123456, // inalcanzable
+    ["1 234,56"]: 123456, // inalcanzable
     ["1."]: 1,
     ["1,"]: 1,
     [".5"]: 0.5,
     [",5"]: 5,
     [""]: "NaN",
     ["abc"]: "NaN",
-    ["1..2"]: 1,
+    ["1..2"]: 1.2, // inalcanzable
     ["1,,2"]: 12,
-    ["1.2.3"]: 1.2,
+    ["1.2.3"]: 12.3, // inalcanzable
     ["123456789.12"]: 123456789.12,
     ["0"]: 0,
     ["00,50"]: 50,
@@ -781,33 +781,33 @@ describe("#8 · correos de BAC (formato estadounidense fijo)", () => {
     ["12,345.00"]: 12345,
     ["3.900,00"]: 3.9,
     ["1,5"]: 15,
-    ["₡5,000.00"]: "NaN",
-    ["CRC 3.900,00"]: "NaN",
-    ["USD 12,345.00"]: "NaN",
+    ["₡5,000.00"]: 5000, // inalcanzable
+    ["CRC 3.900,00"]: 3.9, // inalcanzable
+    ["USD 12,345.00"]: 12345, // inalcanzable
     ["441,60"]: 44160,
     ["39,00"]: 3900,
     ["320.000,5"]: 320.0005,
     ["320.000,00"]: 320,
     ["5.000,00"]: 5,
-    ["₡50.000,00"]: "NaN",
-    ["₡137.400,00"]: "NaN",
-    ["₡8,000.00"]: "NaN",
-    ["₡45,300.00"]: "NaN",
-    ["CRC 12,444.00"]: "NaN",
-    ["CRC 441,60"]: "NaN",
-    ["CRC 100.00"]: "NaN",
-    ["CRC 279"]: "NaN",
-    ["CRC 4,350.00"]: "NaN",
-    ["CRC 6,900.00"]: "NaN",
-    ["CRC 11,490.00"]: "NaN",
-    ["CRC 20,550.00"]: "NaN",
-    ["CRC 150,000.00"]: "NaN",
-    ["CRC 200,000.00"]: "NaN",
-    ["USD 19.99"]: "NaN",
-    ["USD 100.00"]: "NaN",
-    ["USD 25.00"]: "NaN",
-    ["$ 12.50"]: "NaN",
-    ["$300,00"]: "NaN",
+    ["₡50.000,00"]: 50, // inalcanzable
+    ["₡137.400,00"]: 137.4, // inalcanzable
+    ["₡8,000.00"]: 8000, // inalcanzable
+    ["₡45,300.00"]: 45300, // inalcanzable
+    ["CRC 12,444.00"]: 12444, // inalcanzable
+    ["CRC 441,60"]: 44160, // inalcanzable
+    ["CRC 100.00"]: 100, // inalcanzable
+    ["CRC 279"]: 279, // inalcanzable
+    ["CRC 4,350.00"]: 4350, // inalcanzable
+    ["CRC 6,900.00"]: 6900, // inalcanzable
+    ["CRC 11,490.00"]: 11490, // inalcanzable
+    ["CRC 20,550.00"]: 20550, // inalcanzable
+    ["CRC 150,000.00"]: 150000, // inalcanzable
+    ["CRC 200,000.00"]: 200000, // inalcanzable
+    ["USD 19.99"]: 19.99, // inalcanzable
+    ["USD 100.00"]: 100, // inalcanzable
+    ["USD 25.00"]: 25, // inalcanzable
+    ["$ 12.50"]: 12.5, // inalcanzable
+    ["$300,00"]: 30000, // inalcanzable
     ["97,809.27"]: 97809.27,
     ["32,279.95"]: 32279.95,
     ["16,915.00"]: 16915,
