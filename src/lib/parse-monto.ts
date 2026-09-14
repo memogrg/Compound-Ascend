@@ -1,5 +1,5 @@
 /**
- * Lectura de un monto escrito a mano.
+ * Lectura de un monto ESCRITO A MANO. Compartido por web y móvil.
  *
  * En Costa Rica —y en casi toda América Latina y Europa— el separador decimal es la
  * COMA. El teclado numérico del teléfono ofrece la coma, y el campo la borraba: escribir

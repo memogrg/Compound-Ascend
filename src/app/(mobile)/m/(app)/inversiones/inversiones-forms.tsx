@@ -72,7 +72,7 @@ import {
   type ActionResult,
   type Opt,
 } from "../../components/form-kit";
-import { normalizarMontoTexto } from "../../lib/parse-monto";
+import { normalizarMontoTexto } from "@/lib/parse-monto";
 
 const numStr = (n: number | undefined): string => (n == null ? "" : String(n));
 

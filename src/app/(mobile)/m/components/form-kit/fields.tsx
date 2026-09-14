@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { currencySymbol } from "@/lib/format";
 
-import { parseMonto } from "../../lib/parse-monto";
+import { parseMonto } from "@/lib/parse-monto";
 import { useFormError } from "./form-shell";
 import { BottomSheet } from "./bottom-sheet";
 

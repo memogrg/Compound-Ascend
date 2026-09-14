@@ -8,7 +8,7 @@
  * La regla que estos casos fijan: el ÚLTIMO separador es el decimal.
  */
 import { describe, it, expect } from "vitest";
-import { parseMonto, normalizarMontoTexto } from "@/app/(mobile)/m/lib/parse-monto";
+import { parseMonto, normalizarMontoTexto } from "@/lib/parse-monto";
 
 describe("parseMonto", () => {
   it("coma decimal (lo que se escribe acá)", () => {
