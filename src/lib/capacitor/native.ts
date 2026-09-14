@@ -16,11 +16,23 @@ export type PluginListenerHandle = { remove: () => Promise<void> };
 
 type AppUrlOpenEvent = { url: string };
 
+/** `canGoBack` lo calcula Capacitor con el historial de la WebView, no el de Next. */
+type BackButtonEvent = { canGoBack: boolean };
+
 type CapacitorAppPlugin = {
   addListener(
     eventName: "appUrlOpen",
     listener: (event: AppUrlOpenEvent) => void,
   ): Promise<PluginListenerHandle>;
+  /** Botón Atrás de Android. Registrar un listener DESACTIVA el comportamiento por
+   *  defecto de Capacitor (history.back() o cerrar la app): a partir de ahí lo decide
+   *  el listener. Solo existe en Android. */
+  addListener(
+    eventName: "backButton",
+    listener: (event: BackButtonEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  /** Cierra la app. Solo Android: en iOS, salir por código es causal de rechazo. */
+  exitApp(): Promise<void>;
 };
 
 type CapacitorBrowserPlugin = {
@@ -76,6 +88,17 @@ export function isCapacitor(): boolean {
 /** Plugin App (deep links / appUrlOpen). null fuera de la app nativa. */
 export function capacitorApp(): CapacitorAppPlugin | null {
   return bridge()?.Plugins?.App ?? null;
+}
+
+/**
+ * Plataforma donde corre el código. `"web"` fuera de Capacitor (navegador normal y SSR).
+ *
+ * Hace falta porque hay comportamiento que es de UNA plataforma, no de "la app": el botón
+ * Atrás existe solo en Android, y `isCapacitor()` no alcanza para distinguirlo de iOS.
+ */
+export function capacitorPlatform(): "ios" | "android" | "web" {
+  const p = bridge()?.getPlatform?.();
+  return p === "ios" || p === "android" ? p : "web";
 }
 
 /** Plugin Browser (navegador del sistema: Custom Tabs / SFSafariViewController). null fuera de la app nativa. */
