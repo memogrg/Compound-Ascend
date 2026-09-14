@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { currencySymbol } from "@/lib/format";
 
+import { parseMonto } from "@/lib/parse-monto";
 import { useFormError } from "./form-shell";
 import { BottomSheet } from "./bottom-sheet";
 
@@ -99,6 +100,18 @@ export function MoneyField({
   hint?: string | null;
   note?: string | null;
 }) {
+  // El texto TAL CUAL se escribe, con su coma. Antes el input mostraba
+  // `String(value)`, así que la coma desaparecía bajo el dedo apenas se tecleaba y
+  // «1500,50» terminaba siendo 150050. Acá se conserva lo escrito y el número sale de
+  // interpretarlo, no de mutilarlo.
+  const [texto, setTexto] = useState(() => (value == null ? "" : String(value)));
+
+  // Si el valor cambia DESDE AFUERA (semilla del formulario, reinicio tras guardar), el
+  // texto lo sigue. Se compara con lo que el texto SIGNIFICA, no con su forma: mientras
+  // se teclea «1500,» ya significa 1500, así que el campo no se reescribe solo y le
+  // arranca la coma al dedo que la acaba de poner.
+  if (parseMonto(texto) !== value) setTexto(value == null ? "" : String(value));
+
   return (
     <Field name={name} label={label} hint={hint} note={note}>
       <div className="m-money">
@@ -107,12 +120,13 @@ export function MoneyField({
           className="m-inp m-money-inp"
           type="text"
           inputMode="decimal"
-          value={value == null ? "" : String(value)}
+          // Le dice al navegador con qué convención se escriben los números acá: en
+          // es-CR el decimal es la coma.
+          lang="es-CR"
+          value={texto}
           onChange={(e) => {
-            const raw = e.target.value.replace(/[^0-9.]/g, "");
-            if (raw === "") return onChange(undefined);
-            const n = Number(raw);
-            onChange(Number.isFinite(n) ? n : undefined);
+            setTexto(e.target.value);
+            onChange(parseMonto(e.target.value));
           }}
           placeholder={placeholder}
         />
