@@ -211,6 +211,68 @@ export async function requestAccountDeletionOtpAction(): Promise<AccountActionRe
   }
 }
 
+/** Nombre y apellido que manda un proveedor social. Vacíos si no los dio. */
+const providerNameSchema = z.object({
+  givenName: z.string().trim().max(80).default(""),
+  familyName: z.string().trim().max(80).default(""),
+});
+
+/**
+ * Guarda el nombre que un proveedor social manda UNA SOLA VEZ. Hoy lo usa Apple.
+ *
+ * Apple entrega nombre y apellido solo en el PRIMER login de cada Apple ID; si se pierde,
+ * no vuelve (reinstalar no alcanza: hay que revocar el acceso desde Ajustes). Por eso se
+ * escribe apenas llega.
+ *
+ * Solo escribe si el nombre actual es el RELLENO que puso el trigger `handle_new_user`
+ * —`split_part(email, '@', 1)`— o si no hay ninguno. Con "Ocultar mi correo" de Apple ese
+ * relleno es basura del tipo `k7x2m9q`, que es justo lo que este nombre viene a arreglar.
+ * Un nombre puesto por la persona NO se pisa nunca: el proveedor no sabe más que ella.
+ *
+ * Escribe en los dos lados —`profiles.display_name` y el metadato de auth— porque
+ * `getAccountInfo` lee el segundo.
+ */
+export async function setDisplayNameFromProviderAction(input: {
+  givenName?: string;
+  familyName?: string;
+}): Promise<AccountActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
+  const parsed = providerNameSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Nombre no válido." };
+
+  const nombre = [parsed.data.givenName, parsed.data.familyName].filter(Boolean).join(" ").trim();
+  if (!nombre) return { ok: true }; // el proveedor no mandó nombre: no hay nada que hacer
+
+  try {
+    const user = await requireUser();
+    const supabase = await createSupabaseServerClient();
+
+    const { data: perfil } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const actual = (perfil?.display_name ?? "").trim();
+    const relleno = (user.email ?? "").split("@")[0] ?? "";
+    // El relleno del trigger, o nada: son los dos casos en los que el nombre de Apple mejora
+    // lo que hay. Cualquier otra cosa la escribió la persona y se respeta.
+    if (actual && actual !== relleno) return { ok: true };
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ display_name: nombre })
+      .eq("id", user.id);
+    if (error) return { ok: false, message: "No pudimos guardar tu nombre." };
+
+    await supabase.auth.updateUser({ data: { display_name: nombre } });
+    revalidarRuta("/configuracion");
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "Sesión no válida." };
+  }
+}
+
 export type ExportResult = { ok: boolean; filename?: string; base64?: string; message?: string };
 
 /** Paso 2: genera el .xlsx de la data del hogar para descargar ANTES de borrar. */
