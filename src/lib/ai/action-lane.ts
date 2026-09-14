@@ -8,6 +8,7 @@
  * (action = null, reply con la pregunta corta). Nunca respondemos "no puedo crear …".
  */
 import type { AIChatResponse, AIActionProposal } from "@/lib/ai/types";
+import { parseMonto } from "@/lib/parse-monto";
 import { extractFechaNatural, fechaLegible } from "@/lib/ai/fecha-natural";
 
 export type KnownHolding = { symbol: string | null; name: string; assetType?: string };
@@ -39,29 +40,19 @@ export function extractSymbol(text: string, holdings: KnownHolding[] = []): stri
   return byName?.symbol ? byName.symbol.toUpperCase() : null;
 }
 
-/** Primer número monetario del texto: admite 1.234,56 / 1,234.56 / $1 / 5000. Devuelve null si no hay. */
+/**
+ * Primer número monetario del texto: admite 1.234,56 / 1,234.56 / $1 / 5000. `null` si no
+ * hay, o si no es positivo — una alerta o una meta de cero no es nada.
+ *
+ * La lectura del número vive en `@/lib/parse-monto`; acá queda solo QUÉ pedazo del texto
+ * es el monto (el regex) y la validación del intent.
+ */
 export function extractMoney(text: string): number | null {
   // Captura un run completo de dígitos con separadores opcionales (evita cortar 5000 → 500).
   const m = text.match(/(?:[$₡]|USD|CRC)?\s*(\d[\d.,]*\d|\d)/i);
   if (!m || !m[1]) return null;
-  let raw = m[1];
-  // Normaliza separadores: si hay ambos, el ÚLTIMO es el decimal; si hay uno solo y deja 3 dígitos
-  // a la derecha, es de miles (1.000 = 1000), salvo que sea claramente decimal (1,5).
-  const hasDot = raw.includes(".");
-  const hasComma = raw.includes(",");
-  if (hasDot && hasComma) {
-    const decSep = raw.lastIndexOf(",") > raw.lastIndexOf(".") ? "," : ".";
-    const thouSep = decSep === "," ? "." : ",";
-    raw = raw.split(thouSep).join("").replace(decSep, ".");
-  } else if (hasDot || hasComma) {
-    const sep = hasDot ? "." : ",";
-    const parts = raw.split(sep);
-    const last = parts[parts.length - 1] ?? "";
-    // "1.000" / "1,000" (grupo de 3) → miles; "1,5" / "0.25" → decimal.
-    raw = parts.length > 1 && last.length === 3 ? parts.join("") : raw.replace(sep, ".");
-  }
-  const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : null;
+  const n = parseMonto(m[1]);
+  return n !== undefined && Number.isFinite(n) && n > 0 ? n : null;
 }
 
 const say = (reply: string, action: AIActionProposal | null): AIChatResponse => ({ reply, action });

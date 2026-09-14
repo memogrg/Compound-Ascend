@@ -12,6 +12,7 @@
  * bandeja. Confirmar sin tocar nada sigue siendo un solo clic.
  */
 import { useState, useTransition } from "react";
+import { parseMonto } from "@/lib/parse-monto";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
@@ -58,14 +59,14 @@ function draftFrom(p: PendingProposalView): Draft {
  * Lectura del monto tecleado en la propuesta: una sola coma pasa a punto. Extraída tal cual para el test
  * de caracterización (T-16); el comportamiento no cambia.
  */
-export function leerMontoPropuesta(amount: string): number {
-  return Number(amount.replace(",", "."));
+export function leerMontoPropuesta(amount: string): number | undefined {
+  return parseMonto(amount);
 }
 
 /** Solo lo que cambió respecto a la propuesta viaja como override. */
 function diffOverrides(p: PendingProposalView, d: Draft, categoryId: string): ProposalOverrides {
   const ov: ProposalOverrides = {};
-  const amount = leerMontoPropuesta(d.amount);
+  const amount = leerMontoPropuesta(d.amount) ?? NaN;
   if (Number.isFinite(amount) && amount > 0 && amount !== p.amount) ov.amount = amount;
   if (d.currency && d.currency !== p.currency) ov.currency = d.currency;
   if (d.occurredOn && d.occurredOn !== p.occurredOn) ov.occurredOn = d.occurredOn;
