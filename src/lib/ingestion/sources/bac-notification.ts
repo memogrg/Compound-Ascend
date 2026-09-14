@@ -29,8 +29,13 @@ const MONTHS: Record<string, string> = {
   dec: "12",
 };
 
-/** "5,000.00" → 5000.00 (coma = miles, punto = decimal). */
-function parseAmount(s: string): number {
+/**
+ * "5,000.00" → 5000.00 (coma = miles, punto = decimal).
+ *
+ * Exportada SOLO para el test de caracterización (T-16): su cuerpo no cambia. BAC emite
+ * siempre en formato estadounidense, por eso no usa el lector genérico.
+ */
+export function parseAmount(s: string): number {
   return parseFloat(s.replace(/,/g, ""));
 }
 

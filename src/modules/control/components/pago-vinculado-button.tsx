@@ -65,6 +65,14 @@ const COPY: Record<
   },
 };
 
+/**
+ * Lectura del monto tecleado: una sola coma pasa a punto. Extraída tal cual para el test
+ * de caracterización (T-16); el comportamiento no cambia.
+ */
+export function leerMontoTecleado(amount: string): number {
+  return Number(amount.replace(",", "."));
+}
+
 export function PagoVinculadoButton({
   kind,
   id,
@@ -124,7 +132,7 @@ export function PagoVinculadoButton({
     setError(null);
   }, []);
 
-  const crudo = amount.trim() === "" ? null : Number(amount.replace(",", "."));
+  const crudo = amount.trim() === "" ? null : leerMontoTecleado(amount);
   const monto = crudo !== null && Number.isFinite(crudo) ? crudo : null;
   const errs = ctx ? validarPago({ monto, moneda: currency, fecha: date, ctx, hoy: hoy() }) : {};
   const hayError = Object.keys(errs).length > 0;

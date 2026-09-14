@@ -423,13 +423,21 @@ const AFFORD_ITEM_RE =
  *  agarra números sueltos como "2 cervezas"). es-CR: "." = miles, "," = decimales. La moneda sale del
  *  SÍMBOLO (₡/crc → CRC, $/usd → USD, col$ → COP, mx$ → MXN); sin símbolo (mil/k) → null (= "la de
  *  visualización"). NUNCA se asume que "₡8.000" está en la moneda de display: el caller lo convierte. */
+/**
+ * El número de `extractAmount`, extraído tal cual para el test de caracterización (T-16):
+ * todo punto es de miles y toda coma es decimal. Sin cambios de comportamiento.
+ */
+export function parseMontoRouter(raw: string): number {
+  return parseFloat(raw.replace(/\./g, "").replace(",", "."));
+}
+
 export function extractAmount(text: string): { monto: number; moneda: string | null } | null {
   const m = text.match(/(₡|\$|col\$|mx\$|crc|usd)\s*([\d.,]+)|(\d[\d.,]*)\s*(mil|k)\b/i);
   if (!m) return null;
   const sym = (m[1] ?? "").toLowerCase();
   const raw = (m[2] ?? m[3] ?? "").trim();
   const mult = m[4] ? 1000 : 1;
-  const n = parseFloat(raw.replace(/\./g, "").replace(",", "."));
+  const n = parseMontoRouter(raw);
   if (!Number.isFinite(n) || n <= 0) return null;
   const moneda =
     sym === "₡" || sym === "crc"
