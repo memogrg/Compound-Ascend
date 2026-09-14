@@ -1,4 +1,5 @@
 import "server-only";
+import { parseMonto } from "@/lib/parse-monto";
 import { now as simNow } from "@/lib/time/clock";
 
 /**
@@ -424,11 +425,21 @@ const AFFORD_ITEM_RE =
  *  SÍMBOLO (₡/crc → CRC, $/usd → USD, col$ → COP, mx$ → MXN); sin símbolo (mil/k) → null (= "la de
  *  visualización"). NUNCA se asume que "₡8.000" está en la moneda de display: el caller lo convierte. */
 /**
- * El número de `extractAmount`, extraído tal cual para el test de caracterización (T-16):
- * todo punto es de miles y toda coma es decimal. Sin cambios de comportamiento.
+ * El monto que la persona escribió en el chat.
+ *
+ * Delega en `parseMonto` — la misma regla que los formularios — porque esto también es
+ * texto TECLEADO por alguien, no la salida de un sistema con formato fijo.
+ *
+ * Antes hacía `parseFloat(raw.replace(/\./g, "").replace(",", "."))`: todo punto era de
+ * miles y toda coma decimal. Con eso, escribir «$5,000.00 en el super» registraba **5**
+ * colones, y «19.99» se leía como 1999. No era una convención distinta: era un error, y
+ * el más caro de los nueve lectores porque el chat es donde se dictan gastos.
+ *
+ * El rechazo de ≤ 0 sigue en `extractAmount`, que es donde pertenece: es validación del
+ * intent, no lectura del número.
  */
-export function parseMontoRouter(raw: string): number {
-  return parseFloat(raw.replace(/\./g, "").replace(",", "."));
+export function parseMontoRouter(raw: string): number | undefined {
+  return parseMonto(raw);
 }
 
 export function extractAmount(text: string): { monto: number; moneda: string | null } | null {
@@ -438,7 +449,7 @@ export function extractAmount(text: string): { monto: number; moneda: string | n
   const raw = (m[2] ?? m[3] ?? "").trim();
   const mult = m[4] ? 1000 : 1;
   const n = parseMontoRouter(raw);
-  if (!Number.isFinite(n) || n <= 0) return null;
+  if (n === undefined || !Number.isFinite(n) || n <= 0) return null;
   const moneda =
     sym === "₡" || sym === "crc"
       ? "CRC"

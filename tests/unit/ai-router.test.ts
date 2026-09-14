@@ -946,6 +946,23 @@ describe("puedo_gastar · ¿me puedo comprar X?", () => {
     expect(extractAmount("2 cervezas")).toBeNull(); // número suelto → no lo agarra
   });
 
+  /**
+   * El chat es donde se DICTAN gastos, así que era el lector más caro de los nueve: leía
+   * todo punto como separador de miles y toda coma como decimal. Con esa regla, «$5,000.00
+   * en el super» registraba 5 colones y «19.99» se volvía 1999 — sin que nadie lo notara
+   * hasta ver el saldo. Ahora usa la misma regla que los formularios (T-16, PR A).
+   */
+  it("extractAmount: coma de miles + punto decimal, como se escribe en el chat", () => {
+    expect(extractAmount("$5,000.00 en el super")).toEqual({ monto: 5000, moneda: "USD" });
+    expect(extractAmount("$19.99 de Netflix")).toEqual({ monto: 19.99, moneda: "USD" });
+    expect(extractAmount("USD 12,345.00")).toEqual({ monto: 12345, moneda: "USD" });
+  });
+
+  it("extractAmount: el formato de acá (punto de miles, coma decimal) sigue igual", () => {
+    expect(extractAmount("₡1.500,50 del almuerzo")).toEqual({ monto: 1500.5, moneda: "CRC" });
+    expect(extractAmount("₡50.000")).toEqual({ monto: 50000, moneda: "CRC" });
+  });
+
   it("afford con display USD: '¿me da para un gustito de ₡8.000?' convierte ₡8.000 (~$15), no lo trata como $8.000", async () => {
     suggestSobreForChatFast.mockResolvedValue({
       categoryId: "c-rest",
