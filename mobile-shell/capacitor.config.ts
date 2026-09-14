@@ -57,6 +57,14 @@ const config: CapacitorConfig = {
     contentInset: 'never',
   },
   plugins: {
+    SocialLogin: {
+      // Meta (Facebook) no se usa: excluir su proveedor saca FBSDKCoreKit/LoginKit/AEMKit
+      // del binario iOS y evita declarar un SDK publicitario en App Privacy. `apple` se
+      // mantiene: Guideline 4.8 exige Sign in with Apple donde hay login social de terceros.
+      // El hook capacitor:sync:before comenta las deps en el podspec según estos flags →
+      // requiere `cap sync`, no basta `cap copy`.
+      providers: { google: true, facebook: false, apple: true, twitter: false },
+    },
     Keyboard: {
       // TECLADO iOS (solo iOS; Android ignora esta opción y usa adjustResize del manifest).
       //
