@@ -1,0 +1,347 @@
+<title>CARTERA+ Shell A/B/C</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap">
+<style>
+/* CARTERA+ · tokens del design system real (globals.css) + tokens nuevos de gráfico/motion */
+:root{
+  --font-display:"Sora","Segoe UI",system-ui,sans-serif;
+  --font-body:"Manrope","Segoe UI",system-ui,sans-serif;
+  --font-mono:"Space Mono",ui-monospace,Menlo,monospace;
+  --canvas:#f4f2ec;--surface:#ffffff;--surface-2:#fbfaf6;--border:#e7e4dc;--text:#1e1c16;--muted:#625e57;--muted-2:#8a857b;
+  --accent:#378451;--accent-ink:#fff;--accent-soft:rgba(55,132,81,.12);
+  --pos:#378451;--pos-soft:rgba(55,132,81,.12);--neg:#c34f4b;--neg-soft:rgba(195,79,75,.12);--warn:#b07a2e;--warn-soft:rgba(176,122,46,.12);--info:#3a6ea5;--info-soft:rgba(58,110,165,.12);
+  --chip:rgba(20,18,14,.04);--chip-hover:rgba(20,18,14,.07);--line-strong:rgba(30,28,22,.16);
+  --chart-1:#378451;--chart-2:#3a6ea5;--chart-3:#c48a2e;--chart-4:#7b5ea7;--chart-5:#c34f4b;--chart-6:#0f9aa8;
+  --chart-grid:rgba(30,28,22,.08);--chart-axis:#8a857b;--chart-crosshair:rgba(30,28,22,.35);--chart-glow:rgba(55,132,81,.55);
+  --e1:0 1px 2px rgba(20,18,14,.06);--e2:0 4px 14px -6px rgba(20,18,14,.12);--e3:0 14px 40px -16px rgba(20,18,14,.18);
+  --r-sm:8px;--r-md:12px;--r-lg:16px;--r-btn:10px;--r-pill:999px;
+  --dur-micro:120ms;--dur-std:200ms;--dur-tr:320ms;--dur-range:450ms;--ease-std:cubic-bezier(.2,0,0,1);--ease-in:cubic-bezier(.05,.7,.1,1);--ease-out:cubic-bezier(.3,0,.8,.15);
+  --sidebar-w:248px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --canvas:#15140f;--surface:#1e1c16;--surface-2:#23211a;--border:#2e2b23;--text:#ece8dd;--muted:#a29d92;--muted-2:#7d786e;
+  --accent:#4a9d66;--accent-soft:rgba(74,157,102,.16);--pos:#4a9d66;--pos-soft:rgba(74,157,102,.16);--neg:#d46460;--neg-soft:rgba(212,100,96,.16);--warn:#c98a30;--warn-soft:rgba(201,138,48,.16);--info:#5a8ccb;--info-soft:rgba(90,140,203,.16);
+  --chip:rgba(255,255,255,.05);--chip-hover:rgba(255,255,255,.09);--line-strong:rgba(236,232,221,.18);
+  --chart-1:#3f9560;--chart-2:#5a8ccb;--chart-3:#c4862c;--chart-4:#9b7cc8;--chart-5:#d46460;--chart-6:#28a2b0;
+  --chart-grid:rgba(236,232,221,.08);--chart-axis:#7d786e;--chart-crosshair:rgba(236,232,221,.35);--chart-glow:rgba(63,149,96,.6);
+  --e1:0 1px 2px rgba(0,0,0,.3);--e2:0 4px 14px -6px rgba(0,0,0,.5);--e3:0 14px 40px -16px rgba(0,0,0,.6);
+}}
+:root[data-theme="dark"]{
+  --canvas:#15140f;--surface:#1e1c16;--surface-2:#23211a;--border:#2e2b23;--text:#ece8dd;--muted:#a29d92;--muted-2:#7d786e;
+  --accent:#4a9d66;--accent-soft:rgba(74,157,102,.16);--pos:#4a9d66;--pos-soft:rgba(74,157,102,.16);--neg:#d46460;--neg-soft:rgba(212,100,96,.16);--warn:#c98a30;--warn-soft:rgba(201,138,48,.16);--info:#5a8ccb;--info-soft:rgba(90,140,203,.16);
+  --chip:rgba(255,255,255,.05);--chip-hover:rgba(255,255,255,.09);--line-strong:rgba(236,232,221,.18);
+  --chart-1:#3f9560;--chart-2:#5a8ccb;--chart-3:#c4862c;--chart-4:#9b7cc8;--chart-5:#d46460;--chart-6:#28a2b0;
+  --chart-grid:rgba(236,232,221,.08);--chart-axis:#7d786e;--chart-crosshair:rgba(236,232,221,.35);--chart-glow:rgba(63,149,96,.6);
+  --e1:0 1px 2px rgba(0,0,0,.3);--e2:0 4px 14px -6px rgba(0,0,0,.5);--e3:0 14px 40px -16px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+html,body{background:var(--canvas);color:var(--text);font-family:var(--font-body);margin:0}
+body{padding-block:0 48px}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.bar h1{font:600 15px/1.2 var(--font-display);margin:0;letter-spacing:-.01em}
+.bar h1 .cw{font-family:var(--font-display);font-weight:600;font-style:normal;white-space:nowrap}.cw i{color:var(--accent);font-style:normal}
+.bar .note{color:var(--muted);font-size:12px;margin-left:auto}
+.seg{display:inline-flex;background:var(--chip);border-radius:var(--r-pill);padding:3px;gap:2px}
+.seg button{border:0;background:transparent;color:var(--muted);font:600 12.5px var(--font-body);padding:6px 12px;border-radius:var(--r-pill);cursor:pointer;transition:background var(--dur-micro) var(--ease-std),color var(--dur-micro)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--text);box-shadow:var(--e1)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.wrap{padding:20px 16px;max-width:1320px;margin:0 auto}
+.stage{display:flex;justify-content:center}
+.frame{background:var(--canvas);border:1px solid var(--border);border-radius:14px;box-shadow:var(--e3);overflow:hidden;position:relative;width:100%;max-width:1280px;height:780px;transition:width var(--dur-tr) var(--ease-in),height var(--dur-tr) var(--ease-in)}
+.frame.mobile{width:390px;height:800px;border-radius:40px;border:8px solid #1e1c16}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* --- app shell --- */
+.app{display:grid;grid-template-columns:var(--sw,248px) 1fr;height:100%;transition:grid-template-columns var(--dur-tr) var(--ease-in)}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.brand{display:flex;align-items:center;gap:10px;padding:18px 16px 14px}
+.iso{width:30px;height:30px;border-radius:50%;background:var(--surface);border:2px solid var(--accent);display:grid;place-items:center;flex:none}
+.iso svg{width:18px;height:18px}
+.brand-name{font:600 15px var(--font-display);letter-spacing:.01em;white-space:nowrap}.brand-name i{color:var(--accent);font-style:normal}
+.brand-sub{font-size:10.5px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.nav{padding:4px 10px;display:flex;flex-direction:column;gap:2px}
+.nav-label{font:600 10.5px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);padding:12px 8px 4px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-btn);color:var(--muted);font:500 13.5px var(--font-body);text-decoration:none;white-space:nowrap;transition:background var(--dur-micro),color var(--dur-micro);position:relative}
+.nav-item svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav-item:hover{background:var(--chip);color:var(--text)}
+.nav-item.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.nav-item .badge{margin-left:auto;background:var(--accent);color:#fff;font:700 10.5px var(--font-mono);padding:1px 6px;border-radius:var(--r-pill)}
+.nav-item.sub{padding-left:38px;font-size:13px}
+.nav-item.sub::before{content:"";position:absolute;left:19px;top:0;bottom:0;width:1px;background:var(--border)}
+.rail{margin-top:auto;padding:12px 14px;border-top:1px solid var(--border)}
+.rail-t{font:600 10.5px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2)}
+.rail-steps{display:flex;gap:3px;margin:8px 0 6px}.rail-steps i{flex:1;height:4px;border-radius:2px;background:var(--border)}.rail-steps i.on{background:var(--accent)}
+.rail-s{font-size:12px;color:var(--text)}.rail-s b{font-weight:600}.rail-s small{display:block;color:var(--muted);font-size:11px}
+.user{display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--border);font-size:12.5px}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font:700 11px var(--font-mono)}
+.main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.topbar{display:flex;align-items:center;gap:14px;padding:12px 22px;background:var(--surface);border-bottom:1px solid var(--border);min-height:58px}
+.crumb{font-size:12px;color:var(--muted)}.crumb b{color:var(--text);font-weight:600}
+.ptitle{font:600 17px var(--font-display);letter-spacing:-.01em}
+.period{display:inline-flex;align-items:center;gap:2px;background:var(--chip);border-radius:var(--r-pill);padding:3px}
+.period button{border:0;background:transparent;color:var(--muted);width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:14px}
+.period .cur{font:600 12.5px var(--font-body);color:var(--text);padding:0 8px;white-space:nowrap}
+.period .cmp{font-size:11px;color:var(--muted);padding:0 8px 0 4px;border-left:1px solid var(--border);white-space:nowrap}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.ck{display:inline-flex;align-items:center;gap:8px;background:var(--chip);border-radius:var(--r-btn);padding:6px 10px;color:var(--muted);font-size:12.5px;min-width:180px}
+.ck kbd{margin-left:auto;font:600 10.5px var(--font-mono);border:1px solid var(--border);border-radius:5px;padding:1px 5px;color:var(--muted)}
+.ibtn{width:32px;height:32px;border-radius:50%;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;position:relative}
+.ibtn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ibtn .dot{position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--neg);border:1.5px solid var(--surface)}
+.tabs{display:flex;gap:4px;padding:0 22px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto}
+.tab{padding:11px 4px;margin-right:14px;font:600 13px var(--font-body);color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;cursor:pointer}
+.tab.on{color:var(--text);border-bottom-color:var(--accent)}
+.content{padding:22px;overflow:auto;flex:1}
+.greet{font:600 24px/1.15 var(--font-display);letter-spacing:-.02em;margin:0 0 2px}.greet .it{font-style:italic;color:var(--accent);font-weight:500}
+.greet-sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+.viewing{font-size:11.5px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.viewing span{background:var(--chip);border-radius:var(--r-pill);padding:2px 9px}
+.hero{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--e1);padding:20px 22px;display:grid;grid-template-columns:1.1fr .9fr;gap:18px;align-items:center}
+.hero .lbl{font:600 11px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.hero .num{font:600 40px/1.05 var(--font-display);letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin:6px 0 4px}
+.hero .num small{font-size:20px;color:var(--muted);font-weight:500}
+.hero .read{font-size:13px;color:var(--muted);line-height:1.45;max-width:38ch}
+.hero .read b{color:var(--text);font-weight:600}
+.delta{display:inline-flex;align-items:center;gap:4px;font:600 12px var(--font-body);padding:2px 8px;border-radius:var(--r-pill);font-variant-numeric:tabular-nums}
+.delta.pos{background:var(--pos-soft);color:var(--pos)}.delta.neg{background:var(--neg-soft);color:var(--neg)}.delta.warn{background:var(--warn-soft);color:var(--warn)}
+.spark{width:100%;height:118px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.kpi{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--e1);padding:14px 16px}
+.kpi .lbl{font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between}
+.kpi .val{font:600 22px var(--font-display);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:6px 0 4px}
+.kpi .sub{font-size:12px;color:var(--muted)}
+.row2{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:14px}
+.card{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--e1);padding:16px 18px}
+.card-t{font:600 11px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.action{display:flex;gap:12px;align-items:flex-start}
+.action .n{width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font:700 12px var(--font-mono);flex:none}
+.action h4{margin:0 0 3px;font:600 14px var(--font-body)}.action p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.45}
+.action .imp{font:600 12px var(--font-mono);color:var(--accent);margin-top:6px}
+.sig{display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--border);font-size:12.5px;line-height:1.4}
+.sig:first-of-type{border-top:0}
+.sig i{width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none}
+.btn{border:0;border-radius:var(--r-btn);padding:8px 14px;font:600 12.5px var(--font-body);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.btn-p{background:var(--accent);color:#fff}.btn-s{background:var(--chip);color:var(--text)}
+/* option C */
+.app.c{--sw:68px}
+.app.c .sidebar .brand-name,.app.c .sidebar .brand-sub,.app.c .nav-label,.app.c .nav-item span,.app.c .user div,.app.c .rail .rail-s,.app.c .rail-t{display:none}
+.app.c .nav-item{justify-content:center;padding:10px}
+.app.c .brand{justify-content:center;padding:16px 0 10px}
+.app.c .rail{padding:12px}
+.app.c .rail-steps{flex-direction:column;height:80px}.app.c .rail-steps i{height:auto;width:4px}
+.app.c .user{justify-content:center}
+.cmdbar{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-pill);padding:8px 14px;color:var(--muted);font-size:13px;width:min(520px,100%);box-shadow:var(--e1)}
+.cmdbar kbd{margin-left:auto;font:600 10.5px var(--font-mono);border:1px solid var(--border);border-radius:5px;padding:1px 5px}
+.segtabs{display:inline-flex;background:var(--chip);border-radius:var(--r-pill);padding:3px;gap:2px;margin:0 0 4px}
+.segtabs span{padding:6px 12px;border-radius:var(--r-pill);font:600 12.5px var(--font-body);color:var(--muted);white-space:nowrap}
+.segtabs span.on{background:var(--surface);color:var(--text);box-shadow:var(--e1)}
+.journey{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);padding:8px 22px;background:var(--surface-2);border-bottom:1px solid var(--border)}
+.journey .steps{display:flex;gap:3px;flex:1;max-width:260px}.journey .steps i{flex:1;height:4px;border-radius:2px;background:var(--border)}.journey .steps i.on{background:var(--accent)}
+/* mobile shell */
+.mapp{display:flex;flex-direction:column;height:100%;background:var(--canvas)}
+.mhead{padding:14px 16px 8px;display:flex;align-items:center;gap:10px;background:var(--surface);border-bottom:1px solid var(--border)}
+.mhead .ptitle{font-size:18px}
+.mcontent{flex:1;overflow:auto;padding:14px 16px 90px}
+.mcontent .hero{grid-template-columns:1fr;padding:16px}
+.mcontent .kpis{grid-template-columns:1fr 1fr}
+.mcontent .row2{grid-template-columns:1fr}
+.mtabs{display:flex;gap:10px;overflow-x:auto;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);scrollbar-width:none}
+.mtabs .tab{padding:6px 0;margin-right:6px}
+.mbar{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 6px calc(10px + env(safe-area-inset-bottom,0px))}
+.mbar a{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font:600 10px var(--font-body);text-decoration:none;min-width:56px}
+.mbar a svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.mbar a.on{color:var(--accent)}
+.mbar .isoq{width:26px;height:26px;border-radius:50%;background:var(--surface);border:2px solid var(--accent);display:grid;place-items:center}.mbar .isoq svg{width:15px;height:15px}
+.fab{position:absolute;right:18px;bottom:78px;width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;box-shadow:var(--e2);font:500 30px/1 var(--font-display)}
+.mperiod{display:flex;align-items:center;gap:8px;padding:8px 16px;font-size:12.5px;color:var(--muted);background:var(--surface)}
+.mperiod b{color:var(--text)}
+/* notes */
+.opt{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--e1);padding:18px 20px;margin-top:22px;display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:18px}
+.opt h3{margin:0 0 6px;font:600 16px var(--font-display);letter-spacing:-.01em}
+.opt p,.opt li{font-size:13.5px;line-height:1.5;color:var(--text)}
+.opt ul{margin:6px 0 0;padding-left:18px}
+.opt .k{font:600 11px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:22px;background:var(--surface);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--e1)}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
+th{font:600 11px var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--surface-2)}
+td.s{font:700 13px var(--font-mono);text-align:center}
+.reco{margin-top:22px;background:var(--accent-soft);border-radius:var(--r-lg);padding:18px 20px;font-size:14px;line-height:1.55}
+.reco b{font-weight:600}
+.tblwrap{overflow-x:auto}
+@media (max-width:900px){.opt{grid-template-columns:1fr}.frame{height:auto;min-height:640px}.hero{grid-template-columns:1fr}.kpis{grid-template-columns:1fr}.row2{grid-template-columns:1fr}}
+</style>
+
+<div class="bar">
+  <h1><span class="cw">CARTERA<i>+</i></span> · Shell de navegación — opciones A / B / C</h1>
+  <div class="seg" role="group" aria-label="Opción">
+    <button id="optA" aria-pressed="true" onclick="setOpt('A')">A · Evolutiva</button>
+    <button id="optB" aria-pressed="false" onclick="setOpt('B')">B · Data-first</button>
+    <button id="optC" aria-pressed="false" onclick="setOpt('C')">C · Future-forward</button>
+  </div>
+  <div class="seg" role="group" aria-label="Dispositivo">
+    <button id="devD" aria-pressed="true" onclick="setDev('desktop')">Escritorio</button>
+    <button id="devM" aria-pressed="false" onclick="setDev('mobile')">Móvil</button>
+  </div>
+  <div class="seg" role="group" aria-label="Tema">
+    <button id="thL" aria-pressed="true" onclick="setTheme('light')">Claro</button>
+    <button id="thD" aria-pressed="false" onclick="setTheme('dark')">Oscuro</button>
+  </div>
+  <span class="note">Datos: cuenta demo Familia Ramírez · agosto 2026 tratado como mes en curso (día 16)</span>
+</div>
+
+<div class="wrap">
+  <div class="stage"><div class="frame" id="frame"></div></div>
+  <div id="notes"></div>
+
+  <div class="tblwrap"><table>
+    <thead><tr><th>Criterio</th><th>A · Evolutiva</th><th>B · Data-first</th><th>C · Future-forward</th></tr></thead>
+    <tbody>
+      <tr><td>Comprensión del usuario nuevo</td><td class="s">4</td><td class="s">5</td><td class="s">3</td></tr>
+      <tr><td>Jerarquía visual (menos elementos compitiendo)</td><td class="s">3</td><td class="s">5</td><td class="s">5</td></tr>
+      <tr><td>Interacción (paleta ⌘K, periodo global, pestañas en URL)</td><td class="s">3</td><td class="s">5</td><td class="s">5</td></tr>
+      <tr><td>Escalabilidad (agregar una pantalla = una pestaña)</td><td class="s">3</td><td class="s">5</td><td class="s">5</td></tr>
+      <tr><td>Complejidad de implementación</td><td class="s">5</td><td class="s">4</td><td class="s">3</td></tr>
+      <tr><td>Móvil (alcance del pulgar, pestañas, FAB)</td><td class="s">3</td><td class="s">5</td><td class="s">4</td></tr>
+      <tr><td>Esfuerzo de ingeniería (deltas)</td><td class="s">2</td><td class="s">4</td><td class="s">5</td></tr>
+      <tr><td>Espacio para contenido en escritorio</td><td class="s">3</td><td class="s">4</td><td class="s">5</td></tr>
+      <tr><td><b>Total (sobre 40)</b></td><td class="s">26</td><td class="s"><b>37</b></td><td class="s">35</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="reco"><b>Recomendación: B como base, con dos préstamos de C.</b> B es la que un usuario nuevo entiende sin explicación: cinco destinos planos, las pestañas del núcleo siempre visibles bajo el título, el periodo global en la barra y el riel del viaje al pie del sidebar. De C se toma el sidebar <b>colapsable a iconos</b> (para ganar ancho en pantallas analíticas como Gastos y Patrimonio) y la <b>paleta ⌘K como búsqueda y acción</b>, pero no como navegación primaria: en móvil casi nadie la usaría. A se descarta porque conserva los 17 destinos visibles y el problema de «dónde estoy» no se resuelve con renombrar grupos.</div>
+</div>
+
+<script>
+const ICON={
+ home:'<svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',
+ flow:'<svg viewBox="0 0 24 24"><path d="M4 7h12l-3-3M20 17H8l3 3"/></svg>',
+ plan:'<svg viewBox="0 0 24 24"><path d="M5 21V4M5 4h12l-2 4 2 4H5"/></svg>',
+ wealth:'<svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg>',
+ spark:'<svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg>',
+ gear:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+ search:'<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+ bell:'<svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
+ eye:'<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+ iso:'<svg viewBox="0 0 64 64"><path d="M44 18a18 18 0 1 0 0 28" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/><path d="M46 24v16M38 32h16" fill="none" stroke="#378451" stroke-width="4.6" stroke-linecap="round"/></svg>',
+ dots:'<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>',
+ menu:'<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>'
+};
+const HUBS=[
+ {id:'hoy',name:'Hoy',icon:'home',badge:3,tabs:['Panel','Acciones','Progreso']},
+ {id:'flujo',name:'Flujo',icon:'flow',badge:2,tabs:['Resumen del mes','Ingresos','Gastos y sobres','Transacciones','Recurrentes']},
+ {id:'planes',name:'Planes',icon:'plan',badge:1,tabs:['Metas','Deudas','Fondos']},
+ {id:'patrimonio',name:'Patrimonio',icon:'wealth',tabs:['Resumen','Inversiones','Protección','Libertad','Indicadores']},
+ {id:'asesor',name:'Asesor',icon:'spark',tabs:[]},
+];
+const fmt=n=>'₡'+Math.round(n).toLocaleString('es-CR').replace(/\./g,' ');
+const D={libre:562420,ideal16:903525,real16:1167580,cuotasTemprano:678180,nw:34244701,nwPrev:34380821,flujo:1930000-1167580,flujoPlan:173920,comp14:200000+28000+22000};
+
+function sparkSVG(){
+ // ritmo ideal (escalonado con cuotas) vs real, agosto 2026, día 16 marcado
+ const W=420,H=118,pad=8,days=31,max=1900000;
+ const real=[0,0,35850,93850,134700,531880,568280,579980,614980,636980,672930,739030,791280,791280,791280,1017580,1167580];
+ const ideal=[];let c=0;for(let d=0;d<=days;d++){c=(1750580-678180)*d/days+(d>=5?312180:0)+(d>=15?216000:0)+(d>=16?150000:0);ideal.push(c)}
+ const x=d=>pad+(W-2*pad)*d/days,y=v=>H-pad-(H-2*pad)*v/max;
+ const p=(arr,to)=>arr.slice(0,to+1).map((v,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1)).join(' ');
+ const area=p(real,16)+` L${x(16).toFixed(1)} ${(H-pad).toFixed(1)} L${x(0)} ${H-pad} Z`;
+ return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="Ritmo del mes: gasto real frente al ritmo ideal, día 16 de 31">
+ <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--chart-1)" stop-opacity=".28"/><stop offset="1" stop-color="var(--chart-1)" stop-opacity="0"/></linearGradient>
+ <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+ ${[0.25,0.5,0.75].map(f=>`<line x1="${pad}" x2="${W-pad}" y1="${y(max*f).toFixed(1)}" y2="${y(max*f).toFixed(1)}" stroke="var(--chart-grid)" stroke-dasharray="2 5"/>`).join('')}
+ <path d="${p(ideal,days)}" fill="none" stroke="var(--chart-axis)" stroke-width="1.5" stroke-dasharray="4 4"/>
+ <path d="${area}" fill="url(#g1)"/>
+ <path d="${p(real,16)}" fill="none" stroke="var(--chart-1)" stroke-width="2" stroke-linejoin="round"/>
+ <line x1="${x(16).toFixed(1)}" x2="${x(16).toFixed(1)}" y1="${pad}" y2="${H-pad}" stroke="var(--chart-crosshair)" stroke-dasharray="3 3"/>
+ <circle cx="${x(16).toFixed(1)}" cy="${y(real[16]).toFixed(1)}" r="4" fill="var(--chart-1)" filter="url(#glow)"/>
+ <text x="${x(16)-7}" y="${y(real[16])+18}" text-anchor="end" font-family="var(--font-mono)" font-size="10" fill="var(--text)">hoy · ${fmt(D.real16)}</text>
+ <text x="${W-pad}" y="${H-pad+7}" text-anchor="end" font-family="var(--font-mono)" font-size="9" fill="var(--chart-axis)">31 ago</text>
+ <text x="${pad}" y="${H-pad+7}" font-family="var(--font-mono)" font-size="9" fill="var(--chart-axis)">1 ago</text>
+ </svg>`;
+}
+function contentHTML(){
+ return `<h2 class="greet">Hola, <span class="it">José</span></h2>
+ <p class="greet-sub">Esto es lo más importante de tus finanzas hoy.</p>
+ <div class="viewing"><span>Agosto 2026 · día 16</span><span>vs julio</span><span>Todo el hogar</span></div>
+ <div class="hero">
+   <div><div class="lbl">Libre para gastar este mes <span title="Ingreso esperado − gasto real − compromisos pendientes">?</span></div>
+   <div class="num">${fmt(D.libre)}</div>
+   <span class="delta warn">▲ ${fmt(D.real16-D.ideal16)} sobre el ritmo lineal</span>
+   <p class="read">Vas por encima porque <b>${fmt(D.cuotasTemprano)}</b> de cuotas se pagan a inicio de mes. Contra el ritmo real de tus compromisos, vas <b>al día</b>.</p></div>
+   <div>${sparkSVG()}</div>
+ </div>
+ <div class="kpis">
+   <div class="kpi"><div class="lbl">Patrimonio neto <span>?</span></div><div class="val">${fmt(D.nw)}</div><div class="sub"><span class="delta pos">▲ ₡8,7 M</span> vs hace 12 meses · en curso</div></div>
+   <div class="kpi"><div class="lbl">Flujo del mes</div><div class="val">${fmt(D.flujo)}</div><div class="sub">ingresos esperados − gastos reales</div></div>
+   <div class="kpi"><div class="lbl">Compromisos · 14 días</div><div class="val">${fmt(D.comp14)}</div><div class="sub">3 pagos · aporte al fondo el 26</div></div>
+ </div>
+ <div class="row2">
+   <div class="card"><div class="card-t">Tu próxima mejor acción <span>ver las 3 →</span></div>
+     <div class="action"><div class="n">1</div><div><h4>Abonar ₡150 000 extra al préstamo del vehículo</h4><p>Es tu deuda más cara (13,5 %) ahora que la tarjeta está en ₡0. El flujo libre lo permite sin tocar el fondo.</p><div class="imp">Ahorra ₡412 000 en intereses · libre 5 meses antes</div></div></div>
+     <div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-p">Hacerlo</button><button class="btn btn-s">Preguntar al asesor</button></div>
+   </div>
+   <div class="card"><div class="card-t">Señales del mes</div>
+     <div class="sig"><i style="background:var(--warn)"></i><div><b>Restaurantes</b> ya usó 69 % del sobre con 52 % del mes.</div></div>
+     <div class="sig"><i style="background:var(--pos)"></i><div>Ingreso variable mayor: <b>repostería ₡124 500</b> (+21 % vs promedio).</div></div>
+     <div class="sig"><i style="background:var(--info)"></i><div>Aporte DCA pendiente de confirmar: CDP BN.</div></div>
+   </div>
+ </div>`;
+}
+function navA(){
+ return HUBS.map(h=>`<div class="nav-label">${h.name}</div>`+(h.tabs.length?h.tabs.map((t,i)=>`<a class="nav-item ${h.id==='hoy'&&i===0?'active':''}" href="#">${ICON[h.icon]}<span>${t}</span>${h.badge&&i===0?`<b class="badge">${h.badge}</b>`:''}</a>`).join(''):`<a class="nav-item" href="#">${ICON[h.icon]}<span>My Agent C+</span></a>`)).join('');
+}
+function navB(){
+ return HUBS.map(h=>`<a class="nav-item ${h.id==='hoy'?'active':''}" href="#">${ICON[h.icon]}<span>${h.name}</span>${h.badge?`<b class="badge">${h.badge}</b>`:''}</a>`).join('')
+ +`<div class="nav-label" style="margin-top:6px">Pestañas de Hoy</div>`+['Panel','Acciones','Progreso'].map((t,i)=>`<a class="nav-item sub ${i===0?'active':''}" href="#"><span>${t}</span></a>`).join('');
+}
+function rail(){return `<div class="rail"><div class="rail-t">Tu camino</div><div class="rail-steps"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div><div class="rail-s"><b>Sin deuda cara</b> ✓<small>Siguiente: un aporte automático corriendo</small></div></div>`}
+function desktop(opt){
+ const sidebar=`<aside class="sidebar">
+   <div class="brand"><div class="iso">${ICON.iso}</div><div><div class="brand-name">CARTERA<i>+</i></div><div class="brand-sub">Sistema financiero</div></div></div>
+   <nav class="nav">${opt==='A'?navA():opt==='B'?navB():HUBS.map(h=>`<a class="nav-item ${h.id==='hoy'?'active':''}" href="#" title="${h.name}">${ICON[h.icon]}<span>${h.name}</span></a>`).join('')}</nav>
+   ${opt!=='A'?rail():''}
+   <div class="user"><div class="avatar">JR</div><div><b>José Ramírez</b><br><span style="color:var(--muted)">Plan Pro+</span></div>${opt!=='C'?`<span style="margin-left:auto;color:var(--muted)">${ICON.gear.replace('<svg','<svg width="16" height="16" style="stroke:currentColor;fill:none;stroke-width:1.8"')}</span>`:''}</div>
+ </aside>`;
+ const topA=`<div class="topbar"><div><div class="crumb">Resumen / <b>Panel</b></div><div class="ptitle">Centro de mando</div></div>
+   <div class="tb-right"><div class="ck">${ICON.search.replace('<svg','<svg width="14" height="14" style="stroke:currentColor;fill:none;stroke-width:1.8"')} Buscar… <kbd>⌘K</kbd></div><div class="period"><button>‹</button><span class="cur">Agosto 2026</span><button>›</button></div><button class="ibtn">${ICON.bell}<i class="dot"></i></button><button class="ibtn">${ICON.gear}</button></div></div>`;
+ const topB=`<div class="topbar"><div><div class="crumb">Hoy / <b>Panel</b></div><div class="ptitle">Hoy</div></div>
+   <div class="period" style="margin-left:14px"><button aria-label="mes anterior">‹</button><span class="cur">Agosto 2026</span><button aria-label="mes siguiente">›</button><span class="cmp">vs julio ▾</span></div>
+   <div class="tb-right"><div class="ck">${ICON.search.replace('<svg','<svg width="14" height="14" style="stroke:currentColor;fill:none;stroke-width:1.8"')} Buscar o hacer… <kbd>⌘K</kbd></div><button class="ibtn" title="Ocultar montos">${ICON.eye}</button><button class="ibtn">${ICON.bell}<i class="dot"></i></button><div class="avatar" style="width:28px;height:28px">JR</div></div></div>
+   <div class="tabs">${['Panel','Acciones · 3','Progreso'].map((t,i)=>`<span class="tab ${i===0?'on':''}">${t}</span>`).join('')}</div>`;
+ const topC=`<div class="journey"><span>Tu camino ·</span><div class="steps"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div><span><b style="color:var(--text)">Sin deuda cara</b> → siguiente: aporte automático</span><span style="margin-left:auto">Agosto 2026 · vs julio</span></div>
+   <div class="topbar" style="gap:18px"><div class="ptitle">Hoy</div><div class="cmdbar">${ICON.search.replace('<svg','<svg width="15" height="15" style="stroke:currentColor;fill:none;stroke-width:1.8"')} Ir a, buscar o registrar… <kbd>⌘K</kbd></div>
+   <div class="tb-right"><div class="segtabs"><span class="on">Panel</span><span>Acciones · 3</span><span>Progreso</span></div><button class="ibtn">${ICON.bell}<i class="dot"></i></button></div></div>`;
+ return `<div class="app ${opt.toLowerCase()}">${sidebar}<div class="main">${opt==='A'?topA:opt==='B'?topB:topC}<div class="content">${contentHTML()}</div></div></div>`;
+}
+function mobile(opt){
+ const head=opt==='A'
+  ?`<div class="mhead"><div class="iso" style="width:26px;height:26px">${ICON.iso}</div><div class="ptitle">Inicio</div><span style="margin-left:auto" class="ibtn">${ICON.bell}<i class="dot"></i></span><span class="ibtn">${ICON.menu}</span></div>`
+  :opt==='B'
+  ?`<div class="mhead"><div class="ptitle">Hoy</div><span style="margin-left:auto" class="ibtn">${ICON.search}</span><span class="ibtn">${ICON.bell}<i class="dot"></i></span><div class="avatar" style="width:26px;height:26px">JR</div></div>
+    <div class="mtabs">${['Panel','Acciones · 3','Progreso'].map((t,i)=>`<span class="tab ${i===0?'on':''}">${t}</span>`).join('')}</div>
+    <div class="mperiod">‹ <b>Agosto 2026</b> › <span>· vs julio</span></div>`
+  :`<div class="mhead"><div class="cmdbar" style="padding:7px 12px">${ICON.search.replace('<svg','<svg width="14" height="14" style="stroke:currentColor;fill:none;stroke-width:1.8"')} Buscar o registrar…</div><span class="ibtn">${ICON.bell}<i class="dot"></i></span></div>
+    <div class="journey" style="padding:6px 16px"><div class="steps"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div><span>Sin deuda cara</span><span style="margin-left:auto">ago 2026</span></div>
+    <div style="padding:8px 16px 0"><div class="segtabs"><span class="on">Panel</span><span>Acciones</span><span>Progreso</span></div></div>`;
+ const barA=`<div class="mbar">${[['home','Inicio',1],['spark','Asistente'],['flow','Base'],['plan','Ahorro'],['wealth','Portafolio'],['wealth','Patrimonio']].map(([i,n,on])=>`<a class="${on?'on':''}" href="#">${ICON[i]}${n}</a>`).join('')}</div>`;
+ const barB=`<div class="mbar">${[['home','Hoy',1],['flow','Flujo'],['plan','Planes'],['wealth','Patrimonio']].map(([i,n,on])=>`<a class="${on?'on':''}" href="#">${ICON[i]}${n}</a>`).join('')}<a href="#"><span class="isoq">${ICON.iso}</span>Asesor</a></div><div class="fab">+</div>`;
+ const barC=`<div class="mbar" style="justify-content:center;gap:22px">${[['home','Hoy',1],['flow','Flujo'],['plan','Planes'],['wealth','Patrimonio']].map(([i,n,on])=>`<a class="${on?'on':''}" href="#">${ICON[i]}${n}</a>`).join('')}</div><div class="fab" style="bottom:88px;right:16px;background:var(--surface);color:var(--text);border:2px solid var(--accent)">${ICON.iso.replace('<svg','<svg width="26" height="26"')}</div>`;
+ return `<div class="mapp">${head}<div class="mcontent">${contentHTML()}</div>${opt==='A'?barA:opt==='B'?barB:barC}</div>`;
+}
+const NOTES={
+ A:{t:'A · Evolutiva — el sidebar de hoy, reordenado',d:'Conserva la estructura agrupada actual (etiquetas de sección + ítems) pero renombra los grupos a los cinco núcleos y lista sus pestañas como ítems. Agrega el selector de mes al topbar. En móvil mantiene la barra de 6 destinos y el menú ☰.',p:['Cero curva de aprendizaje para quien ya usa la app','Implementación mínima (solo nav.ts y etiquetas)','Cada pantalla sigue a un clic'],c:['Siguen 17 destinos visibles compitiendo','El menú ☰ móvil sigue duplicado y el pulgar no llega','No resuelve «dónde estoy» ni el periodo global','⌘K sigue sin función']},
+ B:{t:'B · Data-first — cinco núcleos, pestañas bajo el título',d:'Sidebar plano de 5 con contadores derivados del dato y el riel del viaje al pie. Las pestañas del núcleo van bajo el título y viven en la URL. El periodo global y la comparación están en la barra superior; ⌘K es real (ir a, buscar, registrar). En móvil: barra de 5 con el isotipo del Asesor, pestañas deslizables y botón «+» flotante.',p:['Prueba de 5 segundos: dónde estoy (núcleo + pestaña) y cuándo (periodo)','Agregar una pantalla = agregar una pestaña','Un solo modelo en nav.ts para web y /m','El riel del viaje reemplaza los tres vocabularios'],c:['Un clic más para llegar a Gastos desde el sidebar (mitigado por ⌘K y contadores)','Requiere mover pestañas de #hash a URL']},
+ C:{t:'C · Future-forward — rail de iconos y barra de comandos',d:'Sidebar colapsado a 68 px con iconos (nombre en tooltip), una barra de comandos central como navegación primaria, el riel del viaje como franja superior y las pestañas como segmented control. En móvil, la búsqueda arriba y el Asesor como botón flotante.',p:['Máximo espacio para análisis y comparación en escritorio','Se siente distintivo y «tecnológico»','El viaje siempre a la vista'],c:['Iconos sin etiqueta exigen aprendizaje; el usuario del hogar no es power user','La barra de comandos como navegación primaria no funciona en móvil','Dos filas de cabecera restan altura en laptops de 13″']}
+};
+let opt='A',dev='desktop';
+function render(){
+ const f=document.getElementById('frame');f.className='frame'+(dev==='mobile'?' mobile':'');
+ f.innerHTML=dev==='desktop'?desktop(opt):mobile(opt);
+ const n=NOTES[opt];document.getElementById('notes').innerHTML=`<div class="opt"><div><h3>${n.t}</h3><p>${n.d}</p></div><div><div class="k">A favor</div><ul>${n.p.map(x=>`<li>${x}</li>`).join('')}</ul></div><div><div class="k">En contra</div><ul>${n.c.map(x=>`<li>${x}</li>`).join('')}</ul></div></div>`;
+ ['A','B','C'].forEach(o=>document.getElementById('opt'+o).setAttribute('aria-pressed',o===opt));
+ document.getElementById('devD').setAttribute('aria-pressed',dev==='desktop');document.getElementById('devM').setAttribute('aria-pressed',dev==='mobile');
+}
+function setOpt(o){opt=o;render();try{localStorage.setItem('cp-shell-opt',o)}catch(e){}}
+function setDev(d){dev=d;render()}
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);document.getElementById('thL').setAttribute('aria-pressed',t==='light');document.getElementById('thD').setAttribute('aria-pressed',t==='dark')}
+try{opt=localStorage.getItem('cp-shell-opt')||'A'}catch(e){}
+render();
+</script>
