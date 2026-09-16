@@ -46,3 +46,8 @@ supabase/.branches
 
 # Bundle de diseño (no versionar)
 design-handoff/
+
+# Config local de Claude Code (puede contener secretos en comandos permitidos)
+.claude/settings.local.json
+.claude/launch.json
+.claude/worktrees/
