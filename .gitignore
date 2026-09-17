@@ -51,3 +51,6 @@ design-handoff/
 .claude/settings.local.json
 .claude/launch.json
 .claude/worktrees/
+
+# Capturas de regresión visual (qa:snap) — no se versionan
+qa-snapshots/
