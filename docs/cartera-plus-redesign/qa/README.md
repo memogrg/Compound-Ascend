@@ -2,14 +2,14 @@
 
 1. **Servidor de producción** (nunca `next dev`: StrictMode corre los efectos dos veces y las
    animaciones por scroll no llegan a verse): `npm run build && npm run start -- -p 3001`.
-2. **Línea base**: `E2E_EMAIL=… E2E_PASSWORD=… npm run qa:snap -- --out qa-snapshots/base`
+2. **Línea base**: `E2E_EMAIL=information.theglowup@gmail.com E2E_PASSWORD=… npm run qa:snap -- --out qa-snapshots/base`
    (23 rutas × 3 anchos × 2 temas; `--theme`, `--widths` y `--base-url` ajustan el alcance).
 3. **Tras el cambio**: `… npm run qa:snap -- --out qa-snapshots/cambio`.
 4. **Comparar**: `npm run qa:diff -- --a qa-snapshots/base --b qa-snapshots/cambio` — imprime
    píxeles distintos por imagen, escribe los PNG de diferencias y sale con 1 si alguna supera
    `--max-diff-pixels` (default 0).
 
-## Ambiente: SIEMPRE el local, con la cuenta sandbox. Nunca producción.
+## Ambiente: SIEMPRE el local, con la demo sembrada. Nunca producción.
 
 La base y la comparación tienen que correr contra la misma base de datos y el mismo usuario: dos
 corridas contra ambientes distintos difieren por los datos, no por el CSS, y el diff deja de
@@ -17,20 +17,32 @@ significar nada. Por eso la regla es fija, no una preferencia por corrida:
 
 - **Ambiente**: Supabase local (`http://127.0.0.1:54321`), que es a donde apuntan `.env.local` y
   `.env.sandbox.local`. `.env.prod.local` apunta a producción y **no se usa para QA visual**.
-- **Cuenta**: la sandbox del smoke E2E — `demo@sandbox.local` (`tests/e2e/smoke.spec.ts`).
-- **Levantar**, con Docker corriendo y el mismo flujo que usa CI (`.github/workflows/ci.yml`):
+- **Cuenta**: la demo **Familia Ramírez** (`information.theglowup@gmail.com`), sembrada en local.
+  `demo@sandbox.local` (la del smoke E2E) existe pero va vacía: sirve para el smoke, no para una
+  línea base — con ella casi todas las rutas capturan estados vacíos.
+- **Levantar**, con Docker corriendo:
 
   ```bash
-  supabase start                 # arranca el stack aplicando migraciones
-  supabase db reset              # re-apply limpio de toda la cadena
-  supabase status -o env         # de ahí salen API_URL / ANON_KEY / SERVICE_ROLE_KEY
-  SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… E2E_EMAIL=demo@sandbox.local E2E_PASSWORD=… \
-    node scripts/seed-e2e-user.mjs
+  export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"   # Node 22: supabase-js pide
+                                                              # WebSocket nativo (Node 20 no lo trae)
+  supabase start
+  DEMO_ENV_FILE=.env.sandbox.local node scripts/demo/seed-demo-familia.mjs
   ```
 
-  El seeder crea el usuario; los datos de la cuenta demo se siembran aparte (`scripts/demo/`).
-  Una base recién reseteada deja muchas pantallas en estado vacío: anotá en el PR cuántas rutas
-  quedaron así, porque una base poco poblada es una línea base poco representativa.
+  **`DEMO_ENV_FILE` nunca se omite**: sin esa variable el sembrador cae en su default,
+  `.env.prod.local`, y **escribe en producción**. Verificá la primera línea que imprime —
+  `objetivo: http://127.0.0.1:54321 (.env.sandbox.local)`— antes de dejarlo correr.
+
+  `supabase db reset` **no** forma parte del flujo: la cadena de migraciones ya se aplica al
+  levantar, y el reset borra toda la base local (incluidos los usuarios del simulador). El reset de
+  CI existe para _probar_ que las migraciones aplican limpio en una base efímera, no como setup.
+
+  El sembrador limpia y resiembra **solo** a José y Marta (`.in('user_id', [JOSE, MARTA])`), así que
+  el resto de la base local queda intacto. Exige `plan: 'max'`: desde la migración
+  `20260902120000_planes_tres_tiers_y_suscripcion.sql` el check de `profiles.plan` admite
+  `('ninguno','esencial','pro','max')` y `premium` se renombró a `max`. Con un plan inválido la fila
+  de `profiles` no se escribe, el usuario queda en `ninguno` y el muro del middleware manda a
+  `/empezar?reanudar=1`: las 19 rutas con sesión capturarían esa pantalla en vez de la app.
 
 **Qué registra el manifest** (`<out>/manifest.json`), además de ruta/ancho/tema/archivo: tiempo
 hasta `networkidle`, errores de consola (`pageerror`), `termsModal` (el modal de Términos estaba
