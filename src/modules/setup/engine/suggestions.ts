@@ -180,8 +180,10 @@ export function nextAfterBudget(s: SetupSnapshot, free: number): NextMove | null
   }
 
   // 2) Deuda cara: rinde más que cualquier inversión razonable.
+  // `balance` es el saldo VIVO (setup-state lo deriva con deriveDebtsForEngine). El filtro `> 0`
+  // es lo que impide sugerir "abonale a X" sobre una deuda ya saldada: antes no filtraba saldo.
   const cara = s.debts
-    .filter((d) => (d.apr ?? 0) >= 20)
+    .filter((d) => (d.apr ?? 0) >= 20 && d.balance > 0)
     .sort((a, b) => (b.apr ?? 0) - (a.apr ?? 0));
   const peor = cara[0];
   if (peor) {
