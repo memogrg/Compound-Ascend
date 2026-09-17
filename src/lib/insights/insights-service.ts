@@ -91,8 +91,20 @@ export async function refreshInsights(ctx?: AuthContext): Promise<void> {
     const last = await getInsightsFreshness(ctx);
     if (!isStale(last)) return; // guardia de frescura
     // Import dinámico para no acoplar lib/insights con el módulo control.
-    const { listGoals, listDebts } = await import("@/modules/control/services/control-service");
-    const [goals, debts] = await Promise.all([listGoals(ctx), listDebts(ctx)]);
+    const { listGoals, listDebts, deriveDebtsForEngine } =
+      await import("@/modules/control/services/control-service");
+    const { getCurrentDebtBalances } = await import("@/modules/control/services/debts-service");
+    const [goals, anclas, liveBalances] = await Promise.all([
+      listGoals(ctx),
+      listDebts(ctx),
+      getCurrentDebtBalances(ctx),
+    ]);
+    // Saldo VIVO (ancla − pagos), NO el ancla de alta: una tarjeta ya saldada seguía saliendo como
+    // "la deuda más cara" y con su monto de alta. Misma derivación que el diagnóstico de control
+    // (deriveDebtsForEngine), para que la campana no pueda discrepar del panel.
+    // Se deriva en la moneda NATIVA de cada deuda (destino = su propia moneda ⇒ convertCurrency es
+    // identidad): los detectores formatean cada monto con `d.currency`, no con una de agregación.
+    const debts = anclas.flatMap((d) => deriveDebtsForEngine([d], liveBalances, d.currency, {}));
     const detected = runDetectors({ goals, debts }, simNow());
     const spend = await getDisfruteSpend(ctx);
     if (spend) detected.push(...detectDisfruteSpike(spend));
