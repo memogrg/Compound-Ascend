@@ -29,6 +29,8 @@ import {
   monedaVinculadaEsCoherente,
 } from "@/modules/financial-base";
 import { buildControlDiagnosis } from "@/modules/control/engine/priority-engine";
+// Type-only (se borra en runtime): evita el ciclo con debts-service, que sí importa de aquí.
+import type { DebtBalance } from "@/modules/control/services/debts-service";
 import { deriveRecurrenceFields, type Recurrence } from "@/modules/control/engine/recurrence";
 import { montoOriginalAlAlta } from "@/modules/control/engine/debt-alta";
 import { convertCurrency } from "@/lib/fx";
@@ -942,6 +944,30 @@ export type ControlSummary = {
   fxRates: Record<string, number>;
 };
 
+/**
+ * Reemplaza el ANCLA de alta (`debts.balance`, que `record_debt_payment` nunca decrementa) por el
+ * saldo VIVO derivado (ancla − pagos, vía `getCurrentDebtBalances`) y normaliza los montos a la
+ * moneda indicada. Conserva el resto del `Debt` (apr, delinquency, clasificación, nombre…).
+ *
+ * Es la MISMA derivación que ya hacía `getControlSummary` en línea; se exporta para que los otros
+ * consumidores que hoy leen el ancla (la campana, el hub de configuración) usen exactamente este
+ * cálculo y no una copia que pueda divergir.
+ */
+export function deriveDebtsForEngine(
+  debts: Debt[],
+  liveBalances: DebtBalance[],
+  currency: string,
+  rates: Record<string, number>,
+): Debt[] {
+  const liveById = new Map(liveBalances.map((d) => [d.id, d.currentBalance]));
+  return debts.map((d) => ({
+    ...d,
+    balance: convertCurrency(liveById.get(d.id) ?? d.balance, d.currency, currency, rates),
+    minPayment: convertCurrency(d.minPayment, d.currency, currency, rates),
+    currentPayment: convertCurrency(d.currentPayment, d.currency, currency, rates),
+  }));
+}
+
 /** Carga todo y calcula el diagnóstico de control. */
 export async function getControlSummary(ctx?: AuthContext): Promise<ControlSummary> {
   const { userId } = await resolveAuth(ctx);
@@ -982,13 +1008,7 @@ export async function getControlSummary(ctx?: AuthContext): Promise<ControlSumma
   // contar como activa/crítica ni entrar al plan/alertas/estrategia del diagnóstico (P2, mismo
   // linaje que el asesor). `summary.debts` sigue crudo abajo: buildDeudasVsMes lo usa como monto
   // de ALTA del mes (flujo), donde el ancla es lo correcto.
-  const liveById = new Map(liveBalances.map((d) => [d.id, d.currentBalance]));
-  const debtsForEngine = debts.map((d) => ({
-    ...d,
-    balance: convertCurrency(liveById.get(d.id) ?? d.balance, d.currency, currency, rates),
-    minPayment: convertCurrency(d.minPayment, d.currency, currency, rates),
-    currentPayment: convertCurrency(d.currentPayment, d.currency, currency, rates),
-  }));
+  const debtsForEngine = deriveDebtsForEngine(debts, liveBalances, currency, rates);
 
   const diagnosis = buildControlDiagnosis(
     goalsForEngine,
