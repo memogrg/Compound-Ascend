@@ -17,12 +17,11 @@
 @import "../styles/modules/base.css" layer(ca);
 @import "../styles/modules/wealth.css" layer(ca);
 @import "../styles/modules/base-composer.css" layer(ca);
-@import "../styles/tokens-shadcn.css";  /* sin capa: contiene @theme inline */
+@import "../styles/tokens-shadcn.css"; /* sin capa: contiene @theme inline */
 @import "../styles/modules/setup-asistentes.css" layer(ca);
 @import "../styles/modules/account.css" layer(ca);
 @import "../styles/modules/assistant-memoria.css" layer(ca);
 @import "../styles/modules/acciones.css" layer(ca);
-
 
 /* shadcn/ui — el dark variant sigue TU mecanismo data-theme, no la clase .dark */
 @custom-variant dark (&:is([data-theme="dark"] *));
