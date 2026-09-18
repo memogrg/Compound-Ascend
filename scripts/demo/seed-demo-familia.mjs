@@ -773,10 +773,10 @@ console.log("conversación del asesor sembrada:", CHAT.length, "mensajes");
 
 // ── perfil de la cuenta ───────────────────────────────────────────────────────
 ok("profiles.jose")(await db.from("profiles").update({
-  display_name: "José Ramírez", onboarding_completed: true, profile_completion: 100, plan: "premium",
+  display_name: "José Ramírez", onboarding_completed: true, profile_completion: 100, plan: "max",
 }).eq("id", JOSE).select("id"));
 ok("profiles.marta")(await db.from("profiles").update({
-  display_name: "Marta Solano", onboarding_completed: true, profile_completion: 60, plan: "premium",
+  display_name: "Marta Solano", onboarding_completed: true, profile_completion: 60, plan: "max",
 }).eq("id", MARTA).select("id"));
 for (const uid of UIDS)
   ok("user_settings")(await db.from("user_settings").upsert({
