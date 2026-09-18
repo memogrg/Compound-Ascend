@@ -1,18 +1,18 @@
 /**
  * Orquestador de precios: cadena de proveedores con cache y fallback.
- * Stocks/ETF: Finnhub → AlphaVantage → Yahoo.  Cripto: CoinGecko → Binance.
+ * Stocks/ETF: cadena configurada (MARKET_PROVIDER_STOCKS; Finnhub si no se configura) →
+ * AlphaVantage → Yahoo.  Cripto: CoinGecko → Binance.
  */
 import "server-only";
 import { priceCache, TTL } from "@/lib/market-data/cache";
 import {
-  finnhub,
+  configuredStockQuote,
+  configuredHighlights,
   alphaVantage,
   yahoo,
   binance,
   coingecko,
   coingeckoBatch,
-  coingeckoHighlights,
-  finnhubHighlights,
   yahooHistory,
   coingeckoHistory,
   logProviderMiss,
@@ -27,7 +27,7 @@ export type AssetType = "stock" | "etf" | "crypto";
 export type MarketPrice = Quote & { symbol: string; assetType: AssetType; cached: boolean };
 import { persistMarketPrice } from "@/lib/market-data/persist";
 
-const STOCK_CHAIN = [finnhub, alphaVantage, yahoo];
+const STOCK_CHAIN = [configuredStockQuote, alphaVantage, yahoo];
 const CRYPTO_CHAIN = [coingecko, binance];
 
 // Single-flight: coalesce ráfagas idénticas (mismo set de símbolos en vuelo) → un render = 1 batch,
@@ -156,8 +156,7 @@ export async function getMarketHighlights(
   }
 
   // 3) ÚLTIMO RECURSO: fetch en vivo (si el store aún no tiene el símbolo). Con dato bueno cachea.
-  const h =
-    assetType === "crypto" ? await coingeckoHighlights(symbol) : await finnhubHighlights(symbol);
+  const h = await configuredHighlights(symbol, assetType === "crypto" ? "crypto" : "stock");
   if (h && (h.price !== null || h.high !== null)) {
     priceCache.set(freshKey, h, TTL.highlights);
     priceCache.set(staleKey, h, TTL.highlightsStale);

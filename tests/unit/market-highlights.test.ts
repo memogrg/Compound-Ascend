@@ -39,7 +39,7 @@ describe("getMarketHighlights · máximo REAL por clase de activo, cacheado (no 
   it("cripto → ATH real de CoinGecko (/coins/markets)", async () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (url.includes("/coins/markets")) {
-        return { ok: true, json: async () => [{ current_price: 60000, ath: 73000, ath_date: "2024-03-14T00:00:00Z" }] };
+        return { ok: true, json: async () => [{ id: "solana", current_price: 60000, ath: 73000, ath_date: "2024-03-14T00:00:00Z" }] };
       }
       // resolveCoingeckoId (/search) para un ticker no listado
       return { ok: true, json: async () => ({ coins: [{ id: "solana", symbol: "SOL", market_cap_rank: 5 }] }) };
@@ -89,7 +89,7 @@ describe("getMarketHighlights · máximo REAL por clase de activo, cacheado (no 
     const seen: Record<string, string | undefined>[] = [];
     const fetchMock = vi.fn(async (url: string, init?: { headers?: Record<string, string> }) => {
       if (url.includes("api.coingecko.com")) seen.push(init?.headers ?? {});
-      if (url.includes("/coins/markets")) return { ok: true, json: async () => [{ current_price: 1, ath: 2, ath_date: "2024-01-01T00:00:00Z" }] };
+      if (url.includes("/coins/markets")) return { ok: true, json: async () => [{ id: "keyedcoin", current_price: 1, ath: 2, ath_date: "2024-01-01T00:00:00Z" }] };
       return { ok: true, json: async () => ({ coins: [{ id: "keyedcoin", symbol: "KEYED", market_cap_rank: 10 }] }) };
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -104,7 +104,7 @@ describe("getMarketHighlights · máximo REAL por clase de activo, cacheado (no 
     vi.useFakeTimers();
     // 1) Primera llamada OK → puebla fresco (6h) + stale (7d).
     const ok = vi.fn(async (url: string) => {
-      if (url.includes("/coins/markets")) return { ok: true, json: async () => [{ current_price: 60000, ath: 73000, ath_date: "2024-03-14T00:00:00Z" }] };
+      if (url.includes("/coins/markets")) return { ok: true, json: async () => [{ id: "bitcoin", current_price: 60000, ath: 73000, ath_date: "2024-03-14T00:00:00Z" }] };
       return { ok: true, json: async () => ({ coins: [{ id: "bitcoin", symbol: "BTC", market_cap_rank: 1 }] }) };
     });
     vi.stubGlobal("fetch", ok);
@@ -153,7 +153,7 @@ describe("getMarketHighlights · lee del STORE primero (sin pegarle a CoinGecko 
     };
     // price 0 y high 0 → el store no aporta nada → último recurso: fetch en vivo.
     const fetchMock = vi.fn(async (url: string) => {
-      if (url.includes("/coins/markets")) return { ok: true, json: async () => [{ current_price: 0.02, ath: 0.25, ath_date: "2024-12-15T00:00:00Z" }] };
+      if (url.includes("/coins/markets")) return { ok: true, json: async () => [{ id: "kamino", current_price: 0.02, ath: 0.25, ath_date: "2024-12-15T00:00:00Z" }] };
       return { ok: true, json: async () => ({ coins: [{ id: "kamino", symbol: "KMNOZERO", market_cap_rank: 300 }] }) };
     });
     vi.stubGlobal("fetch", fetchMock);

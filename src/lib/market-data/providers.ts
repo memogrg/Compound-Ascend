@@ -1,12 +1,26 @@
 /**
- * Proveedores de precios. Cada función intenta una fuente y devuelve
+ * Proveedores de precios del camino EN VIVO (Vercel). Cada función intenta una fuente y devuelve
  * { price, currency } o null. Con timeout, sin filtrar secretos en logs.
  *
- * Stocks/ETF: Finnhub → AlphaVantage → Yahoo Finance.
- * Cripto: Binance → CoinGecko.
+ * Stocks/ETF: la cadena configurada (MARKET_PROVIDER_STOCKS) → AlphaVantage → Yahoo Finance.
+ * Cripto: CoinGecko (plan según COINGECKO_API_PLAN) → Binance.
+ *
+ * Los proveedores pagos viven en `vendors/`, que comparte con el colector de GitHub Actions: acá
+ * solo se los llama con la env de Vercel.
  */
 import { getServerEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import {
+  buildChain,
+  coingeckoApi,
+  fetchWithFallback,
+  marketConfigFromEnv,
+  COINGECKO_IDS,
+  pickCoingeckoMatch,
+  type MarketKind,
+} from "@/lib/market-data/vendors";
+
+export { COINGECKO_IDS, pickCoingeckoMatch };
 
 export type Quote = {
   price: number;
@@ -44,20 +58,23 @@ function num(v: unknown): number | null {
 }
 
 /**
- * Fetch ÚNICO para CoinGecko: inyecta la Demo API key (header x-cg-demo-api-key) si está en el
- * entorno — mucho más rate limit que keyless en IPs compartidas de serverless — y sin ella funciona
- * igual (dev/local). LOGUEA el status HTTP de cada llamada (instrumentación: confirmar que el 429
- * desaparece con la key + caché). Mismo contrato que fetchJson: json o null (con timeout).
+ * Fetch ÚNICO para CoinGecko. Recibe el PATH (`/simple/price?...`) y le pone host y header según
+ * el plan: Demo → api.coingecko.com + x-cg-demo-api-key; Pro (cualquier plan pago) →
+ * pro-api.coingecko.com + x-cg-pro-api-key. Sin llave, host público sin header (dev/local).
+ * LOGUEA el status HTTP de cada llamada. Mismo contrato que fetchJson: json o null (con timeout).
  */
-async function coingeckoFetch(url: string): Promise<unknown | null> {
-  const key = getServerEnv().COINGECKO_API_KEY;
-  const headers: Record<string, string> = key ? { "x-cg-demo-api-key": key } : {};
+async function coingeckoFetch(path: string): Promise<unknown | null> {
+  const env = getServerEnv();
+  const key = env.COINGECKO_API_KEY;
+  const plan = env.COINGECKO_API_PLAN?.trim().toLowerCase() === "pro" ? "pro" : "demo";
+  const { base, headers } = coingeckoApi(plan, key);
+  const url = `${base}${path}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), COINGECKO_TIMEOUT_MS);
-  const endpoint = url.split("?")[0] ?? url; // sin query (no filtra ids ni la key)
-  // `auth` es un string NO sensible ("demo"/"public") → inequívoco en logs y no lo redacta el
-  // scrubber de secretos (a diferencia de un boolean que a veces se tapaba).
-  const auth = key ? "demo" : "public";
+  const endpoint = path.split("?")[0] ?? path; // sin query (no filtra ids ni la key)
+  // `auth` es un string NO sensible ("pro"/"demo"/"public") → inequívoco en logs y no lo redacta
+  // el scrubber de secretos (a diferencia de un boolean que a veces se tapaba).
+  const auth = key ? plan : "public";
   try {
     const res = await fetch(url, { headers, signal: controller.signal });
     // Instrumentación: status por llamada. 429 = rate limit; ver `cause` en el catch para red/timeout.
@@ -85,18 +102,6 @@ function signedNum(v: unknown): number | undefined {
 }
 
 // ---------- Stocks / ETF ----------
-export async function finnhub(symbol: string): Promise<Quote | null> {
-  const token = getServerEnv().FINNHUB_TOKEN;
-  if (!token) return null;
-  const data = (await fetchJson(
-    `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${token}`,
-  )) as { c?: number; dp?: number } | null;
-  const price = data ? num(data.c) : null;
-  return price
-    ? { price, currency: "USD", provider: "finnhub", changePct: signedNum(data?.dp) }
-    : null;
-}
-
 export async function alphaVantage(symbol: string): Promise<Quote | null> {
   const key = getServerEnv().ALPHA_VANTAGE_KEY;
   if (!key) return null;
@@ -164,54 +169,8 @@ export async function binance(ticker: string): Promise<Quote | null> {
   return null;
 }
 
-/**
- * Ticker → id de CoinGecko, lista CURADA (rápido, sin red, sin colisiones de símbolo).
- *
- * Para sumar uno: VERIFICÁ el id contra la API real ANTES de hardcodearlo — NO de
- * memoria. Un id equivocado mapea al precio de OTRA moneda (la misma colisión que esto
- * arregla). Consultá `https://api.coingecko.com/api/v3/search?query=<TICKER>`, elegí el
- * coin cuyo `symbol` coincide Y con mejor `market_cap_rank` (el proyecto real), y usá ESE id.
- */
-export const COINGECKO_IDS: Record<string, string> = {
-  BTC: "bitcoin",
-  ETH: "ethereum",
-  SOL: "solana",
-  XRP: "ripple",
-  ADA: "cardano",
-  AVAX: "avalanche-2",
-  DOGE: "dogecoin",
-  LINK: "chainlink",
-  MATIC: "matic-network",
-  DOT: "polkadot",
-  LTC: "litecoin",
-  BNB: "binancecoin",
-  TRX: "tron",
-  SUI: "sui",
-  APT: "aptos",
-  // Añadidos — verificados vía /search contra la API real (id + market_cap_rank):
-  ONDO: "ondo-finance", // Ondo (Ondo Finance) · rank ~41
-  KMNO: "kamino", // Kamino · rank ~278
-  JUP: "jupiter-exchange-solana", // Jupiter en Solana · rank ~87 (NO "jupiter" = "Jupiter Project" muerto, rank ~4424)
-  AERO: "aerodrome-finance", // Aerodrome Finance (Base) · rank ~109
-};
-
-/**
- * Elige el mejor coin por símbolo entre los resultados de /search. Puro y testeable.
- * CRITERIO (anti-colisión): se DESCARTAN los matches con `market_cap_rank` null —
- * tokens muertos/scam que reusan un símbolo popular no tienen market cap; elegir uno
- * mapearía el ticker a basura. De los que quedan (con market cap real) se toma el de
- * mejor rank. Si no queda ninguno válido → null (mejor sin precio que un precio falso).
- */
-export function pickCoingeckoMatch(
-  coins: { id: string; symbol: string; market_cap_rank: number | null }[],
-  ticker: string,
-): string | null {
-  const key = ticker.toUpperCase();
-  const match = coins
-    .filter((c) => c.symbol?.toUpperCase() === key && c.market_cap_rank != null)
-    .sort((a, b) => (a.market_cap_rank as number) - (b.market_cap_rank as number))[0];
-  return match?.id ?? null;
-}
+// COINGECKO_IDS y pickCoingeckoMatch viven en vendors/coingecko.ts (los comparte el colector) y se
+// re-exportan arriba para no mover a quien ya los importa de acá.
 
 // Cache en memoria de resoluciones dinámicas (ticker → id | null) para el resto. El valor `null`
 // se CACHEA también: un ticker inexistente no debe re-pegar /search en cada consulta (y quemar el
@@ -230,9 +189,9 @@ async function resolveCoingeckoId(ticker: string): Promise<string | null> {
   if (COINGECKO_IDS[key]) return COINGECKO_IDS[key]!;
   const cached = resolvedIds.get(key);
   if (cached && Date.now() - cached.at < RESOLVE_TTL_MS) return cached.id;
-  const data = (await coingeckoFetch(
-    `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(ticker)}`,
-  )) as { coins?: { id: string; symbol: string; market_cap_rank: number | null }[] } | null;
+  const data = (await coingeckoFetch(`/search?query=${encodeURIComponent(ticker)}`)) as {
+    coins?: { id: string; symbol: string; market_cap_rank: number | null }[];
+  } | null;
   // fetchJson devuelve null ante error de red / 429 / timeout: NO lo cacheamos como miss (reintenta).
   if (data === null) return null;
   const id = pickCoingeckoMatch(data.coins ?? [], ticker);
@@ -244,7 +203,7 @@ export async function coingecko(ticker: string): Promise<Quote | null> {
   const id = await resolveCoingeckoId(ticker);
   if (!id) return null;
   const data = (await coingeckoFetch(
-    `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(id)}&vs_currencies=usd&include_24hr_change=true`,
+    `/simple/price?ids=${encodeURIComponent(id)}&vs_currencies=usd&include_24hr_change=true`,
   )) as Record<string, { usd?: number; usd_24h_change?: number }> | null;
   const row = data?.[id];
   const price = row ? num(row.usd) : null;
@@ -273,7 +232,7 @@ export async function coingeckoBatch(symbols: string[]): Promise<Record<string, 
   }
   if (ids.length === 0) return out;
   const data = (await coingeckoFetch(
-    `https://api.coingecko.com/api/v3/simple/price?ids=${ids.map(encodeURIComponent).join(",")}&vs_currencies=usd&include_24hr_change=true`,
+    `/simple/price?ids=${ids.map(encodeURIComponent).join(",")}&vs_currencies=usd&include_24hr_change=true`,
   )) as Record<string, { usd?: number; usd_24h_change?: number }> | null;
   if (!data) return out;
   for (const [id, row] of Object.entries(data)) {
@@ -290,53 +249,6 @@ export async function coingeckoBatch(symbols: string[]): Promise<Record<string, 
   return out;
 }
 
-/** Precio + ATH + high_24h de VARIAS cripto en una fila (para el recolector). */
-export type CryptoMarketRow = {
-  price: number | null;
-  ath: number | null;
-  athDate: string | null; // YYYY-MM-DD
-  high24h: number | null;
-};
-
-/**
- * Precio + ATH + máximo del día de VARIAS cripto en UNA sola llamada a /coins/markets?ids=coma.
- * Es lo que usa el RECOLECTOR (cron) para poblar el store: colapsa el enjambre en 1-2 requests.
- * Mapea por SÍMBOLO (MAYÚS). Best-effort: solo las que respondieron.
- */
-export async function coingeckoMarketsBatch(
-  symbols: string[],
-): Promise<Record<string, CryptoMarketRow>> {
-  const out: Record<string, CryptoMarketRow> = {};
-  const idToSymbol = new Map<string, string>();
-  const ids: string[] = [];
-  for (const raw of symbols) {
-    const s = raw.trim().toUpperCase();
-    const id = await resolveCoingeckoId(s);
-    if (id && !idToSymbol.has(id)) {
-      idToSymbol.set(id, s);
-      ids.push(id);
-    }
-  }
-  if (ids.length === 0) return out;
-  const data = (await coingeckoFetch(
-    `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids.map(encodeURIComponent).join(",")}`,
-  )) as
-    | { id?: string; current_price?: number; ath?: number; ath_date?: string; high_24h?: number }[]
-    | null;
-  if (!data) return out;
-  for (const row of data) {
-    const s = row.id ? idToSymbol.get(row.id) : undefined;
-    if (!s) continue;
-    out[s] = {
-      price: num(row.current_price),
-      ath: num(row.ath),
-      athDate: typeof row.ath_date === "string" ? row.ath_date.slice(0, 10) : null,
-      high24h: num(row.high_24h),
-    };
-  }
-  return out;
-}
-
 /** Máximos de un activo (para el asesor). `athKind` distingue ATH real vs máx. 52 semanas. */
 export type Highlights = {
   price: number | null;
@@ -348,54 +260,64 @@ export type Highlights = {
   highKind: "ath" | "52w" | null; // qué representa `high` (honestidad por clase de activo)
 };
 
+// ---------- Cadena configurada (proveedores pagos, compartida con el colector) ----------
+
 /**
- * CoinGecko /coins/markets: precio + ATH REAL + fecha del ATH (all-time-high verdadero). Best-effort:
- * null en los campos que falten. La cripto SÍ tiene ATH real, por eso highKind='ath'.
+ * La misma capa que usa el colector, con la env de VERCEL. `fetch` se resuelve en cada llamada (no
+ * se captura al importar) para que los tests puedan reemplazarlo con vi.stubGlobal.
  */
-export async function coingeckoHighlights(ticker: string): Promise<Highlights | null> {
-  const id = await resolveCoingeckoId(ticker);
-  if (!id) return null;
-  const data = (await coingeckoFetch(
-    `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${encodeURIComponent(id)}`,
-  )) as { current_price?: number; ath?: number; ath_date?: string }[] | null;
-  const row = data?.[0];
-  if (!row) return null;
+function vendorDeps() {
   return {
-    price: num(row.current_price),
-    currency: "USD",
-    high: num(row.ath),
-    highDate: typeof row.ath_date === "string" ? row.ath_date.slice(0, 10) : null,
-    highKind: num(row.ath) !== null ? "ath" : null,
+    fetch: ((input: RequestInfo | URL, init?: RequestInit) => fetch(input, init)) as typeof fetch,
+    warn: (msg: string) => logger.warn("market-data.vendor", { msg }),
+  };
+}
+
+function vendorConfig() {
+  return marketConfigFromEnv(getServerEnv(), (msg) => logger.warn("market-data.config", { msg }));
+}
+
+/**
+ * Precio de una acción/ETF por la cadena de MARKET_PROVIDER_STOCKS. Sin configurar, esa cadena es
+ * Finnhub, así que el comportamiento es el de antes. Es el primer eslabón de STOCK_CHAIN.
+ */
+export async function configuredStockQuote(symbol: string): Promise<Quote | null> {
+  const r = await fetchWithFallback(
+    buildChain("stock", vendorConfig(), vendorDeps()),
+    [symbol],
+    "quotes",
+  );
+  const row = r.rows[symbol.trim().toUpperCase()];
+  if (!row || row.price === null) return null;
+  return {
+    price: row.price,
+    currency: row.currency,
+    provider: row.provider,
+    changePct: row.changePct,
   };
 }
 
 /**
- * Finnhub: precio (/quote) + MÁXIMO DE 52 SEMANAS (/stock/metric). NO es un ATH: las acciones no
- * exponen un all-time-high gratis, así que devolvemos el 52-sem ETIQUETADO como tal (highKind='52w')
- * para no mentir. Best-effort.
+ * Precio + máximo por la cadena configurada del tipo de activo: ATH real en cripto, 52 semanas en
+ * acciones/ETF. Es lo que usa getMarketHighlights cuando el store no tiene el dato fresco.
  */
-export async function finnhubHighlights(symbol: string): Promise<Highlights | null> {
-  const token = getServerEnv().FINNHUB_TOKEN;
-  if (!token) return null;
-  const [q, m] = await Promise.all([
-    fetchJson(
-      `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${token}`,
-    ),
-    fetchJson(
-      `https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${token}`,
-    ),
-  ]);
-  const price = num((q as { c?: number } | null)?.c);
-  const metric = (m as { metric?: Record<string, unknown> } | null)?.metric ?? {};
-  const high = num(metric["52WeekHigh"]);
-  const hd = metric["52WeekHighDate"];
-  if (price === null && high === null) return null;
+export async function configuredHighlights(
+  symbol: string,
+  kind: MarketKind,
+): Promise<Highlights | null> {
+  const r = await fetchWithFallback(
+    buildChain(kind, vendorConfig(), vendorDeps()),
+    [symbol],
+    "highlights",
+  );
+  const row = r.rows[symbol.trim().toUpperCase()];
+  if (!row) return null;
   return {
-    price,
-    currency: "USD",
-    high,
-    highDate: typeof hd === "string" ? hd.slice(0, 10) : null,
-    highKind: high !== null ? "52w" : null,
+    price: row.price,
+    currency: row.currency,
+    high: row.high,
+    highDate: row.highDate,
+    highKind: row.highKind,
   };
 }
 
@@ -427,7 +349,7 @@ export async function coingeckoHistory(ticker: string): Promise<number[]> {
   const id = await resolveCoingeckoId(ticker);
   if (!id) return [];
   const data = (await coingeckoFetch(
-    `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=30&interval=daily`,
+    `/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=30&interval=daily`,
   )) as { prices?: [number, number][] } | null;
   const series = (data?.prices ?? [])
     .map((p) => p[1])
