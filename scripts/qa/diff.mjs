@@ -9,6 +9,7 @@
  * Uso:
  *   node scripts/qa/diff.mjs --a qa-snapshots/base --b qa-snapshots/cambio --out-diff qa-snapshots/diff
  *   node scripts/qa/diff.mjs --a … --b … --threshold 8 --max-diff-pixels 50
+ *   node scripts/qa/diff.mjs --a … --b … --exclude home,asistente
  */
 import { chromium } from "playwright";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
@@ -150,6 +151,16 @@ async function main() {
   const outDiff = args["out-diff"] ?? "qa-snapshots/diff";
   const threshold = Number(args.threshold ?? 0);
   const maxDiffPixels = Number(args["max-diff-pixels"] ?? 0);
+  // Slugs fuera de la comparación ESTRICTA: se comparan y se reportan igual, pero sus diferencias
+  // no hacen fallar la salida. Para pantallas con movimiento propio que no cede a reduced-motion.
+  const excluidos = new Set(
+    String(args.exclude === true ? "" : (args.exclude ?? ""))
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean),
+  );
+  /** `light/390/home.png` → `home`. */
+  const slugDe = (rel) => path.basename(rel, ".png");
 
   const [pngsA, pngsB] = await Promise.all([listarPngs(dirA), listarPngs(dirB)]);
   const setB = new Set(pngsB);
@@ -179,6 +190,7 @@ async function main() {
         diffPixels: r.diffPixels,
         pct: r.totalPixels ? (r.diffPixels / r.totalPixels) * 100 : 0,
         sizeMismatch: Boolean(r.sizeMismatch),
+        excluida: excluidos.has(slugDe(rel)),
       });
     }
   } finally {
@@ -192,22 +204,29 @@ async function main() {
   console.log("-".repeat(88));
   for (const f of filas.slice(0, 60)) {
     const nombre = f.imagen.length > 58 ? `…${f.imagen.slice(-57)}` : f.imagen.padEnd(58);
-    const marca = f.sizeMismatch ? " (tamaño distinto)" : "";
+    const marca =
+      (f.sizeMismatch ? " (tamaño distinto)" : "") + (f.excluida ? " (excluida del estricto)" : "");
     console.log(
       `${nombre} ${String(f.diffPixels).padStart(12)} ${f.pct.toFixed(4).padStart(8)}${marca}`,
     );
   }
   if (filas.length > 60) console.log(`… y ${filas.length - 60} más`);
 
+  const estrictas = conDiff.filter((f) => !f.excluida);
   console.log(
     `\n${comunes.length} comparadas · ${conDiff.length} con diferencias · umbral ${threshold} · máximo permitido ${maxDiffPixels}px`,
   );
+  if (excluidos.size) {
+    console.log(
+      `excluidas del estricto: ${[...excluidos].join(", ")} · ${conDiff.length - estrictas.length} de ellas difieren (no hacen fallar)`,
+    );
+  }
   if (soloA.length) console.log(`Solo en A (${soloA.length}): ${soloA.slice(0, 5).join(", ")}…`);
   if (soloB.length) console.log(`Solo en B (${soloB.length}): ${soloB.slice(0, 5).join(", ")}…`);
   if (conDiff.length) console.log(`PNGs de diferencias en ${outDiff}/`);
 
   const falla =
-    conDiff.some((f) => f.diffPixels > maxDiffPixels) || soloA.length > 0 || soloB.length > 0;
+    estrictas.some((f) => f.diffPixels > maxDiffPixels) || soloA.length > 0 || soloB.length > 0;
   process.exit(falla ? 1 : 0);
 }
 

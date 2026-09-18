@@ -5,9 +5,42 @@
 2. **Línea base**: `E2E_EMAIL=information.theglowup@gmail.com E2E_PASSWORD=… npm run qa:snap -- --out qa-snapshots/base`
    (23 rutas × 3 anchos × 2 temas; `--theme`, `--widths` y `--base-url` ajustan el alcance).
 3. **Tras el cambio**: `… npm run qa:snap -- --out qa-snapshots/cambio`.
-4. **Comparar**: `npm run qa:diff -- --a qa-snapshots/base --b qa-snapshots/cambio` — imprime
-   píxeles distintos por imagen, escribe los PNG de diferencias y sale con 1 si alguna supera
-   `--max-diff-pixels` (default 0).
+4. **Comparar**: `npm run qa:diff -- --a qa-snapshots/base --b qa-snapshots/cambio --exclude home`
+   — imprime píxeles distintos por imagen, escribe los PNG de diferencias y sale con 1 si alguna
+   supera `--max-diff-pixels` (default 0). Lo excluido se compara y se reporta igual, pero no hace
+   fallar la salida.
+
+## Determinismo: qué hace la herramienta para que dos corridas den 0 píxeles
+
+Sin esto, dos corridas idénticas diferían en 9 de 138 imágenes y el diff no servía para nada. Cada
+pieza cierra una causa distinta, medida:
+
+- **Reloj congelado en el día de la corrida** (hoy a las 12:00 `America/Costa_Rica`, o `--freeze
+<ISO>`; queda escrito en el manifest). Una fecha fija dejaba al navegador en un día y al servidor
+  en otro, y ese desfase producía desajustes de hidratación (React #418) en `/deudas` y
+  `/transacciones`. **Base y comparación tienen que correr el mismo día** — si no, los «hoy» de la
+  app difieren; para reproducir una base vieja, `--freeze` con la fecha que dice su manifest.
+- **Calentamiento**: una visita a todas las rutas con sesión antes de capturar, sin capturar. Varias
+  pantallas ESCRIBEN en el primer load (el aporte mensual de los holdings recurrentes, los snapshots
+  del mes, el refresco de insights). Entre dos corridas seguidas el flujo libre del panel cambiaba
+  en ₡970.680 solo por eso.
+- **Barrido por pasos de una pantalla**, no un salto al final: los revelados por scroll usan
+  `IntersectionObserver` con guarda de una sola vez, y de un salto hay secciones que nunca quedan en
+  viewport lo suficiente. El hero del landing aparecía en una corrida y faltaba en la siguiente.
+- **`document.fonts.ready`** antes de capturar: si no, una captura sale con la fuente de respaldo y
+  la siguiente con la definitiva.
+- **`document.getAnimations().forEach(a => a.finish())`**: `animations: "disabled"` del screenshot
+  congela animaciones, no TRANSICIONES. `finish()` salta al estado final. Las infinitas lanzan
+  `InvalidStateError`, así que esas se pausan en 0.
+- **Flags de render** (`--disable-gpu`, `--disable-lcd-text`, `--force-color-profile=srgb`,
+  `--font-render-hinting=none`, `--deterministic-mode`): rasterizado por software y antialiasing en
+  gris. Sin ellos quedaban tiras de ±1 nivel en bordes de texto.
+
+**`home` queda excluido de la comparación estricta**: la transición del hero no tiene un estado
+final estable — deja ~200 px con delta ≤ 2 (invisible) que ni `finish()` cierra. Se sigue comparando
+y reportando; revisar en la fase de motion. **No se baja el umbral** para taparlo: un `--threshold 2`
+también escondería un cambio de color real de 1-2 niveles en cualquier pantalla, que es justo la
+regresión que un refactor de tokens puede introducir.
 
 ## Ambiente: SIEMPRE el local, con la demo sembrada. Nunca producción.
 
