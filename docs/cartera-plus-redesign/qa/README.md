@@ -5,10 +5,26 @@
 2. **Línea base**: `E2E_EMAIL=information.theglowup@gmail.com E2E_PASSWORD=… npm run qa:snap -- --out qa-snapshots/base`
    (23 rutas × 3 anchos × 2 temas; `--theme`, `--widths` y `--base-url` ajustan el alcance).
 3. **Tras el cambio**: `… npm run qa:snap -- --out qa-snapshots/cambio`.
-4. **Comparar**: `npm run qa:diff -- --a qa-snapshots/base --b qa-snapshots/cambio --exclude home`
-   — imprime píxeles distintos por imagen, escribe los PNG de diferencias y sale con 1 si alguna
-   supera `--max-diff-pixels` (default 0). Lo excluido se compara y se reporta igual, pero no hace
-   fallar la salida.
+4. **Comparar**:
+   `npm run qa:diff -- --a qa-snapshots/base --b qa-snapshots/cambio --exclude home --max-diff-pixels 60 --max-delta 2`
+   — imprime píxeles distintos y delta máximo por imagen, escribe los PNG de diferencias y sale
+   con 1 si alguna reprueba. Lo excluido se compara y se reporta igual, pero no hace fallar.
+
+## Criterio de aceptación: dos condiciones, no una
+
+Una imagen **reprueba si se pasa de CUALQUIERA** de las dos: más de `--max-diff-pixels` píxeles
+distintos, **o** un delta por canal mayor que `--max-delta`. Para el refactor de CSS:
+`--max-diff-pixels 60 --max-delta 2`.
+
+El porqué, medido: el rasterizado de Chromium deja tiras inestables de ~3 px en los bordes —hasta
+**51 px con delta 1-2**— y no siempre en la misma pantalla: entre dos corridas saltaron de
+`/ingresos` a `/control-financiero` y `/asistente`. Un cambio de CSS real no se parece a eso: o
+mueve **miles** de píxeles (layout, tipografía, espaciado), o mueve pocos pero con **delta ≥ 3**
+(un color distinto). Las dos condiciones juntas dejan pasar el ruido y no dejan pasar un cambio.
+
+Lo que NO se hace, y por qué: **bajar `--threshold` a 2** taparía el ruido, pero también un cambio
+de color real de 1-2 niveles en cualquier pantalla — justo la regresión que un refactor de tokens
+puede introducir. `--threshold` se queda en 0: la sensibilidad al color no se toca.
 
 ## Determinismo: qué hace la herramienta para que dos corridas den 0 píxeles
 
