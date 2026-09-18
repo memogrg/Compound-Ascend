@@ -1,6 +1,9 @@
 /**
  * Cuenta demo "Familia Ramírez Solano" — José y Marta, Costa Rica.
- * 12 meses de historia (sep 2025 → ago 2026) con arco antes/después de CARTERA+.
+ * 12 meses CERRADOS de historia con arco antes/después de CARTERA+, más el mes en curso
+ * a medias. El guion es fijo (sep 25 → ago 26); el calendario se recalcula contra la fecha
+ * de siembra, así que la demo no envejece: siempre termina el mes pasado y el mes actual
+ * queda cortado en el día de hoy.
  *
  * NO forma parte del producto. Se corre a mano:
  *   node scripts/demo/seed-demo-familia.mjs
@@ -56,11 +59,35 @@ function split(total, n, pct = 0.35) {
 const pick = (arr) => arr[Math.floor(rnd() * arr.length) % arr.length];
 
 // ── calendario ────────────────────────────────────────────────────────────────
-const HOY = "2026-08-28";
-const MESES = [];
-for (let y = 2025, m = 9; MESES.length < 12; m++) {
+// La historia es NARRATIVA (12 meses fijos: sep 25 → ago 26) y se PROYECTA sobre el
+// calendario real cada vez que se siembra: los 12 meses CERRADOS que terminan el mes
+// pasado, más el mes EN CURSO cortado en el día de hoy. Así la demo no envejece sola.
+//   `key`  → gobierna el guion (fases, aguinaldo, venta de la moto, plan de la tarjeta)
+//   `rkey` / `y` / `m` → gobiernan las fechas reales que se escriben en la base
+const AHORA = new Date();
+const pad2 = (n) => String(n).padStart(2, "0");
+const HOY = `${AHORA.getFullYear()}-${pad2(AHORA.getMonth() + 1)}-${pad2(AHORA.getDate())}`;
+const NARRATIVA = [];
+for (let y = 2025, m = 9; NARRATIVA.length < 12; m++) {
   if (m > 12) { m = 1; y++; }
-  MESES.push({ y, m, key: `${y}-${String(m).padStart(2, "0")}` });
+  NARRATIVA.push(`${y}-${pad2(m)}`);
+}
+/** offset 0 = mes en curso, -1 = el mes pasado, … */
+const mesReal = (offset) => {
+  const t = new Date(AHORA.getFullYear(), AHORA.getMonth() + offset, 1);
+  return { y: t.getFullYear(), m: t.getMonth() + 1 };
+};
+const CERRADOS = 12;
+const MESES = NARRATIVA.map((key, i) => {
+  const { y, m } = mesReal(i - CERRADOS); // i = 11 → el mes pasado
+  return { y, m, key, rkey: `${y}-${pad2(m)}` };
+});
+// 13.º mes: el EN CURSO, con el guion del estado estable. Lo que caiga después de hoy
+// lo descartan los guardas de `tx` / `abonar` / `aportar`, así que el mes queda a medias
+// exactamente como la cuenta de alguien que va al día.
+{
+  const { y, m } = mesReal(0);
+  MESES.push({ y, m, key: NARRATIVA[CERRADOS - 1], rkey: `${y}-${pad2(m)}` });
 }
 const dim = (y, m) => new Date(y, m, 0).getDate();
 const d = (y, m, day) => `${y}-${String(m).padStart(2, "0")}-${String(Math.min(day, dim(y, m))).padStart(2, "0")}`;
@@ -78,9 +105,15 @@ async function upsertUser(email, name) {
   const { data: list } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
   const found = list?.users.find((u) => u.email === email);
   if (found) {
+    // Reescribir la contraseña revoca las sesiones vivas, y entonces cada resiembra te
+    // saca del navegador justo cuando ibas a mirar el resultado. Si el usuario ya existe
+    // solo se refresca la metadata; para forzar el reset: DEMO_RESET_PASSWORD=1.
+    const reset = process.env.DEMO_RESET_PASSWORD === "1";
     await db.auth.admin.updateUserById(found.id, {
-      password: PASS, email_confirm: true, user_metadata: { display_name: name },
+      email_confirm: true, user_metadata: { display_name: name },
+      ...(reset ? { password: PASS } : {}),
     });
+    if (reset) console.log(`  contraseña reseteada para ${email} (sesiones revocadas)`);
     return found.id;
   }
   const { data, error } = await db.auth.admin.createUser({
@@ -393,7 +426,9 @@ const TX = [];      // filas de transactions (+ campos auxiliares _nature/_link)
 const PAGOS = [];   // debt_payments
 const APORTES = []; // goal_contributions
 
-const tx = (o) => { TX.push(o); return o; };
+// Nada se escribe con fecha futura: es lo que deja el mes en curso a medias.
+const tx = (o) => { if (o.occurred_on <= HOY) TX.push(o); return o; };
+const aportar = (a) => { if (a.occurred_on <= HOY) APORTES.push(a); };
 const gasto = (fecha, desc, monto, catKey, nature, extra = {}) =>
   tx({ ...B, kind: "gasto", description: desc, amount: Math.round(monto), currency: "CRC",
        occurred_on: fecha, category_id: cat(catKey), source: "manual", origin: "manual",
@@ -450,7 +485,7 @@ const BUDGET_GASTO = {
 };
 const BUDGET_INC = {};
 const budgetRows = [];
-for (const { y, m, key } of MESES) {
+for (const { y, m, key, rkey } of MESES) {
   const g = BUDGET_GASTO[fase(key)];
   const ingresos = [
     ["Salario José — Grupo Q", 1150000, "activo"],
@@ -460,10 +495,10 @@ for (const { y, m, key } of MESES) {
     ...(key === "2026-01" ? [["Salario escolar Marta", 650000, "extraordinario"]] : []),
     ...(key === "2026-05" ? [["Venta de la moto (Suzuki 2015)", 1080000, "extraordinario"]] : []),
   ];
-  BUDGET_INC[key] = {};
+  BUDGET_INC[rkey] = {};
   for (const [name, amount, income_type] of ingresos) {
     const id = crypto.randomUUID();
-    BUDGET_INC[key][name] = id;
+    BUDGET_INC[rkey][name] = id;
     budgetRows.push({ ...B, id, type: "income", name, amount, currency: "CRC", frequency: "mensual",
       period_month: m, period_year: y, source_kind: "manual", income_type,
       category_id: cat(income_type === "extraordinario" ? "inc_extra" : "inc_salario") });
@@ -492,6 +527,7 @@ const saldo = { hipoteca: 28500000, carro: 7200000, tarjeta: 1850000 };
 const saldoMes = {}; // key → { hipoteca, carro, tarjeta } al cierre del mes
 
 function abonar(key, fecha, monto, kind = "ordinario") {
+  if (fecha > HOY) return { principal: 0, interes: 0 };
   const apr = D[key].apr;
   let principal, interes;
   if (kind === "extraordinario") {
@@ -508,10 +544,9 @@ function abonar(key, fecha, monto, kind = "ordinario") {
   return { principal, interes };
 }
 
-for (const { y, m, key } of MESES) {
+for (const { y, m, key, rkey } of MESES) {
   const f = PERFIL[fase(key)];
-  const last = key === "2026-08";
-  const D_ = (day) => d(y, m, last ? Math.min(day, 27) : day);
+  const D_ = (day) => d(y, m, day);
 
   // ── ingresos
   ingreso(D_(15), "Salario quincena — Grupo Q", 575000, "inc_salario", "Salario José — Grupo Q");
@@ -603,21 +638,21 @@ for (const { y, m, key } of MESES) {
     const fecha = key === "2026-01" ? d(y, m, 26) : D_(26);
     gasto(fecha, "Aporte al fondo de emergencia", monto, "fondo_emergencia", "ahorro",
           { linked_kind: "goal", linked_id: G.fondo });
-    APORTES.push({ ...B, goal_id: G.fondo, amount: monto, occurred_on: fecha });
+    aportar({ ...B, goal_id: G.fondo, amount: monto, occurred_on: fecha });
   }
   if (key === "2026-05") {
     gasto(d(y, m, 25), "Aporte extra al fondo (resto de la venta de la moto)", 20000, "fondo_emergencia", "ahorro",
           { linked_kind: "goal", linked_id: G.fondo });
-    APORTES.push({ ...B, goal_id: G.fondo, amount: 20000, occurred_on: d(y, m, 25) });
+    aportar({ ...B, goal_id: G.fondo, amount: 20000, occurred_on: d(y, m, 25) });
   }
   if (APORTE_UNI[key]) {
     const monto = APORTE_UNI[key];
     gasto(D_(26), "Ahorro universidad de Sofía", monto, "ahorro_metas", "ahorro",
           { linked_kind: "goal", linked_id: G.uni });
-    APORTES.push({ ...B, goal_id: G.uni, amount: monto, occurred_on: D_(26) });
+    aportar({ ...B, goal_id: G.uni, amount: monto, occurred_on: D_(26) });
   }
 
-  saldoMes[key] = { ...saldo };
+  saldoMes[rkey] = { ...saldo };
 }
 console.log("movimientos generados:", TX.length, "| pagos de deuda:", PAGOS.length);
 
@@ -667,15 +702,15 @@ const presion = (inc, exp, dw) => {
 
 const snapsMes = [], snapsNW = [], snapsPort = [];
 let liq = apertura, metasAcum = 0;
-for (const { y, m, key } of MESES) {
-  const delMes = TX.filter((t) => t.occurred_on.startsWith(key));
+for (const { y, m, key, rkey } of MESES.slice(0, CERRADOS)) {
+  const delMes = TX.filter((t) => t.occurred_on.startsWith(rkey));
   const income = delMes.filter((t) => t.kind === "ingreso").reduce((s, t) => s + t.amount, 0);
   const expense = delMes.filter((t) => t.kind === "gasto").reduce((s, t) => s + t.amount, 0);
   const byNat = Object.fromEntries(NAT.map((n) => [n, 0]));
   for (const t of delMes) if (t.kind === "gasto") byNat[t._nature] = (byNat[t._nature] ?? 0) + t.amount;
   const free = income - expense;
   const dw = ratio(byNat.financiero, income);
-  snapsMes.push({ ...B, period: `${key}-01`, income_monthly: income, expense_monthly: expense,
+  snapsMes.push({ ...B, period: `${rkey}-01`, income_monthly: income, expense_monthly: expense,
     free_cashflow: free, savings_rate: ratio(byNat.ahorro + Math.max(0, free), income),
     investment_rate: ratio(byNat.inversion, income), debt_weight: dw,
     essentials_weight: ratio(byNat.esencial, income), lifestyle_weight: ratio(byNat.estilo_vida, income),
@@ -683,12 +718,12 @@ for (const { y, m, key } of MESES) {
     breakdown: { currency: "CRC", byNature: byNat, transactions: delMes.length, fase: fase(key) } });
 
   liq += delMes.reduce((s, t) => s + delta(t), 0);
-  metasAcum += APORTES.filter((a) => a.occurred_on.startsWith(key)).reduce((s, a) => s + a.amount, 0);
+  metasAcum += APORTES.filter((a) => a.occurred_on.startsWith(rkey)).reduce((s, a) => s + a.amount, 0);
   const invCRCv = 1800000, invUSDv = key >= "2026-05" ? 1040000 : 0;
   const activos = 52000000 + 8900000 + invCRCv + invUSDv + Math.max(0, liq) + metasAcum;
-  const s = saldoMes[key];
+  const s = saldoMes[rkey];
   const pasivos = Math.round(s.hipoteca + s.carro + s.tarjeta);
-  snapsNW.push({ ...B, period: `${key}-01`, total_assets: Math.round(activos),
+  snapsNW.push({ ...B, period: `${rkey}-01`, total_assets: Math.round(activos),
     total_liabilities: pasivos, net_worth: Math.round(activos - pasivos),
     breakdown: { currency: "CRC", casa: 52000000, vehiculo: 8900000, inversiones: invCRCv + invUSDv,
       liquidez: Math.round(Math.max(0, liq)), metas: metasAcum,
@@ -697,9 +732,44 @@ for (const { y, m, key } of MESES) {
     investment_value: invCRCv + invUSDv, net_worth: Math.round(activos - pasivos), currency: "CRC" });
 }
 await ins("monthly_snapshots", snapsMes);
-// El mes en curso lo reescriben las pantallas; el histórico CERRADO es el que importa.
-await ins("net_worth_snapshots", snapsNW.slice(0, -1));
+// Los 12 meses CERRADOS: el mes en curso no entra al bucle (MESES.slice(0, CERRADOS)), y su
+// snapshot lo escriben las pantallas de patrimonio al cargar.
+await ins("net_worth_snapshots", snapsNW);
 await ins("portfolio_snapshots", snapsPort);
+
+// ── conversación del asesor ───────────────────────────────────────────────────
+// El chat tiene ventana de retención, así que se siembra con marcas RELATIVAS a ahora:
+// una demo con una conversación de hace un mes se ve vacía. Los números salen de las
+// mismas cifras que muestra la app (flujo libre, fondo de emergencia, APR del vehículo);
+// si cambia el guion del arco, hay que revisarlos.
+const hace = (min, seg = 0) => new Date(AHORA.getTime() - min * 60000 + seg * 1000).toISOString();
+const CHAT = [
+  ["user", "Me quedaron ₡300.000 libres este mes. ¿Los abono al carro o los meto al fondo de emergencia?", hace(9)],
+  ["assistant", `Al fondo de emergencia, y te digo por qué con tus números.
+
+Tu flujo libre de este mes es ₡296.403. El préstamo del vehículo con el BCR está al 13,5% anual, así que abonarle ₡300.000 te ahorra alrededor de ₡40.500 de interés en un año. No es poco.
+
+Pero tu fondo de emergencia va en ₡1.520.000 de ₡3.500.000: hoy cubre menos de dos meses de tus gastos esenciales. Si el carro se descompone o falta un ingreso antes de llegar a tres meses, la salida vuelve a ser la tarjeta — y esa está al 45%. Te costaría más de tres veces lo que te ahorra el abono.
+
+Cuando el fondo llegue a los tres meses, el orden se invierte y el vehículo pasa a ser la mejor jugada. Ahí seguimos con la avalancha.`, hace(9, -11)],
+  ["user", "¿Y cuánto me falta para llegar a los tres meses?", hace(6)],
+  ["assistant", `Te faltan ₡1.980.000. Al ritmo de ₡296.403 al mes son unos siete meses; si le sumás el aguinaldo de diciembre, cae a cinco.
+
+Un dato que vale la pena que veas: la cuota de la tarjeta que liquidaste eran ₡380.000 al mes. Ese dinero es el que hoy te deja llegar a ₡296.403 libres. El fondo se está construyendo con la deuda de la que ya saliste.`, hace(6, -9)],
+  ["user", "Dale, registrá el aporte de ₡300.000 al fondo entonces.", hace(3)],
+  ["assistant", `Listo, lo dejo preparado para que lo confirmes:
+
+  Aporte al fondo de emergencia
+  ₡300.000 · hoy · Cuenta de ahorro BAC
+
+Con esto el fondo queda en ₡1.820.000 de ₡3.500.000 — 52% del objetivo, y pasás de cubrir 1,7 meses a 2,1.
+
+No lo registro hasta que me digas que sí. La decisión siempre es tuya.`, hace(3, -8)],
+];
+await ins("chat_messages", CHAT.map(([role, content, created_at]) => ({
+  user_id: JOSE, household_id: HH, role, content, created_at,
+})));
+console.log("conversación del asesor sembrada:", CHAT.length, "mensajes");
 
 // ── perfil de la cuenta ───────────────────────────────────────────────────────
 ok("profiles.jose")(await db.from("profiles").update({
@@ -725,7 +795,7 @@ console.log(`
 ═══ CUENTA DEMO LISTA ═══
   Login   : ${PERSONAS[0].email}  /  ${PASS}
   Pareja  : ${PERSONAS[1].email}  (mismo password)
-  Hogar   : Familia Ramírez Solano — ${TX.length} movimientos, ${MESES[0].key} → ${MESES[11].key}
+  Hogar   : Familia Ramírez Solano — ${TX.length} movimientos, ${MESES[0].rkey} → ${MESES[MESES.length - 1].rkey} (hoy ${HOY})
 
   ANTES (${first.period.slice(0, 7)})   ingreso ${p(first.income_monthly)} · gasto ${p(first.expense_monthly)} · libre ${p(first.free_cashflow)} · deuda ${(first.debt_weight * 100).toFixed(0)}% · ahorro ${(first.savings_rate * 100).toFixed(0)}%
   HOY   (${lastS.period.slice(0, 7)})   ingreso ${p(lastS.income_monthly)} · gasto ${p(lastS.expense_monthly)} · libre ${p(lastS.free_cashflow)} · deuda ${(lastS.debt_weight * 100).toFixed(0)}% · ahorro ${(lastS.savings_rate * 100).toFixed(0)}%
