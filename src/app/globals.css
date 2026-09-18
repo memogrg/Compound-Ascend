@@ -1,24 +1,27 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "../styles/tokens.css";
-@import "../styles/shell.css";
-@import "../styles/primitives.css";
-@import "../styles/modules/assistant.css";
-@import "../styles/shell-nav-movil.css";
-@import "../styles/responsive.css";
-@import "../styles/primitives-modal.css";
-@import "../styles/modules/dashboard.css";
-@import "../styles/modules/setup.css";
-@import "../styles/modules/auth.css";
-@import "../styles/modules/debts.css";
-@import "../styles/modules/base.css";
-@import "../styles/modules/wealth.css";
-@import "../styles/modules/base-composer.css";
-@import "../styles/tokens-shadcn.css";
-@import "../styles/modules/setup-asistentes.css";
-@import "../styles/modules/account.css";
-@import "../styles/modules/assistant-memoria.css";
-@import "../styles/modules/acciones.css";
+/* Tailwind v4 declara `theme, base, components, utilities`; `ca` va DESPUÉS para que
+   nuestras reglas sigan ganándole a sus utilidades, como cuando estaban sin capa. */
+@layer theme, base, components, utilities, ca;
+@import "../styles/tokens.css" layer(ca);
+@import "../styles/shell.css" layer(ca);
+@import "../styles/primitives.css" layer(ca);
+@import "../styles/modules/assistant.css" layer(ca);
+@import "../styles/shell-nav-movil.css" layer(ca);
+@import "../styles/responsive.css" layer(ca);
+@import "../styles/primitives-modal.css" layer(ca);
+@import "../styles/modules/dashboard.css" layer(ca);
+@import "../styles/modules/setup.css" layer(ca);
+@import "../styles/modules/auth.css" layer(ca);
+@import "../styles/modules/debts.css" layer(ca);
+@import "../styles/modules/base.css" layer(ca);
+@import "../styles/modules/wealth.css" layer(ca);
+@import "../styles/modules/base-composer.css" layer(ca);
+@import "../styles/tokens-shadcn.css";  /* sin capa: contiene @theme inline */
+@import "../styles/modules/setup-asistentes.css" layer(ca);
+@import "../styles/modules/account.css" layer(ca);
+@import "../styles/modules/assistant-memoria.css" layer(ca);
+@import "../styles/modules/acciones.css" layer(ca);
 
 
 /* shadcn/ui — el dark variant sigue TU mecanismo data-theme, no la clase .dark */
