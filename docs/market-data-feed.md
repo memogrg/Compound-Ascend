@@ -66,8 +66,8 @@ nombre mal escrito se descarta con aviso en el log.
 | Frescura | 15 min diferido | según plan |
 
 Con Finnhub free de respaldo, **un ETF de Londres no lo cotiza nadie** si el primario es Massive:
-Finnhub free tampoco cubre Londres. Con la configuración de antes (`finnhub` solo) eso ya pasaba:
-`VWRA.L` no se recolectaba nunca.
+Finnhub free tampoco cubre Londres. Con la configuración de antes (`finnhub` solo), un UCITS cargado
+no se habría recolectado. Twelve Data se eligió por esa capacidad, no por un hueco actual.
 
 Twelve Data cotiza muchos instrumentos de Londres **en peniques** (`GBp`). El adaptador los pasa a
 libras antes de guardarlos; sin eso un ETF de £98 quedaría como 9.800.
