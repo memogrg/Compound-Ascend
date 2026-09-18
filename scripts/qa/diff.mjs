@@ -10,6 +10,7 @@
  *   node scripts/qa/diff.mjs --a qa-snapshots/base --b qa-snapshots/cambio --out-diff qa-snapshots/diff
  *   node scripts/qa/diff.mjs --a … --b … --threshold 8 --max-diff-pixels 50
  *   node scripts/qa/diff.mjs --a … --b … --exclude home,asistente
+ *   node scripts/qa/diff.mjs --a … --b … --exclude home --max-diff-pixels 60 --max-delta 2
  */
 import { chromium } from "playwright";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
@@ -79,6 +80,7 @@ async function compararEnPagina(page, aUri, bUri, threshold) {
           a: { w: ia.width, h: ia.height },
           b: { w: ib.width, h: ib.height },
           diffPixels: ia.width * ia.height,
+          maxDelta: 255,
           totalPixels: ia.width * ia.height,
           diffPng: null,
         };
@@ -97,11 +99,14 @@ async function compararEnPagina(page, aUri, bUri, threshold) {
 
       const salida = new ImageData(w, h);
       let diffPixels = 0;
+      let maxDelta = 0;
       for (let i = 0; i < da.data.length; i += 4) {
         const dr = Math.abs(da.data[i] - db.data[i]);
         const dg = Math.abs(da.data[i + 1] - db.data[i + 1]);
         const dbl = Math.abs(da.data[i + 2] - db.data[i + 2]);
         const dal = Math.abs(da.data[i + 3] - db.data[i + 3]);
+        const delta = Math.max(dr, dg, dbl, dal);
+        if (delta > maxDelta) maxDelta = delta;
         const distinto = dr > tol || dg > tol || dbl > tol || dal > tol;
         if (distinto) {
           diffPixels++;
@@ -132,6 +137,7 @@ async function compararEnPagina(page, aUri, bUri, threshold) {
       return {
         sizeMismatch: false,
         diffPixels,
+        maxDelta,
         totalPixels: w * h,
         diffPng,
       };
@@ -151,6 +157,12 @@ async function main() {
   const outDiff = args["out-diff"] ?? "qa-snapshots/diff";
   const threshold = Number(args.threshold ?? 0);
   const maxDiffPixels = Number(args["max-diff-pixels"] ?? 0);
+  // Criterio de DOS condiciones. El rasterizado de Chromium deja tiras inestables en los bordes:
+  // hasta 51 px con delta 1-2, y cambian de pantalla entre corridas. Tolerarlas por CANTIDAD sola
+  // obligaría a subir mucho el margen; tolerarlas bajando --threshold escondería un cambio de color
+  // real de 1-2 niveles en cualquier parte. Con las dos juntas, ese ruido pasa y un cambio de CSS
+  // real no: mueve miles de píxeles, o mueve pocos pero con delta >= 3.
+  const maxDelta = Number(args["max-delta"] ?? 255);
   // Slugs fuera de la comparación ESTRICTA: se comparan y se reportan igual, pero sus diferencias
   // no hacen fallar la salida. Para pantallas con movimiento propio que no cede a reduced-motion.
   const excluidos = new Set(
@@ -188,6 +200,7 @@ async function main() {
       filas.push({
         imagen: rel,
         diffPixels: r.diffPixels,
+        maxDelta: r.maxDelta ?? 0,
         pct: r.totalPixels ? (r.diffPixels / r.totalPixels) * 100 : 0,
         sizeMismatch: Boolean(r.sizeMismatch),
         excluida: excluidos.has(slugDe(rel)),
@@ -200,21 +213,21 @@ async function main() {
   filas.sort((x, y) => y.diffPixels - x.diffPixels);
   const conDiff = filas.filter((f) => f.diffPixels > 0);
 
-  console.log(`\nimagen${" ".repeat(54)}px distintos       %`);
-  console.log("-".repeat(88));
+  console.log(`\nimagen${" ".repeat(54)}px distintos       %  delta`);
+  console.log("-".repeat(96));
   for (const f of filas.slice(0, 60)) {
     const nombre = f.imagen.length > 58 ? `…${f.imagen.slice(-57)}` : f.imagen.padEnd(58);
     const marca =
       (f.sizeMismatch ? " (tamaño distinto)" : "") + (f.excluida ? " (excluida del estricto)" : "");
     console.log(
-      `${nombre} ${String(f.diffPixels).padStart(12)} ${f.pct.toFixed(4).padStart(8)}${marca}`,
+      `${nombre} ${String(f.diffPixels).padStart(12)} ${f.pct.toFixed(4).padStart(8)} ${String(f.maxDelta).padStart(6)}${marca}`,
     );
   }
   if (filas.length > 60) console.log(`… y ${filas.length - 60} más`);
 
   const estrictas = conDiff.filter((f) => !f.excluida);
   console.log(
-    `\n${comunes.length} comparadas · ${conDiff.length} con diferencias · umbral ${threshold} · máximo permitido ${maxDiffPixels}px`,
+    `\n${comunes.length} comparadas · ${conDiff.length} con diferencias · umbral ${threshold} · permitido hasta ${maxDiffPixels}px Y delta ${maxDelta}`,
   );
   if (excluidos.size) {
     console.log(
@@ -225,8 +238,15 @@ async function main() {
   if (soloB.length) console.log(`Solo en B (${soloB.length}): ${soloB.slice(0, 5).join(", ")}…`);
   if (conDiff.length) console.log(`PNGs de diferencias en ${outDiff}/`);
 
-  const falla =
-    estrictas.some((f) => f.diffPixels > maxDiffPixels) || soloA.length > 0 || soloB.length > 0;
+  // Una imagen falla si se pasa de CUALQUIERA de las dos: demasiados píxeles o un delta demasiado
+  // grande. El ruido de rasterizado se queda corto en las dos; un cambio real se pasa en alguna.
+  const reprobadas = estrictas.filter((f) => f.diffPixels > maxDiffPixels || f.maxDelta > maxDelta);
+  if (reprobadas.length) {
+    console.log(
+      `reprobadas (px > ${maxDiffPixels} o delta > ${maxDelta}): ${reprobadas.map((f) => f.imagen).join(", ")}`,
+    );
+  }
+  const falla = reprobadas.length > 0 || soloA.length > 0 || soloB.length > 0;
   process.exit(falla ? 1 : 0);
 }
 

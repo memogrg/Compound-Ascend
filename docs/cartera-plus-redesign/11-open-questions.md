@@ -39,5 +39,9 @@ Para entrar a la fase de diseño basta con aprobar cuatro cosas de la sección 2
 
 Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` … `12-progress.md` quedan en el repo como copia de este blueprint y como registro de decisiones, sin commit hasta que Memo lo apruebe.
 
+## Hallazgos abiertos (de la línea base visual)
+
+- **`/ingresos` y `/control-financiero` desbordan horizontalmente a 390 px.** La captura de página completa sale de **555 px** y **454 px** de ancho respectivamente, contra un viewport de 390: hay contenido que se sale de la pantalla en móvil. Se detectó porque el borde desbordado es justo donde el rasterizado deja tiras inestables entre corridas. Bug de móvil **preexistente**, no introducido por el rediseño; a atender en la fase 1/2.
+
 Nada de lo anterior toca producción.
 
