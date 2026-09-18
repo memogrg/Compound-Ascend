@@ -1,0 +1,328 @@
+/* ============================================================
+   shadcn/ui — TOKENS (aditivo, mapeados a tu design system)
+   ------------------------------------------------------------
+   Los componentes de shadcn/Aceternity/Magic UI usan utilidades
+   semánticas (bg-background, text-foreground, border-border…).
+   Aquí esas utilidades se reconducen a TUS variables (--bg, --ink,
+   --line…). El modo oscuro se hereda automáticamente porque estos
+   tokens referencian variables que ya cambian bajo [data-theme="dark"].
+   NOTA: NO se redeclaran --muted, --accent, --border ni --input
+   (tokens de marca v2); sus versiones shadcn se mapean directo en
+   @theme inline (--color-muted → --chip, --color-accent → --chip,
+   --color-border/--color-input → --border). Así ningún bloque pisa
+   los tokens CARTERA+ y la cascada deja de importar.
+   ============================================================ */
+:root {
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-ink);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--ink-2);
+  --muted-foreground: var(--muted);
+  --destructive: var(--neg);
+  --destructive-foreground: #ffffff;
+  --ring: var(--accent);
+  --radius: var(--r-md);
+  --chart-1: var(--s1);
+  --chart-2: var(--s2);
+  --chart-3: var(--s3);
+  --chart-4: var(--s4);
+  --chart-5: var(--s5);
+  --sidebar: var(--bg-elev);
+  --sidebar-foreground: var(--ink-2);
+  --sidebar-primary: var(--accent);
+  --sidebar-primary-foreground: var(--accent-ink);
+  --sidebar-accent: var(--chip);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--accent);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--chip);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--chip);
+  --color-accent-foreground: var(--text);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --animate-marquee: marquee var(--duration) infinite linear;
+  --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+  --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
+  --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(calc(-100% - var(--gap)));
+    }
+  }
+  @keyframes marquee-vertical {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(calc(-100% - var(--gap)));
+    }
+  }
+  @keyframes shimmer-slide {
+    to {
+      transform: translate(calc(100cqw - 100%), 0);
+    }
+  }
+  @keyframes spin-around {
+    0% {
+      transform: translateZ(0) rotate(0);
+    }
+    15%,
+    35% {
+      transform: translateZ(0) rotate(90deg);
+    }
+    65%,
+    85% {
+      transform: translateZ(0) rotate(270deg);
+    }
+    100% {
+      transform: translateZ(0) rotate(360deg);
+    }
+  }
+}
+
+/* ── Alta EN LOTE de un estado de cuenta conciliado ─────────────────────────── */
+/* Lista scrolleable: un estado puede traer 15 filas y la tarjeta no puede comerse el hilo.
+   Con la fila entera editable cada una ocupa cuatro campos, así que el alto crece y el scroll
+   pasa a ser el modo normal de uso, no la excepción: de ahí el separador marcado entre filas y
+   el respiro interno, para no leer un bloque de inputs sin costuras. */
+.ac-batch {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 420px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 8px 0 4px;
+  padding-right: 4px;
+}
+.ac-batch-row {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ac-batch-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+/* Gasto/ingreso ya no se deduce del signo del monto, porque el monto ahora es un input. */
+.ac-batch-kind {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ac-batch-kind.is-in {
+  color: var(--pos);
+}
+.ac-batch-kind.is-out {
+  color: var(--muted);
+}
+/* ── Rejilla de campos de las tarjetas de confirmación (recibo y alta en lote) ──────
+   DOS columnas iguales de verdad. `repeat(2, minmax(0, 1fr))` y no `1fr 1fr`: el `1fr`
+   pelado tiene un mínimo implícito de `auto`, así que una columna NO puede encoger por
+   debajo del contenido — y el `input[type=date]` trae ancho intrínseco propio ("dd/mm/aaaa"
+   más el icono del calendario). Con `auto` ese input empujaba su columna y la fila se
+   desbordaba; con `minmax(0, …)` la columna puede achicarse y el campo la respeta.
+   Los tres campos en línea de antes (fecha | monto | moneda) se partieron en dos: en el
+   panel flotante, que mide ~380px con el viewport ancho, las tres columnas recortaban el
+   valor de la fecha y dejaban "CRC" en "CR". La media query anterior no ayudaba porque
+   mide el VIEWPORT, no el ancho real del contenedor. */
+.ac-rc-fields,
+.ac-batch-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* `start`: si un campo muestra su error, no estira al de al lado — quedan alineados arriba. */
+  align-items: start;
+  gap: 10px 8px;
+}
+.ac-rc-fields {
+  margin: 10px 0 2px;
+}
+.ac-batch-grid {
+  margin-top: 6px;
+}
+.ac-batch-cell,
+.ac-rc-cell {
+  min-width: 0;
+}
+/* Campos que ocupan la fila entera (comercio, moneda, sobre, avisos). */
+.ac-rc-wide,
+.ac-batch-cell-cur {
+  grid-column: 1 / -1;
+}
+/* Una sola definición para TODOS los campos de las dos tarjetas: misma altura, mismo radio,
+   mismo padding, mismo ancho. Antes el combobox de sobre no la llevaba y quedaba desparejo.
+   `min-width: 0` es imprescindible: el mínimo por defecto de un input es su ancho intrínseco,
+   así que sin esto `width: 100%` no alcanza para que quepa en una columna angosta. */
+.ac-batch-field,
+.ac-rc-field {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 40px;
+  margin-top: 4px;
+}
+/* El input de fecha es el que se desbordaba. `appearance: none` le quita el ancho intrínseco
+   que le da el motor; el indicador del calendario se empuja al final para que no corra el
+   valor, y el valor se alinea a la izquierda como el de los demás campos. */
+.ac-batch-field[type="date"],
+.ac-rc-field[type="date"] {
+  appearance: none;
+  -webkit-appearance: none;
+}
+.ac-batch-field[type="date"]::-webkit-date-and-time-value,
+.ac-rc-field[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+  min-width: 0;
+}
+.ac-batch-field[type="date"]::-webkit-calendar-picker-indicator,
+.ac-rc-field[type="date"]::-webkit-calendar-picker-indicator {
+  flex: none;
+  margin-inline-start: auto;
+  padding-inline-start: 4px;
+}
+/* El <select> de moneda con el aspecto de los DEMÁS campos. Sin `appearance: none` el motor lo
+   pinta con su propio fondo y su propio borde (gris en WebKit), y quedaba como el único campo
+   de otro color dentro de la tarjeta. La flechita se dibuja con la misma técnica de gradientes
+   que `.m-select` del shell móvil, así que sigue los tokens del tema. */
+select.ac-batch-field,
+select.ac-rc-field {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 34px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) calc(50% - 2px),
+    calc(100% - 13px) calc(50% - 2px);
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+}
+.ac-batch-field.is-bad,
+.ac-rc-field.is-bad {
+  border-color: var(--neg);
+}
+/* Etiquetas: mismo tamaño y mismo aire en los cinco campos, sin alturas sueltas. */
+.ac-rc-fields .fld-label,
+.ac-batch-row .fld-label {
+  display: block;
+  line-height: 1.3;
+}
+/* El error de un campo cuelga de SU campo, no del final de la tarjeta. */
+.ac-rc-cell > .ac-err,
+.ac-rc-cell > .ac-rc-warn {
+  margin-top: 6px;
+}
+.ac-batch-row .ac-err {
+  margin-top: 4px;
+}
+/* La media query de antes ("en pantallas angostas, dos columnas") ya no existe: medía el
+   VIEWPORT, así que el panel flotante —380px dentro de un escritorio de 1280— nunca la
+   activaba y era justo donde los campos se recortaban. Ahora la rejilla es de dos columnas
+   SIEMPRE, en las tres superficies. */
+.ac-batch-x {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.ac-batch-x svg {
+  width: 14px;
+  height: 14px;
+}
+.ac-batch-x:hover {
+  color: var(--ink);
+}
+
+/* ── Recibo escaneado: avisos de la tarjeta ─────────────────────────────────
+   Ámbar y no rojo: una fecha de otro mes o una moneda no detectada NO impiden
+   registrar —pueden ser correctas—, pero tienen que verse ANTES de confirmar.
+   El rojo queda para lo que sí bloquea (`.ac-err`). */
+.ac-rc-warn {
+  margin-top: 6px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border-left: 2px solid var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 12px;
+  line-height: 1.45;
+}
+/* El chip de confirmar la moneda vive DENTRO del aviso: confirmar es la salida del aviso. */
+.ac-rc-chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 9px;
+  border: 1px solid var(--warning);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--warning);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ac-rc-chip:hover {
+  background: var(--warning);
+  color: var(--bg);
+}
+.ac-done .ac-rc-warn {
+  margin-top: 8px;
+}
+

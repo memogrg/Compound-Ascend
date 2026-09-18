@@ -1,0 +1,202 @@
+
+/* ============================================================
+   CARTERA+ — Design System v2.0
+   Tokens v2 (handoff assets/cartera.css) + aliases legacy → v2
+   para que las clases existentes adopten el look sin reescribirse.
+   Light es el default; dark bajo [data-theme="dark"].
+   ============================================================ */
+
+:root {
+  /* ---- Type (Sora/Manrope/Space Mono via next/font en layout.tsx) ---- */
+  --font-display: var(--font-sora), "Sora", "Segoe UI", system-ui, sans-serif;
+  --font-body: var(--font-manrope), "Manrope", "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), "Space Mono", ui-monospace, Menlo, monospace;
+  --sans: var(--font-body);
+  --serif: var(--font-display);
+  --mono: var(--font-mono);
+
+  /* ---- LIGHT · default ---- */
+  --canvas: #f4f2ec;
+  --surface: #ffffff;
+  --surface-2: #fbfaf6;
+  --border: #e7e4dc;
+  --text: #1e1c16;
+  /* AA (WCAG 1.4.3, 4.5:1). El anterior #807c72 no llegaba en NINGÚN fondo: su techo
+     sobre blanco puro era 4.16:1, y sobre el canvas crema caía a 3.62:1. Este es el gris
+     MÁS CLARO del mismo tono cálido que cumple en todos los fondos donde se pinta —
+     canvas 5.60:1, blanco 6.45:1 — incluido el vidrio de los overlays del móvil (4.55:1),
+     que es el fondo más exigente y por eso fija el valor. Sigue lejísimos del texto
+     primario (17:1) — no se confunden. No lo aclares sin volver a medir. */
+  --text-muted: #625e57;
+  --accent: #378451;
+  --accent-ink: #ffffff;
+  --success: #378451;
+  --warning: #b07a2e;
+  --danger: #c34f4b;
+  --info: #3a6ea5;
+  --accent-soft: rgba(55, 132, 81, 0.12);
+  --success-soft: var(--accent-soft);
+  --danger-soft: rgba(195, 79, 75, 0.12);
+  --warning-soft: rgba(176, 122, 46, 0.12);
+  --info-soft: rgba(58, 110, 165, 0.12);
+
+  /* Ranked chips (perfil): 3 rangos DISTINTOS, texto y número SIEMPRE blancos. Fondos fijos y
+     suficientemente oscuros para cumplir AA (>4.5:1) con blanco en tema claro Y oscuro — el
+     contraste es contra el relleno del chip, no contra la página, así que no necesitan flip. */
+  --rank-1: #2c6e43; /* verde  · blanco 5.3:1 */
+  --rank-2: #305c88; /* azul   · blanco 6.9:1 */
+  --rank-3: #855a1d; /* ámbar  · blanco 6.0:1 */
+
+  /* ---- Data viz series (--s6 extiende el handoff con el teal legacy) ---- */
+  --s1: #378451;
+  --s2: #b07a2e;
+  --s3: #c34f4b;
+  --s4: #6b8a5f;
+  --s5: #2b7d6a;
+  --s6: oklch(0.62 0.08 195);
+
+  /* ---- Spacing (base 4) ---- */
+  --sp1: 4px;
+  --sp2: 8px;
+  --sp3: 12px;
+  --sp4: 16px;
+  --sp6: 24px;
+  --sp8: 32px;
+  --sp12: 48px;
+  --sp16: 64px;
+
+  /* Peso de cifras grandes (num-xl, KPIs, montos hero). Apple-like: 600, no 700. */
+  --figure-weight: 600;
+
+  /* ---- Radii ---- */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+  --r-btn: 10px;
+  --r-xl: 18px;
+  --r-2xl: 24px;
+
+  /* ---- Elevation ---- */
+  --e1: 0 1px 2px rgba(20, 18, 14, 0.06);
+  --e2: 0 4px 14px -6px rgba(20, 18, 14, 0.12);
+  --e3: 0 14px 40px -16px rgba(20, 18, 14, 0.18);
+
+  --sidebar-w: 248px;
+
+  /* ---- Aliases legacy → v2 (consumidos por las clases existentes) ---- */
+  --bg: var(--canvas);
+  --bg-elev: var(--surface);
+  --line: var(--border);
+  --line-strong: color-mix(in srgb, var(--text) 16%, transparent);
+  --ink: var(--text);
+  --ink-2: color-mix(in srgb, var(--text) 84%, var(--canvas));
+  --muted: var(--text-muted);
+  --muted-2: var(--text-muted);
+  --chip: rgba(20, 18, 14, 0.04);
+  --chip-hover: rgba(20, 18, 14, 0.07);
+  --shadow-card: var(--e1);
+  --shadow-pop: var(--e2);
+  --shadow-float: var(--e3);
+
+  --pos: var(--success);
+  --pos-soft: var(--success-soft);
+  --neg: var(--danger);
+  --neg-soft: var(--danger-soft);
+  --warn: var(--warning);
+  --warn-soft: var(--warning-soft);
+
+  /* ---- Layer / domain accents (re-derivados de la paleta v2) ---- */
+  --c-income: var(--success);
+  --c-expense: var(--s2);
+  --c-savings: var(--s6);
+  --c-debt: var(--danger);
+  --c-invest: var(--info);
+  --c-protect: var(--s4);
+  --c-networth: oklch(0.45 0.04 250);
+  --gold: var(--s2);
+
+  --teal: var(--s6);
+  --green: var(--pos);
+  --green-soft: var(--pos-soft);
+  --blue: var(--info);
+  --blue-soft: var(--info-soft);
+  --amber: var(--warn);
+  --amber-soft: var(--warn-soft);
+  --rose: var(--neg);
+  --rose-soft: var(--neg-soft);
+}
+
+[data-theme="dark"] {
+  --canvas: #15140f;
+  --surface: #1e1c16;
+  --surface-2: #26241c;
+  --border: #2e2c24;
+  --text: #f4f2ec;
+  /* En oscuro este gris ya cumple AA en los cuatro fondos (canvas 7.18:1 … surface-3
+     5.45:1): se deja como está. El problema del contraste era solo del tema claro. */
+  --text-muted: #a6a199;
+  --accent: #51af6f;
+  --accent-ink: #0c2114;
+  --success: #51af6f;
+  --warning: #d9a85a;
+  --danger: #d46b62;
+  --info: #6aa0d8;
+  --accent-soft: rgba(81, 175, 111, 0.14);
+  --danger-soft: rgba(212, 107, 98, 0.16);
+  --warning-soft: rgba(217, 168, 90, 0.16);
+  --info-soft: rgba(106, 160, 216, 0.16);
+
+  --s1: #51af6f;
+  --s2: #d9a85a;
+  --s3: #d46b62;
+  --s4: #557d5b;
+  --s5: #43a064;
+  --s6: oklch(0.74 0.08 195);
+
+  --e1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --e2: 0 4px 14px -6px rgba(0, 0, 0, 0.5);
+  --e3: 0 14px 40px -16px rgba(0, 0, 0, 0.6);
+
+  /* aliases legacy que no se re-derivan solos en oscuro */
+  --line-strong: color-mix(in srgb, var(--text) 20%, transparent);
+  --chip: rgba(255, 252, 240, 0.05);
+  --chip-hover: rgba(255, 252, 240, 0.09);
+  --c-networth: oklch(0.7 0.04 250);
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  font-size: 15px;
+  line-height: 1.5;
+  font-feature-settings: "tnum";
+  transition:
+    background 240ms ease,
+    color 240ms ease;
+  min-height: 100vh;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+}
+::selection {
+  background: var(--accent-soft);
+}
+
