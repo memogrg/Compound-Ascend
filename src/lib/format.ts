@@ -193,3 +193,69 @@ export function formatAxisCompact(amount: number, currency: string): string {
   const body = `${prefixOf(currency)}${formatAbs(scaled, dec)}${step.suffix}`;
   return amount < 0 ? `${MINUS}${body}` : body;
 }
+
+/**
+ * Variación con signo explícito: +₡2.500 · −₡2.500 · ₡0 (el cero va SIN signo).
+ *
+ * Reusa formatMoney en vez de Intl con `signDisplay` a propósito: mantiene las cuatro
+ * reglas del encabezado, y sobre todo la 1 —agrupación a mano, no CLDR—. Un delta
+ * formateado con Intl saldría "+₡2 500" (espacio duro) al lado de un "₡2.500" de
+ * formatMoney, que es exactamente el bug de dos separadores que la nota 1 documenta.
+ */
+export function formatDelta(value: number, currency: string, decimals?: number): string {
+  const dec = decimals ?? currencyDecimals(currency);
+  const body = formatMoney(Math.abs(value), currency, decimals);
+  // El redondeo manda, igual que en formatMoney: +0,4 con 0 decimales es "₡0", sin signo.
+  if (Number(Math.abs(value).toFixed(dec)) === 0) return body;
+  return value > 0 ? `+${body}` : `${MINUS}${body}`;
+}
+
+/**
+ * Proporción 0-1 como porcentaje con UNA decimal: 0.123 → "12,3 %".
+ *
+ * Coma decimal y espacio duro antes del signo (tipografía española: el % va separado,
+ * y el espacio duro impide que quede huérfano al final de una línea). El espacio duro
+ * acá es una decisión tipográfica nuestra, no agrupación de CLDR: no depende del ICU
+ * del motor y por lo tanto es idéntico en servidor y cliente.
+ */
+export function formatPct1(ratio: number): string {
+  const pct = ratio * 100;
+  // formatAbs es el formateador de la casa: agrupa miles con punto y usa coma decimal.
+  // Un porcentaje de cuatro cifras (un retorno de 12.345,6 %) se agrupa como cualquier
+  // otra cifra; sin esto saldría "12345,6 %" al lado de importes que sí van agrupados.
+  const body = `${formatAbs(pct, 1)} %`;
+  return Number(Math.abs(pct).toFixed(1)) === 0 || pct > 0 ? body : `${MINUS}${body}`;
+}
+
+/** Meses en minúscula para etiquetas cortas de eje y fila. */
+const MONTHS_TINY = [
+  "ene",
+  "feb",
+  "mar",
+  "abr",
+  "may",
+  "jun",
+  "jul",
+  "ago",
+  "sep",
+  "oct",
+  "nov",
+  "dic",
+];
+
+/**
+ * "2026-08-16" → "16 ago". Parsea la CADENA, sin Date: `new Date("2026-08-16")` se
+ * interpreta en UTC y en Costa Rica (UTC−6) retrocede al día 15.
+ */
+export function formatDayMonth(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  return `${Number(m[3])} ${MONTHS_TINY[Number(m[2]) - 1] ?? ""}`;
+}
+
+/** "2026-08" o "2026-08-16" → "ago 26". Mismo parseo determinista. */
+export function formatMonthShort(iso: string): string {
+  const m = /^(\d{4})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  return `${MONTHS_TINY[Number(m[2]) - 1] ?? ""} ${(m[1] ?? "").slice(2)}`;
+}

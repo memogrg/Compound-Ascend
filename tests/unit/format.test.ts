@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { formatMoney, formatCompact, formatAxisCompact, formatMonthYear, CURRENCY_SYMBOL } from "@/lib/format";
+import {
+  formatMoney,
+  formatCompact,
+  formatAxisCompact,
+  formatMonthYear,
+  formatDelta,
+  formatPct1,
+  formatDayMonth,
+  formatMonthShort,
+  CURRENCY_SYMBOL,
+} from "@/lib/format";
 
 /**
  * Blindaje de la POLÍTICA ÚNICA de formato numérico (ver el bloque de doc en
@@ -132,5 +142,86 @@ describe("moneda: nunca un símbolo que no corresponde al importe (P0-2)", () =>
   it("una moneda desconocida se rotula con su código, no con un símbolo ajeno", () => {
     expect(formatMoney(500, "XYZ")).toBe("XYZ 500");
     expect(formatMoney(500, "XYZ")).not.toContain("₡");
+  });
+});
+
+/**
+ * Helpers agregados en 0.5. Heredan la misma política: agrupación A MANO, nunca CLDR.
+ * El prompt original pedía `Intl.NumberFormat` con `signDisplay`, que en Node emite
+ * ESPACIO DURO como separador de miles — justo la grieta servidor/iOS que el bloque de
+ * doc de format.ts documenta. Estos tests fijan la decisión contraria.
+ */
+describe("formatDelta: signo explícito, misma gramática que formatMoney", () => {
+  it("positivo con +, negativo con el menos tipográfico", () => {
+    expect(formatDelta(2500, "CRC")).toBe("+₡2.500");
+    expect(formatDelta(-2500, "CRC")).toBe("−₡2.500");
+  });
+
+  it("el cero es NEUTRO: sin signo", () => {
+    expect(formatDelta(0, "CRC")).toBe("₡0");
+  });
+
+  it("el cero lo deciden los decimales de la moneda", () => {
+    expect(formatDelta(0.4, "CRC")).toBe("₡0"); // 0 decimales: redondea a cero
+    expect(formatDelta(0.4, "USD", 2)).toBe("+$0,40"); // 2 decimales: sí es positivo
+  });
+
+  it("produce EXACTAMENTE el cuerpo de formatMoney, solo con el signo delante", () => {
+    for (const [monto, moneda, dec] of [
+      [2500, "CRC", undefined],
+      [1_250_000, "CRC", undefined],
+      [2500, "USD", 2],
+      [1_250_000, "USD", 2],
+    ] as const) {
+      expect(formatDelta(monto, moneda, dec)).toBe(`+${formatMoney(monto, moneda, dec)}`);
+    }
+  });
+
+  it("no agrupa con espacio duro (si aparece, alguien lo reimplementó con Intl)", () => {
+    expect(formatDelta(1_250_000, "CRC")).not.toContain(" ");
+    expect(formatDelta(-1_250_000, "USD", 2)).not.toContain(" ");
+  });
+});
+
+describe("formatPct1: una decimal, coma, espacio duro antes del %", () => {
+  it("formatea y redondea a una decimal", () => {
+    expect(formatPct1(0.123)).toBe("12,3 %");
+    expect(formatPct1(0.12345)).toBe("12,3 %");
+    expect(formatPct1(0.129)).toBe("12,9 %");
+  });
+
+  it("cero y negativos", () => {
+    expect(formatPct1(0)).toBe("0,0 %");
+    expect(formatPct1(-0.045)).toBe("−4,5 %");
+  });
+
+  it("agrupa los miles con PUNTO; el espacio duro es solo el de antes del %", () => {
+    expect(formatPct1(123.456)).toBe("12.345,6 %");
+    expect(formatPct1(123.456).split(" ")).toHaveLength(2);
+  });
+});
+
+describe("fechas cortas: parseo de la CADENA, sin Date ni Intl", () => {
+  it("formatDayMonth: día sin cero a la izquierda, mes en minúscula", () => {
+    expect(formatDayMonth("2026-08-16")).toBe("16 ago");
+    expect(formatDayMonth("2026-01-05")).toBe("5 ene");
+    expect(formatDayMonth("2026-12-31")).toBe("31 dic");
+  });
+
+  it("formatMonthShort: mes y año a dos dígitos", () => {
+    expect(formatMonthShort("2026-08")).toBe("ago 26");
+    expect(formatMonthShort("2026-08-16")).toBe("ago 26");
+  });
+
+  // El día 1 delata un parseo con Date: new Date("2026-08-01") se interpreta en UTC y
+  // leído en Costa Rica (UTC−6) retrocede al 31 de julio.
+  it("no retrocede un día por zona horaria", () => {
+    expect(formatDayMonth("2026-08-01")).toBe("1 ago");
+    expect(formatMonthShort("2026-01-01")).toBe("ene 26");
+  });
+
+  it("lo que no es ISO se devuelve intacto", () => {
+    expect(formatDayMonth("mañana")).toBe("mañana");
+    expect(formatMonthShort("")).toBe("");
   });
 });
