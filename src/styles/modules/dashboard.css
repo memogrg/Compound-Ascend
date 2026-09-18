@@ -1,0 +1,525 @@
+/* ============================================================ DASHBOARD ============================================================ */
+.def-hero {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 18px;
+}
+@media (max-width: 1000px) {
+  .def-hero {
+    grid-template-columns: 1fr;
+  }
+}
+.dash-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+/* Saludo del dashboard (v2 .greet) */
+.greet {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 26px;
+  letter-spacing: -0.01em;
+  margin: 0 0 4px;
+}
+.greet .it {
+  font-style: normal;
+  color: var(--accent);
+}
+.greet-sub {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0 0 6px;
+}
+
+.dash-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 1000px) {
+  .dash-hero,
+  .dash-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Panel: franja Norte (3 cards) + pilares (v2) ---- */
+.dash-norte {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+}
+.norte-cell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 18px;
+  box-shadow: var(--e1);
+}
+.norte-nba .nba-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+}
+.nba-spark {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: #fff;
+  flex: none;
+}
+.trend-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+}
+.freedom-bar {
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  overflow: hidden;
+  margin-top: 12px;
+}
+.freedom-fill {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+}
+
+.dash-pillars {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.pillar {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  transition:
+    border-color 150ms,
+    transform 100ms;
+}
+.pillar:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+.pillar-ic {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.ai-read {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.ai-read .ai-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.ai-read p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+/* Observaciones (celebrar/accionar/observar) — v2 */
+.obs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Respiro respecto al "Hola, {nombre}" que viene inmediatamente debajo. */
+  margin-bottom: var(--sp6);
+}
+.obs-empty {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  color: var(--muted);
+  padding: 11px 14px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+}
+.obs-empty svg {
+  width: 14px;
+  height: 14px;
+  color: var(--success);
+  flex: none;
+}
+.bell-recall {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 7px;
+}
+.bell-recall:hover {
+  color: var(--ink);
+  background: var(--chip);
+}
+.bell-recall:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.bell-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  max-height: 420px;
+  overflow-y: auto;
+  z-index: 50;
+  box-shadow: var(--shadow-pop);
+  padding: 0;
+}
+/* En pantallas chicas la campana queda cerca del borde y el ancho fijo se
+   salía del viewport: se ancla al viewport, no al botón. */
+@media (max-width: 480px) {
+  .bell-pop {
+    position: fixed;
+    top: 64px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+}
+/* ── Pop-up del ritmo del mes ──────────────────────────────────────────────
+   Tarjeta flotante abajo a la derecha, UNA a la vez. Deliberadamente discreta:
+   acompaña, no interrumpe — nada de overlay, nada de bloquear la pantalla, y el
+   contenido de abajo sigue siendo clickeable. */
+.rhythm-nudge {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 340px;
+  max-width: calc(100vw - 24px);
+  z-index: 45; /* debajo de la campana (50): un modal abierto siempre gana */
+  padding: 14px 16px 12px;
+  box-shadow: var(--shadow-pop);
+  animation: rhythm-nudge-in 0.22s ease-out;
+}
+.rhythm-nudge[data-leaving] {
+  animation: rhythm-nudge-out 0.16s ease-in forwards;
+}
+@keyframes rhythm-nudge-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes rhythm-nudge-out {
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+/* Quien pidió menos movimiento no necesita la animación para entender el aviso. */
+@media (prefers-reduced-motion: reduce) {
+  .rhythm-nudge,
+  .rhythm-nudge[data-leaving] {
+    animation: none;
+  }
+}
+.rhythm-nudge-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.rhythm-nudge-icon {
+  color: var(--accent);
+  flex: none;
+  margin-top: 1px;
+}
+.rhythm-nudge-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.rhythm-nudge-body {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+.rhythm-nudge-foot {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+.rhythm-nudge-foot .btn {
+  font-size: 12.5px;
+  padding: 7px 12px;
+}
+/* En móvil web se ancla a los dos bordes y sube: abajo a la derecha choca con la
+   barra de navegación inferior. */
+@media (max-width: 480px) {
+  .rhythm-nudge {
+    right: 12px;
+    left: 12px;
+    bottom: 76px;
+    width: auto;
+  }
+}
+
+/* ── Tarjeta de ritmo de gasto ─────────────────────────────────────────────
+   Acento de ATENCIÓN (--warn), no de error (--neg): el sobre todavía está dentro de
+   su presupuesto y esto es una proyección. El rojo queda reservado para cuando ya se
+   pasó (sobre_sobregirado); gastarlo antes le quita significado. */
+.ritmo-card {
+  border-left: 3px solid var(--warn);
+  padding: 13px 15px 12px;
+}
+.ritmo-card + .ritmo-card {
+  margin-top: 10px;
+}
+.ritmo-card-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.ritmo-card-body {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+.ritmo-card-salidas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.ritmo-card-salidas .btn {
+  font-size: 12.5px;
+  padding: 7px 12px;
+}
+/* El número de "bajar el ritmo" ocupa toda la fila: es información para decidir, no una
+   acción, y ponerlo en línea con los botones lo haría parecer uno. */
+.ritmo-card-salidas .ritmo-card-body {
+  flex-basis: 100%;
+  margin: 0;
+}
+.ritmo-card-done {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--pos);
+  padding: 10px 0;
+}
+
+.obs-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  box-shadow: var(--e1);
+}
+.obs-card .oi {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.obs-card .oi svg {
+  width: 16px;
+  height: 16px;
+}
+.obs-card h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0;
+}
+.obs-card p {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 4px 0 0;
+  line-height: 1.5;
+}
+.obs-card .dis {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 5px 8px;
+  border-radius: 7px;
+  flex: none;
+}
+.obs-card .dis:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.obs-card.sev-celebrar {
+  border-left-color: var(--success);
+}
+.obs-card.sev-celebrar .oi {
+  background: var(--accent-soft);
+  color: var(--success);
+}
+.obs-card.sev-accionar {
+  border-left-color: var(--danger);
+}
+.obs-card.sev-accionar .oi {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.obs-card.sev-observar {
+  border-left-color: var(--warning);
+}
+.obs-card.sev-observar .oi {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.obs-card.sev-info {
+  border-left-color: var(--info);
+}
+.obs-card.sev-info .oi {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+/* Chip del asesor en headers de card */
+.chip-ai {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 4px 9px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ---- Base Financiera v2: métricas, deltas y tablas top ---- */
+.met-k {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.dlt {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.dlt.up {
+  background: var(--accent-soft);
+  color: var(--success);
+}
+.dlt.down {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.dlt.warn {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.dlt svg {
+  width: 10px;
+  height: 10px;
+}
+.tag {
+  display: inline-flex;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+}
+.tag.baja {
+  background: var(--accent-soft);
+  color: var(--success);
+}
+.tag.media {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.tag.alta {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.tbl-h {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.pctb {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  font-variant-numeric: tabular-nums;
+}
+.pctb.g {
+  background: var(--accent-soft);
+  color: var(--success);
+}
+.pctb.a {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.pctb.r {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+@media (max-width: 880px) {
+  .dash-norte {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 760px) {
+  .dash-pillars {
+    grid-template-columns: 1fr;
+  }
+}
+

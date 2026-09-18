@@ -1,0 +1,385 @@
+/* ============================================================ APP SHELL ============================================================ */
+.app {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  min-height: 100dvh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 18px 12px;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  transition:
+    background 240ms ease,
+    border-color 240ms ease;
+  z-index: 40;
+}
+.nav-scroll {
+  flex: 1;
+  overflow-y: auto;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--text);
+  color: var(--canvas);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.brand-mark svg {
+  width: 19px;
+  height: 19px;
+}
+.brand-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+}
+.brand-name .ascend {
+  color: var(--accent);
+}
+.brand-sub {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 1px;
+  white-space: nowrap;
+}
+
+.nav-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 10px 10px 5px;
+  font-weight: 700;
+}
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  border-radius: var(--r-btn);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+  user-select: none;
+  white-space: nowrap;
+}
+.nav-item:hover {
+  background: var(--surface-2);
+}
+.nav-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.nav-icon {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  opacity: 0.85;
+  display: grid;
+  place-items: center;
+}
+.nav-icon svg {
+  width: 17px;
+  height: 17px;
+}
+.nav-item.active .nav-icon {
+  opacity: 1;
+}
+.nav-group {
+  margin-bottom: 6px;
+}
+.nav-badge {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--accent);
+  color: var(--accent-ink);
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+}
+.nav-badge.alert {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.nav-dot {
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.user-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 120ms;
+}
+/* El botón de cerrar sesión nunca se encoge ni lo tapa el texto largo. */
+.user-row form {
+  flex: none;
+  display: flex;
+}
+.user-row:hover {
+  background: var(--surface-2);
+}
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  flex: none;
+}
+.user-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.user-mail {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Logout del pie: botón fantasma compacto (spec .sb-foot .lo) */
+.sidebar-foot .icon-btn {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 8px;
+}
+.sidebar-foot .icon-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.sidebar-foot .icon-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.sidebar-scrim {
+  display: none;
+}
+
+/* ---------- Main ---------- */
+.main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.content {
+  padding: 22px;
+  max-width: 1180px;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 22px;
+  background: color-mix(in srgb, var(--canvas) 85%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.crumb-mut {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.crumb-sep {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.crumb-now {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.page-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+  margin: 1px 0 0; /* neutraliza el margen por defecto del <h1> (es un h1 semántico). */
+}
+.page-title .it {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-btn);
+  padding: 8px 11px;
+  width: 230px;
+  transition:
+    border-color 120ms,
+    background 240ms;
+}
+.search:hover {
+  border-color: var(--line-strong);
+}
+.search:focus-within {
+  border-color: var(--accent);
+}
+.search input {
+  border: 0;
+  background: transparent;
+  outline: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  width: 100%;
+}
+.search input::placeholder {
+  color: var(--text-muted);
+}
+.kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+.icon-btn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-btn);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    background 120ms,
+    color 120ms;
+  flex: none;
+}
+.icon-btn:hover {
+  background: var(--surface-2);
+}
+.icon-btn svg {
+  width: 17px;
+  height: 17px;
+}
+.hamburger {
+  display: none;
+}
+
+.theme-toggle {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-btn);
+  color: var(--text);
+  cursor: pointer;
+  flex: none;
+  transition: background 120ms;
+}
+.theme-toggle:hover {
+  background: var(--surface-2);
+}
+.theme-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+.theme-toggle .sun,
+.theme-toggle .moon {
+  display: grid;
+  place-items: center;
+}
+.theme-toggle .moon {
+  display: none;
+}
+[data-theme="dark"] .theme-toggle .sun {
+  display: none;
+}
+[data-theme="dark"] .theme-toggle .moon {
+  display: grid;
+}
+

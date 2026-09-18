@@ -1,0 +1,282 @@
+/* ============================================================ MODAL / SHEET ============================================================ */
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(20, 18, 14, 0.34);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+.modal-scrim.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.modal {
+  width: 460px;
+  max-width: 100%;
+  max-height: 88vh;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-float);
+  display: flex;
+  flex-direction: column;
+  transform: translateY(14px) scale(0.98);
+  transition: transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.modal.lg {
+  width: 620px;
+}
+.modal-scrim.open .modal {
+  transform: none;
+}
+/* Footer fijo con wrapper <form>: varios modales envuelven body+foot en un
+   <form>, que como bloque crecía bajo su contenido y rompía la cadena flex de
+   .modal (el foot se clipeaba). display:contents disuelve la caja del form para
+   que .modal-body/.modal-foot sean hijos flex directos de .modal — sin afectar
+   el submit. Los modales sin form (body/foot directos) no se ven afectados. */
+.modal > form {
+  display: contents;
+}
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 22px 14px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.modal-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.modal-x {
+  margin-left: auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.modal-x:hover {
+  background: var(--chip);
+  color: var(--ink);
+}
+.modal-x svg {
+  width: 16px;
+  height: 16px;
+}
+.modal-body {
+  padding: 20px 22px;
+  overflow-y: auto;
+  /* Footer fijo: el body se encoge bajo su contenido y hace scroll interno
+     (min-height:0 vence el min-height:auto de flexbox); head/foot quedan fijos. */
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.modal-foot {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 14px 22px;
+  border-top: 1px solid var(--line);
+  flex: none;
+}
+@media (max-width: 560px) {
+  .modal-scrim {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .modal,
+  .modal.lg {
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    max-height: 92vh;
+  }
+}
+
+/* ---------- Form primitives ---------- */
+.fld {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+.fld-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.fld-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 460px) {
+  .fld-2 {
+    grid-template-columns: 1fr;
+  }
+}
+.inp,
+.sel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  width: 100%;
+  transition:
+    border-color 120ms,
+    background 120ms;
+}
+.inp:focus,
+.sel:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.inp::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+.inp-money {
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding-left: 12px;
+}
+.inp-money:focus-within {
+  border-color: var(--ink-2);
+  background: var(--surface-2);
+}
+.inp-money .pre {
+  color: var(--muted);
+  font-size: 13.5px;
+  padding-right: 4px;
+}
+.inp-money input {
+  border: 0;
+  background: transparent;
+  padding: 10px 12px 10px 4px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  width: 100%;
+  outline: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.searchbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-btn);
+  transition: border-color 120ms;
+}
+.searchbar:focus-within {
+  border-color: var(--accent);
+}
+.searchbar:focus-within {
+  border-color: var(--ink-2);
+}
+.searchbar svg {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  flex: none;
+}
+.searchbar input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.searchbar input::placeholder {
+  color: var(--muted);
+}
+.filter-chips {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.fchip {
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 13px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  border: 1px solid var(--border);
+  transition: all 120ms;
+  white-space: nowrap;
+}
+.fchip:hover {
+  border-color: var(--accent);
+}
+.fchip.on {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: transparent;
+}
+
+.confirm-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 13px;
+  border-radius: var(--r-btn);
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--success);
+  cursor: pointer;
+  transition: all 140ms;
+  white-space: nowrap;
+}
+.confirm-pill:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.confirm-pill svg {
+  width: 12px;
+  height: 12px;
+}
+.confirm-pill.done {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-ink);
+  cursor: default;
+}
+
