@@ -2,25 +2,45 @@
 #
 # POR QUÉ ACÁ (no en Vercel): los logs probaron que Vercel NO alcanza CoinGecko (timeout hasta para
 # BTC), y el store terminaba con "$0". Los runners de GitHub SÍ alcanzan CoinGecko. Este workflow
-# corre scripts/market-data-collect.mjs: lee los símbolos de holdings + alertas de precio, hace UNA
-# llamada batched /coins/markets (precio + ATH + fecha) + Finnhub por acción, y UPSERTEA al store
+# corre scripts/market-data-collect.ts: lee los símbolos de holdings + alertas de precio, pide precio +
+# máximo a la CADENA de proveedores de cada tipo de activo (primario → respaldos) y UPSERTEA al store
 # vía Supabase service key — RECHAZANDO precios ≤0 (nunca guarda "$0"; preserva el último bueno).
 # La app/AI/valuación/alertas LEEN de ese store.
 #
-# CADENCIA: cada hora. Una sola /coins/markets trae precio Y ATH juntos, así que el barrido horario
-# refresca ambos (el precio queda "de esta hora"; el ATH, que se mueve lento, al menos diario).
+# CADENCIA: cada hora. Si se cambia, ajustar MARKET_RUNS_PER_DAY: la guarda de costo proyecta el
+# gasto del día multiplicando lo de una corrida por esa cantidad.
 #
-# CONFIG a crear (Settings → Secrets and variables → Actions):
-#   Variables (no secretas):
-#     · SUPABASE_URL                — https://<ref>.supabase.co
+# NODE 24 SIN INSTALAR NADA: el script es TypeScript y Node ≥22.18 le quita los tipos solo. No hay
+# `npm ci`: todo lo que importa (src/lib/market-data/vendors) es TypeScript sin dependencias.
+#
+# CONFIG (Settings → Secrets and variables → Actions). Guía completa: docs/market-data-feed.md
+#
 #   Secrets:
 #     · SUPABASE_SERVICE_ROLE_KEY   — service role (bypassa RLS; recorre todos los usuarios)
-#     · COINGECKO_API_KEY           — Demo key opcional (sube el rate limit; sin ella igual corre)
-#     · FINNHUB_TOKEN               — opcional (sin él NO se recolectan acciones/ETF, solo cripto)
+#     · COINGECKO_API_KEY           — opcional; sin ella usa la API pública
+#     · MASSIVE_API_KEY             — si Massive está en la cadena de acciones
+#     · TWELVEDATA_API_KEY          — si Twelve Data está en la cadena de acciones
+#     · FINNHUB_TOKEN               — si Finnhub está en la cadena (por defecto lo está)
+#
+#   Variables (no secretas):
+#     · SUPABASE_URL                — https://<ref>.supabase.co
+#     · COINGECKO_API_PLAN          — "pro" con cualquier plan pago (Basic incluido); "demo" o vacío si no
+#     · MARKET_PROVIDER_STOCKS      — cadena de acciones/ETF en orden, ej. "massive,finnhub". Vacío = finnhub
+#     · MARKET_PROVIDER_CRYPTO      — cadena de cripto. Vacío = coingecko
+#     · MARKET_EXCHANGE_SUFFIXES    — bolsas extra para Twelve Data, ej. "DE=XETR" (.L ya es LSE)
+#     · MARKET_BUDGET_DAILY_<VENDOR> — créditos/día del plan (mensual ÷ 30), ej. MARKET_BUDGET_DAILY_COINGECKO=3300
+#     · MARKET_BUDGET_WARN_RATIO    — umbral de aviso, 0.8 si vacío
+#     · MARKET_RUNS_PER_DAY         — 24 si vacío (cron horario)
+#
+# LAS LLAVES VIVEN EN DOS LUGARES: acá (para este colector) y en la env de Vercel (para el camino
+# en vivo de la app). Se cargan por separado y una vencida en un lado NO se nota mirando el otro:
+# el FINNHUB_TOKEN de este Action dio 401 más de diez días mientras la app mostraba precios frescos
+# con el token de Vercel.
 #
 # Caveats: el cron de GitHub puede retrasarse unos minutos y se PAUSA tras ~60 días sin actividad del
-# repo (un push lo reactiva, o corré "Run workflow"). El script se AUTOVERIFICA: si había cripto
-# objetivo y ninguna trajo precio válido, falla ruidosamente (prueba que el runner alcanza CoinGecko).
+# repo (un push lo reactiva, o corré "Run workflow"). El script se AUTOVERIFICA por tipo de activo:
+# falla si un tipo entero quedó sin precios, o si el PRIMARIO de una cadena no resolvió nada y lo
+# tapó el respaldo. En los dos casos escribe primero lo que sí consiguió.
 
 name: market-data-refresh
 
@@ -41,11 +61,25 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
       - name: Recolectar datos de mercado (fetch en el runner → store)
         env:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+          COINGECKO_API_PLAN: ${{ vars.COINGECKO_API_PLAN }}
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
-        run: node scripts/market-data-collect.mjs
+          MARKET_PROVIDER_STOCKS: ${{ vars.MARKET_PROVIDER_STOCKS }}
+          MARKET_PROVIDER_CRYPTO: ${{ vars.MARKET_PROVIDER_CRYPTO }}
+          MARKET_EXCHANGE_SUFFIXES: ${{ vars.MARKET_EXCHANGE_SUFFIXES }}
+          MARKET_BUDGET_DAILY_COINGECKO: ${{ vars.MARKET_BUDGET_DAILY_COINGECKO }}
+          MARKET_BUDGET_DAILY_MASSIVE: ${{ vars.MARKET_BUDGET_DAILY_MASSIVE }}
+          MARKET_BUDGET_DAILY_TWELVEDATA: ${{ vars.MARKET_BUDGET_DAILY_TWELVEDATA }}
+          MARKET_BUDGET_DAILY_FINNHUB: ${{ vars.MARKET_BUDGET_DAILY_FINNHUB }}
+          MARKET_BUDGET_WARN_RATIO: ${{ vars.MARKET_BUDGET_WARN_RATIO }}
+          MARKET_RUNS_PER_DAY: ${{ vars.MARKET_RUNS_PER_DAY }}
+        # --disable-warning: el repo no declara "type": "module" y Node avisa en cada corrida que
+        # detectó ESM por sintaxis. Es cierto e inofensivo; ensucia el log que se lee cuando algo falla.
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/market-data-collect.ts
