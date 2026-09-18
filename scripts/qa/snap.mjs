@@ -13,6 +13,7 @@
  * Uso:
  *   E2E_EMAIL=… E2E_PASSWORD=… node scripts/qa/snap.mjs --out qa-snapshots/base
  *   node scripts/qa/snap.mjs --out qa-snapshots/x --theme dark --widths 390,1280
+ *   node scripts/qa/snap.mjs --out qa-snapshots/x --freeze 2026-09-17T12:00:00-06:00
  */
 import { chromium } from "playwright";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -46,11 +47,39 @@ export const ROUTES = [
   { path: "/empezar", auth: false },
 ];
 
-/** Instante congelado: sin esto los «hoy» de la app cambian entre corridas y todo difiere. */
-const FIXED_TIME = new Date("2026-08-16T12:00:00-06:00");
+const TZ = "America/Costa_Rica";
 const THEME_KEY = "ca-theme"; // src/components/layout/theme-provider.tsx
 const ESPERA_EXTRA_MS = 800;
 const TIMEOUT_CARGANDO_MS = 10_000;
+
+/**
+ * Instante congelado de la corrida: HOY a las 12:00 en la zona del usuario.
+ *
+ * Congelar una fecha FIJA (antes: 16-ago) dejaba al navegador en un día y al servidor en otro, y
+ * ese desfase produce desajustes de hidratación (React #418) en las pantallas que pintan «hoy» en
+ * el servidor y lo recalculan en el cliente. Con el día de la corrida, ambos lados coinciden y solo
+ * queda congelada la HORA, que es lo que hacía variar las capturas dentro del mismo día.
+ *
+ * Costa Rica no tiene horario de verano, así que el offset es -06:00 todo el año.
+ * `--freeze <ISO>` la fija a mano (para reproducir una corrida vieja); queda escrita en el manifest.
+ */
+function instanteCongelado(iso) {
+  if (iso && iso !== true) {
+    const d = new Date(String(iso));
+    if (Number.isNaN(d.getTime())) {
+      console.error(`--freeze inválido: ${iso}`);
+      process.exit(2);
+    }
+    return d;
+  }
+  const hoy = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  return new Date(`${hoy}T12:00:00-06:00`);
+}
 
 function parseArgs(argv) {
   const args = {};
@@ -117,12 +146,68 @@ async function hayModalTerminos(page) {
   }
 }
 
-/** Empuja el lazy-load/IntersectionObserver: al final y de vuelta arriba. */
+/**
+ * Espera a que las fuentes web estén cargadas. Sin esto, una captura puede salir con la fuente de
+ * respaldo y la siguiente con la definitiva: métricas distintas, texto corrido, diff enorme.
+ */
+async function esperarFuentes(page) {
+  try {
+    await page.evaluate(() => document.fonts.ready);
+  } catch {
+    /* document.fonts no disponible: seguir igual */
+  }
+}
+
+/**
+ * Barre la página POR PASOS de una pantalla, no de un salto al final.
+ *
+ * Los revelados por scroll usan IntersectionObserver con guarda de "una sola vez": si se salta del
+ * tope al final, hay secciones que nunca quedan en viewport el tiempo suficiente y su observador no
+ * dispara. El hero del landing aparecía en una corrida y faltaba por completo en la siguiente por
+ * eso mismo (103 711 px de diferencia). Pasar pantalla por pantalla, con una pausa en cada una, deja
+ * todos los revelados en su estado final antes de capturar.
+ */
 async function recorrerPagina(page) {
+  const alto = await page.evaluate(() => document.body.scrollHeight);
+  const paso = await page.evaluate(() => window.innerHeight);
+  for (let y = 0; y < alto; y += paso) {
+    await page.evaluate((py) => window.scrollTo(0, py), y);
+    await page.waitForTimeout(220);
+  }
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.waitForTimeout(400);
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(600);
+}
+
+/**
+ * Lleva toda animación y TRANSICIÓN a su estado final.
+ *
+ * `animations: "disabled"` del screenshot congela animaciones, no transiciones: el revelado del
+ * hero del landing terminaba en un punto marginalmente distinto en cada corrida (delta ≤ 2
+ * repartido por todo el elemento, ~200 px). `finish()` no espera: salta al estado final, que es
+ * justo el que queremos fotografiar. En animaciones infinitas lanza InvalidStateError, así que
+ * esas se pausan en 0.
+ */
+async function finalizarAnimaciones(page) {
+  try {
+    await page.evaluate(() => {
+      document.getAnimations().forEach((a) => {
+        try {
+          a.finish();
+        } catch {
+          try {
+            a.pause();
+            a.currentTime = 0;
+          } catch {
+            /* la animación ya no existe */
+          }
+        }
+      });
+    });
+  } catch {
+    /* getAnimations no disponible: seguir igual */
+  }
 }
 
 async function iniciarSesion(browser, baseUrl, email, password) {
@@ -147,6 +232,35 @@ async function iniciarSesion(browser, baseUrl, email, password) {
   return storageState;
 }
 
+/**
+ * Visita una vez cada ruta con sesión, sin capturar.
+ *
+ * Varias pantallas ESCRIBEN en el primer load (el aporte mensual de los holdings recurrentes, los
+ * snapshots del mes en curso, el refresco de insights). Son idempotentes, pero mueven los números:
+ * entre dos corridas seguidas el flujo libre del panel cambiaba en ₡970.680 solo por eso. El
+ * calentamiento paga ese costo ANTES de medir, así todas las capturas ven el mismo estado.
+ */
+async function calentar(browser, baseUrl, storageState, freeze) {
+  const context = await browser.newContext({
+    storageState,
+    viewport: { width: 1280, height: 900 },
+    reducedMotion: "reduce",
+  });
+  const page = await context.newPage();
+  await page.clock.setFixedTime(freeze);
+  for (const ruta of ROUTES.filter((r) => r.auth)) {
+    try {
+      await page.goto(new URL(ruta.path, baseUrl).toString(), {
+        waitUntil: "networkidle",
+        timeout: 60_000,
+      });
+    } catch {
+      /* el calentamiento es best-effort: lo que falle acá se verá en la captura */
+    }
+  }
+  await context.close();
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const out = args.out;
@@ -168,12 +282,27 @@ async function main() {
     process.exit(2);
   }
 
-  const browser = await chromium.launch();
+  const freeze = instanteCongelado(args.freeze);
+  // Render determinista: sin esto, dos corridas idénticas difieren en ±1-2 niveles de color en los
+  // bordes (antialiasing de texto y degradados). Son 200 px invisibles, pero rompen la comparación
+  // estricta a umbral 0 — y bajar el umbral taparía cambios de color reales de 1-2 niveles.
+  const browser = await chromium.launch({
+    args: [
+      "--force-color-profile=srgb", // mismo perfil siempre, no el del monitor
+      "--disable-lcd-text", // antialiasing en gris, no subpíxel (el subpíxel varía)
+      "--font-render-hinting=none",
+      "--disable-gpu", // rasterizado por software: reproducible entre corridas
+      "--deterministic-mode",
+    ],
+  });
   const entries = [];
   let conTerminos = 0;
 
   try {
     const storageState = await iniciarSesion(browser, baseUrl, email, password);
+    console.log(`reloj congelado: ${freeze.toISOString()}`);
+    console.log("calentando (visita sin capturar; paga las escrituras del primer load)…");
+    await calentar(browser, baseUrl, storageState, freeze);
 
     for (const tema of temas) {
       for (const width of widths) {
@@ -201,8 +330,8 @@ async function main() {
           const consoleErrors = [];
           page.on("pageerror", (err) => consoleErrors.push(String(err?.message ?? err)));
 
-          await page.clock.setFixedTime(FIXED_TIME);
-          await page.emulateMedia({ colorScheme: tema });
+          await page.clock.setFixedTime(freeze);
+          await page.emulateMedia({ colorScheme: tema, reducedMotion: "reduce" });
           await page.setViewportSize({ width, height: 900 });
 
           const url = new URL(ruta.path, baseUrl).toString();
@@ -217,6 +346,8 @@ async function main() {
 
           await page.waitForTimeout(ESPERA_EXTRA_MS);
           await recorrerPagina(page);
+          await esperarFuentes(page);
+          await finalizarAnimaciones(page);
           const loadingResidual = await esperarSinCargando(page);
           const termsModal = await hayModalTerminos(page);
           if (termsModal) conTerminos++;
@@ -255,7 +386,9 @@ async function main() {
   const manifest = {
     generatedAt: new Date().toISOString(),
     baseUrl,
-    fixedTime: FIXED_TIME.toISOString(),
+    fixedTime: freeze.toISOString(),
+    fixedTimeSource: args.freeze && args.freeze !== true ? "--freeze" : `hoy 12:00 ${TZ}`,
+    warmup: true,
     widths,
     themes: temas,
     entries,
