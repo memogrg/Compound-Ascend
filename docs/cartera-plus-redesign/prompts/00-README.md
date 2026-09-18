@@ -12,3 +12,5 @@ Un prompt a la vez, en este orden. Cada uno abre su propia rama, termina con `np
 | 0.6 | `chore/nuqs-axe` | `nuqs`, `@axe-core/playwright`, spec de a11y sobre las 19 rutas | No | axe sin violaciones serias (o lista de las existentes) |
 
 Reglas fijas en todos los prompts: repo-first (leer antes de escribir), Conventional Commits, un commit = un cambio lógico, nunca `git add .`, nunca tocar `.env*`, nunca cambiar apariencia en un `refactor/`.
+
+**Antes de crear un archivo, comprobar si ya existe** (`test -f` / `ls`) y, si existe, editarlo o hacer append — nunca `cat >` ni escribirlo entero encima. En 0.5 se sobrescribió así `tests/unit/format.test.ts`, que ya tenía 25 tests (incluido el guard de regresión P0-2 de símbolos de moneda); se recuperó del índice de git, pero el archivo nuevo no lo habría delatado. La señal que lo destapa es `git diff --stat`: un archivo que solo debía crecer no puede mostrar borrados.
