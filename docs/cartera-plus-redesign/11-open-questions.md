@@ -46,5 +46,8 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 - **No existen tokens tipográficos (`--fs-*`).** Los tamaños (42/23/17/13,5/11/10,5 px) viven incrustados en cada regla, así que la escala de `/dev/ui` se dibuja con estilos en línea. Tokenizarlos es trabajo de la fase 2.
 - **Los alias de tema no voltean en un contenedor.** `--bg: var(--canvas)`, `--pos: var(--success)` y compañía se declaran en `:root` y un alias se resuelve donde se declara: poner `data-theme="dark"` en un `<div>` cambia los tokens DIRECTOS (`--canvas`, `--text`, `--chart-*`, `--success`…) pero deja los alias con el valor claro. Se descubrió al montar la sección oscura de `/dev/ui`. Cualquier componente que quiera un área localmente oscura tiene que usar los directos, o habrá que redeclarar los alias en el bloque `[data-theme="dark"]`.
 
+- **Divisor de «/día prom.» en `/transacciones`**: con TZ local (UTC−6) divide por 29 en septiembre —`new Date(period.to).getDate()` sobre una fecha ISO parseada como UTC—; en Vercel (UTC) da 30. Latente, no afecta prod. Línea: `src/modules/financial-base/services/transaction-service.ts:773` (uso en `:782`, y las dos pantallas móviles consumen el mismo `real.avgDaily`). Pendiente `fix/` con test bajo `TZ=America/Costa_Rica`.
+- **Precios de QA**: la línea base depende de `market_price_cache` local; mejora futura: un fixture de precios para las capturas.
+
 Nada de lo anterior toca producción.
 

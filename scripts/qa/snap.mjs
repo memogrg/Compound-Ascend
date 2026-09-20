@@ -63,11 +63,13 @@ const TIMEOUT_CARGANDO_MS = 10_000;
  * Costa Rica no tiene horario de verano, así que el offset es -06:00 todo el año.
  * `--freeze <ISO>` la fija a mano (para reproducir una corrida vieja); queda escrita en el manifest.
  */
-function instanteCongelado(iso) {
-  if (iso && iso !== true) {
-    const d = new Date(String(iso));
+export function instanteCongelado(iso) {
+  // Precedencia: --freeze > QA_FREEZE (la misma que usa el servidor congelado) > hoy 12:00.
+  const elegido = iso && iso !== true ? iso : (process.env.QA_FREEZE ?? null);
+  if (elegido) {
+    const d = new Date(String(elegido));
     if (Number.isNaN(d.getTime())) {
-      console.error(`--freeze inválido: ${iso}`);
+      console.error(`instante congelado inválido: ${elegido}`);
       process.exit(2);
     }
     return d;
@@ -387,7 +389,14 @@ async function main() {
     generatedAt: new Date().toISOString(),
     baseUrl,
     fixedTime: freeze.toISOString(),
-    fixedTimeSource: args.freeze && args.freeze !== true ? "--freeze" : `hoy 12:00 ${TZ}`,
+    fixedTimeSource:
+      args.freeze && args.freeze !== true
+        ? "--freeze"
+        : process.env.QA_FREEZE
+          ? "QA_FREEZE"
+          : `hoy 12:00 ${TZ}`,
+    serverFreeze: process.env.QA_FREEZE ?? null,
+    tz: process.env.TZ ?? null,
     warmup: true,
     widths,
     themes: temas,
