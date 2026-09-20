@@ -39,6 +39,7 @@
     "motion": "^12.42.2",
     "next": "^16.3.4",
     "nodemailer": "^9.0.1",
+    "nuqs": "^2.10.1",
     "qrcode": "^1.5.4",
     "radix-ui": "^1.6.7",
     "react": "19.2.8",
@@ -51,6 +52,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/eslintrc": "^3.3.5",
     "@playwright/test": "^1.62.0",
     "@tailwindcss/postcss": "^4.3.3",
