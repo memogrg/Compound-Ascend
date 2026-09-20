@@ -16,3 +16,34 @@
 | 2026-09-16 | Paleta de gráfico validada (daltonismo, contraste) claro y oscuro | Hecho | prototipos/tokens.css (`--chart-1..6`) |
 | 2026-09-16 | Decisiones 15-17 aprobadas (shell B+, /dev/ui, Hoy B+) | Hecho | 10-decisions.md |
 | 2026-09-16 | Prompts delta de la fase 0 (0.1-0.6) redactados | Entregados | prompts/ |
+
+## Fase 0 · Fundamentos — cerrada
+
+| Prompt | Rama | PR | Qué entregó |
+| --- | --- | --- | --- |
+| 0.1 | `chore/redesign-secrets-docs` | [#800](https://github.com/memogrg/Compound-Ascend/pull/800) | `.gitignore` de la config local de Claude Code; `docs/cartera-plus-redesign/` versionada |
+| 0.2 | `fix/dashboard-deuda-saldo-vivo` | [#801](https://github.com/memogrg/Compound-Ascend/pull/801) | La campana y el hub leen el saldo VIVO de deuda, no el ancla |
+| 0.3 | `chore/qa-snapshots` · `chore/qa-determinismo` · `chore/qa-criterio-ruido` | [#802](https://github.com/memogrg/Compound-Ascend/pull/802) · [#803](https://github.com/memogrg/Compound-Ascend/pull/803) · [#804](https://github.com/memogrg/Compound-Ascend/pull/804) | Captura y diff de píxeles; determinismo (9 → 0 diferencias); criterio de dos condiciones |
+| 0.4 | `refactor/css-layers` | [#807](https://github.com/memogrg/Compound-Ascend/pull/807) | `globals.css` (7.614 líneas) partido en 19 archivos y en la capa `ca`, con bundle idéntico |
+| 0.5 | `feat/design-tokens-v2` | [#808](https://github.com/memogrg/Compound-Ascend/pull/808) | `--chart-1..6` y motion; `formatDelta`/`formatPct1`/fechas cortas; galería `/dev/ui` |
+| — | `chore/qa-reloj-servidor` | [#810](https://github.com/memogrg/Compound-Ascend/pull/810) | Reloj del SERVIDOR congelado y red externa bloqueada: la base pasa a ser válida entre días |
+| 0.6 | `chore/nuqs-axe` | este PR | `nuqs` + parsers de URL puros; auditoría axe y línea base de a11y; cierre documental |
+
+### Hallazgos abiertos
+
+Todos anotados en [`11-open-questions.md`](./11-open-questions.md), con archivo y línea:
+desborde horizontal a 390 px en `/ingresos` y `/control-financiero`; alias de tema que no
+voltean en un contenedor; ausencia de tokens tipográficos; divisor de «/día prom.» con
+`getDate()` sobre fecha UTC; drift de versión de npm en el lockfile; `eslint.config.mjs` con
+reglas de `react-hooks` sin `files`; y la dependencia de la línea base respecto de
+`market_price_cache` local.
+
+La línea base de accesibilidad está en [`qa/a11y-baseline.md`](./qa/a11y-baseline.md): 392
+nodos, 2 `critical` y 390 `serious`, concentrados en 5 reglas.
+
+### Siguiente
+
+1. `fix(a11y)`: `select-name` (los 2 `critical`, una ruta) y `aria-prohibited-attr` en
+   `.brand-mark` (38 nodos en 19 rutas — un solo componente).
+2. `fix/` del divisor de «/día prom.», con test bajo `TZ=America/Costa_Rica`.
+3. Pilotos de rediseño: **Hoy** y **Gastos**.
