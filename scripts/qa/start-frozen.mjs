@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import { instanteCongelado } from "./snap.mjs";
 
 const aquí = path.dirname(fileURLToPath(import.meta.url));
-const preload = path.join(aquí, "server-freeze.cjs");
+const preload = path.join(aquí, "server-freeze.js");
 
 function argumento(nombre) {
   const i = process.argv.indexOf(`--${nombre}`);

@@ -2,6 +2,12 @@
  * Preload de Node para las capturas de QA: congela el reloj DEL SERVIDOR y corta la red
  * externa. CommonJS y sin dependencias, porque entra por `--require`.
  *
+ * Extensión `.js` y no `.cjs`: package.json no declara `type`, así que `.js` YA es
+ * CommonJS, y `.cjs` sería el primero del repo — queda fuera de los globs de
+ * eslint-config-next y ESLint revienta al resolver la config (el objeto final de
+ * eslint.config.mjs fija reglas de react-hooks sin `files`, y sin el plugin en alcance
+ * para ese archivo falla toda la corrida).
+ *
  * Por qué existe: `--freeze` de snap.mjs congela el reloj del NAVEGADOR. Todo lo que la
  * app calcula en el servidor sigue corriendo con el reloj real, así que una base tomada
  * el 18-sep y una comparación del 20-sep difieren sin que nadie haya tocado el código:

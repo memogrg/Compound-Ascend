@@ -79,7 +79,7 @@ QA_FREEZE=2026-09-18T18:00:00Z E2E_EMAIL=… E2E_PASSWORD=… \
 **El mismo `QA_FREEZE` en las dos terminales**, o el navegador y el servidor quedan en días
 distintos. `qa:start` imprime el comando exacto al arrancar.
 
-**Qué hace el preload** (`scripts/qa/server-freeze.cjs`, entra por `NODE_OPTIONS=--require`):
+**Qué hace el preload** (`scripts/qa/server-freeze.js`, entra por `NODE_OPTIONS=--require`):
 
 - **Reloj del proceso**: `new Date()` sin argumentos y `Date.now()` devuelven el instante
   congelado; las fechas construidas con argumentos no se tocan. Los estáticos `parse` y `UTC` se

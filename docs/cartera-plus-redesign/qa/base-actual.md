@@ -10,7 +10,7 @@ Instante        : 2026-09-18T18:00:00Z  (navegador Y servidor)
 TZ del servidor : UTC (como Vercel). El manifest anota tz:null porque ese campo registra
                   el TZ del proceso de CAPTURA, no el del servidor.
 Modo            : servidor congelado + red externa bloqueada
-                  (npm run qa:start → NODE_OPTIONS=--require scripts/qa/server-freeze.cjs)
+                  (npm run qa:start → NODE_OPTIONS=--require scripts/qa/server-freeze.js)
 Ambiente        : Supabase LOCAL http://127.0.0.1:54321
 Cuenta          : information.theglowup@gmail.com — demo Familia Ramírez
 Node / Playwright: v20.20.2 / 1.62.0
