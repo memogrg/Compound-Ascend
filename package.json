@@ -16,6 +16,7 @@
     "test:eval": "vitest run tests/evals",
     "qa:snap": "node scripts/qa/snap.mjs",
     "qa:start": "node scripts/qa/start-frozen.mjs",
+    "test:a11y": "playwright test -c playwright.a11y.config.ts",
     "qa:diff": "node scripts/qa/diff.mjs",
     "sim": "vitest run --config sim/vitest.config.ts"
   },

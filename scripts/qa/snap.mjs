@@ -17,35 +17,23 @@
  */
 import { chromium } from "playwright";
 import { mkdir, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-/** Rutas capturadas. Las públicas van sin sesión (no requieren login). */
-export const ROUTES = [
-  { path: "/dashboard", auth: true },
-  { path: "/mis-acciones", auth: true },
-  { path: "/mis-acciones?tab=decisiones", auth: true },
-  { path: "/mis-acciones?tab=progreso", auth: true },
-  { path: "/asistente", auth: true },
-  { path: "/mi-base-financiera", auth: true },
-  { path: "/ingresos", auth: true },
-  { path: "/gastos", auth: true },
-  { path: "/transacciones", auth: true },
-  { path: "/control-financiero", auth: true },
-  { path: "/deudas", auth: true },
-  { path: "/patrimonio", auth: true },
-  { path: "/patrimonio/proteccion", auth: true },
-  { path: "/patrimonio/indicadores", auth: true },
-  { path: "/mi-rich-life", auth: true },
-  { path: "/mi-perfil-financiero", auth: true },
-  { path: "/configurar", auth: true },
-  { path: "/configuracion", auth: true },
-  { path: "/suscripcion", auth: true },
-  { path: "/", auth: false },
-  { path: "/faqs", auth: false },
-  { path: "/login", auth: false },
-  { path: "/empezar", auth: false },
-];
+/**
+ * Rutas capturadas, en `routes.json` para que sea una sola fuente.
+ *
+ * Vive como JSON y no como constante acá porque el spec de accesibilidad
+ * (`tests/a11y/routes.spec.ts`) también la necesita, y el cargador de TypeScript de
+ * Playwright transpila los `.mjs` importados a CommonJS: importar este archivo desde un
+ * `.ts` revienta con «exports is not defined in ES module scope». Un JSON lo lee cualquiera.
+ *
+ * Las públicas (`auth: false`) se visitan sin sesión.
+ */
+export const ROUTES = JSON.parse(
+  readFileSync(new URL("./routes.json", import.meta.url), "utf8"),
+);
 
 const TZ = "America/Costa_Rica";
 const THEME_KEY = "ca-theme"; // src/components/layout/theme-provider.tsx
