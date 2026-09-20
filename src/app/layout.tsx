@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope, Sora, Space_Mono } from "next/font/google";
 import "./globals.css";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { ThemeProvider, THEME_INIT_SCRIPT } from "@/components/layout/theme-provider";
 import { TooltipLayer } from "@/components/shared/tooltip-layer";
 
@@ -51,7 +52,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <NuqsAdapter>
+          <ThemeProvider>{children}</ThemeProvider>
+        </NuqsAdapter>
         {/* Capa única de tooltips (web + móvil): reposiciona la burbuja dentro del
             viewport. Ver components/shared/tooltip-layer.tsx y el gate `.tip-js` en CSS. */}
         <TooltipLayer />
