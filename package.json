@@ -15,6 +15,7 @@
     "test:watch": "vitest",
     "test:eval": "vitest run tests/evals",
     "qa:snap": "node scripts/qa/snap.mjs",
+    "qa:start": "node scripts/qa/start-frozen.mjs",
     "qa:diff": "node scripts/qa/diff.mjs",
     "sim": "vitest run --config sim/vitest.config.ts"
   },

@@ -4,6 +4,8 @@
    animaciones por scroll no llegan a verse): `npm run build && npm run start -- -p 3001`.
 2. **Línea base**: `E2E_EMAIL=information.theglowup@gmail.com E2E_PASSWORD=… npm run qa:snap -- --out qa-snapshots/base`
    (23 rutas × 3 anchos × 2 temas; `--theme`, `--widths` y `--base-url` ajustan el alcance).
+   La procedencia de la base vigente —SHA, instante, modo y condición de validez— está en
+   [`base-actual.md`](./base-actual.md); las capturas viven fuera de git.
 3. **Tras el cambio**: `… npm run qa:snap -- --out qa-snapshots/cambio`.
 4. **Comparar**:
    `npm run qa:diff -- --a qa-snapshots/base --b qa-snapshots/cambio --exclude home --max-diff-pixels 60 --max-delta 2`
@@ -57,6 +59,56 @@ final estable — deja ~200 px con delta ≤ 2 (invisible) que ni `finish()` cie
 y reportando; revisar en la fase de motion. **No se baja el umbral** para taparlo: un `--threshold 2`
 también escondería un cambio de color real de 1-2 niveles en cualquier pantalla, que es justo la
 regresión que un refactor de tokens puede introducir.
+
+## Servidor congelado
+
+`--freeze` congela el reloj del NAVEGADOR. Todo lo que la app calcula en el SERVIDOR seguía
+corriendo con el reloj real, así que una base del 18-sep y una comparación del 20 diferían sin
+que nadie tocara el código: `/empezar` pasó de «2 de octubre» a «4 de octubre» (hoy + 14 días de
+prueba), y los precios de mercado en vivo movían patrimonio y Rich Life.
+
+```bash
+# Terminal A — servidor
+QA_FREEZE=2026-09-18T18:00:00Z npm run qa:start
+
+# Terminal B — captura, con el MISMO instante
+QA_FREEZE=2026-09-18T18:00:00Z E2E_EMAIL=… E2E_PASSWORD=… \
+  npm run qa:snap -- --out qa-snapshots/cambio
+```
+
+**El mismo `QA_FREEZE` en las dos terminales**, o el navegador y el servidor quedan en días
+distintos. `qa:start` imprime el comando exacto al arrancar.
+
+**Qué hace el preload** (`scripts/qa/server-freeze.js`, entra por `NODE_OPTIONS=--require`):
+
+- **Reloj del proceso**: `new Date()` sin argumentos y `Date.now()` devuelven el instante
+  congelado; las fechas construidas con argumentos no se tocan. Los estáticos `parse` y `UTC` se
+  copian como propiedades PROPIAS: se heredan por la cadena de prototipos, pero el runtime de
+  Turbopack reexpone los globales copiando las propias, y sin eso toda página daba 500 con
+  «Date.parse is not a function».
+- **Red externa bloqueada** (`QA_BLOCK_EXTERNAL=1`): todo host que no sea `127.0.0.1`,
+  `localhost`, `::1` o el de `NEXT_PUBLIC_SUPABASE_URL` recibe una **promesa rechazada** con
+  `TypeError` — que es como falla `fetch` de verdad y lo que las cadenas de respaldo saben
+  atrapar. Al salir imprime `[qa] fetch bloqueados: N (host: n…)`.
+- **`TZ=UTC`**, como Vercel: la captura reproduce producción, no la zona de la máquina.
+
+**Efecto en los datos**: los precios salen de `market_price_cache` y el FX es el estático. Por eso
+una corrida congelada difiere de una en vivo en `patrimonio`, `dashboard` y `mi-rich-life` — y por
+eso **una sesión local SIN congelar contra la misma base de datos puede reescribir esos precios e
+invalidar la línea base en esas tres rutas**. Si pasa: regenerar la base, o levantar el dev server
+con `QA_BLOCK_EXTERNAL=1`.
+
+**Huecos conocidos:**
+
+- `Intl.DateTimeFormat().format()` sin argumento usa el reloj interno de V8, no `Date.now()`: no
+  queda congelado. Si aparece una fecha que no obedece al `QA_FREEZE`, es por ahí.
+- `NODE_OPTIONS` se parte por espacios, así que la ruta del preload va **entrecomillada**: este
+  repo vive en `…/Compound Ascend v1` y sin comillas Node busca `/Users/memogrg/Compound`.
+
+Con el servidor congelado el diff esperado es **0 px**; los umbrales `--max-diff-pixels 60
+--max-delta 2` quedan como margen, no como objetivo.
+
+La base vigente y cómo se tomó: [`base-actual.md`](./base-actual.md).
 
 ## Ambiente: SIEMPRE el local, con la demo sembrada. Nunca producción.
 
