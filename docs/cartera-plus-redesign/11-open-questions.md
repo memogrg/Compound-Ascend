@@ -50,6 +50,7 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 - **Precios de QA**: la línea base depende de `market_price_cache` local; mejora futura: un fixture de precios para las capturas.
 
 - **`eslint.config.mjs`**: el último objeto fija `react-hooks/exhaustive-deps` sin `files`; cualquier archivo fuera de los globs de `eslint-config-next` (p. ej. `.cjs`) aborta ESLint con «could not find plugin react-hooks». Pendiente chore: acotar ese objeto con `files` o registrar el plugin globalmente.
+- **Drift de npm**: el lockfile fue generado con npm 11 (escribe `"libc"`) y npm 10 lo borra. Pendiente chore: fijar versión (`engines` / `packageManager` / `.nvmrc`). Sin efecto funcional; `npm ci` no reescribe.
 
 Nada de lo anterior toca producción.
 
