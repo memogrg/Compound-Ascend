@@ -93,7 +93,7 @@ export function BellNotifications() {
     <div ref={wrapRef} style={{ position: "relative" }}>
       <button
         className="icon-btn"
-        aria-label="Notificaciones"
+        aria-label={count > 0 ? `Notificaciones, ${count} novedades` : "Notificaciones"}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -101,7 +101,6 @@ export function BellNotifications() {
         <Icon name="bell" />
         {count > 0 ? (
           <span
-            aria-label={`${count} novedades`}
             style={{
               position: "absolute",
               top: 2,

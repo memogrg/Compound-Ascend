@@ -54,5 +54,13 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 
 - **`parseMonthParam`** (`financial-base/engine/period.ts:76`) acepta mes 13 (regex `^\d{4}-\d{2}$`) y `monthPeriod` lo **clampea a diciembre, silenciosamente**; `url-state` usa regex estricto. Pendiente `fix/` separado: endurecer `parseMonthParam` + test.
 
+- Shell móvil (`/m`) fuera de la auditoría a11y y de la base visual: agregar rutas `/m` a `routes.json` en un chore propio (implica regenerar la base).
+
+- `tests/a11y/routes.spec.ts` guarda los nodos `incomplete` solo como conteo; guardar `html`/`target` para poder triarlos.
+
+- Copy: `defense-funds-mobile` usa «Dimensiona» (tú) donde el web usa «Dimensioná» (vos).
+
+- `a11y-report.mjs`: marcar el SHA con `-dirty` cuando `git status --porcelain` no esté vacío.
+
 Nada de lo anterior toca producción.
 

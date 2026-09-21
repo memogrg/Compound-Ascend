@@ -1,7 +1,7 @@
 /** Isotipo de CARTERA+ ("C" con el "+" en el color de acento). */
 export function BrandMark() {
   return (
-    <div className="brand-mark" aria-label="CARTERA+">
+    <div className="brand-mark">
       <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
         <path
           d="M45 18.5 A 19 19 0 1 0 45 45.5"
