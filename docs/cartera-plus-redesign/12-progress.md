@@ -48,4 +48,5 @@ nodos, 2 `critical` y 390 `serious`, concentrados en 5 reglas.
 2. `fix/` del divisor de «/día prom.», con test bajo `TZ=America/Costa_Rica`.
 3. Pilotos de rediseño: **Hoy** y **Gastos**.
 
-Fase 1 · delta 1 nav-model: en curso.
+Fase 1 · delta 1 nav-model: hecho (#815).
+Fase 1 · delta 2 sidebar-v2: en revisión.

@@ -9,6 +9,9 @@
 @import "../styles/modules/assistant.css" layer(ca);
 @import "../styles/shell-nav-movil.css" layer(ca);
 @import "../styles/responsive.css" layer(ca);
+/* Después de responsive.css: el sidebar v2 tiene media queries propias y su orden
+   tiene que ganar a las del shell viejo. */
+@import "../styles/shell-nav-v2.css" layer(ca);
 @import "../styles/primitives-modal.css" layer(ca);
 @import "../styles/modules/dashboard.css" layer(ca);
 @import "../styles/modules/setup.css" layer(ca);

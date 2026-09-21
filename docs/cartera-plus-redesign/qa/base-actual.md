@@ -33,3 +33,37 @@ Válida entre días y máquinas mientras market_price_cache local no sea reescri
 sesión sin congelar. Si eso pasa, patrimonio / dashboard / mi-rich-life se desvían y hay
 que regenerar la base (o levantar el dev server con QA_BLOCK_EXTERNAL=1).
 ```
+
+## base-nav-v2 — el menú nuevo
+
+Segunda base, para el sidebar v2. No sustituye a la de arriba: **son dos builds distintos**
+del mismo commit y no se comparan entre sí. La de arriba (`base`) es la app con la bandera
+apagada, y es la que prueba que un delta no cambió nada; esta es la app con el menú nuevo, y
+es contra la que se comparan los deltas siguientes de la fase 1.
+
+```
+Copia local     : qa-snapshots/nav-v2/ (ignorado por git)
+Bandera         : NEXT_PUBLIC_NAV_V2=1 en el BUILD. Es NEXT_PUBLIC_, o sea que se inlinea al
+                  compilar: ponerla solo al arrancar el servidor no enciende nada.
+Instante        : 2026-09-18T18:00:00Z — el MISMO que la base, para poder mirar las dos
+                  pantallas lado a lado
+Modo            : servidor congelado + red externa bloqueada
+Ambiente        : Supabase LOCAL http://127.0.0.1:54321 · cuenta demo Familia Ramírez
+Capturas        : 138 = 23 rutas x 3 anchos x 2 temas
+a11y            : 351 nodos, 0 critical, 3 reglas — una MENOS de contraste que con la
+                  bandera apagada (352) y ninguna regla nueva
+```
+
+Regenerar:
+
+```bash
+NEXT_PUBLIC_NAV_V2=1 npm run build
+# Terminal A
+NEXT_PUBLIC_NAV_V2=1 QA_FREEZE=2026-09-18T18:00:00Z npm run qa:start
+# Terminal B
+QA_FREEZE=2026-09-18T18:00:00Z E2E_EMAIL=... E2E_PASSWORD=... \
+  npm run qa:snap -- --out qa-snapshots/nav-v2
+```
+
+Las capturas de revision (1280, los dos temas, expandido y colapsado) viven aparte en
+`qa-snapshots/nav-v2-review/` y no son una base: son para mirarlas.
