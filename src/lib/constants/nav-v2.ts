@@ -99,7 +99,13 @@ export const NUCLEOS: readonly Nucleo[] = [
         hrefM: "/m/mi-base-financiera",
         status: "existente",
       },
-      { id: "ingresos", name: "Ingresos", href: "/ingresos", hrefM: "/m/ingresos", status: "existente" },
+      {
+        id: "ingresos",
+        name: "Ingresos",
+        href: "/ingresos",
+        hrefM: "/m/ingresos",
+        status: "existente",
+      },
       {
         id: "gastos",
         name: "Gastos y sobres",
@@ -132,7 +138,13 @@ export const NUCLEOS: readonly Nucleo[] = [
     hrefM: "/m/metas",
     badgeKey: "metasRiesgo",
     tabs: [
-      { id: "metas", name: "Metas", href: "/control-financiero", hrefM: "/m/metas", status: "existente" },
+      {
+        id: "metas",
+        name: "Metas",
+        href: "/control-financiero",
+        hrefM: "/m/metas",
+        status: "existente",
+      },
       { id: "deudas", name: "Deudas", href: "/deudas", hrefM: "/m/deudas", status: "existente" },
       {
         id: "fondos",
@@ -198,7 +210,9 @@ export const NUCLEOS: readonly Nucleo[] = [
     icon: "spark",
     href: "/asistente",
     hrefM: "/m/asistente",
-    tabs: [{ id: "chat", name: "Chat", href: "/asistente", hrefM: "/m/asistente", status: "existente" }],
+    tabs: [
+      { id: "chat", name: "Chat", href: "/asistente", hrefM: "/m/asistente", status: "existente" },
+    ],
   },
 ] as const;
 
@@ -225,7 +239,13 @@ export const CONFIGURACION: readonly Pestana[] = [
     hrefM: "/m/configurar",
     status: "existente",
   },
-  { id: "suscripcion", name: "Suscripción", href: "/suscripcion", hrefM: null, status: "existente" },
+  {
+    id: "suscripcion",
+    name: "Suscripción",
+    href: "/suscripcion",
+    hrefM: null,
+    status: "existente",
+  },
 ] as const;
 
 /** Barra inferior del móvil: los cinco núcleos. Derivada, nunca una copia a mano. */
@@ -304,9 +324,7 @@ export function breadcrumb(pathname: string, search?: string | null): string[] {
  */
 function paresWebMovil(): Array<{ href: string; hrefM: string }> {
   const todas: Pestana[] = [...NUCLEOS.flatMap((n) => [...n.tabs]), ...CONFIGURACION];
-  return todas.flatMap((p) =>
-    p.href && p.hrefM ? [{ href: p.href, hrefM: p.hrefM }] : [],
-  );
+  return todas.flatMap((p) => (p.href && p.hrefM ? [{ href: p.href, hrefM: p.hrefM }] : []));
 }
 
 /** Ruta móvil equivalente, o `null` si esa pantalla no tiene par. */

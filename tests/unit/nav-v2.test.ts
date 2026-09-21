@@ -47,9 +47,7 @@ function tienePagina(ruta: string): boolean {
     // la base ya lo incluye. Y "/m" a secas es la RAÍZ de ese grupo —"(mobile)/m/(app)/page.tsx"—,
     // así que la barra del prefijo tiene que ser opcional o "m" no se convierte en "".
     const candidatos = base.endsWith("/(app)") ? [limpia.replace(/^m\/?/, "")] : [limpia];
-    return candidatos.some((c) =>
-      existsSync(path.join(RAIZ, base, c, "page.tsx")),
-    );
+    return candidatos.some((c) => existsSync(path.join(RAIZ, base, c, "page.tsx")));
   });
 }
 
@@ -144,7 +142,9 @@ describe("cobertura de la v1: nada queda huérfano", () => {
 
     // Exclusiones justificadas. Vacía hoy: toda entrada del menú móvil tiene sitio en la v2.
     const excluidas = new Set<string>([]);
-    const huerfanas = [...new Set(hrefs)].filter((h) => !enV2.has(soloRuta(h)) && !excluidas.has(h));
+    const huerfanas = [...new Set(hrefs)].filter(
+      (h) => !enV2.has(soloRuta(h)) && !excluidas.has(h),
+    );
     expect(huerfanas).toEqual([]);
   });
 });
