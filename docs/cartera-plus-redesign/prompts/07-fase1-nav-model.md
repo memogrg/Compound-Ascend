@@ -41,7 +41,7 @@ Antes de escribir: verificá que no existan `src/lib/constants/nav-v2.ts`, `src/
 
 4. Docs: guardá este prompt como `docs/cartera-plus-redesign/prompts/07-fase1-nav-model.md` (mismo formato que los 01–06) y agregá en `12-progress.md` la línea "Fase 1 · delta 1 nav-model: en curso".
 
-5. Verificación en la rama tras el último archivo: `npm run typecheck && npm run lint` (30539/5960) `&& npx vitest run tests/unit/ && npm run build`. No hace falta captura visual: ningún archivo de UI cambia (decilo así en el reporte y confirmalo con `git diff --stat`: nada bajo `src/components` ni `src/app` salvo `.env.example` si aplica).
+5. Verificación en la rama tras el último archivo: `npm run typecheck && npm run lint` (30539/5960) `&& npm run format:check && npx vitest run tests/unit/ && npm run build`. No hace falta captura visual: ningún archivo de UI cambia (decilo así en el reporte y confirmalo con `git diff --stat`: nada bajo `src/components` ni `src/app` salvo `.env.example` si aplica).
 
 6. `git status` + `git diff --stat` + el contenido completo de `nav-v2.ts`, y esperá mi ok para commitear como:
    `feat(nav): modelo único de navegación v2 (5 núcleos, pestañas, par web/móvil) y bandera NAV_V2`
@@ -61,3 +61,5 @@ Antes de escribir: verificá que no existan `src/lib/constants/nav-v2.ts`, `src/
 **Control negativo en el test de rutas.** Un `tienePagina()` que devolviera siempre `true` dejaría pasar los tres tests de existencia sin comprobar nada, así que hay un test que exige que sepa decir que no. Apareció por eso mismo un bug real del helper: `/m` vive en `(mobile)/m/(app)/page.tsx`, y el `replace(/^m\//)` no convertía `"m"` en `""` — la raíz del móvil se reportaba como inexistente.
 
 `MENU` sigue siendo un `const` privado de `mobile-menu.tsx`, así que el test lo parsea del fuente, como preveía el prompt.
+
+**La cadena de verificación no incluía `format:check`, y el PR salió en rojo.** El job de CI corre `npm run format:check` (`prettier --check "src/**"`) además de lint, typecheck, tests y build; `nav-v2.ts` no cumplía el formato. Se arregló con `npx prettier --write` acotado a los dos archivos propios —nunca `npm run format`, que reformatea `src/**` entero— y se comprobó que el cambio fuera de formato puro con `prettier --stdin-filepath` sobre la versión de HEAD. Dos comprobaciones más obvias dan falso positivo y no sirven: comparar ignorando espacios falla porque `trailingComma: "all"` añade comas al expandir, y formatear una copia fuera del repo usa el ancho por defecto (80) porque no hereda el `.prettierrc`. La cadena del `00-README.md` pasó a ser la del CI, no un subconjunto.

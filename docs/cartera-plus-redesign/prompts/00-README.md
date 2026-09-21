@@ -1,6 +1,6 @@
 # Prompts delta — fase 0 · Fundamentos
 
-Un prompt a la vez, en este orden. Cada uno abre su propia rama, termina con `npm run typecheck && npm run lint && npm run test` en verde y se detiene ANTES de `git commit` (Claude Code pide aprobación; Memo revisa `git status` + `git diff --staged`, aprueba el commit, hace push y abre el PR).
+Un prompt a la vez, en este orden. Cada uno abre su propia rama, termina con la cadena de verificación de abajo en verde y se detiene ANTES de `git commit` (Claude Code pide aprobación; Memo revisa `git status` + `git diff --staged`, aprueba el commit, hace push y abre el PR).
 
 | # | Rama | Qué entrega | Toca lógica | Verificación |
 | --- | --- | --- | --- | --- |
@@ -13,7 +13,9 @@ Un prompt a la vez, en este orden. Cada uno abre su propia rama, termina con `np
 
 Reglas fijas en todos los prompts: repo-first (leer antes de escribir), Conventional Commits, un commit = un cambio lógico, nunca `git add .`, nunca tocar `.env*`, nunca cambiar apariencia en un `refactor/`.
 
-**`npm run lint && npm run typecheck` en la rama, después del último archivo tocado y antes del push.** En 0.6 se reportó «lint idéntico al baseline» con una corrida de otra rama, anterior a los archivos nuevos; el CI cazó lo que la verificación no: un `.cjs` que abortaba ESLint entero.
+**`npm run typecheck && npm run lint && npm run format:check && npx vitest run tests/unit/ && npm run build`, en la rama, tras el último archivo tocado y antes del push.** En 0.6 se reportó «lint idéntico al baseline» con una corrida de otra rama, anterior a los archivos nuevos; el CI cazó lo que la verificación no: un `.cjs` que abortaba ESLint entero. En la fase 1 volvió a pasar por el otro extremo: la cadena no incluía `format:check` —que el job de CI sí corre— y un fichero nuevo mal formateado puso el PR en rojo. La cadena de aquí es la del CI, no un subconjunto.
+
+**Prettier solo con `--write` acotado a los archivos propios; nunca `npm run format`.** El script apunta a `src/**` entero y reformatea ficheros que no son del cambio (221 en una prueba), enterrando el diff real.
 
 **Nunca `git stash -u` ni `git clean` en este repo.** Hay carpetas sin versionar de Memo (`docs/apple-app-store/`, `_qa/`, `scripts/demo/`, código en curso bajo `src/`): el `-u` se las lleva todas al stash y el árbol queda incompleto —en 0.6 eso rompió el build—. Stash solo con rutas explícitas: `git stash push -m "…" -- <rutas>`.
 
