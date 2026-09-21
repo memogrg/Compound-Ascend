@@ -47,3 +47,5 @@ nodos, 2 `critical` y 390 `serious`, concentrados en 5 reglas.
    `.brand-mark` (38 nodos en 19 rutas — un solo componente).
 2. `fix/` del divisor de «/día prom.», con test bajo `TZ=America/Costa_Rica`.
 3. Pilotos de rediseño: **Hoy** y **Gastos**.
+
+Fase 1 · delta 1 nav-model: en curso.
