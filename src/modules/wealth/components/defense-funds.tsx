@@ -215,6 +215,7 @@ export function DefenseFunds({ report, mortgageCase }: { report: Report; mortgag
             disabled={pending}
             onChange={(e) => onMonths(Number(e.target.value))}
             className="sel"
+            aria-label="Meses de gasto esencial de tu fondo de paz"
             style={{ width: "auto", display: "inline-block", padding: "4px 8px" }}
           >
             {Array.from(

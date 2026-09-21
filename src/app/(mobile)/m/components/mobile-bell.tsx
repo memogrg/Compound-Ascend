@@ -135,14 +135,13 @@ export function MobileBell() {
       <button
         type="button"
         className="icon-btn"
-        aria-label="Notificaciones"
+        aria-label={count > 0 ? `Notificaciones, ${count} novedades` : "Notificaciones"}
         style={{ position: "relative" }}
         onClick={() => setOpen(true)}
       >
         <Icon name="bell" />
         {count > 0 ? (
           <span
-            aria-label={`${count} novedades`}
             style={{
               position: "absolute",
               top: 0,
