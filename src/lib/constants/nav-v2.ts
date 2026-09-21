@@ -48,21 +48,14 @@ export type Nucleo = {
 };
 
 /**
- * Los cinco núcleos, en el orden en que se pintan.
- *
- * Iconos: se usan los `IconName` que YA existen. Ninguno de los cinco tiene todavía su
- * dibujo propio, así que se toma el más cercano y queda anotado para el delta sidebar-v2:
- *   · hoy        → falta una CASA; se usa `dashboard`.
- *   · flujo      → faltan las FLECHAS de entrada/salida; se usa `txn`.
- *   · planes     → falta una BANDERA; se usa `savings`.
- *   · patrimonio → falta la COLUMNA/edificio; se usa `networth`.
- *   · asesor     → falta el ISOTIPO C+; se usa `spark`.
+ * Los cinco núcleos, en el orden en que se pintan. Cada uno con su icono propio
+ * (`home`, `flow`, `flag`, `coins`, `iso`), añadidos a `icon.tsx` en el delta sidebar-v2.
  */
 export const NUCLEOS: readonly Nucleo[] = [
   {
     id: "hoy",
     name: "Hoy",
-    icon: "dashboard",
+    icon: "home",
     href: "/dashboard",
     hrefM: "/m",
     badgeKey: "acciones",
@@ -87,7 +80,7 @@ export const NUCLEOS: readonly Nucleo[] = [
   {
     id: "flujo",
     name: "Flujo",
-    icon: "txn",
+    icon: "flow",
     href: "/mi-base-financiera",
     hrefM: "/m/mi-base-financiera",
     badgeKey: "porRevisar",
@@ -133,7 +126,7 @@ export const NUCLEOS: readonly Nucleo[] = [
   {
     id: "planes",
     name: "Planes",
-    icon: "savings",
+    icon: "flag",
     href: "/control-financiero",
     hrefM: "/m/metas",
     badgeKey: "metasRiesgo",
@@ -161,7 +154,7 @@ export const NUCLEOS: readonly Nucleo[] = [
   {
     id: "patrimonio",
     name: "Patrimonio",
-    icon: "networth",
+    icon: "coins",
     href: "/mi-rich-life",
     hrefM: "/m/patrimonio",
     tabs: [
@@ -207,7 +200,7 @@ export const NUCLEOS: readonly Nucleo[] = [
   {
     id: "asesor",
     name: "Asesor",
-    icon: "spark",
+    icon: "iso",
     href: "/asistente",
     hrefM: "/m/asistente",
     tabs: [

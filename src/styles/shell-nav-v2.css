@@ -1,0 +1,328 @@
+/* ============================================================
+   SIDEBAR V2 — detrás de NEXT_PUBLIC_NAV_V2
+   ============================================================
+   Todo con prefijo `sb2-`. Dos razones, las dos aprendidas a golpes en este repo:
+   1. `.nav-item`, `.nav-label` y `.nav-badge` ya existen en `shell.css` para el sidebar v1,
+      que sigue vivo mientras la bandera esté apagada. Un nombre compartido haría que los dos
+      menús se pisaran según el orden de los ficheros.
+   2. Nunca nombrar una clase como una utilidad de Tailwind (`flex`, `hidden`, `truncate`…):
+      Tailwind genera esas reglas y no aparecen al grepear el repo.
+
+   El posicionamiento NO se redefine aquí: el aside lleva también la clase `.sidebar`, así
+   que el drawer móvil, el scrim y el `sticky` vienen de `shell.css`/`responsive.css`, que
+   este fichero no toca. */
+
+.sb2 {
+  position: relative;
+}
+
+/* ── Colapso ──────────────────────────────────────────────────────────────── */
+
+/* El ancho lo decide el grid de `.app` vía `--sidebar-w`; acá solo se redefine el token.
+   La clase la pone `app-shell` en `.app`, no en el aside, porque quien tiene la columna
+   es el contenedor. */
+.app.sb2-collapsed {
+  --sidebar-w: 64px;
+}
+.app.sb2-collapsed .sidebar {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.sb2.sb2-collapsed .sb2-brand-text,
+.sb2.sb2-collapsed .sb2-label,
+.sb2.sb2-collapsed .sb2-tabs,
+.sb2.sb2-collapsed .sb2-rail,
+.sb2.sb2-collapsed .sb2-user-text {
+  display: none;
+}
+
+/* El engrane SIGUE presente colapsado (con su aria-label y su title), pero los tres
+   controles no caben en una fila: quedan 48 px útiles (64 − 8 − 8) y el avatar (32) más el
+   engrane (26) más salir (28) suman 118 con sus gaps. Encogerlos hasta que entren los
+   dejaría por debajo del mínimo tocable, así que el pie se apila en columna. */
+.sb2.sb2-collapsed .user-row {
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+.sb2.sb2-collapsed .sb2-item {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+.sb2.sb2-collapsed .brand {
+  justify-content: center;
+}
+.sb2.sb2-collapsed .user-row {
+  align-items: center;
+}
+
+/* Colapsado el contador no cabe como número: se degrada a punto. Sigue siendo el mismo
+   elemento —no se desmonta— para que su `aria-label` se lea igual. */
+.sb2.sb2-collapsed .sb2-badge {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  min-width: 8px;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 0;
+  line-height: 0;
+  overflow: hidden;
+}
+
+/* La transición va en el grid, no en el aside: es la COLUMNA la que cambia de ancho.
+   `prefers-reduced-motion` ya pone `--dur-std: 150ms` en tokens.css, pero acá se anula del
+   todo: un reflujo de layout es de lo más molesto para quien pidió menos movimiento. */
+.app {
+  transition: grid-template-columns var(--dur-std) ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app {
+    transition: none;
+  }
+}
+
+/* ── Botón de colapso ─────────────────────────────────────────────────────── */
+
+.sb2-toggle {
+  position: absolute;
+  top: 22px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--r-btn);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background var(--dur-micro) ease;
+}
+.sb2-toggle:hover {
+  background: var(--chip);
+  color: var(--text);
+}
+.sb2-toggle svg {
+  width: 14px;
+  height: 14px;
+  transform: rotate(180deg);
+  transition: transform var(--dur-std) ease;
+}
+/* Colapsado sale del posicionamiento absoluto y cae en el flujo, entre la marca y el nav.
+   Con `position: absolute` se superponía al isotipo —los dos ocupaban la misma esquina de un
+   aside de 64 px— y el chevron quedaba encima del logo. Ponerlo en el flujo lo resuelve sin
+   coordenadas calculadas a mano, que se romperían al cambiar el alto de la marca. */
+.sb2.sb2-collapsed .sb2-toggle {
+  position: static;
+  margin: 0 auto 8px;
+}
+.sb2.sb2-collapsed .sb2-toggle svg {
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb2-toggle svg {
+    transition: none;
+  }
+}
+
+/* El botón de colapso no tiene sentido en el drawer móvil: ahí el aside es un panel que se
+   abre entero, y encogerlo a 64 px dejaría un drawer inútil. */
+@media (max-width: 1024px) {
+  .sb2-toggle {
+    display: none;
+  }
+}
+
+/* ── Marca ────────────────────────────────────────────────────────────────── */
+
+.sb2-brand {
+  /* Sitio para el botón de colapso sin que pise el nombre. */
+  padding-right: 32px;
+}
+.sb2.sb2-collapsed .sb2-brand {
+  padding-right: 0;
+}
+
+/* ── Ítems ────────────────────────────────────────────────────────────────── */
+
+.sb2-nav {
+  flex: 1;
+  overflow-y: auto;
+  margin: 0 -4px;
+  padding: 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sb2-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--r-btn);
+  color: var(--muted);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    background var(--dur-micro) ease,
+    color var(--dur-micro) ease;
+}
+.sb2-item:hover {
+  background: var(--chip);
+  color: var(--text);
+}
+.sb2-item.sb2-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sb2-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+.sb2-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sb2-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sb2-badge {
+  margin-left: auto;
+  flex: none;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* ── Pestañas del núcleo activo ───────────────────────────────────────────── */
+
+.sb2-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 4px;
+  /* La guía vertical ancla las pestañas a su núcleo: sin ella, un segundo nivel sin sangría
+     propia se lee como otro ítem de primer nivel. */
+  padding-left: 18px;
+  border-left: 1px solid var(--border);
+  margin-left: 19px;
+}
+.sb2-item.sb2-sub {
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 400;
+}
+.sb2-item.sb2-sub.sb2-active {
+  background: transparent;
+  font-weight: 600;
+}
+
+/* ── Riel «Tu camino» ─────────────────────────────────────────────────────── */
+
+.sb2-rail {
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-btn);
+  background: var(--chip);
+}
+.sb2-rail-t {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sb2-rail-steps {
+  display: flex;
+  gap: 3px;
+  margin: 7px 0;
+}
+.sb2-rail-steps i {
+  flex: 1;
+  height: 3px;
+  border-radius: var(--r-pill);
+  background: var(--border);
+}
+.sb2-rail-steps i.on {
+  background: var(--accent);
+}
+.sb2-rail-s b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sb2-rail-s small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ── Pie ──────────────────────────────────────────────────────────────────── */
+
+.sb2-gear {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-btn);
+  color: var(--muted);
+  transition: background var(--dur-micro) ease;
+}
+.sb2-gear:hover {
+  background: var(--chip);
+  color: var(--text);
+}
+.sb2-gear svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ── Solo para lectores de pantalla ───────────────────────────────────────── */
+
+/* Propia y no la `.sr-only` de `modules/auth.css`: esa pertenece a las pantallas de auth y
+   el shell no debería depender de un módulo ajeno. Cuando el design system tenga la suya,
+   esta se borra. */
+.sb2-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+/* Expandido el nombre ya está visible en `.sb2-label`: leerlo dos veces sobra. */
+.sb2:not(.sb2-collapsed) .sb2-sr-only {
+  display: none;
+}
