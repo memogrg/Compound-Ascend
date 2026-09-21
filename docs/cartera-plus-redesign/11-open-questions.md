@@ -62,5 +62,11 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 
 - `a11y-report.mjs`: marcar el SHA con `-dirty` cuando `git status --porcelain` no esté vacío.
 
+- Frescura: un usuario sin ninguna fila de detector corre los detectores en cada carga; antes del fix la fila del ritual lo enmascaraba y no corrían nunca. Marcador de última corrida pendiente.
+
+- `InsightKind` (`types.ts`) no incluye `alerta_precio` ni `perfil_revision` aunque se escriben.
+
+- `runDetectors` corre 3 de 14 detectores; el resto se invoca a mano desde `refreshInsights`: candidato a registro real.
+
 Nada de lo anterior toca producción.
 
