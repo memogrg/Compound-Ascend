@@ -9,6 +9,9 @@
  * existentes (addHolding/edit/sell/remove via wizard, detalle y modales).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
+
+import { navV2Enabled } from "@/lib/flags";
 import "./portfolio-view.css";
 import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
 import { PerformanceChart, type AreaPoint } from "@/components/charts/lazy";
@@ -83,12 +86,28 @@ const SUBTABS: { id: Subtab; label: string }[] = [
   { id: "monitor", label: "Monitor de fondos" },
 ];
 
+/** Valor de subtab válido, o el default. Pura: es lo que prueba el test. */
+export function parseSubtab(valor: string | null | undefined): Subtab {
+  return SUBTABS.some((t) => t.id === valor) ? (valor as Subtab) : "portafolio";
+}
+
 /** Subtab desde el hash de la URL ('#monitor' → 'monitor'); default portafolio. */
 function subtabFromHash(): Subtab {
   if (typeof window === "undefined") return "portafolio";
-  const h = window.location.hash.replace(/^#/, "");
-  return SUBTABS.some((t) => t.id === h) ? (h as Subtab) : "portafolio";
+  return parseSubtab(window.location.hash.replace(/^#/, ""));
 }
+
+/**
+ * `?tab=` con los mismos tres valores. Se usa solo con NAV_V2.
+ *
+ * `history: "push"` conserva lo que hacía el hash: `window.location.hash = id` apilaba una
+ * entrada, así que «atrás» volvía a la subpestaña anterior. El default de nuqs es `replace`,
+ * con el que «atrás» se sale de Patrimonio — y 03-navigation pide justo lo contrario, que el
+ * botón atrás sea consistente porque las pestañas viven en la URL.
+ */
+const subtabParser = parseAsStringLiteral(SUBTABS.map((t) => t.id) as [Subtab, ...Subtab[]])
+  .withDefault("portafolio")
+  .withOptions({ history: "push" });
 
 function periodCutoff(period: Period): string | null {
   if (period === "all") return null;
@@ -122,18 +141,35 @@ export function PortfolioView({
   rates: Record<string, number>;
   openContributions: OpenContribution[];
 }) {
-  // Subtab dirigido por el hash (deep-link /patrimonio#monitor + back/forward).
-  // Arranca en "portafolio" para no romper la hidratación SSR.
-  const [subtab, setSubtab] = useState<Subtab>("portafolio");
+  // Dos fuentes para la subpestaña y una bandera que decide cuál manda:
+  //  · NAV_V2 → `?tab=` en la URL (nuqs). Las pestañas por #hash se retiran (03-navigation)
+  //    y así el estado es enlazable y compartible como el resto.
+  //  · sin la bandera → el hash de siempre, intacto.
+  // Los dos hooks se llaman SIEMPRE: React no admite hooks condicionales, y aunque la
+  // bandera sea constante en tiempo de build, hacerlo dependiente de ella sería frágil.
+  // `useQueryState` solo LEE hasta que se llama su setter, así que con la bandera apagada
+  // es inerte y no escribe `?tab=` en la URL.
+  const navV2 = navV2Enabled();
+  const [tabUrl, setTabUrl] = useQueryState("tab", subtabParser);
+  const [subtabHash, setSubtabHash] = useState<Subtab>("portafolio");
   useEffect(() => {
-    const sync = () => setSubtab(subtabFromHash());
+    if (navV2) return;
+    const sync = () => setSubtabHash(subtabFromHash());
     sync();
     window.addEventListener("hashchange", sync);
     return () => window.removeEventListener("hashchange", sync);
-  }, []);
+  }, [navV2]);
+
+  const subtab = navV2 ? tabUrl : subtabHash;
   const selectSubtab = (id: Subtab) => {
-    window.location.hash = id;
-    setSubtab(id);
+    if (navV2) {
+      // `shallow: true` (el default): la subpestaña es estado de CLIENTE — la página ya
+      // trae los tres paneles y no hay nada que recalcular en el servidor.
+      void setTabUrl(id);
+    } else {
+      window.location.hash = id;
+      setSubtabHash(id);
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
