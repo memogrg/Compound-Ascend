@@ -64,6 +64,16 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 
 - Con `NAV_V2`, Mi Base muestra **dos selectores de periodo** (el global de la barra superior y el de la propia página); el de la página se retira cuando la pantalla se rediseñe (fase 3/4). Gastos usa `asOf`/`range` en vez de `period`: se unifica en el piloto.
 
+- `BaseTabs` (`financial-base/components/v2/base-tabs.tsx`) y sus estilos `.base-tabs` —que además viven en `modules/auth.css`— son **código muerto**: ningún componente los importa. Mi Base ya muestra solo el Resumen y las demás secciones viven en sus rutas. Pendiente `chore/` de borrado, fuera del alcance de un delta con bandera.
+
+- Las pestañas del núcleo propagan **solo `?period=`** entre rutas. Si una pantalla futura necesita conservar otro parámetro al cambiar de pestaña, hay que decidirlo explícitamente en `nucleo-tabs-items.ts`, no por omisión.
+
+- Con `NAV_V2`, las pestañas del núcleo se ven **tres veces** en `/mis-acciones`: en el sidebar (bajo el núcleo activo), en la barra superior y en la propia pantalla (Este mes · Decisiones · Progreso). Las dos primeras son del rediseño y conviven a propósito hasta decidir cuál se queda; la tercera se retira al rediseñar Hoy.
+
+- `/mis-acciones` **no está en `PAGE_META`** y cae a `DEFAULT_META`, así que su `<h1>` dice «CARTERA+». Es **preexistente** (pasa igual con la barra v1), pero con la v2 se nota más porque el breadcrumb sí dice «Hoy / Progreso». Pendiente: darle su entrada, o que el `h1` caiga al nombre de la pestaña cuando page-meta no tenga una.
+
+- Contraste del par «activo» del design system: `--accent` sobre `--accent-soft` da **3.56** y sobre `--canvas` **4.09**; AA exige 4.5 para texto normal. El sidebar v2 lo usa y aporta 15 nodos de `color-contrast`. Las pestañas de la barra superior lo evitan usando `--text` con subrayado verde, pero el patrón del sidebar sigue pendiente de decisión.
+
 - Frescura: un usuario sin ninguna fila de detector corre los detectores en cada carga; antes del fix la fila del ritual lo enmascaraba y no corrían nunca. Marcador de última corrida pendiente.
 
 - `InsightKind` (`types.ts`) no incluye `alerta_precio` ni `perfil_revision` aunque se escriben.

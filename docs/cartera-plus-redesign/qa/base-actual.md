@@ -52,7 +52,15 @@ Ambiente        : Supabase LOCAL http://127.0.0.1:54321 · cuenta demo Familia R
 Capturas        : 138 = 23 rutas x 3 anchos x 2 temas
 a11y            : 349 nodos, 0 critical, 3 reglas — tres MENOS de contraste que con la
                   bandera apagada (352) y ninguna regla nueva. Historial: 351 con el
-                  sidebar v2 (#816), 349 al entrar la barra superior v2.
+                  sidebar v2 (#816), 349 con la barra superior v2 (#817), 349 con las
+                  pestañas del núcleo.
+
+OJO con la deriva : las propias corridas de QA ESCRIBEN en la BD local (syncDerivedBudget
+                  regenera los budget_items derivados al cargar pantallas). El 21-sep a
+                  las 22:56 UTC eso cambió el presupuesto del usuario demo y dejó
+                  obsoleta la base de /gastos. Antes de culpar a un delta por un diff
+                  grande, comparar contra una captura de `main` tomada con el MISMO
+                  estado de BD: eso aísla el código de los datos.
 ```
 
 Regenerar:

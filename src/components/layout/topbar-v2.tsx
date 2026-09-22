@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 import { BellNotifications } from "@/components/layout/bell-notifications";
 import { CurrencySwitch } from "@/components/layout/currency-switch";
+import { NucleoTabs } from "@/components/layout/nucleo-tabs";
 import { PeriodControl } from "@/components/layout/period-control";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Icon } from "@/components/ui/icon";
@@ -44,37 +45,53 @@ export function TopbarV2({
 
   return (
     <div className="topbar tb2">
-      <div className="crumbs" style={{ alignItems: "center", gap: 14 }}>
-        <button className="icon-btn hamburger" aria-label="Menú" onClick={onMenu}>
-          <Icon name="menu" />
-        </button>
-        <div>
-          <div className="crumbs" style={{ marginBottom: 3 }}>
-            <span className="crumb-mut">{raiz}</span>
-            <span className="crumb-sep">/</span>
-            <span className="crumb-now">{hoja}</span>
+      {/* Fila superior explícita. Sin ella, poner `flex-wrap: wrap` en `.topbar` para bajar
+          las pestañas hacía que el buscador y las acciones ENVOLVIERAN cuando el título era
+          largo (`/patrimonio`): flexbox envuelve según el tamaño base, antes de encoger. */}
+      <div className="tb2-fila">
+        <div className="crumbs" style={{ alignItems: "center", gap: 14 }}>
+          <button className="icon-btn hamburger" aria-label="Menú" onClick={onMenu}>
+            <Icon name="menu" />
+          </button>
+          <div className="tb2-titulo">
+            <div className="crumbs" style={{ marginBottom: 3 }}>
+              <span className="crumb-mut">{raiz}</span>
+              <span className="crumb-sep">/</span>
+              <span className="crumb-now">{hoja}</span>
+            </div>
+            {/* `title` con el texto PLANO: el h1 puede truncarse con ellipsis y `titleHTML`
+                lleva marcado (`<span class="it">`) que no sirve como tooltip. */}
+            <h1
+              className="page-title"
+              title={meta.title}
+              dangerouslySetInnerHTML={{ __html: meta.titleHTML ?? meta.title }}
+            />
           </div>
-          <h1
-            className="page-title"
-            dangerouslySetInnerHTML={{ __html: meta.titleHTML ?? meta.title }}
-          />
+          {enElModelo && defaultPeriod ? <PeriodControl defaultPeriod={defaultPeriod} /> : null}
         </div>
-        {enElModelo && defaultPeriod ? <PeriodControl defaultPeriod={defaultPeriod} /> : null}
+
+        <div className="topbar-actions">
+          <div className="search">
+            <Icon name="search" style={{ width: 14, height: 14, color: "var(--muted)" }} />
+            <input placeholder="Buscar cuentas, inversiones…" aria-label="Buscar" />
+            <span className="kbd">⌘K</span>
+          </div>
+          {currency ? (
+            <CurrencySwitch current={currency.display} primary={currency.primary} />
+          ) : null}
+          <BellNotifications />
+          <Link href="/configuracion" className="icon-btn" aria-label="Ajustes">
+            <Icon name="gear" />
+          </Link>
+          <ThemeToggle />
+        </div>
       </div>
 
-      <div className="topbar-actions">
-        <div className="search">
-          <Icon name="search" style={{ width: 14, height: 14, color: "var(--muted)" }} />
-          <input placeholder="Buscar cuentas, inversiones…" aria-label="Buscar" />
-          <span className="kbd">⌘K</span>
-        </div>
-        {currency ? <CurrencySwitch current={currency.display} primary={currency.primary} /> : null}
-        <BellNotifications />
-        <Link href="/configuracion" className="icon-btn" aria-label="Ajustes">
-          <Icon name="gear" />
-        </Link>
-        <ThemeToggle />
-      </div>
+      {/* Las pestañas del núcleo van en su propia fila, bajo el título y las acciones: son
+          navegación de segundo nivel y competir por el ancho con el buscador las dejaría
+          sin sitio. `NucleoTabs` se auto-oculta fuera del modelo y cuando el núcleo tiene
+          una sola pestaña. */}
+      <NucleoTabs />
     </div>
   );
 }

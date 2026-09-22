@@ -9,12 +9,67 @@
    cambia de dónde sale el breadcrumb y agrega el periodo, no cómo se dispone la barra.
    `topbar.css` y `shell.css` no se tocan. */
 
+/* ── Layout estable de la barra ───────────────────────────────────────────────
+   La v1 cabía porque solo tenía título y acciones. La v2 mete el periodo en la misma fila,
+   y sin reglas de encogimiento el resultado depende del largo del título: en `/patrimonio`
+   («Portafolio de inversiones») las acciones se caían bajo el título. Se fija QUIÉN cede
+   espacio: primero el título (truncando), luego el buscador (hasta 160 px), y nunca el
+   periodo ni los iconos de acción. */
+
+/* El bloque de la izquierda (hamburguesa + título + periodo) es quien cede: `min-width: 0`
+   para que sus hijos puedan truncar, y `flex: 1 1 auto` para que ocupe lo que sobre. */
+.tb2-fila > .crumbs {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tb2-titulo {
+  /* Sin esto un hijo flex no baja de su contenido y el ellipsis nunca entra en juego. */
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.tb2-titulo .page-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* El breadcrumb también: «Patrimonio / Inversiones» no puede empujar la fila. */
+.tb2-titulo > .crumbs {
+  min-width: 0;
+}
+.tb2-titulo .crumb-now,
+.tb2-titulo .crumb-mut {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* El buscador cede ancho, pero no desaparece: por debajo de 160 px el placeholder deja de
+   leerse y el campo parece un botón roto. */
+.tb2 .search {
+  flex: 1 1 160px;
+  min-width: 160px;
+  width: auto;
+}
+
+/* El GRUPO puede encogerse —si no, el buscador nunca cede sus 230 px y el título trunca
+   sin necesidad—, pero los ICONOS de dentro no: son objetivos de clic de tamaño fijo y
+   encogerlos los deja bajo el mínimo tocable. El que cede es el buscador, hasta 160 px. */
+.tb2 .topbar-actions {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+.tb2 .topbar-actions > *:not(.search) {
+  flex-shrink: 0;
+}
+
 /* ── Control de periodo ───────────────────────────────────────────────────── */
 
 .tb2-period {
   display: flex;
   align-items: center;
   gap: 2px;
+  flex-shrink: 0;
   margin-left: 18px;
   padding: 3px;
   border: 1px solid var(--border);
@@ -107,12 +162,96 @@
   white-space: nowrap;
 }
 
+/* ── Pestañas del núcleo ──────────────────────────────────────────────────── */
+
+/* `.topbar` es una fila flex (título ↔ acciones). Para meter una segunda fila sin que la
+   primera se descomponga, `.tb2` pasa a COLUMNA y la fila superior se declara aparte
+   (`.tb2-fila`). Con `flex-wrap: wrap` en `.topbar` el efecto era otro: cuando el título
+   era largo, el buscador y las acciones envolvían a una segunda línea en vez de encogerse
+   —flexbox envuelve según el tamaño base, antes de aplicar `flex-shrink`—. */
+.tb2 {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+.tb2-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tb2-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 12px;
+  /* A 390 px se desplazan en horizontal en vez de envolver: una barra de pestañas de dos
+     líneas deja de leerse como una barra. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tb2-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tb2-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 7px 12px;
+  border-radius: var(--r-btn);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background var(--dur-micro) ease,
+    color var(--dur-micro) ease;
+}
+.tb2-tab:hover {
+  background: var(--chip);
+  color: var(--text);
+}
+/* La pestaña activa: texto en `--text` y el verde SOLO en el subrayado.
+   El par de «activo» del sidebar (`--accent` sobre `--accent-soft`) no sirve aquí: sobre el
+   fondo de la topbar (`--canvas` #f4f2ec) el verde da 4.09 y AA exige 4.5 para texto normal
+   —13 px en semibold no llega a «texto grande» (18.66 px bold)—. Con `--text` sube a 15.22.
+   De paso deja de depender del color como único indicador: el subrayado y el peso también
+   marcan cuál está activa, que es lo que pide WCAG 1.4.1. */
+.tb2-tab-on {
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--accent);
+  border-radius: var(--r-btn) var(--r-btn) 0 0;
+}
+.tb2-tab-on:hover {
+  background: transparent;
+  color: var(--text);
+}
+
+.tb2-tab-badge {
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+}
+
 /* ── Móvil ────────────────────────────────────────────────────────────────── */
 
 /* 03-navigation: en móvil el selector de periodo va BAJO el título, no arriba — por alcance
    del pulgar. El contenedor del título pasa a columna y el control cae a su propia línea. */
 @media (max-width: 768px) {
-  .tb2 .crumbs {
+  .tb2-fila > .crumbs {
     flex-wrap: wrap;
   }
   .tb2-period {
@@ -125,5 +264,13 @@
   /* La comparación es lo primero que sobra cuando no hay ancho: el mes sí tiene que caber. */
   .tb2-cmp {
     display: none;
+  }
+  /* Las pestañas se salen del padding lateral para que el scroll llegue al borde: cortadas
+     con margen a los lados parecen terminar donde no terminan. */
+  .tb2-tabs {
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 }
