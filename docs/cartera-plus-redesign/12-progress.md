@@ -52,4 +52,5 @@ Fase 1 · delta 1 nav-model: hecho (#815).
 Fase 1 · delta 2 sidebar-v2: hecho (#816).
 Fase 1 · delta 3 topbar-period: hecho (#817).
 Fase 1 · delta 4 tabs-url: hecho (#818).
-fix(budget) presupuesto derivado retroactivo: en revisión — base visual regenerada desde e4cace8b.
+fix(budget) presupuesto derivado retroactivo: hecho (#819) — base visual regenerada desde `e4cace8b`.
+Fase 1 · delta 5 command-palette: en revisión — paleta ⌘K sobre `modal.tsx`, sin dependencias nuevas.

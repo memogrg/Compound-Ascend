@@ -25,7 +25,7 @@ export type ItemPestana = {
  * un filtro que nadie pidió. El `?tab=` no se propaga, se respeta: viene del propio `href`
  * de la pestaña, que es quien lo define.
  */
-function conPeriodo(href: string, search: string | null): string {
+export function conPeriodo(href: string, search: string | null): string {
   if (!search) return href;
   const period = new URLSearchParams(search).get("period");
   if (!period) return href;

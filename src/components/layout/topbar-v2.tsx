@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { BellNotifications } from "@/components/layout/bell-notifications";
 import { CurrencySwitch } from "@/components/layout/currency-switch";
@@ -27,15 +28,29 @@ export function TopbarV2({
   onMenu,
   currency,
   defaultPeriod,
+  onAbrirPaleta,
+  refBusqueda,
 }: {
   onMenu: () => void;
   currency?: { display: string; primary: string };
   defaultPeriod?: string;
+  onAbrirPaleta?: () => void;
+  /** El shell necesita ESTE botón para devolverle el foco al cerrar la paleta. */
+  refBusqueda?: React.Ref<HTMLButtonElement>;
 }) {
   const pathname = usePathname() ?? "/dashboard";
   const searchParams = useSearchParams();
   const search = searchParams?.toString() ?? null;
   const meta = resolvePageMeta(pathname);
+
+  // El atajo se decide TRAS montar. `navigator` no existe en el servidor, así que el primer
+  // render muestra ⌘K en todas partes y en Windows/Linux pasa a «Ctrl K» al hidratar: leerlo
+  // durante el render daría HTML distinto en servidor y cliente (#418).
+  const [atajo, setAtajo] = useState("⌘K");
+  useEffect(() => {
+    const plataforma = navigator.platform ?? "";
+    if (!/mac|iphone|ipad|ipod/i.test(plataforma)) setAtajo("Ctrl K");
+  }, []);
 
   const migas = breadcrumb(pathname, search);
   // Fuera del modelo (configuración, suscripción, wizards) no hay núcleo: ni breadcrumb de
@@ -71,11 +86,20 @@ export function TopbarV2({
         </div>
 
         <div className="topbar-actions">
-          <div className="search">
+          {/* Botón, no `<input>`: el campo anterior era decorativo —sin onChange ni
+              handler— y un input que no acepta texto engaña a quien usa teclado o lector
+              de pantalla. Mismo aspecto, pero ahora abre la paleta. */}
+          <button
+            type="button"
+            ref={refBusqueda}
+            className="search tb2-search"
+            aria-label={`Buscar o ir a… (${atajo})`}
+            onClick={onAbrirPaleta}
+          >
             <Icon name="search" style={{ width: 14, height: 14, color: "var(--muted)" }} />
-            <input placeholder="Buscar cuentas, inversiones…" aria-label="Buscar" />
-            <span className="kbd">⌘K</span>
-          </div>
+            <span className="tb2-search-ph">Buscar o ir a…</span>
+            <span className="kbd">{atajo}</span>
+          </button>
           {currency ? (
             <CurrencySwitch current={currency.display} primary={currency.primary} />
           ) : null}

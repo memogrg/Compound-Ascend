@@ -52,6 +52,24 @@
   width: auto;
 }
 
+/* El buscador pasó de `<input>` decorativo a `<button>`: hereda `.search` para conservar el
+   aspecto, y acá se neutraliza lo que un botón trae de fábrica. */
+.tb2-search {
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  appearance: none;
+}
+.tb2-search-ph {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 /* El GRUPO puede encogerse —si no, el buscador nunca cede sus 230 px y el título trunca
    sin necesidad—, pero los ICONOS de dentro no: son objetivos de clic de tamaño fijo y
    encogerlos los deja bajo el mínimo tocable. El que cede es el buscador, hasta 160 px. */

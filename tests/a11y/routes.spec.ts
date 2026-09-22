@@ -18,7 +18,9 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import AxeBuilder from "@axe-core/playwright";
-import { test, expect, type Page, type BrowserContext } from "@playwright/test";
+import { test, type BrowserContext } from "@playwright/test";
+
+import { iniciarSesion } from "./sesion";
 
 type Ruta = { path: string; auth: boolean };
 
@@ -49,29 +51,6 @@ function slug(routePath: string): string {
 }
 
 let estadoSesion: Awaited<ReturnType<BrowserContext["storageState"]>> | null = null;
-
-/** Una sola sesión para todas las rutas con auth, como en las capturas. */
-async function iniciarSesion(page: Page): Promise<void> {
-  const email = process.env.E2E_EMAIL;
-  const password = process.env.E2E_PASSWORD;
-  expect(email, "falta E2E_EMAIL").toBeTruthy();
-  expect(password, "falta E2E_PASSWORD").toBeTruthy();
-
-  await page.goto("/login", { waitUntil: "networkidle" });
-  await page.getByLabel("Correo").fill(email!);
-  // #password y no getByLabel: el toggle de visibilidad también matchea "Contraseña".
-  await page.locator("#password").fill(password!);
-  for (let intento = 0; intento < 3; intento++) {
-    await page.getByRole("button", { name: "Iniciar sesión" }).click();
-    try {
-      await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
-      return;
-    } catch {
-      if (intento === 2) throw new Error("Login no navegó tras 3 intentos");
-      await page.waitForTimeout(1000);
-    }
-  }
-}
 
 test.beforeAll(async ({ browser }) => {
   const ctx = await browser.newContext();
