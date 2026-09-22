@@ -3,9 +3,17 @@
 Copia local: `qa-snapshots/base/BASE.txt` (ignorado por git). Regenerar según el README,
 sección «Servidor congelado».
 
+**Regenerada el 22-sep-2026 desde `main e4cace8b`.** Es la primera vez desde `1c4e9b14`, y
+no fue por gusto: las propias corridas de QA habían fabricado presupuesto derivado para
+jun/jul/ago 2026 del usuario demo (15 filas, `source_kind` `debt`/`goal`), y eso movía el
+«Gasto planificado» y el histórico de `/gastos`, que agregan varios meses. Se borraron esas
+15 filas en el Supabase LOCAL —queda solo septiembre, el de la siembra original del 17-sep—
+y se capturó de nuevo. La causa está corregida en `fix(budget)`: una lectura ya no escribe
+presupuesto de meses pasados.
+
 ```
-App             : main 1c4e9b14 — esta rama (chore/qa-reloj-servidor) no cambia nada
-                  bajo src/; la herramienta vive en scripts/qa/.
+App             : main e4cace8b — base capturada desde main limpio, sin el fix aplicado
+                  (el fix se compara CONTRA esta base).
 Instante        : 2026-09-18T18:00:00Z  (navegador Y servidor)
 TZ del servidor : UTC (como Vercel). El manifest anota tz:null porque ese campo registra
                   el TZ del proceso de CAPTURA, no el del servidor.
@@ -16,9 +24,12 @@ Cuenta          : information.theglowup@gmail.com — demo Familia Ramírez
 Node / Playwright: v20.20.2 / 1.62.0
 Capturas        : 138 = 23 rutas × 3 anchos (390/768/1280) × 2 temas (light/dark)
 
-Determinismo    : dos capturas consecutivas → 132/132 estrictas a 0 px (home excluida).
+Determinismo    : dos capturas consecutivas → 132/132 estrictas a 0 px (home excluida),
+                  reconfirmado el 22-sep sobre la base regenerada.
                   market_price_cache sin una sola escritura durante las 276 capturas.
                   /empezar muestra "2 de octubre" = 18-sep + 14 días de prueba.
+Filas derivadas : usuario demo, solo 2026-09 (3 debt + 2 goal, 970.680). Si aparecen otros
+                  meses, alguien navegó el pasado con un build anterior al fix.
 
 Para comparar:
   Terminal A:  QA_FREEZE=2026-09-18T18:00:00Z npm run qa:start
