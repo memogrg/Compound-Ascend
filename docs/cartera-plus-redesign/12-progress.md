@@ -51,4 +51,5 @@ nodos, 2 `critical` y 390 `serious`, concentrados en 5 reglas.
 Fase 1 · delta 1 nav-model: hecho (#815).
 Fase 1 · delta 2 sidebar-v2: hecho (#816).
 Fase 1 · delta 3 topbar-period: hecho (#817).
-Fase 1 · delta 4 tabs-url: en revisión.
+Fase 1 · delta 4 tabs-url: hecho (#818).
+fix(budget) presupuesto derivado retroactivo: en revisión — base visual regenerada desde e4cace8b.

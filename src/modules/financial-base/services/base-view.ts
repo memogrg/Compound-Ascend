@@ -38,6 +38,7 @@ import { syncDerivedBudget } from "@/modules/financial-base/services/derived-bud
 import { getExpenseJars } from "@/modules/financial-base/services/expense-jars-service";
 import { TRANSACTIONS_LIST_CAP } from "@/modules/financial-base/constants";
 import {
+  esPeriodoAnterior,
   parseMonthParam,
   parseRangeParam,
   previousMonthPeriod,
@@ -89,8 +90,13 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
   // ANTES de leer el presupuesto, para que el periodo refleje deudas/metas/
   // pólizas/recurrentes/dividendos al día. Best-effort: si falla, la vista
   // carga igual con lo que haya.
+  // El guard va en ESTE caller y no dentro de syncDerivedBudget: una LECTURA no debe
+  // escribir, pero rental-service y dividend-service sí la llaman a propósito con el mes
+  // del pago —que puede ser pasado— y necesitan el id de la línea que materializa.
+  // Mismo criterio que `ensureRecurringIncome` arriba; acá el mes en curso Y los futuros
+  // sí sincronizan, porque un presupuesto por venir todavía se puede planificar.
   try {
-    await syncDerivedBudget(period);
+    if (!esPeriodoAnterior(period, actual)) await syncDerivedBudget(period);
   } catch (err) {
     // Best-effort: la vista carga igual. Pero logueamos (antes el catch vacío
     // escondió un fallo del sync durante horas).
