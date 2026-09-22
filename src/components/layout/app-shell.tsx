@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { SidebarV2 } from "@/components/layout/sidebar-v2";
 import { Topbar } from "@/components/layout/topbar";
 import { TopbarV2 } from "@/components/layout/topbar-v2";
+import { CommandPalette } from "@/components/layout/command-palette";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { CoachPanel } from "@/components/ai/coach-panel";
 import { ToastProvider } from "@/components/ui/toast";
 import { CurrencyProvider } from "@/components/layout/currency-context";
 import { TimezoneProvider } from "@/components/tz/timezone-context";
 import { navV2Enabled } from "@/lib/flags";
+import { useCommandPalette } from "@/hooks/use-command-palette";
 import { cn } from "@/lib/utils";
 
 /** Dónde se recuerda el sidebar colapsado. Por navegador, como pide 03-navigation.md. */
@@ -41,6 +43,13 @@ export function AppShell({
   const close = () => setDrawer(false);
   const currencies = currency ?? { display: "CRC", primary: "CRC" };
   const navV2 = navV2Enabled();
+
+  // Solo bajo bandera y solo acá: este cascarón es el shell WEB. `/m` tiene su propio
+  // layout y no monta nada de esto, así que el atajo no existe en la app móvil.
+  // El botón buscador del topbar es el disparador: el hook lo enfoca antes de abrir para
+  // que `Modal` le devuelva el foco al cerrar, también cuando se abrió con ⌘K.
+  const botonBusqueda = useRef<HTMLButtonElement>(null);
+  const paleta = useCommandPalette(navV2, botonBusqueda);
 
   // Render inicial SIEMPRE expandido y la preferencia se aplica en un efecto: leer
   // localStorage durante el render daría un HTML distinto en servidor y cliente (#418).
@@ -91,6 +100,8 @@ export function AppShell({
                   onMenu={() => setDrawer(true)}
                   currency={currency}
                   defaultPeriod={defaultPeriod}
+                  onAbrirPaleta={paleta.abrir}
+                  refBusqueda={botonBusqueda}
                 />
               ) : (
                 <Topbar onMenu={() => setDrawer(true)} currency={currency} />
@@ -104,6 +115,7 @@ export function AppShell({
             onClick={close}
             aria-hidden="true"
           />
+          {navV2 ? <CommandPalette abierta={paleta.abierta} onCerrar={paleta.cerrar} /> : null}
           <BottomNav />
           <CoachPanel />
         </CurrencyProvider>

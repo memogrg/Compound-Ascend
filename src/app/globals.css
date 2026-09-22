@@ -13,6 +13,10 @@
    tiene que ganar a las del shell viejo. */
 @import "../styles/shell-nav-v2.css" layer(ca);
 @import "../styles/shell-topbar-v2.css" layer(ca);
+/* Antes de `primitives-modal` y no después, aunque la paleta ajuste ese modal: sus
+   reglas lo hacen con `:has(.cp)`, que gana por especificidad sin depender del orden, y
+   así no se mueve la posición de `primitives-modal` en la hoja final. */
+@import "../styles/command-palette.css" layer(ca);
 @import "../styles/primitives-modal.css" layer(ca);
 @import "../styles/modules/dashboard.css" layer(ca);
 @import "../styles/modules/setup.css" layer(ca);
