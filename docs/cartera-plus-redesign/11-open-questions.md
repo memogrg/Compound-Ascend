@@ -84,5 +84,7 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 
 - Pendiente en la herramienta de QA: **huella de la BD del demo en el manifest** de `snap.mjs` y aviso en `diff.mjs` cuando cambie entre corridas. Sin eso, una diferencia grande obliga a descartar a mano si fue el código o los datos — que es lo que pasó acá.
 
+- `feat/`: rutas que leen `asOf`/`range` y **no consumen `?period=`** (`/gastos` confirmado). Mordió al reproducir el fix del presupuesto derivado: `/gastos?period=2026-05` no dispara nada y el repro parecía ya arreglado en `main`. Unificar con el periodo global en el piloto de Gastos.
+
 Nada de lo anterior toca producción.
 
