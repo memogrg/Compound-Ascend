@@ -12,9 +12,12 @@
    que el drawer móvil, el scrim y el `sticky` vienen de `shell.css`/`responsive.css`, que
    este fichero no toca. */
 
-.sb2 {
-  position: relative;
-}
+/* NO se declara `position` en `.sb2`.
+   `.sidebar` ya es `sticky` en escritorio y `fixed` bajo 1024 px (responsive.css), y las dos
+   sirven de ancla para el `.sb2-toggle` absoluto. Poner `position: relative` aquí parecía
+   inofensivo y no lo era: misma especificidad que `.sidebar`, y como este fichero se importa
+   DESPUÉS de responsive.css, ganaba — el aside dejaba de ser `fixed` en móvil, volvía a
+   ocupar una fila del grid y empujaba todo el contenido 100dvh hacia abajo. */
 
 /* ── Colapso ──────────────────────────────────────────────────────────────── */
 

@@ -4,7 +4,8 @@ import {
   getDisplayCurrency,
   getPrimaryCurrency,
 } from "@/modules/financial-base/services/base-service";
-import { getUserTimezone, knownUserTz } from "@/lib/time/user-time";
+import { getUserTimezone, knownUserTz, userCurrentPeriod } from "@/lib/time/user-time";
+import { monthParam } from "@/modules/financial-base/engine/period";
 import { TimezoneSync } from "@/components/tz/timezone-sync";
 import { RhythmNudge } from "@/components/layout/rhythm-nudge";
 import { AceptarTerminosBanner } from "@/components/legal/aceptar-terminos-banner";
@@ -72,12 +73,23 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // Sin `.catch()` mudo: el helper ya degrada a false y lo LOGUEA.
   const terminosPendientes = user ? await aceptacionPendiente(user.id) : false;
 
+  // Mes por defecto del control de periodo (barra superior v2). Se resuelve en el SERVIDOR
+  // porque depende de la zona del usuario: el navegador de alguien que viaja diría otro mes.
+  // Best-effort — sin sesión el control no se monta y el valor no se usa.
+  let defaultPeriod: string | undefined;
+  try {
+    if (user) defaultPeriod = monthParam(await userCurrentPeriod());
+  } catch {
+    // sin perfil aún: el control cae al mes de la URL o no se muestra
+  }
+
   return (
     <AppShell
       user={{ name, sub, initials }}
       currency={currency}
       navBadges={navBadges}
       timezone={knownTz}
+      defaultPeriod={defaultPeriod}
     >
       <TimezoneSync savedTz={savedTz} />
       {/* Va en el layout, no en cada página: el ritmo del mes acompaña en toda la app.

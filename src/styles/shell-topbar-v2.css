@@ -1,0 +1,129 @@
+/* ============================================================
+   BARRA SUPERIOR V2 — detrás de NEXT_PUBLIC_NAV_V2
+   ============================================================
+   Prefijo `tb2-`, por lo mismo que `sb2-`: `.topbar`, `.crumbs` y `.search` ya existen para
+   la v1, que sigue viva mientras la bandera esté apagada, y ninguna clase puede llamarse
+   como una utilidad de Tailwind.
+
+   El esqueleto (`.topbar`, `.crumbs`, `.topbar-actions`, `.page-title`) se REUSA: la v2
+   cambia de dónde sale el breadcrumb y agrega el periodo, no cómo se dispone la barra.
+   `topbar.css` y `shell.css` no se tocan. */
+
+/* ── Control de periodo ───────────────────────────────────────────────────── */
+
+.tb2-period {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 18px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+}
+
+.tb2-arrow {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background var(--dur-micro) ease,
+    color var(--dur-micro) ease;
+}
+.tb2-arrow:hover:not(:disabled) {
+  background: var(--chip);
+  color: var(--text);
+}
+.tb2-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.tb2-arrow svg {
+  width: 14px;
+  height: 14px;
+}
+/* El primero apunta a la izquierda. El icono `chev` solo existe mirando a la derecha. */
+.tb2-arrow:first-child svg {
+  transform: rotate(180deg);
+}
+
+/* El `<select>` se estira encima de su etiqueta: se ve el texto y se comporta como menú.
+   Un `<select>` nativo no se puede estilar por dentro de forma fiable entre navegadores,
+   así que el texto visible es un hermano y el select va transparente encima. Sigue siendo
+   un select de verdad: teclado, lectores de pantalla y el menú del sistema funcionan. */
+.tb2-period-label,
+.tb2-cmp {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  border-radius: var(--r-pill);
+  transition: background var(--dur-micro) ease;
+}
+.tb2-period-label:hover,
+.tb2-cmp:hover {
+  background: var(--chip);
+}
+.tb2-period-label > select,
+.tb2-cmp > select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  /* Sin apariencia nativa: en Safari un select de opacidad 0 dibuja igual su flecha. */
+  appearance: none;
+}
+/* El foco de teclado tiene que verse: el select es invisible, así que el anillo lo pinta
+   el contenedor. Sin esto, tabular hasta el mes no muestra nada. */
+.tb2-period-label:focus-within,
+.tb2-cmp:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.tb2-period-label > span {
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.tb2-cmp {
+  margin-left: 4px;
+}
+.tb2-cmp > span {
+  padding: 0 9px;
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── Móvil ────────────────────────────────────────────────────────────────── */
+
+/* 03-navigation: en móvil el selector de periodo va BAJO el título, no arriba — por alcance
+   del pulgar. El contenedor del título pasa a columna y el control cae a su propia línea. */
+@media (max-width: 768px) {
+  .tb2 .crumbs {
+    flex-wrap: wrap;
+  }
+  .tb2-period {
+    margin-left: 0;
+    margin-top: 8px;
+    /* Ocupa su propia línea: `.crumbs` envuelve y este es el único que fuerza el salto. */
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+  /* La comparación es lo primero que sobra cuando no hay ancho: el mes sí tiene que caber. */
+  .tb2-cmp {
+    display: none;
+  }
+}

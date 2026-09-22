@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { SidebarV2 } from "@/components/layout/sidebar-v2";
 import { Topbar } from "@/components/layout/topbar";
+import { TopbarV2 } from "@/components/layout/topbar-v2";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { CoachPanel } from "@/components/ai/coach-panel";
 import { ToastProvider } from "@/components/ui/toast";
@@ -23,10 +24,19 @@ type AppShellProps = {
   navBadges?: Record<string, number>;
   /** Zona del perfil (cookie → user_settings); null = todavía sin capturar. */
   timezone?: string | null;
+  /** Mes del USUARIO ("YYYY-MM"), resuelto en el servidor. Sin `?period=` manda este. */
+  defaultPeriod?: string;
 };
 
 /** Cascarón principal de la app: sidebar + topbar + contenido + coach + nav móvil. */
-export function AppShell({ children, user, currency, navBadges, timezone }: AppShellProps) {
+export function AppShell({
+  children,
+  user,
+  currency,
+  navBadges,
+  timezone,
+  defaultPeriod,
+}: AppShellProps) {
   const [drawer, setDrawer] = useState(false);
   const close = () => setDrawer(false);
   const currencies = currency ?? { display: "CRC", primary: "CRC" };
@@ -76,7 +86,15 @@ export function AppShell({ children, user, currency, navBadges, timezone }: AppS
               <Sidebar open={drawer} onNavigate={close} user={user} navBadges={navBadges} />
             )}
             <main className="main">
-              <Topbar onMenu={() => setDrawer(true)} currency={currency} />
+              {navV2 ? (
+                <TopbarV2
+                  onMenu={() => setDrawer(true)}
+                  currency={currency}
+                  defaultPeriod={defaultPeriod}
+                />
+              ) : (
+                <Topbar onMenu={() => setDrawer(true)} currency={currency} />
+              )}
               <div className="content">{children}</div>
             </main>
           </div>

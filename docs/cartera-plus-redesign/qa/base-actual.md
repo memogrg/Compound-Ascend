@@ -50,8 +50,9 @@ Instante        : 2026-09-18T18:00:00Z — el MISMO que la base, para poder mira
 Modo            : servidor congelado + red externa bloqueada
 Ambiente        : Supabase LOCAL http://127.0.0.1:54321 · cuenta demo Familia Ramírez
 Capturas        : 138 = 23 rutas x 3 anchos x 2 temas
-a11y            : 351 nodos, 0 critical, 3 reglas — una MENOS de contraste que con la
-                  bandera apagada (352) y ninguna regla nueva
+a11y            : 349 nodos, 0 critical, 3 reglas — tres MENOS de contraste que con la
+                  bandera apagada (352) y ninguna regla nueva. Historial: 351 con el
+                  sidebar v2 (#816), 349 al entrar la barra superior v2.
 ```
 
 Regenerar:

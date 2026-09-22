@@ -62,6 +62,8 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 
 - `a11y-report.mjs`: marcar el SHA con `-dirty` cuando `git status --porcelain` no esté vacío.
 
+- Con `NAV_V2`, Mi Base muestra **dos selectores de periodo** (el global de la barra superior y el de la propia página); el de la página se retira cuando la pantalla se rediseñe (fase 3/4). Gastos usa `asOf`/`range` en vez de `period`: se unifica en el piloto.
+
 - Frescura: un usuario sin ninguna fila de detector corre los detectores en cada carga; antes del fix la fila del ritual lo enmascaraba y no corrían nunca. Marcador de última corrida pendiente.
 
 - `InsightKind` (`types.ts`) no incluye `alerta_precio` ni `perfil_revision` aunque se escriben.
