@@ -52,8 +52,16 @@ del mismo commit y no se comparan entre sí. La de arriba (`base`) es la app con
 apagada, y es la que prueba que un delta no cambió nada; esta es la app con el menú nuevo, y
 es contra la que se comparan los deltas siguientes de la fase 1.
 
+**Regenerada el 22-sep-2026 desde `main 638c0e32`** (antes: build del delta 4 tomado el
+22-sep a las 03:16 UTC, *antes* de que #819 entrara en `main`). Hubo que hacerlo porque esa
+captura vieja hacía fallar `/gastos` en las 6 combinaciones del delta 5 con píxeles en el
+cuerpo y hasta a 390 px, donde el buscador ni se ve: era deriva de la BD, no código. Contra
+la referencia regenerada, `/gastos` a 1280 da exactamente los mismos 5.971 px que el resto
+—la franja del buscador— y **0 px** a 390 y 768.
+
 ```
 Copia local     : qa-snapshots/nav-v2/ (ignorado por git)
+App             : main 638c0e32
 Bandera         : NEXT_PUBLIC_NAV_V2=1 en el BUILD. Es NEXT_PUBLIC_, o sea que se inlinea al
                   compilar: ponerla solo al arrancar el servidor no enciende nada.
 Instante        : 2026-09-18T18:00:00Z — el MISMO que la base, para poder mirar las dos
@@ -61,7 +69,7 @@ Instante        : 2026-09-18T18:00:00Z — el MISMO que la base, para poder mira
 Modo            : servidor congelado + red externa bloqueada
 Ambiente        : Supabase LOCAL http://127.0.0.1:54321 · cuenta demo Familia Ramírez
 Capturas        : 138 = 23 rutas x 3 anchos x 2 temas
-a11y            : 349 nodos, 0 critical, 3 reglas — tres MENOS de contraste que con la
+a11y            : 349 nodos, 0 critical, 3 reglas (medido en el delta 4) — tres MENOS de contraste que con la
                   bandera apagada (352) y ninguna regla nueva. Historial: 351 con el
                   sidebar v2 (#816), 349 con la barra superior v2 (#817), 349 con las
                   pestañas del núcleo.

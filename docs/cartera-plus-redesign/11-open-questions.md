@@ -86,5 +86,9 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 
 - `feat/`: rutas que leen `asOf`/`range` y **no consumen `?period=`** (`/gastos` confirmado). Mordió al reproducir el fix del presupuesto derivado: `/gastos?period=2026-05` no dispara nada y el repro parecía ya arreglado en `main`. Unificar con el periodo global en el piloto de Gastos.
 
+- Alta rápida sin deep-link: `/transacciones` **no acepta `?new=expense|income`**, así que las acciones «Registrar gasto» y «Registrar ingreso» de la paleta ⌘K llevan a la pantalla pero no abren el formulario — el alta vive en `QuickAddModal`, sin `useDeepLinkModal`. Los otros cuatro `?new=` (meta, inversión, deuda, póliza) sí abren el suyo. Pendiente: darle a `QuickAddModal` el mismo deep-link que los demás.
+
+- **Paleta de comandos en `/m` — delta 6.** La paleta se monta en `app-shell`, que es el cascarón web; la app móvil tiene su propio layout y no la ve. En móvil el atajo de teclado no aplica, así que el disparador tendría que ser un control visible en su barra, no un ⌘K.
+
 Nada de lo anterior toca producción.
 
