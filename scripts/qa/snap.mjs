@@ -30,10 +30,26 @@ import { pathToFileURL } from "node:url";
  * `.ts` revienta con «exports is not defined in ES module scope». Un JSON lo lee cualquiera.
  *
  * Las públicas (`auth: false`) se visitan sin sesión.
+ *
+ * `superficie: "m"` marca las pantallas de la app móvil (`/m/*`). Una ruta SIN ese campo es
+ * de la web, y nada cambia para ella: las 23 de siempre se siguen capturando igual.
  */
-export const ROUTES = JSON.parse(
-  readFileSync(new URL("./routes.json", import.meta.url), "utf8"),
-);
+export const ROUTES = JSON.parse(readFileSync(new URL("./routes.json", import.meta.url), "utf8"));
+
+/**
+ * Anchos por superficie. `/m` es un shell de teléfono —viewport bloqueado, `viewportFit:
+ * cover`— y a 1280 no se ve nada que exista en un dispositivo real: capturarlo ahí sería
+ * fabricar una pantalla que nadie usa. Sin `superficie`, la ruta es web y no se restringe.
+ *
+ * Duplicado a propósito en `tests/a11y/routes.spec.ts`: ese `.ts` no puede importar este
+ * `.mjs` (ver el comentario de ROUTES). Si cambia acá, cambia allá.
+ */
+export const ANCHOS_POR_SUPERFICIE = { m: [390, 768] };
+
+/** Anchos permitidos para una ruta, o `null` cuando no tiene restricción. */
+export function anchosDe(ruta) {
+  return ANCHOS_POR_SUPERFICIE[ruta.superficie] ?? null;
+}
 
 const TZ = "America/Costa_Rica";
 const THEME_KEY = "ca-theme"; // src/components/layout/theme-provider.tsx
@@ -297,6 +313,11 @@ async function main() {
     for (const tema of temas) {
       for (const width of widths) {
         for (const ruta of ROUTES) {
+          // Una superficie con anchos propios se salta el resto: no es un fallo, es que esa
+          // pantalla no existe a ese ancho.
+          const permitidos = anchosDe(ruta);
+          if (permitidos && !permitidos.includes(width)) continue;
+
           const context = await browser.newContext({
             storageState: ruta.auth ? storageState : undefined,
             viewport: { width, height: 900 },

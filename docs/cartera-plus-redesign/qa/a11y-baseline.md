@@ -3,20 +3,15 @@
 Inventario, no puerta: **este informe no corrige nada y el spec no falla**. Mide el estado
 actual para que cada pantalla que se rediseñe pueda compararse contra él.
 
-**Actualizada tras `fix(a11y)`.** La corrida anterior daba **392 nodos** (2 `critical`, 390
-`serious`); esta da **352** (0 `critical`). La diferencia son las dos reglas atacadas:
-`aria-prohibited-attr` (38 nodos, el isotipo en 19 rutas) y `select-name` (2 nodos, el
-selector de meses del fondo de paz) — ambas desaparecen enteras.
+Las dos superficies van **separadas**: la web (`/dashboard`, `/gastos`…) y la app móvil
+(`/m/*`). Son dos apps con su propio shell y su propia hoja de estilos, y un total común
+no le serviría a ninguna para compararse consigo misma con el tiempo.
 
-El alcance NO cambió: siguen siendo las mismas 23 rutas del shell **web**, a 1280 y 390, en
-tema claro. El shell móvil (`/m`) sigue fuera de la auditoría, así que los arreglos que se
-hicieron ahí —el `<select>` gemelo y la campana— no se reflejan en estas cifras.
-
-- **SHA**: `2baab68c` + cambios de `fix(a11y)` (medido antes del commit)
-- **Instante congelado**: `2026-09-18T18:00:00Z`
+- **SHA**: `845ca4a6e40b48b5cb4595c74a3f7b2e35d810f8`
+- **Instante congelado**: `(sin QA_FREEZE)`
 - **Motor**: axe-core 4.13.0
 - **Reglas**: `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`
-- **Anchos**: 1280 y 390 · tema claro · 46 combinaciones
+- **Combinaciones**: 61 · web 46 · `/m` 15 · tema claro
 
 Regenerar:
 
@@ -31,7 +26,14 @@ node scripts/qa/a11y-report.mjs
 El servidor va congelado a propósito: sin eso, una fecha o un precio distinto cambia el DOM
 y con él el conteo de nodos, y el inventario deja de ser comparable entre días.
 
-## Totales
+El conteo es por **nodos** afectados, no por reglas: una sola regla puede afectar decenas de
+elementos, y eso es lo que hay que arreglar.
+
+## Web
+
+Anchos 1280 y 390.
+
+### Totales
 
 | Impacto | Nodos |
 | --- | --- |
@@ -41,7 +43,7 @@ y con él el conteo de nodos, y el inventario deja de ser comparable entre días
 | minor | 0 |
 | **total** | **352** |
 
-## Las 5 reglas más frecuentes
+### Las 5 reglas más frecuentes
 
 | Regla | Impacto | Nodos | Rutas | Ejemplo de selector |
 | --- | --- | --- | --- | --- |
@@ -53,10 +55,7 @@ y con él el conteo de nodos, y el inventario deja de ser comparable entre días
 - **`nested-interactive`** — Interactive controls must not be nested
 - **`aria-hidden-focus`** — ARIA hidden element must not be focusable or contain focusable elements
 
-## Por ruta y ancho
-
-Conteo por **nodos** afectados, no por reglas: una sola regla puede afectar decenas de
-elementos, y eso es lo que hay que arreglar.
+### Por ruta y ancho
 
 | Ruta | Ancho | critical | serious | moderate | minor | total |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -106,6 +105,52 @@ elementos, y eso es lo que hay que arreglar.
 | `/suscripcion` | 390 | 0 | 0 | 0 | 0 | **0** |
 | `/transacciones` | 1280 | 0 | 25 | 0 | 0 | **25** |
 | `/transacciones` | 390 | 0 | 24 | 0 | 0 | **24** |
+
+## Superficie `/m` (app móvil)
+
+Solo a 390: `/m` es un shell de teléfono con el viewport bloqueado, y a 1280 se vería una pantalla que en un dispositivo real no existe.
+
+### Totales
+
+| Impacto | Nodos |
+| --- | --- |
+| critical | 0 |
+| serious | 89 |
+| moderate | 15 |
+| minor | 0 |
+| **total** | **104** |
+
+### Las 5 reglas más frecuentes
+
+| Regla | Impacto | Nodos | Rutas | Ejemplo de selector |
+| --- | --- | --- | --- | --- |
+| `color-contrast` | serious | 57 | 10 | `a[href$="presupuesto"] > .setup-hub-item-top > .ok.setup-hub` |
+| `aria-hidden-focus` | serious | 32 | 6 | `div:nth-child(1) > .m-swipe > .m-swipe-actions[aria-hidden="` |
+| `meta-viewport` | moderate | 15 | 15 | `meta[name="viewport"]` |
+
+- **`color-contrast`** — Elements must meet minimum color contrast ratio thresholds
+- **`aria-hidden-focus`** — ARIA hidden element must not be focusable or contain focusable elements
+- **`meta-viewport`** — Zooming and scaling must not be disabled
+
+### Por ruta y ancho
+
+| Ruta | Ancho | critical | serious | moderate | minor | total |
+| --- | --- | --- | --- | --- | --- | --- |
+| `/m` | 390 | 0 | 10 | 1 | 0 | **11** |
+| `/m/configurar` | 390 | 0 | 0 | 1 | 0 | **1** |
+| `/m/deudas` | 390 | 0 | 4 | 1 | 0 | **5** |
+| `/m/gastos` | 390 | 0 | 23 | 1 | 0 | **24** |
+| `/m/indicadores` | 390 | 0 | 0 | 1 | 0 | **1** |
+| `/m/ingresos` | 390 | 0 | 3 | 1 | 0 | **4** |
+| `/m/inversiones` | 390 | 0 | 0 | 1 | 0 | **1** |
+| `/m/metas` | 390 | 0 | 2 | 1 | 0 | **3** |
+| `/m/mi-base-financiera` | 390 | 0 | 3 | 1 | 0 | **4** |
+| `/m/mi-perfil-financiero` | 390 | 0 | 7 | 1 | 0 | **8** |
+| `/m/mis-acciones` | 390 | 0 | 6 | 1 | 0 | **7** |
+| `/m/patrimonio` | 390 | 0 | 3 | 1 | 0 | **4** |
+| `/m/perfil` | 390 | 0 | 1 | 1 | 0 | **2** |
+| `/m/proteccion` | 390 | 0 | 6 | 1 | 0 | **7** |
+| `/m/transacciones` | 390 | 0 | 21 | 1 | 0 | **22** |
 
 Los JSON crudos de cada corrida (con el detalle de cada nodo) quedan en `qa-snapshots/a11y/`,
 fuera de git.

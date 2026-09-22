@@ -45,6 +45,58 @@ sesión sin congelar. Si eso pasa, patrimonio / dashboard / mi-rich-life se desv
 que regenerar la base (o levantar el dev server con QA_BLOCK_EXTERNAL=1).
 ```
 
+## Superficie `/m` — la app móvil
+
+Desde `chore(qa)`, `scripts/qa/routes.json` cubre **38 rutas**: las 23 de la web y los **15
+destinos del drawer ☰** de `/m` (`app/(mobile)/m/components/mobile-menu.tsx`, `/m` incluido).
+Las de `/m` llevan `superficie: "m"` y se capturan **solo a 390 y 768**: `/m` es un shell de
+teléfono con el viewport bloqueado (`viewportFit: cover`, `userScalable: false`), y a 1280 se
+vería una pantalla que en un dispositivo real no existe. Una ruta SIN `superficie` es web y
+nada cambia para ella.
+
+Total: **198 capturas** = web 23 × 3 anchos × 2 temas (138) + `/m` 15 × 2 anchos × 2 temas (60).
+
+```
+App             : main 845ca4a6, bandera APAGADA (la app que hay en producción)
+Instante        : 2026-09-18T18:00:00Z  (navegador Y servidor)
+Sesión          : la MISMA cookie de Supabase que la web (`sb-127-auth-token`). El login de
+                  `tests/a11y/sesion.ts` sirve tal cual para `/m`: no hace falta nada aparte.
+Muro de plan    : NO intercepta. `debeRedirigirSinPlan` solo actúa con `plan === "ninguno"`
+                  y la cuenta demo tiene `plan = "max"`; las 15 rutas resuelven a sí mismas,
+                  sin pasar por `/m/login` ni `/m/sin-plan`.
+Determinismo    : dos corridas consecutivas → **las 30 capturas de `/m` a 0 px**. De las 198,
+                  solo difieren `home` (excluida, bucle de la portada) e `ingresos` a 390
+                  con 17 px — el ruido de fondo del arnés, ya anotado en el backlog.
+```
+
+### Visitar `/m/patrimonio` ESCRIBE, y eso movió la base de la web
+
+Al incorporar `/m` al arnés, `/patrimonio` **web** saltó ~10.000 px en las 6 combinaciones
+contra la base anterior. No fue el cambio de QA ni una regresión: `m/(app)/patrimonio/page.tsx:40`
+llama a `ensureTodaySnapshot()` **al cargar la pantalla** —best-effort e idempotente, y
+deliberado: sin eso la tabla se quedaba vacía y el gráfico no aparecía nunca—. La visita del
+calentamiento escribió la fila `portfolio_snapshots.date = 2026-09-18` (la fecha congelada),
+y el gráfico de patrimonio de la web, que lee `getSnapshotHistory`, ganó el punto «sep 26».
+
+Se comprobó, no se supuso: la caja del diff cae solo en el gráfico (x 307–548, y 713–780), el
+recorte muestra la serie terminando en ago 26 antes y en sep 26 después, y la fila nueva está
+en la tabla con `created_at` dentro de la ventana de la corrida. `net_worth_snapshots`,
+`holding_contributions` y `market_price_cache` no registraron escrituras.
+
+Es la MISMA clase de problema que el presupuesto derivado retroactivo de #819 —una lectura
+que escribe—, en otra tabla y otra pantalla. Acá es intencional y no se tocó (este `chore` no
+toca producto). La consecuencia práctica sí: **la base se regeneró con el estado ya
+estabilizado**, porque tras esa primera escritura el sistema es idempotente (la segunda
+corrida da 0 px en `/patrimonio`). La base anterior quedó en `qa-snapshots/base.previa/`.
+
+### Rate-limit del login con el reloj congelado
+
+`QA_FREEZE` congela `Date.now()` **en el servidor**, así que la ventana fija del limitador de
+`auth` nunca rota: los logins del arnés se acumulan y a partir de cierto punto todo intento
+devuelve «rate-limit excedido» y no se recupera hasta reiniciar el proceso. Pasó tras dos
+corridas de capturas más la de accesibilidad. Si el login empieza a fallar sin motivo, es
+esto: reiniciá `npm run qa:start`.
+
 ## base-nav-v2 — el menú nuevo
 
 Segunda base, para el sidebar v2. No sustituye a la de arriba: **son dos builds distintos**
