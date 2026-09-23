@@ -1,3 +1,5 @@
+import { formatMonthShort } from "@/lib/format";
+
 /**
  * Las constantes de marca de los gráficos. Un solo sitio donde está escrito qué es «premium»
  * en CARTERA+: grosores, radios, opacidades y qué token usa cada cosa.
@@ -19,6 +21,12 @@ export type SerieDef = {
   marca: MarcaSerie;
   /** Trazo discontinuo: se usa para proyecciones, que no son un dato observado. */
   guion?: boolean;
+  /**
+   * Hacia dónde es BUENO que se mueva esta serie. Decide el color del delta vs comparación:
+   * en ingresos subir es bueno, en gastos es malo. Sin esto, el tooltip pintaría de verde una
+   * subida de gasto. Si no se declara, el delta va en neutro.
+   */
+  sentidoBueno?: "arriba" | "abajo";
 };
 
 /**
@@ -111,3 +119,45 @@ export const ANIMACION_ACTIVA = false;
 
 /** Alto mínimo de un gráfico. Por debajo, los ejes y el tooltip no caben. */
 export const ALTO_MINIMO = 160;
+
+/**
+ * La etiqueta del eje X, y la MISMA en la cabecera del tooltip.
+ *
+ * Que el eje diga «ago 26» y el tooltip «2026-08-01» es el defecto más común en un gráfico y
+ * el más fácil de colar: son dos formateadores distintos escritos en sitios distintos. Acá hay
+ * uno solo y las tres muestras lo comparten.
+ *
+ * Delega en `formatMonthShort` de `format.ts` —determinista, sin `Intl`— y deja pasar lo que
+ * no sea una fecha ISO: las etiquetas ya legibles («abr», «may») se escriben tal cual.
+ */
+export function formatoEjeX(label: string | number | undefined): string {
+  if (label === undefined || label === null) return "";
+  const s = String(label);
+  return /^\d{4}-\d{2}/.test(s) ? formatMonthShort(s) : s;
+}
+
+/**
+ * Sincronización entre gráficos: `grupoSync` en `ChartFrame` → `syncId` de Recharts, con
+ * `syncMethod="value"`.
+ *
+ * **Qué sincroniza: el tooltip y el crosshair.** Dos gráficos del mismo grupo muestran el
+ * mismo periodo a la vez, que es lo que se quiere cuando están apilados en una pantalla.
+ *
+ * **Qué NO sincroniza: el resaltado de serie.** Eso vive en `useSerieActiva`, es de cada
+ * gráfico y no cruza: señalar «Presupuesto» en el de abajo no tiene por qué atenuar nada en
+ * el de arriba, donde esa serie ni existe.
+ *
+ * `"value"` y no el `"index"` por defecto: casa por el valor del eje categórico, así que dos
+ * series de distinta longitud (12 meses y 7) se alinean por el MES y no por la posición. Con
+ * `"index"`, el punto 3 de una se emparejaría con el punto 3 de la otra aunque sean meses
+ * distintos — el propio tipo de Recharts avisa de que con longitudes distintas «this might
+ * yield unexpected results».
+ */
+export const SYNC_METHOD = "value" as const;
+
+/** El crosshair pasa de punteado a SÓLIDO cuando el tooltip está fijado: el estado se ve. */
+export const CROSSHAIR_FIJO = {
+  color: "var(--chart-crosshair)",
+  ancho: 1.5,
+  patron: undefined,
+} as const;

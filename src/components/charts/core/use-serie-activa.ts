@@ -12,19 +12,28 @@ import { OPACIDAD, type SerieDef } from "./theme";
  *  - **activa**: alguien la está señalando (hover o foco). Las demás se atenúan a 0,35, no
  *    desaparecen: atenuar es jerarquía, ocultar es censura.
  *  - **oculta**: alguien la apagó desde la leyenda. Esa sí sale del dibujo.
+ *
+ * Y un tercero, del punto y no de la serie:
+ *  - **fijado**: el índice del punto que alguien clavó con un clic. Mientras hay uno, el
+ *    tooltip no sigue al ratón y el crosshair se dibuja sólido. Es lo que permite leer un
+ *    valor sin mantener el pulso, copiar una cifra, o mirar el gráfico de al lado.
  */
 export type EstadoSerie = {
   activa: string | null;
   ocultas: ReadonlySet<string>;
+  /** Índice del punto fijado, o `null`. */
+  fijado: number | null;
 };
 
 export type AccionSerie =
   | { tipo: "activar"; clave: string }
   | { tipo: "desactivar" }
   | { tipo: "alternarOculta"; clave: string }
+  | { tipo: "fijar"; indice: number }
+  | { tipo: "soltar" }
   | { tipo: "limpiar" };
 
-export const ESTADO_INICIAL: EstadoSerie = { activa: null, ocultas: new Set() };
+export const ESTADO_INICIAL: EstadoSerie = { activa: null, ocultas: new Set(), fijado: null };
 
 /**
  * Reductor puro.
@@ -50,13 +59,26 @@ export function reducirSerieActiva(estado: EstadoSerie, accion: AccionSerie): Es
       // Apagar la serie que estaba señalada deja el resaltado sin dueño.
       const activa =
         ocultas.has(accion.clave) && estado.activa === accion.clave ? null : estado.activa;
-      return { activa, ocultas };
+      return { ...estado, activa, ocultas };
     }
 
+    case "fijar":
+      // Clic en el MISMO punto suelta: es un interruptor, no un acumulador. Sin esto, para
+      // quitar el tooltip habría que acertar fuera del gráfico.
+      return estado.fijado === accion.indice
+        ? { ...estado, fijado: null }
+        : { ...estado, fijado: accion.indice };
+
+    case "soltar":
+      return estado.fijado === null ? estado : { ...estado, fijado: null };
+
     case "limpiar":
-      // Escape suelta el resaltado, pero NO vuelve a encender lo que alguien apagó: eso fue
-      // una decisión deliberada y deshacerla por una tecla sería una sorpresa.
-      return estado.activa === null ? estado : { ...estado, activa: null };
+      // Escape suelta el resaltado Y el punto fijado — las dos cosas son transitorias. Lo que
+      // NO reenciende es lo que alguien apagó en la leyenda: eso fue una decisión deliberada
+      // y deshacerla por una tecla sería una sorpresa.
+      return estado.activa === null && estado.fijado === null
+        ? estado
+        : { ...estado, activa: null, fijado: null };
   }
 }
 
@@ -106,6 +128,8 @@ export function useSerieActiva(inicial: EstadoSerie = ESTADO_INICIAL) {
   const activar = useCallback((clave: string) => despachar({ tipo: "activar", clave }), []);
   const desactivar = useCallback(() => despachar({ tipo: "desactivar" }), []);
   const alternar = useCallback((clave: string) => despachar({ tipo: "alternarOculta", clave }), []);
+  const fijar = useCallback((indice: number) => despachar({ tipo: "fijar", indice }), []);
+  const soltar = useCallback(() => despachar({ tipo: "soltar" }), []);
 
-  return { estado, activar, desactivar, alternar };
+  return { estado, activar, desactivar, alternar, fijar, soltar };
 }
