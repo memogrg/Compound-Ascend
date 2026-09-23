@@ -77,3 +77,23 @@ export function tablaDeDatos(
     ]),
   };
 }
+
+/**
+ * Lo que se anuncia por `aria-live` cuando alguien recorre el gráfico con el teclado.
+ *
+ *   «may 26: Real ₡1.887.000; Presupuesto ₡1.930.000»
+ *
+ * Punto y coma entre series porque la coma ya separa los miles dentro de cada cifra, y un
+ * lector de pantalla lee «uno coma ochocientos ochenta y siete» de corrido si se mezclan.
+ *
+ * Solo se anuncia en TECLADO, no en hover de ratón: quien usa el ratón ya está viendo el
+ * tooltip, y anunciar cada punto al pasar por encima convierte el lector en ruido continuo.
+ * Esa decisión la aplica quien llama; acá solo se construye la frase.
+ */
+export function describirPunto(
+  label: string,
+  filas: readonly { etiqueta: string; valor: string }[],
+): string {
+  if (filas.length === 0) return label;
+  return `${label}: ${filas.map((f) => `${f.etiqueta} ${f.valor}`).join("; ")}`;
+}

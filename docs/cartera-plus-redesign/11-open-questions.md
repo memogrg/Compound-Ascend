@@ -122,5 +122,9 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 
 - **Dependencias de la fase 2, diferidas a propósito**: `@number-flow/react` entra en el **delta 3** (`feat/kpi-hero-card`), que es cuando hay un KPI que animar; `echarts` **modular** en el **delta 5** (`feat/echarts-wrapper-theme`), con el presupuesto de peso que fija el BLUEPRINT (§14): solo en los chunks de Patrimonio, Deudas, Gastos y Resumen, y `echarts` fuera del chunk cliente de `/dashboard`. Este delta no instaló nada.
 
+- **Tres implementaciones de «ago 26»**: `formatMonthShort` (`lib/format.ts:257`), `formatMonthYear` (`:144`, que da «ago 2026») y una privada dentro de `area-chart.tsx:43` con su propio array de meses (`:41`). El núcleo de gráficos usa una sola —`formatoEjeX`, que delega en `formatMonthShort`— pero los tres wrappers viejos siguen con lo suyo, y `line-chart` ni siquiera formatea el eje X. Unificar en el **delta 7** (`refactor/charts-wrappers-delegate`), junto con `formatCompact`/`formatAxisCompact`.
+
+- **`/dev/ui` solo existe en local y en previews.** La página hace `notFound()` cuando `VERCEL_ENV === "production"` (doble puerta: eso más la sesión que exige `(dashboard)`), así que en el dominio real devuelve **404 por diseño**. Un smoke de producción que espere verla fallará, y el fallo sería del smoke. Para revisarla en remoto hay que abrir el preview del PR.
+
 Nada de lo anterior toca producción.
 

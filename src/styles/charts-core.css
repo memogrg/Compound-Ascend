@@ -199,3 +199,73 @@
   color: var(--muted);
   font-weight: 600;
 }
+
+/* ── Tooltip: delta, nota y recorte ───────────────────────────────────────── */
+
+.cf-tip-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.cf-tip-linea {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+/* El delta se colorea por DIRECCIÓN × sentido de la serie, nunca por el signo a secas: en
+   gastos, subir es malo. Y el signo (+/−) va siempre delante, que es el canal no cromático
+   (WCAG 1.4.1): el color es un refuerzo, no la información. */
+.cf-tip-delta {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.cf-tip-delta[data-tono="bueno"] {
+  color: var(--pos);
+}
+.cf-tip-delta[data-tono="malo"] {
+  color: var(--neg);
+}
+
+/* «+2 más»: el tooltip recorta por legibilidad, y la tabla del marco sigue completa. */
+.cf-tip-mas {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* La nota del punto («aguinaldo»): una línea, con elipsis. Dos líneas de nota empujan el
+   valor fuera del vistazo, que es lo único que el tooltip tiene que garantizar. */
+.cf-tip-nota {
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Foco del gráfico ─────────────────────────────────────────────────────── */
+
+/* `accessibilityLayer` de Recharts hace el SVG focalizable, y el navegador le dibuja el
+   anillo también al hacer CLIC: quien usa el ratón se encuentra un recuadro que no pidió, en
+   cada punto que toca. El anillo se reserva para `:focus-visible`, que es exactamente la
+   heurística de «llegó por teclado». No se quita el foco: se quita el ruido. */
+/* La regla cubre el SVG y sus grupos internos: un clic no enfoca el `<svg>` sino uno de los
+   `<g class="recharts-zIndex-layer_…">` que Recharts marca con `tabindex="-1"`, así que
+   apuntar solo al svg dejaba el recuadro puesto igual. */
+.cf svg.recharts-surface:focus,
+.cf svg.recharts-surface :focus {
+  outline: none;
+}
+.cf svg.recharts-surface:focus-visible,
+.cf svg.recharts-surface :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-md);
+}

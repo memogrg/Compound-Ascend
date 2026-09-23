@@ -46,13 +46,13 @@ async function abrir(browser: Browser, tema: "light" | "dark" = "light", movimie
   return { ctx, page };
 }
 
-test("las tres muestras se montan, con su tabla", async ({ browser }) => {
+test("las cuatro muestras se montan, con su tabla", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
-  await expect(page.locator(".cf")).toHaveCount(3);
+  await expect(page.locator(".cf")).toHaveCount(4);
   // Una superficie de Recharts por marco: si alguna no midió, no hay SVG.
-  await expect(page.locator(".cf .recharts-surface")).toHaveCount(3);
+  await expect(page.locator(".cf .recharts-surface")).toHaveCount(4);
   // La tabla está SIEMPRE en el DOM, aunque no se vea: es el canal accesible.
-  await expect(page.locator(".cf table.cf-tabla")).toHaveCount(3);
+  await expect(page.locator(".cf table.cf-tabla")).toHaveCount(4);
   await ctx.close();
 });
 
@@ -89,6 +89,8 @@ test("la leyenda es de botones, con aria-pressed, y atenúa en vez de ocultar", 
   const { ctx, page } = await abrir(browser);
   // El segundo marco es el de tres series.
   const marco = page.locator(".cf").nth(1);
+  await marco.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
   const botones = marco.locator(".cf-leyenda-btn");
   await expect(botones).toHaveCount(3);
   for (let i = 0; i < 3; i++) {
@@ -120,6 +122,8 @@ test("se llega al gráfico con Tab y las flechas mueven el tooltip", async ({ br
   const { ctx, page } = await abrir(browser);
   const marco = page.locator(".cf").first();
 
+  await marco.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
   // `accessibilityLayer` de Recharts pone `role="application"` y `tabindex=0` en el propio
   // `<svg class="recharts-surface">` — no en el wrapper, que es donde uno lo buscaría.
   const foco = marco.locator("svg.recharts-surface");

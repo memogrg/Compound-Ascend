@@ -20,8 +20,19 @@ export {
   type AccionSerie,
   type EstadoSerie,
 } from "./use-serie-activa";
+export { ANCHO_TOOLTIP_ESTIMADO, posicionAnclada } from "./interaccion";
+export {
+  SIN_COMPARACION,
+  deltaComparacion,
+  filasTooltip,
+  tonoDelta,
+  type Delta,
+  type FilaTooltip,
+  type FilasRecortadas,
+} from "./tooltip-datos";
 export {
   describirGrafico,
+  describirPunto,
   tablaDeDatos,
   SIN_DATO,
   type FilaDato,
@@ -30,8 +41,12 @@ export {
 } from "./accesible";
 export {
   ALTO_MINIMO,
+  ALTO_TOOLTIP_ANCLADO,
   ANIMACION_ACTIVA,
   AREA,
+  CROSSHAIR_FIJO,
+  SYNC_METHOD,
+  formatoEjeX,
   BARRA,
   CROSSHAIR,
   EJE,
