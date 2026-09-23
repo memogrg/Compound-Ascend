@@ -1,0 +1,193 @@
+/* ============================================================
+   NÚCLEO DE GRÁFICOS — prefijo `cf-`
+   ============================================================
+   `cf` de «chart frame». Prefijo propio como `sb2-`, `tb2-`, `cp-` y `mn2-`: ni colisión con
+   el shell ni con una utilidad de Tailwind (`chart`, `legend`, `tooltip` y `table` son
+   palabras que Tailwind podría generar; `cf-` no).
+
+   Todo color sale de tokens. Los tiempos salen de `--dur-*`, que ya se ponen a 0 bajo
+   `prefers-reduced-motion` en `tokens.css`: acá no hace falta repetir la media query. */
+
+.cf {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Cabecera ─────────────────────────────────────────────────────────────── */
+
+.cf-cab {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cf-titulos {
+  min-width: 0;
+}
+.cf-titulo {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.cf-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* «Ver tabla» no es un control secundario escondido: es la otra forma de leer el gráfico. */
+.cf-btn-tabla {
+  flex: none;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: var(--r-btn);
+  cursor: pointer;
+  transition: background var(--dur-micro) var(--ease-std);
+}
+.cf-btn-tabla:hover {
+  background: var(--chip);
+}
+
+/* ── Lienzo ───────────────────────────────────────────────────────────────── */
+
+.cf-lienzo {
+  position: relative;
+  min-height: 0;
+}
+
+/* ── Leyenda ──────────────────────────────────────────────────────────────── */
+
+.cf-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cf-leyenda-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  background: transparent;
+  padding: 3px 2px;
+  /* El texto NUNCA lleva el color de la serie: esos colores están calibrados contra el
+     fondo del gráfico, no para texto de 12 px sobre la tarjeta. */
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: var(--r-btn);
+  transition: opacity var(--dur-micro) var(--ease-std);
+}
+/* Serie apagada: se ve que existe y que está apagada, no se borra de la leyenda. */
+.cf-leyenda-btn[data-oculta] {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.cf-swatch {
+  flex: none;
+  display: inline-block;
+  border-radius: 2px;
+}
+/* El swatch imita la MARCA: bloque para área y barras, línea para líneas. */
+.cf-swatch-bloque {
+  width: 11px;
+  height: 11px;
+}
+.cf-swatch-linea {
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+}
+.cf-swatch[data-guion] {
+  mask-image: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 7px);
+  -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 7px);
+}
+
+/* ── Tooltip ──────────────────────────────────────────────────────────────── */
+
+.cf-tip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-float);
+  padding: 8px 10px;
+  min-width: 120px;
+}
+.cf-tip-x {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.cf-tip-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.cf-tip-fila {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+/* Trazo de 2 px, la misma marca que dibuja la serie — no una caja de color. */
+.cf-tip-trazo {
+  flex: none;
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  align-self: center;
+}
+.cf-tip-valor {
+  font-variant-numeric: tabular-nums;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.cf-tip-serie {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ── Tabla de datos ───────────────────────────────────────────────────────── */
+
+.cf-tabla-vista {
+  max-height: 100%;
+  overflow: auto;
+}
+.cf-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.cf-tabla caption {
+  text-align: left;
+  color: var(--muted);
+  font-size: 11px;
+  padding-bottom: 6px;
+}
+.cf-tabla th,
+.cf-tabla td {
+  text-align: right;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.cf-tabla thead th,
+.cf-tabla tbody th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+}

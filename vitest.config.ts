@@ -9,7 +9,9 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts", "src/**/*.test.ts"],
+    // `.tsx` para los tests que renderizan marcado con `react-dom/server` (sin jsdom ni
+    // RTL): hoy solo los `<defs>` de los gráficos, que hay que comprobar en el HTML.
+    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx", "src/**/*.test.ts"],
     globals: true,
     // Bloquea el fetch a red EXTERNA (coingecko/fx/economic-indicators) → suite determinista, sin flaky
     // por timeouts de red. Localhost se permite; los tests que necesitan fetch lo stubbean por su cuenta.

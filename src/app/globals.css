@@ -18,6 +18,8 @@
    así no se mueve la posición de `primitives-modal` en la hoja final. */
 @import "../styles/command-palette.css" layer(ca);
 @import "../styles/primitives-modal.css" layer(ca);
+/* Núcleo de gráficos (fase 2). Prefijo `cf-`; no toca ninguna clase existente. */
+@import "../styles/charts-core.css" layer(ca);
 @import "../styles/modules/dashboard.css" layer(ca);
 @import "../styles/modules/setup.css" layer(ca);
 @import "../styles/modules/auth.css" layer(ca);

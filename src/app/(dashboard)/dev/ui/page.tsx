@@ -11,6 +11,7 @@ import {
   formatMonthShort,
 } from "@/lib/format";
 
+import { ChartsDemo } from "./charts-demo";
 import { MotionDemo } from "./motion-demo";
 
 /**
@@ -368,6 +369,14 @@ export default function DevUiPage() {
 
       <Seccion
         n={6}
+        titulo="Gráficos"
+        sub="Núcleo de la fase 2 sobre Recharts 3 — datos fijos, sin fetch. Cada uno con su tabla."
+      >
+        <ChartsDemo />
+      </Seccion>
+
+      <Seccion
+        n={7}
         titulo="Formateadores"
         sub="src/lib/format.ts — miles con punto, siempre, en servidor y cliente"
       >

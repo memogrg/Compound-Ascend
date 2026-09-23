@@ -40,14 +40,15 @@ const ANCHOS = [1280, 390] as const;
 
 /**
  * Anchos por superficie: `/m` es un shell de teléfono y a 1280 no se ve nada que exista en
- * un dispositivo real. Una ruta sin `superficie` es web y se mide a los dos anchos.
+ * un dispositivo real; `dev` es el catálogo interno, que solo se mira en escritorio. Una ruta
+ * sin `superficie` es web y se mide a los dos anchos.
  *
  * Duplicado a propósito desde `scripts/qa/snap.mjs` (`ANCHOS_POR_SUPERFICIE`): este `.ts`
  * no puede importar ese `.mjs` —el cargador de Playwright lo transpila a CommonJS y revienta
  * con «exports is not defined»—, que es la misma razón por la que `ROUTES` vive en un JSON.
  * Si cambia allá, cambia acá.
  */
-const ANCHOS_POR_SUPERFICIE: Record<string, readonly number[]> = { m: [390, 768] };
+const ANCHOS_POR_SUPERFICIE: Record<string, readonly number[]> = { m: [390, 768], dev: [1280] };
 
 /** ¿Se mide esta ruta a este ancho? Sin `superficie`, siempre. */
 function seMide(ruta: Ruta, ancho: number): boolean {
