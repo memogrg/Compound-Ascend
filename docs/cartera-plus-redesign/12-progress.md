@@ -56,8 +56,33 @@ fix(budget) presupuesto derivado retroactivo: hecho (#819) — base visual regen
 Fase 1 · delta 5 command-palette: hecho (#820).
 chore(qa) cobertura de `/m`: hecho (#821) — routes.json 23 → 38, a11y por superficie.
 Fase 1 · delta 6 mobile-nav-v2: hecho (#822) — alcance A; la barra inferior no vuelve.
-Fase 2 · delta 1 charts-core: hecho (#823) — núcleo compartido demostrado en `/dev/ui`.
+Fase 2 · delta 1 charts-core: hecho (#823) — núcleo compartido (marco con tabla, degradados,
+glow, tooltip, serie activa, leyenda, tema sin colores literales) demostrado en `/dev/ui`.
+Las pantallas reales no cambian: los 3 wrappers viejos siguen intactos hasta el delta 7.
 chore(qa) antialiasing: hecho (#824) — `--ignore-delta-below 5` en el diff visual.
-Fase 2 · delta 2 charts-tooltip-crosshair: en revisión — crosshair sincronizado entre gráficos,
+Fase 2 · delta 2 charts-tooltip-crosshair: hecho (#825) — crosshair sincronizado entre gráficos,
 tooltip fijable con clic y con Enter, táctil anclado arriba, `aria-live` solo en teclado, delta
 vs comparación y tope de 4 filas. Las pantallas reales siguen sin cambiar.
+Fase 2 · delta 3 kpi-hero-card: en revisión — `KpiHero`, `KpiCard`, `DeltaChip`, `Sparkline` y
+`Meter` en `/dev/ui`, con `@number-flow/react` 0.6.2 (6,9 KB gz). La cifra animada coincide
+carácter a carácter con `formatMoney` (`de-DE` + signo y símbolo en el prefijo); la coincidencia
+se prueba en el formateador porque **el número pintado no existe como texto en el DOM**.
+
+### CI: dos días en rojo, y la causa no era la que parecía
+
+`chore(ci)` (#829) y `fix(ci)` (#830). Los jobs `Migraciones` y `E2E smoke` caían con
+`toomanyrequests` de ghcr.io. Parecía un límite de descargas y en parte lo era, pero la causa
+raíz es que **`supabase/setup-cli@v2` exporta `SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io`, y en
+el CLI 2.109.1 esa variable no elige un registro preferido: apaga el fallback**
+(`public.ecr.aws` → `ghcr.io` → `docker.io`). De ahí el mensaje «failed to pull from all
+registries» con un solo registro en la lista: era la lista entera.
+
+Tres lecciones que costaron una corrida cada una:
+
+- **Ponerlo en el `env` del job no basta**: lo que un paso escribe en `$GITHUB_ENV` gana al
+  `env` del job en los pasos siguientes. Hay que vaciar la variable DESPUÉS de `setup-cli`.
+- **Una corrida verde no valida un fallo intermitente.** La primera corrida «verde» seguía
+  bajando de ghcr.io: verde por suerte. Regla nueva: un arreglo de CI se da por bueno con
+  **3 corridas verdes consecutivas**.
+- **`-x` excluye servicios de ARRANCAR, no de descargarse.** La caché basada en `docker ps`
+  guardaba 1 imagen de las 4 descargadas; va por `docker images`.

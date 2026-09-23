@@ -18,3 +18,4 @@ Registro de decisiones aprobadas. Una vez aquí, no se vuelven a discutir; si ca
 | 2026-09-16 | 15 | Shell | B + sidebar colapsable a iconos y paleta ⌘K de C («adelante con todo lo que recomiendas») | Memo | Artifact Shell A/B/C |
 | 2026-09-16 | 16 | /dev/ui | Tokens `--chart-1..6` (claro/oscuro validados), 8 primitivas y lenguaje visual aprobados | Memo | Artifact /dev/ui |
 | 2026-09-16 | 17 | Hoy | B + titular integrado a lo ancho y barra «Preguntale a My Agent C+» de C; señales como feed solo en móvil | Memo | Artifact Hoy A/B/C |
+| 2026-09-23 | 18 | Instalación de `@number-flow/react` (delta 2.3) | 0.6.2 · 23,8 KB / 6,9 KB gz · solo en el hero | Memo | Aprobada con el prompt; decisión 6 ya la contemplaba. Locale `de-DE` para coincidir con `formatMoney` |

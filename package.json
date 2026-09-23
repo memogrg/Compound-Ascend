@@ -26,6 +26,7 @@
     "@capacitor/core": "^7.6.7",
     "@capacitor/preferences": "^7.0.4",
     "@floating-ui/react": "^0.27.20",
+    "@number-flow/react": "^0.6.2",
     "@sentry/nextjs": "^10.68.0",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.108.2",
