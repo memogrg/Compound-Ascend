@@ -132,13 +132,19 @@ jobs:
         run: |
           echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las 13 imágenes del stack salen de ghcr.io."
 
+      # El arranque va por `scripts/ci/supabase-start.sh` y no por `supabase start` a pelo:
+      # el limitador de ghcr.io es intermitente y parcial —en la misma corrida unas imágenes
+      # bajan y otras rebotan—, y el CLI reintenta una sola vez antes de rendirse. El script
+      # reintenta cinco veces aprovechando que lo ya descargado queda en caché. No enmascara
+      # nada: si se agotan los intentos, sale con 1.
+      #
       # `-x`: de las trece imágenes, este job solo necesita **Postgres**. `db reset` aplica
       # SQL y nada más — no hay API, ni Studio, ni almacenamiento, ni correo que mirar. Cada
       # imagen que no se baja es una petición que el limitador de ghcr.io no puede rechazar,
       # y de paso el job arranca en segundos en vez de en minutos.
       - name: Apply fresco de toda la cadena de migraciones
         run: |
-          supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          scripts/ci/supabase-start.sh -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
           supabase db reset
 
   # Guard BLOQUEANTE: levanta la app contra un Supabase real, crea un usuario y
@@ -239,7 +245,7 @@ jobs:
       # imágenes pasan a ocho.
       - name: Levantar Supabase local + migraciones
         run: |
-          supabase start -x imgproxy,mailpit,studio,logflare,vector
+          scripts/ci/supabase-start.sh -x imgproxy,mailpit,studio,logflare,vector
           supabase migration up --local
           # Exporta URL + claves del stack efímero al entorno del job.
           # `supabase status -o env` entrecomilla los valores ("..."); hay que
