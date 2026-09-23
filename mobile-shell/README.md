@@ -35,6 +35,8 @@ npm run copy          # solo copiar la web, sin tocar dependencias nativas
 npm run pods          # reinstalar Pods de iOS (fuerza locale UTF-8; ver nota en package.json)
 ```
 
+Cada PR que toque `mobile-shell/` compila el APK de debug en CI (`.github/workflows/android-shell.yml`), falla si `cap sync` deja deriva, y deja el APK como artefacto descargable (14 días).
+
 ## Modo HÍBRIDO / remote URL (probar contra el Next.js real)
 
 **DEV — live-reload contra tu Next.js local (Android, gratis):**
