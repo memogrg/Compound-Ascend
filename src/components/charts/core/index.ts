@@ -31,6 +31,7 @@ export {
 export {
   ALTO_MINIMO,
   ANIMACION_ACTIVA,
+  AREA,
   BARRA,
   CROSSHAIR,
   EJE,
@@ -41,4 +42,4 @@ export {
   type MarcaSerie,
   type SerieDef,
 } from "./theme";
-export { niceDomain } from "./escala";
+export { dominioBarras, niceDomain } from "./escala";

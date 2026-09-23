@@ -9,6 +9,8 @@ import { describe, it, expect } from "vitest";
 
 import {
   ESTADO_INICIAL,
+  dominioBarras,
+  niceDomain,
   describirGrafico,
   esVisible,
   opacidadDe,
@@ -204,5 +206,47 @@ describe("theme.ts no contiene colores literales", () => {
     for (const [, valor] of fuente.matchAll(/\b\w*[cC]olor\w*:\s*"([^"]+)"/g)) {
       expect(valor, "valor de color sin token").toMatch(/^var\(--/);
     }
+  });
+});
+
+describe("dominioBarras", () => {
+  it("siempre empieza en 0, aunque el mínimo esté muy arriba", () => {
+    // El caso real: ingresos de 2,3 M a 2,5 M. Con el eje cortado en 2,2 M, una barra de
+    // 2,5 M parecería el triple que una de 2,3 M. El área de la barra ES el dato.
+    const [min, max] = dominioBarras([2_300_000, 2_450_000, 2_520_000]);
+    expect(min).toBe(0);
+    expect(max).toBeGreaterThanOrEqual(2_520_000);
+  });
+
+  it("el tope es redondo y NO deja el gráfico medio vacío", () => {
+    // Con 4 ticks fijos, `zeroBased` daba [0, 4 M] para un máximo de 2,52 M: las barras a
+    // media altura y medio panel en blanco. El tope tiene que quedar pegado al máximo.
+    const [, max] = dominioBarras([1_690_000, 2_520_000]);
+    expect(max).toBeGreaterThanOrEqual(2_520_000);
+    expect(max, `tope ${max} demasiado alto`).toBeLessThanOrEqual(2_520_000 * 1.35);
+    expect(max % 500_000, `tope ${max} no es redondo`).toBe(0);
+  });
+
+  it("con todo a cero la base sigue siendo 0, no un negativo", () => {
+    // La rama de «serie plana» de niceDomain abre un rango simétrico: daba [-1, 1] y la
+    // barra arrancaba por encima del eje.
+    const [min, max] = dominioBarras([0, 0]);
+    expect(min).toBe(0);
+    expect(max).toBeGreaterThan(0);
+  });
+
+  it("no recorta la base aunque el mínimo sea negativo", () => {
+    // Un mes con saldo negativo tiene que verse bajo la línea, no reencuadrado.
+    const [min, max] = dominioBarras([-400_000, 900_000]);
+    expect(min).toBeLessThanOrEqual(-400_000);
+    expect(max).toBeGreaterThanOrEqual(900_000);
+  });
+
+  it("niceDomain sin `zeroBased` SÍ recorta: por eso son dos funciones", () => {
+    // En una línea lo que se lee es la pendiente y recortar es legítimo. La diferencia es
+    // deliberada, y este test existe para que nadie las unifique «simplificando».
+    const [minLinea] = niceDomain([2_300_000, 2_520_000]);
+    expect(minLinea).toBeGreaterThan(0);
+    expect(dominioBarras([2_300_000, 2_520_000])[0]).toBe(0);
   });
 });

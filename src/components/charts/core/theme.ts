@@ -41,6 +41,20 @@ export const PUNTO_ACTIVO = {
   anilloColor: "var(--surface)",
 } as const;
 
+/**
+ * La lavada del área: 0,18 arriba y 0 abajo.
+ *
+ * Vive acá y no en el token `--chart-gradient-top` (0,28) a propósito: medido sobre el
+ * gráfico real, con 0,28 el relleno tapa la rejilla y, con dos series superpuestas, la de
+ * abajo deja de leerse. 0,18 sigue dando cuerpo al área sin competir con la línea, que es la
+ * que lleva el dato. La divergencia con el token queda anotada para el delta 7, que es cuando
+ * los wrappers viejos pasan por acá y hay un solo sitio donde decidirlo.
+ */
+export const AREA = {
+  opacidadTope: 0.18,
+  opacidadBase: 0,
+} as const;
+
 /** Rejilla de 1 px sólida. Discontinua compite con la serie de proyección, que sí lo es. */
 export const REJILLA = {
   ancho: 1,
@@ -66,7 +80,14 @@ export const CROSSHAIR = {
 export const BARRA = {
   anchoMaximo: 24,
   radio: 4,
+  /** Entre las barras de un MISMO mes: 2 px, solo para que no se toquen. */
   separacion: 2,
+  /**
+   * Entre grupos de meses. En porcentaje porque Recharts lo mide contra el ancho de la
+   * banda: un valor fijo se come el gráfico cuando hay muchas categorías. El aire entre
+   * meses tiene que ser claramente mayor que el de dentro del mes, o el ojo agrupa mal.
+   */
+  separacionCategoria: "28%",
 } as const;
 
 /**

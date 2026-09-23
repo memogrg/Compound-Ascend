@@ -28,6 +28,7 @@ import {
   REJILLA,
   TRAZO,
   describirGrafico,
+  dominioBarras,
   niceDomain,
   opacidadDe,
   seriesVisibles,
@@ -288,12 +289,14 @@ function LineaDemo() {
 function BarrasDemo() {
   const { estado, activar, desactivar, alternar } = useSerieActiva();
   const visibles = seriesVisibles(SERIES_MESES, estado);
-  const dominio = ejesComunes(MESES, ["ingresos", "gastos"]);
+  // Barras SIEMPRE desde cero: el área de la barra es lo que codifica el valor, y cortar la
+  // base exagera las diferencias.
+  const dominio = dominioBarras(MESES.flatMap((d) => [d.ingresos, d.gastos]));
 
   return (
     <ChartFrame
       titulo="Ingresos y gastos por mes"
-      subtitulo="Barras ≤ 24 px · radio solo en el extremo · 2 px entre barras"
+      subtitulo="Desde cero · barras ≤ 24 px · 2 px dentro del mes y aire entre meses"
       descripcion={describirGrafico({
         titulo: "Ingresos por mes",
         serie: MESES.map((d) => ({ x: d.x, y: d.ingresos })),
@@ -316,6 +319,7 @@ function BarrasDemo() {
           data={MESES}
           margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
           barGap={BARRA.separacion}
+          barCategoryGap={BARRA.separacionCategoria}
           accessibilityLayer
         >
           <CartesianGrid stroke={REJILLA.color} strokeWidth={REJILLA.ancho} vertical={false} />

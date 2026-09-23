@@ -177,6 +177,9 @@
   font-size: 11px;
   padding-bottom: 6px;
 }
+/* Columnas NUMÉRICAS a la derecha y con cifras de ancho fijo: así los miles quedan uno
+   debajo de otro y se puede comparar la columna de un vistazo, que es para lo que existe una
+   tabla de datos. El encabezado se alinea con su columna, no al revés. */
 .cf-tabla th,
 .cf-tabla td {
   text-align: right;
@@ -185,9 +188,14 @@
   font-variant-numeric: tabular-nums;
   color: var(--text);
 }
+/* La primera columna es el PERIODO: texto, y va a la izquierda — en el encabezado y en cada
+   fila (que es un `<th scope="row">`). */
+.cf-tabla thead th:first-child,
+.cf-tabla tbody th:first-child {
+  text-align: left;
+}
 .cf-tabla thead th,
 .cf-tabla tbody th {
-  text-align: left;
   color: var(--muted);
   font-weight: 600;
 }
