@@ -8,7 +8,7 @@
    [`base-actual.md`](./base-actual.md); las capturas viven fuera de git.
 3. **Tras el cambio**: `… npm run qa:snap -- --out qa-snapshots/cambio`.
 4. **Comparar**:
-   `npm run qa:diff -- --a qa-snapshots/base --b qa-snapshots/cambio --exclude home --max-diff-pixels 60 --max-delta 2`
+   `npm run qa:diff -- --a qa-snapshots/base --b qa-snapshots/cambio --exclude home,dev_ui --max-diff-pixels 60 --max-delta 2`
    — imprime píxeles distintos y delta máximo por imagen, escribe los PNG de diferencias y sale
    con 1 si alguna reprueba. Lo excluido se compara y se reporta igual, pero no hace fallar.
 
@@ -59,6 +59,26 @@ final estable — deja ~200 px con delta ≤ 2 (invisible) que ni `finish()` cie
 y reportando; revisar en la fase de motion. **No se baja el umbral** para taparlo: un `--threshold 2`
 también escondería un cambio de color real de 1-2 niveles en cualquier pantalla, que es justo la
 regresión que un refactor de tokens puede introducir.
+
+**`/dev/ui` también queda fuera del criterio estricto**, y por el motivo contrario: no es que
+su diferencia sea invisible, es que **cambia por diseño en cada delta de la fase 2**. Es el
+catálogo donde se aprueba el lenguaje visual, así que cada primitiva nueva lo modifica a
+propósito; medirlo contra la base solo produciría un rojo que hay que ignorar, y un rojo que
+se ignora deja de avisar de nada.
+
+Se sigue capturando y midiendo —las capturas son justamente lo que Memo aprueba— y entra en
+el inventario de accesibilidad como una superficie más.
+
+El nombre a excluir es el SLUG, no la ruta: `diff.mjs` compara por igualdad contra
+`slugDe(rel)`, y `/dev/ui` se convierte en `dev_ui`. El comando completo queda:
+
+```bash
+npm run qa:diff -- --a qa-snapshots/base --b qa-snapshots/cambio \
+  --exclude home,dev_ui --max-diff-pixels 60 --max-delta 2
+```
+
+`/dev/ui` se captura y se audita **solo a 1280** (`superficie: "dev"` en `routes.json`): es un
+catálogo de escritorio y nadie lo abre en un teléfono.
 
 ## Servidor congelado
 
