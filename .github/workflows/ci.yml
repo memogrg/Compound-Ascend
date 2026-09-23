@@ -18,6 +18,13 @@ permissions:
   contents: read
   packages: read
 
+env:
+  # En UN solo sitio: lo usan `supabase/setup-cli` de los dos jobs y la clave de la caché de
+  # imágenes, que tiene que invalidarse sola cuando esta versión suba (los tags de las
+  # imágenes los decide el CLI). Ver el comentario del job de migraciones para por qué es
+  # una versión fija y no "latest".
+  SUPABASE_CLI_VERSION: 2.109.1
+
 jobs:
   ci:
     name: Lint, Typecheck, Test & Build
@@ -68,6 +75,27 @@ jobs:
     env:
       # Solo para poder preguntar por su existencia en el `if` de los pasos de login.
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      # ─────────────────────────────────────────────────────────────────────────────────
+      # LA CAUSA RAÍZ de que estos dos jobs llevaran días en rojo, y no es el rate limit.
+      #
+      # `supabase/setup-cli@v2` exporta `SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io`. En el
+      # CLI 2.109.1 —comprobado en el binario de esa versión exacta— esa variable no elige
+      # un registro PREFERIDO: **apaga el fallback**.
+      #
+      #   registros(imagen) = env puesta ? [solo ese] : [public.ecr.aws, ghcr.io, docker.io]
+      #
+      # Por eso el error decía «failed to pull docker image from all registries: ghcr.io/…»
+      # con un solo registro en la lista: era la lista entera. Y por eso el limitador de
+      # ghcr.io sobre la IP del runner bastaba para tumbar el job.
+      #
+      # Vacía ⇒ el CLI la trata como ausente (`trim()`, `length === 0`) y recupera su
+      # comportamiento por defecto: **public.ecr.aws primero**, con ghcr.io y docker.io
+      # detrás. Comprobado que las ocho imágenes existen en `public.ecr.aws/supabase/*` con
+      # exactamente los mismos tags.
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
+      # De las trece imágenes, este job solo necesita **Postgres**: `db reset` aplica SQL y
+      # nada más. Vive en el `env` porque lo leen el arranque Y la clave de la caché.
+      EXCLUIR_SERVICIOS: gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
     steps:
       - uses: actions/checkout@v7
 
@@ -83,8 +111,9 @@ jobs:
           # (`version.toLowerCase() === "latest" ? await resolveLatestVersion() : ...`), así
           # que un número la elimina: el binario se baja directo de releases/download/v<ver>.
           # 2.109.1 es la última ESTABLE (2026-07-07); todas las posteriores son beta.
-          # Para subirla: comprueba que exista una estable nueva y súbela en LOS DOS jobs.
-          version: 2.109.1
+          # Vive en el `env` del workflow: los dos jobs y la clave de caché la leen de ahí,
+          # así que subirla es cambiar UNA línea y la caché se invalida sola.
+          version: ${{ env.SUPABASE_CLI_VERSION }}
         env:
           SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -104,7 +133,7 @@ jobs:
       # este repo y no se arregla esperando —tres reintentos repartidos en 2,5 h dieron lo
       # mismo—. Autenticado, la cuota pasa a contarse por usuario.
       - name: Login en ghcr.io (cuota por usuario en vez de por IP del runner)
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -122,7 +151,7 @@ jobs:
       - name: Login en Docker Hub (preventivo — hoy no se descarga nada de ahí)
         # `env` y no `secrets`: el contexto `secrets` no existe en el `if` de un paso.
         if: env.DOCKERHUB_USERNAME != ''
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -130,22 +159,42 @@ jobs:
       - name: Aviso si Docker Hub no está autenticado
         if: env.DOCKERHUB_USERNAME == ''
         run: |
-          echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las 13 imágenes del stack salen de ghcr.io."
+          echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las imágenes del stack salen de public.ecr.aws, con ghcr.io de respaldo."
 
-      # El arranque va por `scripts/ci/supabase-start.sh` y no por `supabase start` a pelo:
-      # el limitador de ghcr.io es intermitente y parcial —en la misma corrida unas imágenes
-      # bajan y otras rebotan—, y el CLI reintenta una sola vez antes de rendirse. El script
-      # reintenta cinco veces aprovechando que lo ya descargado queda en caché. No enmascara
-      # nada: si se agotan los intentos, sale con 1.
+      # ── Caché de imágenes ────────────────────────────────────────────────────────────
       #
-      # `-x`: de las trece imágenes, este job solo necesita **Postgres**. `db reset` aplica
-      # SQL y nada más — no hay API, ni Studio, ni almacenamiento, ni correo que mirar. Cada
-      # imagen que no se baja es una petición que el limitador de ghcr.io no puede rechazar,
-      # y de paso el job arranca en segundos en vez de en minutos.
-      - name: Apply fresco de toda la cadena de migraciones
+      # Mientras el job dependa de DESCARGAR imágenes de un registro público, depende de que
+      # ese registro esté de buenas. La caché convierte esa dependencia en una copia local:
+      # la primera corrida la llena y las siguientes no bajan nada.
+      #
+      # La clave lleva la versión del CLI —que es quien decide los tags— y un hash de la
+      # lista de exclusiones, que es quien decide CUÁNTAS imágenes son. Cambiar cualquiera de
+      # las dos invalida la caché sola, sin que nadie tenga que acordarse.
+      - name: Clave de la caché de imágenes
+        id: clave_imagenes
         run: |
-          scripts/ci/supabase-start.sh -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
-          supabase db reset
+          echo "valor=imagenes-${{ env.SUPABASE_CLI_VERSION }}-migrations-$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de imágenes del stack
+        id: cache_imagenes
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/supabase-imagenes/stack.tar
+          key: ${{ steps.clave_imagenes.outputs.valor }}
+
+      - name: Cargar imágenes de la caché
+        run: scripts/ci/imagenes-supabase.sh cargar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Levantar el stack
+        run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
+
+      # Solo cuando la caché no acertó: si acertó, el tarball ya es el que está en disco.
+      - name: Guardar imágenes para la próxima corrida
+        if: steps.cache_imagenes.outputs.cache-hit != 'true'
+        run: scripts/ci/imagenes-supabase.sh guardar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Apply fresco de toda la cadena de migraciones
+        run: supabase db reset
 
   # Guard BLOQUEANTE: levanta la app contra un Supabase real, crea un usuario y
   # navega. Es el ÚNICO job que EJERCITA el esquema en vez de solo aplicarlo, y
@@ -175,6 +224,28 @@ jobs:
     env:
       # Solo para poder preguntar por su existencia en el `if` de los pasos de login.
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      # ─────────────────────────────────────────────────────────────────────────────────
+      # LA CAUSA RAÍZ de que estos dos jobs llevaran días en rojo, y no es el rate limit.
+      #
+      # `supabase/setup-cli@v2` exporta `SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io`. En el
+      # CLI 2.109.1 —comprobado en el binario de esa versión exacta— esa variable no elige
+      # un registro PREFERIDO: **apaga el fallback**.
+      #
+      #   registros(imagen) = env puesta ? [solo ese] : [public.ecr.aws, ghcr.io, docker.io]
+      #
+      # Por eso el error decía «failed to pull docker image from all registries: ghcr.io/…»
+      # con un solo registro en la lista: era la lista entera. Y por eso el limitador de
+      # ghcr.io sobre la IP del runner bastaba para tumbar el job.
+      #
+      # Vacía ⇒ el CLI la trata como ausente (`trim()`, `length === 0`) y recupera su
+      # comportamiento por defecto: **public.ecr.aws primero**, con ghcr.io y docker.io
+      # detrás. Comprobado que las ocho imágenes existen en `public.ecr.aws/supabase/*` con
+      # exactamente los mismos tags.
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
+      # El smoke abre un navegador, inicia sesión y navega: necesita Postgres, kong, gotrue,
+      # postgrest, realtime y storage. Fuera quedan los cinco que nada de eso toca — Studio,
+      # imgproxy, mailpit (el usuario se siembra ya confirmado) y el par logflare + vector.
+      EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
     steps:
       - uses: actions/checkout@v7
 
@@ -190,9 +261,8 @@ jobs:
       - name: Supabase CLI
         uses: supabase/setup-cli@v2
         with:
-          # Misma versión fija que el job de migraciones: ver allí el porqué. Si subes una,
-          # sube la otra — que los dos jobs prueben contra el mismo CLI es parte del punto.
-          version: 2.109.1
+          # Misma versión que el job de migraciones, y del mismo sitio: el `env` del workflow.
+          version: ${{ env.SUPABASE_CLI_VERSION }}
         env:
           SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -209,7 +279,7 @@ jobs:
       # este repo y no se arregla esperando —tres reintentos repartidos en 2,5 h dieron lo
       # mismo—. Autenticado, la cuota pasa a contarse por usuario.
       - name: Login en ghcr.io (cuota por usuario en vez de por IP del runner)
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -227,7 +297,7 @@ jobs:
       - name: Login en Docker Hub (preventivo — hoy no se descarga nada de ahí)
         # `env` y no `secrets`: el contexto `secrets` no existe en el `if` de un paso.
         if: env.DOCKERHUB_USERNAME != ''
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -235,17 +305,41 @@ jobs:
       - name: Aviso si Docker Hub no está autenticado
         if: env.DOCKERHUB_USERNAME == ''
         run: |
-          echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las 13 imágenes del stack salen de ghcr.io."
+          echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las imágenes del stack salen de public.ecr.aws, con ghcr.io de respaldo."
 
-      # `-x`, como en el job de migraciones pero conservador: el smoke abre un navegador,
-      # inicia sesión y navega, así que necesita Postgres, kong, gotrue, postgrest, realtime
-      # y storage. Se quedan fuera los cinco servicios que ninguna de esas cosas toca:
-      # Studio (la UI de administración), imgproxy (miniaturas), mailpit (buzón local — el
-      # usuario se siembra ya confirmado) y el par logflare + vector (analítica). Trece
-      # imágenes pasan a ocho.
-      - name: Levantar Supabase local + migraciones
+      # ── Caché de imágenes ────────────────────────────────────────────────────────────
+      #
+      # Mientras el job dependa de DESCARGAR imágenes de un registro público, depende de que
+      # ese registro esté de buenas. La caché convierte esa dependencia en una copia local:
+      # la primera corrida la llena y las siguientes no bajan nada.
+      #
+      # La clave lleva la versión del CLI —que es quien decide los tags— y un hash de la
+      # lista de exclusiones, que es quien decide CUÁNTAS imágenes son. Cambiar cualquiera de
+      # las dos invalida la caché sola, sin que nadie tenga que acordarse.
+      - name: Clave de la caché de imágenes
+        id: clave_imagenes
         run: |
-          scripts/ci/supabase-start.sh -x imgproxy,mailpit,studio,logflare,vector
+          echo "valor=imagenes-${{ env.SUPABASE_CLI_VERSION }}-e2e-$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de imágenes del stack
+        id: cache_imagenes
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/supabase-imagenes/stack.tar
+          key: ${{ steps.clave_imagenes.outputs.valor }}
+
+      - name: Cargar imágenes de la caché
+        run: scripts/ci/imagenes-supabase.sh cargar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Levantar el stack
+        run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
+
+      - name: Guardar imágenes para la próxima corrida
+        if: steps.cache_imagenes.outputs.cache-hit != 'true'
+        run: scripts/ci/imagenes-supabase.sh guardar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Migraciones y variables del stack efímero
+        run: |
           supabase migration up --local
           # Exporta URL + claves del stack efímero al entorno del job.
           # `supabase status -o env` entrecomilla los valores ("..."); hay que

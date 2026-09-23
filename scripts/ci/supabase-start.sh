@@ -2,25 +2,25 @@
 #
 # `supabase start` con reintentos, para el rate limit de ghcr.io en los runners de GitHub.
 #
-# El límite es INTERMITENTE y PARCIAL: en la misma corrida, unas imágenes bajan («Status:
-# Downloaded newer image for ghcr.io/supabase/storage-api») y otras rebotan con
-# `toomanyrequests`. El CLI de Supabase reintenta UNA vez con 8 s de espera y después se
-# rinde, así que basta con que una sola imagen tenga mala suerte para tumbar el job.
+# Los reintentos son la RED, no el arreglo: el arreglo es el registro (ver el `env` del
+# workflow) y la caché de imágenes. Esto cubre el caso en que, aun así, un registro público
+# tenga un mal minuto.
 #
-# Cada imagen que sí baja se queda en la caché local del daemon, de modo que cada intento
-# arranca más cerca del final que el anterior. Por eso reintentar converge en vez de repetir
-# el mismo trabajo.
+# Espera CRECIENTE y no fija. Con 30 s fijos, la corrida #1741 gastó cinco intentos en cuatro
+# minutos contra un limitador que seguía activo: reintentar rápido contra algo que limita por
+# tiempo es pedirle que te siga diciendo que no. Doblando la espera —30, 60, 120, 240— el
+# último intento cae ocho minutos después del primero, que es cuando una ventana de cuota ya
+# ha rotado.
 #
 # Esto NO enmascara fallos: si se agotan los intentos, el script sale con 1 y el job cae. Un
-# error real de migración o de configuración falla igual en el primer intento… y sí, se
-# reintentaría cuatro veces más antes de reportarlo; a cambio, un job que hoy no arranca
-# nunca vuelve a arrancar. El coste es tiempo en el caso malo; el beneficio, un CI que
-# existe.
+# error real de configuración falla igual en el primer intento y se reintentaría en vano; a
+# cambio, un job que hoy no arranca vuelve a arrancar. El coste es tiempo en el caso malo.
 #
 # Uso:  scripts/ci/supabase-start.sh [argumentos de `supabase start`…]
 set -uo pipefail
 
 INTENTOS="${SUPABASE_START_INTENTOS:-5}"
+# Primera espera; se dobla en cada intento fallido.
 ESPERA="${SUPABASE_START_ESPERA:-30}"
 
 for i in $(seq 1 "$INTENTOS"); do
@@ -34,11 +34,12 @@ for i in $(seq 1 "$INTENTOS"); do
     exit 1
   fi
 
-  echo "::warning::intento $i de $INTENTOS falló; se reintenta en ${ESPERA}s. Las imágenes ya descargadas quedan en caché."
+  echo "::warning::intento $i de $INTENTOS falló; se reintenta en ${ESPERA}s (la espera se dobla en cada intento)"
   # Dejar contenedores a medio arrancar hace que el siguiente intento falle por otra razón.
   # `if !` y no `|| true`: no hay stack que parar en el primer intento, y eso no es un error.
   if ! supabase stop --no-backup; then
     echo "no había stack que parar"
   fi
   sleep "$ESPERA"
+  ESPERA=$((ESPERA * 2))
 done
