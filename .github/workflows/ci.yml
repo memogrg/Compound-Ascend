@@ -111,13 +111,17 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Hoy NINGUNA imagen del stack viene de Docker Hub; este paso es preventivo, para el
-      # día en que el CLI de Supabase mueva alguna o añadamos un servicio propio. Por eso
-      # va condicionado a que el secret exista y con `continue-on-error`: si falta o
-      # caduca, deja un aviso en el log y el PR no depende de él.
+      # día en que el CLI de Supabase mueva alguna o añadamos un servicio propio.
+      #
+      # Sin `continue-on-error`, a propósito: `tests/unit/ci-guards.test.ts` prohíbe esa
+      # directiva en TODO el archivo —un job que se salta su propio veredicto ya nos costó
+      # un incidente— y no hace falta, porque el `if` ya se encarga de lo único que se
+      # quería cubrir: que el PR no dependa de unos secrets que todavía no existen. Si el
+      # secret existe pero es inválido, que falle es lo correcto: una credencial rota tiene
+      # que verse.
       - name: Login en Docker Hub (preventivo — hoy no se descarga nada de ahí)
         # `env` y no `secrets`: el contexto `secrets` no existe en el `if` de un paso.
         if: env.DOCKERHUB_USERNAME != ''
-        continue-on-error: true
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -128,9 +132,13 @@ jobs:
         run: |
           echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las 13 imágenes del stack salen de ghcr.io."
 
+      # `-x`: de las trece imágenes, este job solo necesita **Postgres**. `db reset` aplica
+      # SQL y nada más — no hay API, ni Studio, ni almacenamiento, ni correo que mirar. Cada
+      # imagen que no se baja es una petición que el limitador de ghcr.io no puede rechazar,
+      # y de paso el job arranca en segundos en vez de en minutos.
       - name: Apply fresco de toda la cadena de migraciones
         run: |
-          supabase start
+          supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
           supabase db reset
 
   # Guard BLOQUEANTE: levanta la app contra un Supabase real, crea un usuario y
@@ -202,13 +210,17 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Hoy NINGUNA imagen del stack viene de Docker Hub; este paso es preventivo, para el
-      # día en que el CLI de Supabase mueva alguna o añadamos un servicio propio. Por eso
-      # va condicionado a que el secret exista y con `continue-on-error`: si falta o
-      # caduca, deja un aviso en el log y el PR no depende de él.
+      # día en que el CLI de Supabase mueva alguna o añadamos un servicio propio.
+      #
+      # Sin `continue-on-error`, a propósito: `tests/unit/ci-guards.test.ts` prohíbe esa
+      # directiva en TODO el archivo —un job que se salta su propio veredicto ya nos costó
+      # un incidente— y no hace falta, porque el `if` ya se encarga de lo único que se
+      # quería cubrir: que el PR no dependa de unos secrets que todavía no existen. Si el
+      # secret existe pero es inválido, que falle es lo correcto: una credencial rota tiene
+      # que verse.
       - name: Login en Docker Hub (preventivo — hoy no se descarga nada de ahí)
         # `env` y no `secrets`: el contexto `secrets` no existe en el `if` de un paso.
         if: env.DOCKERHUB_USERNAME != ''
-        continue-on-error: true
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -219,9 +231,15 @@ jobs:
         run: |
           echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las 13 imágenes del stack salen de ghcr.io."
 
+      # `-x`, como en el job de migraciones pero conservador: el smoke abre un navegador,
+      # inicia sesión y navega, así que necesita Postgres, kong, gotrue, postgrest, realtime
+      # y storage. Se quedan fuera los cinco servicios que ninguna de esas cosas toca:
+      # Studio (la UI de administración), imgproxy (miniaturas), mailpit (buzón local — el
+      # usuario se siembra ya confirmado) y el par logflare + vector (analítica). Trece
+      # imágenes pasan a ocho.
       - name: Levantar Supabase local + migraciones
         run: |
-          supabase start
+          supabase start -x imgproxy,mailpit,studio,logflare,vector
           supabase migration up --local
           # Exporta URL + claves del stack efímero al entorno del job.
           # `supabase status -o env` entrecomilla los valores ("..."); hay que
