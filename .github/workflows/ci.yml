@@ -10,6 +10,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# `packages: read` es lo que hace que el login a ghcr.io sirva para algo: sin él, el
+# GITHUB_TOKEN no puede leer paquetes y el `docker login` de abajo autenticaría a una
+# identidad sin permiso de descarga. `contents: read` es lo único más que hace falta —
+# el workflow no comenta, no etiqueta y no publica nada.
+permissions:
+  contents: read
+  packages: read
+
 jobs:
   ci:
     name: Lint, Typecheck, Test & Build
@@ -57,6 +65,9 @@ jobs:
   migrations:
     name: Migraciones aplican en BD fresca
     runs-on: ubuntu-latest
+    env:
+      # Solo para poder preguntar por su existencia en el `if` de los pasos de login.
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     steps:
       - uses: actions/checkout@v7
 
@@ -81,9 +92,59 @@ jobs:
       # `supabase start` arranca el stack aplicando migraciones; `supabase db reset`
       # fuerza un re-apply LIMPIO de TODA la cadena y sale con código ≠ 0 si alguna
       # migración falla → el job (y el PR) fallan. Sin seed ni app: solo el esquema.
+
+      # ── Autenticación de registros, ANTES de cualquier `supabase start` ──────────────
+      #
+      # `supabase start` baja TRECE imágenes y **todas** salen de ghcr.io/supabase/*:
+      # postgres, gotrue, postgrest, realtime, storage-api, imgproxy, edge-runtime,
+      # postgres-meta, studio, logflare, vector, mailpit y kong. Ninguna de Docker Hub.
+      #
+      # Anónimamente, ghcr.io limita por IP, y la IP es la del runner compartido de
+      # GitHub: el error es `toomanyrequests: allowed: 44000/minute`, que no es culpa de
+      # este repo y no se arregla esperando —tres reintentos repartidos en 2,5 h dieron lo
+      # mismo—. Autenticado, la cuota pasa a contarse por usuario.
+      - name: Login en ghcr.io (cuota por usuario en vez de por IP del runner)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Hoy NINGUNA imagen del stack viene de Docker Hub; este paso es preventivo, para el
+      # día en que el CLI de Supabase mueva alguna o añadamos un servicio propio.
+      #
+      # Sin `continue-on-error`, a propósito: `tests/unit/ci-guards.test.ts` prohíbe esa
+      # directiva en TODO el archivo —un job que se salta su propio veredicto ya nos costó
+      # un incidente— y no hace falta, porque el `if` ya se encarga de lo único que se
+      # quería cubrir: que el PR no dependa de unos secrets que todavía no existen. Si el
+      # secret existe pero es inválido, que falle es lo correcto: una credencial rota tiene
+      # que verse.
+      - name: Login en Docker Hub (preventivo — hoy no se descarga nada de ahí)
+        # `env` y no `secrets`: el contexto `secrets` no existe en el `if` de un paso.
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Aviso si Docker Hub no está autenticado
+        if: env.DOCKERHUB_USERNAME == ''
+        run: |
+          echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las 13 imágenes del stack salen de ghcr.io."
+
+      # El arranque va por `scripts/ci/supabase-start.sh` y no por `supabase start` a pelo:
+      # el limitador de ghcr.io es intermitente y parcial —en la misma corrida unas imágenes
+      # bajan y otras rebotan—, y el CLI reintenta una sola vez antes de rendirse. El script
+      # reintenta cinco veces aprovechando que lo ya descargado queda en caché. No enmascara
+      # nada: si se agotan los intentos, sale con 1.
+      #
+      # `-x`: de las trece imágenes, este job solo necesita **Postgres**. `db reset` aplica
+      # SQL y nada más — no hay API, ni Studio, ni almacenamiento, ni correo que mirar. Cada
+      # imagen que no se baja es una petición que el limitador de ghcr.io no puede rechazar,
+      # y de paso el job arranca en segundos en vez de en minutos.
       - name: Apply fresco de toda la cadena de migraciones
         run: |
-          supabase start
+          scripts/ci/supabase-start.sh -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
           supabase db reset
 
   # Guard BLOQUEANTE: levanta la app contra un Supabase real, crea un usuario y
@@ -111,6 +172,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: ci
     if: github.event_name == 'pull_request'
+    env:
+      # Solo para poder preguntar por su existencia en el `if` de los pasos de login.
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     steps:
       - uses: actions/checkout@v7
 
@@ -133,9 +197,55 @@ jobs:
           SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+
+      # ── Autenticación de registros, ANTES de cualquier `supabase start` ──────────────
+      #
+      # `supabase start` baja TRECE imágenes y **todas** salen de ghcr.io/supabase/*:
+      # postgres, gotrue, postgrest, realtime, storage-api, imgproxy, edge-runtime,
+      # postgres-meta, studio, logflare, vector, mailpit y kong. Ninguna de Docker Hub.
+      #
+      # Anónimamente, ghcr.io limita por IP, y la IP es la del runner compartido de
+      # GitHub: el error es `toomanyrequests: allowed: 44000/minute`, que no es culpa de
+      # este repo y no se arregla esperando —tres reintentos repartidos en 2,5 h dieron lo
+      # mismo—. Autenticado, la cuota pasa a contarse por usuario.
+      - name: Login en ghcr.io (cuota por usuario en vez de por IP del runner)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Hoy NINGUNA imagen del stack viene de Docker Hub; este paso es preventivo, para el
+      # día en que el CLI de Supabase mueva alguna o añadamos un servicio propio.
+      #
+      # Sin `continue-on-error`, a propósito: `tests/unit/ci-guards.test.ts` prohíbe esa
+      # directiva en TODO el archivo —un job que se salta su propio veredicto ya nos costó
+      # un incidente— y no hace falta, porque el `if` ya se encarga de lo único que se
+      # quería cubrir: que el PR no dependa de unos secrets que todavía no existen. Si el
+      # secret existe pero es inválido, que falle es lo correcto: una credencial rota tiene
+      # que verse.
+      - name: Login en Docker Hub (preventivo — hoy no se descarga nada de ahí)
+        # `env` y no `secrets`: el contexto `secrets` no existe en el `if` de un paso.
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Aviso si Docker Hub no está autenticado
+        if: env.DOCKERHUB_USERNAME == ''
+        run: |
+          echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las 13 imágenes del stack salen de ghcr.io."
+
+      # `-x`, como en el job de migraciones pero conservador: el smoke abre un navegador,
+      # inicia sesión y navega, así que necesita Postgres, kong, gotrue, postgrest, realtime
+      # y storage. Se quedan fuera los cinco servicios que ninguna de esas cosas toca:
+      # Studio (la UI de administración), imgproxy (miniaturas), mailpit (buzón local — el
+      # usuario se siembra ya confirmado) y el par logflare + vector (analítica). Trece
+      # imágenes pasan a ocho.
       - name: Levantar Supabase local + migraciones
         run: |
-          supabase start
+          scripts/ci/supabase-start.sh -x imgproxy,mailpit,studio,logflare,vector
           supabase migration up --local
           # Exporta URL + claves del stack efímero al entorno del job.
           # `supabase status -o env` entrecomilla los valores ("..."); hay que
