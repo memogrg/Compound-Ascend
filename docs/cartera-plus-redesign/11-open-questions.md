@@ -102,5 +102,15 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 
 - **El rate-limit de `auth` no caduca con el reloj congelado.** `QA_FREEZE` congela `Date.now()` en el servidor y la ventana fija del limitador nunca rota, así que los logins del arnés se acumulan hasta agotar el bucket y solo se recupera reiniciando el proceso. Pendiente: que `RATE_LIMITS` use un reloj que el congelador no toque, o exceptuar el bucket cuando `QA_FREEZE` está presente.
 
+- **Un solo login por corrida de a11y.** Cada spec de `tests/a11y/` hace el suyo en su `beforeAll`; con tres specs son tres logins por corrida, y el bucket `auth` no caduca con el reloj congelado (ver arriba). Pendiente: un `storageState` global de Playwright (`globalSetup` + `use.storageState`) para iniciar sesión una vez.
+
+- **Job de a11y con bandera ENCENDIDA en CI.** Hoy `npm run test:a11y` corre contra un servidor construido con la bandera apagada, así que los specs de la paleta ⌘K y de `/m` v2 se saltan solos y nadie los ejecuta salvo a mano. Pendiente: un job aparte que construya con `NEXT_PUBLIC_NAV_V2=1` y corra solo esos specs.
+
+- **`meta-viewport` en `/m` (moderate, 1 nodo por ruta, 15 en total).** Es WCAG 1.4.4: el layout móvil bloquea el escalado (`maximumScale: 1`, `userScalable: false`) para que el WebView se comporte como app nativa, con el argumento —escrito en `m/layout.tsx:24-36`— de que el zoom del SISTEMA sigue disponible. **Decisión de Memo**, no de un delta: cerrar la regla es renunciar al pellizco dentro de la app.
+
+- **`fix(a11y)` posterior: `aria-hidden-focus` en `/m`.** 32 nodos, el doble que en la web (14), concentrados en `/m/gastos` y `/m/transacciones`. No es de este delta —ya estaba en la línea base— y no hay `critical`, así que va aparte.
+
+- **`/m/asistente` no está en `routes.json`.** Se añadieron los 15 destinos del drawer ☰, y el chat se alcanza desde la acción del header, no desde el drawer. Queda sin cobertura visual ni de a11y. Pendiente: decidir si entra como ruta 16.
+
 Nada de lo anterior toca producción.
 

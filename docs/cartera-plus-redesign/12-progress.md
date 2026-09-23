@@ -53,4 +53,7 @@ Fase 1 · delta 2 sidebar-v2: hecho (#816).
 Fase 1 · delta 3 topbar-period: hecho (#817).
 Fase 1 · delta 4 tabs-url: hecho (#818).
 fix(budget) presupuesto derivado retroactivo: hecho (#819) — base visual regenerada desde `e4cace8b`.
-Fase 1 · delta 5 command-palette: en revisión — paleta ⌘K sobre `modal.tsx`, sin dependencias nuevas.
+Fase 1 · delta 5 command-palette: hecho (#820).
+chore(qa) cobertura de `/m`: hecho (#821) — routes.json 23 → 38, a11y por superficie.
+Fase 1 · delta 6 mobile-nav-v2: en revisión — alcance A, el drawer y el eyebrow de `/m` salen
+del modelo v2 y se añaden pestañas de núcleo; la barra inferior NO vuelve.
