@@ -33,6 +33,7 @@ export function ChartFrame({
   subtitulo,
   descripcion,
   alto = 220,
+  reservaSuperior = 0,
   estado = "datos",
   mensajeVacio = "No hay suficiente historial para mostrar la gráfica.",
   mensajeError = "No se pudo cargar la gráfica.",
@@ -47,6 +48,15 @@ export function ChartFrame({
   /** `aria-label` del gráfico, de `describirGrafico()`. Es el titular hablado. */
   descripcion: string;
   alto?: number;
+  /**
+   * Alto EXTRA sobre el del gráfico, para la franja del tooltip anclado en táctil.
+   *
+   * Suma, no resta. La primera versión lo descontaba del área de trazado con `margin.top` y
+   * dejaba una curva de 40 px en un gráfico de 230: el tooltip dejaba de tapar el trazado
+   * porque casi no quedaba trazado. La reserva tiene que darle sitio al tooltip sin quitárselo
+   * al dato.
+   */
+  reservaSuperior?: number;
   estado?: EstadoGrafico;
   mensajeVacio?: string;
   mensajeError?: string;
@@ -63,7 +73,7 @@ export function ChartFrame({
 }) {
   const [verTabla, setVerTabla] = useState(false);
   const idTabla = `cf-tabla-${useId()}`;
-  const altura = Math.max(alto, ALTO_MINIMO);
+  const altura = Math.max(alto, ALTO_MINIMO) + reservaSuperior;
   const figuraRef = useRef<HTMLElement>(null);
 
   /**

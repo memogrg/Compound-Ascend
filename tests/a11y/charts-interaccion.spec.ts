@@ -157,7 +157,10 @@ test("teclado: las flechas mueven el anuncio y Enter fija", async ({ browser }) 
 test("táctil: el arrastre horizontal recorre y el tooltip se ancla arriba", async ({ browser }) => {
   const { ctx, page } = await abrir(browser, { tactil: true });
   const b = page.locator(".cf").nth(1);
-  const caja = await areaDe(page, b);
+  await areaDe(page, b);
+  // Se apunta dentro de la REJILLA, no del SVG: en táctil el gráfico reserva arriba la
+  // franja del tooltip, así que el centro del SVG cae en esa franja y no en el trazado.
+  const caja = (await b.locator(".recharts-cartesian-grid").first().boundingBox())!;
   const y = caja.y + caja.height * 0.6;
 
   // Arrastre HORIZONTAL: recorre puntos.
@@ -172,11 +175,16 @@ test("táctil: el arrastre horizontal recorre y el tooltip se ancla arriba", asy
   await page.mouse.up();
   expect(segundo, "el arrastre cambió de punto").not.toBe(primero);
 
-  // Con puntero grueso el tooltip va ARRIBA del área: bajo el dedo no se lee.
-  const cajaTip = await b.locator(".cf-tip").boundingBox();
-  const cajaRejilla = await b.locator(".recharts-cartesian-grid").first().boundingBox();
+  // Con puntero grueso el tooltip va ARRIBA del área y el gráfico le reserva el hueco: no
+  // basta con anclarlo arriba si al hacerlo tapa la curva que se está recorriendo.
+  const cajaTip = (await b.locator(".cf-tip").boundingBox())!;
+  const cajaRejilla = caja;
   expect(cajaTip, "el tooltip no tiene caja").not.toBeNull();
-  expect(cajaTip!.y, "el tooltip tapa el área de trazado").toBeLessThan(cajaRejilla!.y);
+  expect(
+    cajaTip.y + cajaTip.height,
+    `el tooltip (${Math.round(cajaTip.y)}–${Math.round(cajaTip.y + cajaTip.height)}) ` +
+      `invade el trazado (desde ${Math.round(cajaRejilla.y)})`,
+  ).toBeLessThanOrEqual(cajaRejilla.y);
 
   await ctx.close();
 });
@@ -234,3 +242,33 @@ for (const tema of ["light", "dark"] as const) {
     await ctx.close();
   });
 }
+
+test("el anillo de foco del gráfico solo aparece por teclado", async ({ browser }) => {
+  // Recharts hace el SVG focalizable, y el navegador le dibuja el anillo también al hacer
+  // clic: quien usa el ratón se encontraba un recuadro en cada punto que tocaba.
+  const { ctx, page } = await abrir(browser);
+  const a = page.locator(".cf").nth(0);
+  const caja = await areaDe(page, a);
+  const svg = a.locator("svg.recharts-surface");
+
+  await page.mouse.click(caja.x + caja.width * 0.5, caja.y + caja.height * 0.5);
+  await page.waitForTimeout(300);
+  // El clic NO enfoca el `<svg>`: enfoca uno de los `<g tabindex="-1">` que Recharts pone
+  // dentro. Por eso se mira el elemento realmente enfocado, no el que uno supondría.
+  const conRaton = await page.evaluate(() => {
+    const el = document.activeElement as HTMLElement | null;
+    return el ? getComputedStyle(el).outlineStyle : "sin-foco";
+  });
+  expect(conRaton, "con el ratón no debería haber anillo").toBe("none");
+
+  // Por teclado sí: es cuando hace falta saber dónde se está.
+  await page.keyboard.press("Escape");
+  await svg.evaluate((e) => (e as unknown as HTMLElement).focus());
+  await page.keyboard.press("ArrowRight");
+  await page.waitForTimeout(250);
+  await expect(svg).toBeFocused();
+  const porTeclado = await svg.evaluate((e) => getComputedStyle(e).outlineStyle);
+  expect(porTeclado, "por teclado sí debería haber anillo").not.toBe("none");
+
+  await ctx.close();
+});

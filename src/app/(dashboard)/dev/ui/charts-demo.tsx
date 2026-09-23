@@ -16,6 +16,7 @@ import {
 } from "recharts";
 
 import {
+  ALTO_TOOLTIP_ANCLADO,
   ANIMACION_ACTIVA,
   BARRA,
   ChartFrame,
@@ -258,8 +259,21 @@ function useInteraccion() {
     ? { x: posicionAnclada({ ancho: anchoRef.current || 320, x: coordX }), y: 0 }
     : undefined;
 
+  /**
+   * En táctil el gráfico reserva arriba el alto del tooltip anclado. Sin esta reserva, el
+   * tooltip «anclado arriba» se dibuja ENCIMA del trazado y tapa justo la curva que se está
+   * recorriendo con el dedo — se cambiaría un estorbo por otro.
+   */
+  const margen = grueso
+    ? { top: ALTO_TOOLTIP_ANCLADO, right: 8, bottom: 0, left: 0 }
+    : { top: 8, right: 8, bottom: 0, left: 0 };
+
   return {
     ...serie,
+    margen,
+    // El marco crece lo que ocupa la franja: el `margin.top` de Recharts empuja el trazado
+    // hacia abajo, y sin este extra el gráfico se quedaría sin sitio para la curva.
+    reservaSuperior: grueso ? ALTO_TOOLTIP_ANCLADO : 0,
     anuncio: porTeclado ? anuncio : null,
     alPunto,
     propsChart,
@@ -321,6 +335,7 @@ function AreaDemo() {
         formato: (v) => formatMoney(v, MONEDA),
       })}
       alto={230}
+      reservaSuperior={it.reservaSuperior}
       anuncio={it.anuncio}
       onSoltar={it.soltar}
       tabla={tablaDeDatos(
@@ -343,7 +358,7 @@ function AreaDemo() {
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={PATRIMONIO}
-            margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+            margin={it.margen}
             syncId={GRUPO}
             syncMethod={SYNC_METHOD}
             accessibilityLayer
@@ -414,6 +429,7 @@ function LineaDemo() {
         formato: (v) => formatMoney(v, MONEDA),
       })}
       alto={230}
+      reservaSuperior={it.reservaSuperior}
       anuncio={it.anuncio}
       onSoltar={it.soltar}
       tabla={tablaDeDatos(
@@ -436,7 +452,7 @@ function LineaDemo() {
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={FLUJO}
-            margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+            margin={it.margen}
             syncId={GRUPO}
             syncMethod={SYNC_METHOD}
             accessibilityLayer
@@ -502,6 +518,7 @@ function BarrasDemo() {
         formato: (v) => formatMoney(v, MONEDA),
       })}
       alto={230}
+      reservaSuperior={it.reservaSuperior}
       anuncio={it.anuncio}
       onSoltar={it.soltar}
       tabla={tablaDeDatos(
@@ -524,7 +541,7 @@ function BarrasDemo() {
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={MESES}
-            margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+            margin={it.margen}
             barGap={BARRA.separacion}
             barCategoryGap={BARRA.separacionCategoria}
             accessibilityLayer
@@ -578,6 +595,7 @@ function SobresDemo() {
         formato: (v) => formatMoney(v, MONEDA),
       })}
       alto={230}
+      reservaSuperior={it.reservaSuperior}
       anuncio={it.anuncio}
       onSoltar={it.soltar}
       tabla={tablaDeDatos(
@@ -598,12 +616,7 @@ function SobresDemo() {
     >
       <div {...it.propsContenedor} style={{ height: "100%" }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={SOBRES}
-            margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
-            accessibilityLayer
-            {...it.propsChart}
-          >
+          <LineChart data={SOBRES} margin={it.margen} accessibilityLayer {...it.propsChart}>
             <CartesianGrid stroke={REJILLA.color} strokeWidth={REJILLA.ancho} vertical={false} />
             <XAxis dataKey="x" {...EJE_PROPS} tickFormatter={formatoEjeX} />
             <YAxis

@@ -41,6 +41,7 @@ export {
 } from "./accesible";
 export {
   ALTO_MINIMO,
+  ALTO_TOOLTIP_ANCLADO,
   ANIMACION_ACTIVA,
   AREA,
   CROSSHAIR_FIJO,

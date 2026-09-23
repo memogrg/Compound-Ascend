@@ -249,3 +249,23 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── Foco del gráfico ─────────────────────────────────────────────────────── */
+
+/* `accessibilityLayer` de Recharts hace el SVG focalizable, y el navegador le dibuja el
+   anillo también al hacer CLIC: quien usa el ratón se encuentra un recuadro que no pidió, en
+   cada punto que toca. El anillo se reserva para `:focus-visible`, que es exactamente la
+   heurística de «llegó por teclado». No se quita el foco: se quita el ruido. */
+/* La regla cubre el SVG y sus grupos internos: un clic no enfoca el `<svg>` sino uno de los
+   `<g class="recharts-zIndex-layer_…">` que Recharts marca con `tabindex="-1"`, así que
+   apuntar solo al svg dejaba el recuadro puesto igual. */
+.cf svg.recharts-surface:focus,
+.cf svg.recharts-surface :focus {
+  outline: none;
+}
+.cf svg.recharts-surface:focus-visible,
+.cf svg.recharts-surface :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-md);
+}

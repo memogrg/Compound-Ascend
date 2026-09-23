@@ -117,6 +117,22 @@ export const OPACIDAD = {
  */
 export const ANIMACION_ACTIVA = false;
 
+/**
+ * Alto que ocupa el tooltip anclado arriba en un puntero grueso, más su respiro.
+ *
+ * **150 px medidos** sobre el caso peor de las muestras (cabecera + tres filas con delta +
+ * nota), más 10 de respiro. En táctil el gráfico RESERVA este espacio con `margin.top`, en vez
+ * de dejar que el tooltip flote sobre el trazado: anclarlo arriba no sirve de nada si al
+ * hacerlo tapa la curva que se está recorriendo con el dedo. En escritorio no se reserva —
+ * ahí el tooltip sigue al ratón y se aparta solo.
+ *
+ * Es una constante y no una medición en vivo porque medir obligaría a un ciclo
+ * render → medir → re-render en cada punto. Si un tooltip futuro crece más (más de tres
+ * series con delta y nota a la vez), el test táctil lo caza: comprueba que la caja del
+ * tooltip NO se solapa con la de la rejilla.
+ */
+export const ALTO_TOOLTIP_ANCLADO = 160;
+
 /** Alto mínimo de un gráfico. Por debajo, los ejes y el tooltip no caben. */
 export const ALTO_MINIMO = 160;
 
