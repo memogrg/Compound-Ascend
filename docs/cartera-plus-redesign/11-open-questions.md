@@ -129,5 +129,7 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 
 - **La coincidencia con `formatMoney` depende de que `de-DE` siga agrupando con punto.** `numero-animado.ts` no elige ese locale por idioma sino por su gramática numérica, que es la única de `Intl` que coincide con `format.ts`. Si CLDR cambiara esa agrupación, el hero y las tarjetas empezarían a decir cosas distintas; lo detecta `tests/unit/kpi.test.tsx`, que compara carácter a carácter, pero conviene saber de dónde vendría el fallo.
 
+- **Los runners quedan fijados a `ubuntu-24.04`, y eso es una deuda con fecha.** `ubuntu-latest` migra a **Ubuntu 26 el 19 de octubre de 2026**, y una migración de imagen que llega sola el día que toca no es una decisión: es una sorpresa que aparece como CI en rojo sin que nadie haya tocado el repo. Pendiente: probar Ubuntu 26 en una rama —`runs-on: ubuntu-26.04` en los 7 sitios, las tres corridas verdes de rigor— y subir el pin a conciencia antes de esa fecha, no después.
+
 Nada de lo anterior toca producción.
 

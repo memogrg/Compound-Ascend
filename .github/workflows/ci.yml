@@ -28,7 +28,7 @@ env:
 jobs:
   ci:
     name: Lint, Typecheck, Test & Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
@@ -71,7 +71,7 @@ jobs:
   # NOTA: marcar este check como REQUERIDO en branch protection para que bloquee.
   migrations:
     name: Migraciones aplican en BD fresca
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # Solo para poder preguntar por su existencia en el `if` de los pasos de login.
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -234,7 +234,7 @@ jobs:
   # GitHub permite mergear igual. Aplica lo mismo al job `migrations`.
   e2e:
     name: E2E smoke
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: ci
     if: github.event_name == 'pull_request'
     env:
@@ -335,40 +335,13 @@ jobs:
         run: |
           echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las imágenes del stack salen de public.ecr.aws, con ghcr.io de respaldo."
 
-      # ── Caché de imágenes ────────────────────────────────────────────────────────────
-      #
-      # Mientras el job dependa de DESCARGAR imágenes de un registro público, depende de que
-      # ese registro esté de buenas. La caché convierte esa dependencia en una copia local:
-      # la primera corrida la llena y las siguientes no bajan nada.
-      #
-      # La clave lleva la versión del CLI —que es quien decide los tags— y un hash de la
-      # lista de exclusiones, que es quien decide CUÁNTAS imágenes son. Cambiar cualquiera de
-      # las dos invalida la caché sola, sin que nadie tenga que acordarse.
-      #
-      # El `v2` es a mano: al recuperar el fallback, las imágenes pasan a llamarse
-      # `public.ecr.aws/supabase/*` en vez de `ghcr.io/supabase/*`, y un tarball con los
-      # nombres viejos no le sirve al CLI. Súbelo cada vez que cambie CÓMO se nombran.
-      - name: Clave de la caché de imágenes
-        id: clave_imagenes
-        run: |
-          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-e2e-$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
-
-      - name: Caché de imágenes del stack
-        id: cache_imagenes
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/supabase-imagenes/stack.tar
-          key: ${{ steps.clave_imagenes.outputs.valor }}
-
-      - name: Cargar imágenes de la caché
-        run: scripts/ci/imagenes-supabase.sh cargar ~/.cache/supabase-imagenes/stack.tar
-
+      # Este job NO cachea las imágenes, y es deliberado. Medido: descargarlas de
+      # public.ecr.aws tarda MENOS que restaurar el tarball y hacerle `docker load` (3m40s
+      # contra 4m36s), y las ocho ocupaban 1,07 GiB de un cupo de 10 GiB que el repo ya tenía
+      # lleno — desalojando las cachés de npm y de Next, que sí ahorran tiempo. La de
+      # `migrations` se queda porque ahí sí gana. Ver `scripts/ci/imagenes-supabase.sh`.
       - name: Levantar el stack
         run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
-
-      - name: Guardar imágenes para la próxima corrida
-        if: steps.cache_imagenes.outputs.cache-hit != 'true'
-        run: scripts/ci/imagenes-supabase.sh guardar ~/.cache/supabase-imagenes/stack.tar
 
       - name: Migraciones y variables del stack efímero
         run: |
