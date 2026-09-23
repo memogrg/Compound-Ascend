@@ -38,10 +38,10 @@ test.beforeAll(async ({ browser }) => {
   await ctx.close();
 });
 
-async function abrir(browser: Browser, movimiento = true) {
+async function abrir(browser: Browser, movimiento = true, ancho = 1280) {
   const ctx = await browser.newContext({
     storageState: estadoSesion,
-    viewport: { width: 1280, height: 1000 },
+    viewport: { width: ancho, height: 1000 },
     reducedMotion: movimiento ? "no-preference" : "reduce",
   });
   const page = await ctx.newPage();
@@ -155,6 +155,42 @@ test("la sparkline es decorativa: no la anuncia nadie", async ({ browser }) => {
   // El dato está en la cifra de al lado. Una sparkline «accesible» solo añadiría ruido.
   const { ctx, page } = await abrir(browser);
   await expect(page.locator(".kpi-spark").first()).toHaveAttribute("aria-hidden", "true");
+  await ctx.close();
+});
+
+test("el medidor pinta la misma cadena que anuncia", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser);
+  const meter = page.locator(".kpi-hero [role='meter']");
+  const texto = await meter.getAttribute("aria-valuetext");
+  expect(texto).toBe("43 %");
+  await expect(page.locator(".kpi-hero .kpi-meter-valor")).toHaveText(texto!);
+  await ctx.close();
+});
+
+test("a 390 la etiqueta «vs …» cae a la misma altura en las cuatro tarjetas", async ({
+  browser,
+}) => {
+  // Si la etiqueta baja de línea solo en las tarjetas cuyo importe es largo, la fila queda
+  // con cuatro chips a alturas distintas. Por debajo de 420 px baja siempre.
+  const { ctx, page } = await abrir(browser, true, 390);
+  const tarjetas = page.locator(".kpi-card");
+  await tarjetas.first().scrollIntoViewIfNeeded();
+  const n = await tarjetas.count();
+  expect(n).toBe(4);
+
+  const relativas: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const tarjeta = await tarjetas.nth(i).boundingBox();
+    const etiqueta = await tarjetas.nth(i).locator(".kpi-delta-vs").boundingBox();
+    expect(tarjeta, `tarjeta ${i} sin caja`).not.toBeNull();
+    expect(etiqueta, `etiqueta ${i} sin caja`).not.toBeNull();
+    relativas.push(Math.round(etiqueta!.y - tarjeta!.y));
+  }
+  // Una sola altura para las cuatro (tolerancia 1 px por redondeo del layout).
+  expect(
+    Math.max(...relativas) - Math.min(...relativas),
+    relativas.join(" · "),
+  ).toBeLessThanOrEqual(1);
   await ctx.close();
 });
 

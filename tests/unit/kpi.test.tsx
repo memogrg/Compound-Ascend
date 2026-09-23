@@ -15,8 +15,10 @@ import {
   describirDelta,
   pathSparkline,
   severidadMeter,
+  textoMeter,
   partesNumero,
   textoNumero,
+  digitosNumero,
   KpiHero,
   KpiCard,
   Meter,
@@ -43,6 +45,22 @@ describe("NumberFlow escribe lo mismo que formatMoney", () => {
   it("el menos es el tipográfico (U+2212), no un guion", () => {
     const t = textoNumero(partesNumero(-1, "CRC"));
     expect(t.charCodeAt(0)).toBe(0x2212);
+  });
+
+  it("el signo y el símbolo se pueden pintar aparte sin descuadrar la cadena", () => {
+    // El hero los saca del `prefix` de NumberFlow para poder atenuar el símbolo. La suma
+    // de las tres piezas tiene que seguir siendo, letra por letra, lo que dice formatMoney.
+    for (const v of [0, 1234567, -890000, 1500.5]) {
+      const p = partesNumero(v, "CRC");
+      expect(p.signo + p.simbolo + digitosNumero(p)).toBe(formatMoney(v, "CRC"));
+      expect(p.signo + p.simbolo).toBe(p.prefijo);
+    }
+  });
+
+  it("el signo va vacío cuando el número no es negativo", () => {
+    expect(partesNumero(5, "CRC").signo).toBe("");
+    expect(partesNumero(-0.4, "CRC").signo).toBe("");
+    expect(partesNumero(-5, "CRC").signo.charCodeAt(0)).toBe(0x2212);
   });
 
   it("el valor que recibe NumberFlow nunca es negativo", () => {
@@ -157,6 +175,21 @@ describe("severidadMeter", () => {
   });
 });
 
+describe("textoMeter", () => {
+  it("sobre 100 se lee como porcentaje", () => {
+    expect(textoMeter(43, 100)).toBe("43 %");
+  });
+
+  it("sobre otro máximo se lee como fracción, no como un porcentaje falso", () => {
+    // Con max 12, «7» no es «7 %»: decirlo así convertiría 7 de 12 en un 7 por ciento.
+    expect(textoMeter(7, 12)).toBe("7 / 12");
+  });
+
+  it("redondea, para no pintar 43,000000001 %", () => {
+    expect(textoMeter(42.6, 100)).toBe("43 %");
+  });
+});
+
 describe("render en servidor", () => {
   it("el hero escribe el número entero en texto, no solo en dígitos animados", () => {
     // NumberFlow parte el número en un `<span>` por dígito: un lector de pantalla leería
@@ -192,5 +225,26 @@ describe("render en servidor", () => {
     const html = renderToStaticMarkup(<Meter valor={180} etiqueta="Presupuesto usado" />);
     expect(html).toContain("width:100%");
     expect(html).toContain('aria-valuenow="100"');
+    // Y el texto acompaña al valor acotado, no al que se pidió.
+    expect(html).toContain("100 %");
+  });
+
+  it("el valor visible del meter y su aria-valuetext son la MISMA cadena", () => {
+    // Si se escriben por separado se acaba anunciando «43» mientras la pantalla dice «43 %».
+    const html = renderToStaticMarkup(<Meter valor={43} etiqueta="Presupuesto usado" />);
+    expect(html).toContain('aria-valuetext="43 %"');
+    expect(html).toContain(">43 %<");
+  });
+
+  it("el texto del meter va aria-hidden: aria-valuetext ya lo dice", () => {
+    const html = renderToStaticMarkup(<Meter valor={43} etiqueta="Presupuesto usado" />);
+    expect(html).toMatch(/aria-hidden="true"[^>]*>43 %/);
+  });
+
+  it("la tarjeta pinta el símbolo aparte pero anuncia la cifra entera", () => {
+    const html = renderToStaticMarkup(<KpiCard etiqueta="Ingresos" valor={-2500} />);
+    expect(html).toContain(formatMoney(-2500, "CRC"));
+    expect(html).toContain("kpi-cifra-simbolo");
+    expect(html).toContain("kpi-cifra-signo");
   });
 });

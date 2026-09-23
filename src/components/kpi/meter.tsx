@@ -17,6 +17,17 @@ export type UmbralesMeter = {
 export type SeveridadMeter = "ok" | "aviso" | "peligro";
 
 /**
+ * El texto de la medida. UNA función para los dos canales: es lo que se pinta a la derecha
+ * de la pista y, literal, lo que va en `aria-valuetext`. Tenerlo dos veces escrito es cómo
+ * se acaba anunciando «43» mientras la pantalla dice «43 %».
+ *
+ * Espacio normal antes del «%», como `formatPct1`; que no parta de línea lo resuelve el CSS.
+ */
+export function textoMeter(valor: number, max: number): string {
+  return max === 100 ? `${Math.round(valor)} %` : `${Math.round(valor)} / ${max}`;
+}
+
+/**
  * Pura. Los umbrales son INCLUSIVOS por arriba: con `aviso: 80`, un 80 exacto ya avisa —
  * quien fija el umbral en 80 quiere enterarse AL llegar, no al pasarse.
  */
@@ -43,17 +54,26 @@ export function Meter({
 }) {
   const acotado = Math.max(min, Math.min(max, Number.isFinite(valor) ? valor : min));
   const pct = max === min ? 0 : ((acotado - min) / (max - min)) * 100;
+  const texto = textoMeter(acotado, max);
   return (
-    <div
-      className="kpi-meter"
-      role="meter"
-      aria-valuenow={Math.round(acotado)}
-      aria-valuemin={min}
-      aria-valuemax={max}
-      aria-label={etiqueta}
-      data-severidad={severidadMeter(valor, umbrales)}
-    >
-      <span className="kpi-meter-relleno" style={{ width: `${pct}%` }} />
+    <div className="kpi-meter-fila">
+      <div
+        className="kpi-meter"
+        role="meter"
+        aria-valuenow={Math.round(acotado)}
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuetext={texto}
+        aria-label={etiqueta}
+        data-severidad={severidadMeter(valor, umbrales)}
+      >
+        <span className="kpi-meter-relleno" style={{ width: `${pct}%` }} />
+      </div>
+      {/* `aria-hidden` porque `aria-valuetext` ya dice exactamente esto: sin ocultarlo, un
+          lector de pantalla leería la medida dos veces seguidas. */}
+      <span className="kpi-meter-valor tnum" aria-hidden="true">
+        {texto}
+      </span>
     </div>
   );
 }

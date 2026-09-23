@@ -38,7 +38,9 @@
   font-family: var(--font-display);
   font-size: 42px;
   line-height: 1.05;
-  font-weight: var(--figure-weight);
+  /* 600 explícito y no `--figure-weight`: el token vale 600 hoy, pero el peso de la cifra
+     principal es una decisión de esta primitiva, no algo que herede de otra pantalla. */
+  font-weight: 600;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   font-style: normal;
@@ -51,6 +53,23 @@
   .kpi-hero-cifra {
     font-size: 34px;
   }
+}
+
+/* ── Signo y símbolo (hero y tarjeta) ─────────────────────────────────────── */
+
+/* El símbolo es la UNIDAD, no el dato: se atenúa y se achica para que la cifra gane la
+   mirada. `vertical-align: baseline` explícito —un `em` más pequeño dentro de una línea
+   grande es justo donde un `super`/`text-top` heredado se notaría—. */
+.kpi-cifra-simbolo {
+  font-size: 0.8em;
+  vertical-align: baseline;
+  color: var(--muted);
+}
+
+/* El signo, en cambio, ES dato: conserva el tamaño, el peso y el color de la cifra. */
+.kpi-cifra-signo {
+  color: inherit;
+  vertical-align: baseline;
 }
 
 .kpi-hero-contexto {
@@ -99,7 +118,7 @@
   font-family: var(--font-display);
   font-size: 23px;
   line-height: 1.15;
-  font-weight: var(--figure-weight);
+  font-weight: 600;
   letter-spacing: -0.01em;
   font-style: normal;
   color: var(--text);
@@ -152,6 +171,15 @@
   color: var(--muted);
 }
 
+/* En una tarjeta estrecha, que la etiqueta baje o no según lo largo que sea el importe
+   deja las cuatro tarjetas de la fila con alturas distintas y los chips desalineados. Por
+   debajo de 420 px baja SIEMPRE, en las cuatro por igual: consistente vale más que compacto. */
+@media (max-width: 420px) {
+  .kpi-card .kpi-delta-vs {
+    flex-basis: 100%;
+  }
+}
+
 /* ── Sparkline ────────────────────────────────────────────────────────────── */
 
 .kpi-spark {
@@ -161,6 +189,22 @@
 }
 
 /* ── Meter ────────────────────────────────────────────────────────────────── */
+
+/* La pista y su número, en una fila: el número a la derecha, donde termina de leerse. */
+.kpi-meter-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kpi-meter-valor {
+  flex: none;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  /* «43 %» es una unidad de lectura: el espacio antes del signo no puede partir línea. */
+  white-space: nowrap;
+  color: var(--muted);
+}
 
 .kpi-meter {
   position: relative;

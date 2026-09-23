@@ -58,12 +58,21 @@ export function KpiHero({
       <p className="kpi-hero-cifra">
         {/* El número entero, una sola vez, para quien escucha la pantalla. */}
         <span className="sr-only">{texto}</span>
+        {/* El signo y el símbolo se pintan acá y NO se le pasan a NumberFlow como `prefix`:
+            dentro de su shadow root no hay forma de darles un tamaño ni un color propios.
+            El símbolo se atenúa y se achica —es la unidad, no el dato—; el signo conserva
+            el peso y el color, que para eso indica que el número es negativo. */}
+        <span aria-hidden="true" className="kpi-cifra-signo">
+          {partes.signo}
+        </span>
+        <span aria-hidden="true" className="kpi-cifra-simbolo">
+          {partes.simbolo}
+        </span>
         <NumberFlow
           aria-hidden="true"
           value={partes.valor}
           locales={partes.locales}
           format={partes.format}
-          prefix={partes.prefijo}
           // Sin `isolate`, el ancho del hero empujaría el layout en cada tick.
           isolate
           willChange

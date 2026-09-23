@@ -47,8 +47,16 @@ export type FormatoNumero = {
 export type PartesNumero = {
   /** Lo que se le pasa a NumberFlow: siempre ≥ 0. */
   valor: number;
-  /** Signo y símbolo, ya pegados: «₡» o «−₡». */
+  /** Signo y símbolo, ya pegados: «₡» o «−₡». Es lo que compara el test. */
   prefijo: string;
+  /**
+   * El menos tipográfico, o cadena vacía. Va SEPARADO del símbolo porque se pintan
+   * distinto: el símbolo se atenúa y se achica —es la unidad, no el dato—, y el signo
+   * conserva el peso y el color de la cifra, que para eso indica si el número es negativo.
+   */
+  signo: string;
+  /** «₡», «$»… El símbolo solo, sin signo. */
+  simbolo: string;
   locales: string;
   format: FormatoNumero;
 };
@@ -63,18 +71,31 @@ export function partesNumero(valor: number, moneda: string, decimales?: number):
   // El redondeo manda, igual que en `formatMoney`: −0,4 con 0 decimales es «₡0», no «−₡0».
   const redondeado = Number(Math.abs(valor).toFixed(dec));
   const negativo = redondeado !== 0 && valor < 0;
+  const signo = negativo ? MENOS : "";
+  const simbolo = currencySymbol(moneda);
   return {
     valor: Math.abs(valor),
-    prefijo: `${negativo ? MENOS : ""}${currencySymbol(moneda)}`,
+    prefijo: `${signo}${simbolo}`,
+    signo,
+    simbolo,
     locales: LOCALE_NUMERICO,
     format: { minimumFractionDigits: dec, maximumFractionDigits: dec },
   };
 }
 
+/** Solo los dígitos, ya agrupados: «1.234.567». Sin signo ni símbolo. */
+export function digitosNumero(partes: PartesNumero): string {
+  return new Intl.NumberFormat(partes.locales, partes.format).format(partes.valor);
+}
+
 /**
- * El texto que producirá NumberFlow con esas partes. Es lo que el test contrasta contra
- * `formatMoney`, y lo que el componente usa como respaldo cuando no anima.
+ * El texto completo. Es lo que el test contrasta contra `formatMoney`, y lo que el
+ * componente usa como respaldo cuando no anima.
+ *
+ * Se mantiene aunque el hero pinte el signo, el símbolo y los dígitos en tres `<span>`
+ * distintos: la comparación tiene que ser sobre la cadena ENTERA, o partir el número en
+ * piezas sería justo la forma de que se descuadre sin que nadie se entere.
  */
 export function textoNumero(partes: PartesNumero): string {
-  return partes.prefijo + new Intl.NumberFormat(partes.locales, partes.format).format(partes.valor);
+  return partes.prefijo + digitosNumero(partes);
 }
