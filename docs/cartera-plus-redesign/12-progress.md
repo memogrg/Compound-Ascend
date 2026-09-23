@@ -55,5 +55,7 @@ Fase 1 · delta 4 tabs-url: hecho (#818).
 fix(budget) presupuesto derivado retroactivo: hecho (#819) — base visual regenerada desde `e4cace8b`.
 Fase 1 · delta 5 command-palette: hecho (#820).
 chore(qa) cobertura de `/m`: hecho (#821) — routes.json 23 → 38, a11y por superficie.
-Fase 1 · delta 6 mobile-nav-v2: en revisión — alcance A, el drawer y el eyebrow de `/m` salen
-del modelo v2 y se añaden pestañas de núcleo; la barra inferior NO vuelve.
+Fase 1 · delta 6 mobile-nav-v2: hecho (#822) — alcance A; la barra inferior no vuelve.
+Fase 2 · delta 1 charts-core: en revisión — núcleo compartido (marco con tabla, degradados,
+glow, tooltip, serie activa, leyenda, tema sin colores literales) demostrado en `/dev/ui`.
+Las pantallas reales no cambian: los 3 wrappers viejos siguen intactos hasta el delta 7.

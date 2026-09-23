@@ -39,12 +39,13 @@ export const ROUTES = JSON.parse(readFileSync(new URL("./routes.json", import.me
 /**
  * Anchos por superficie. `/m` es un shell de teléfono —viewport bloqueado, `viewportFit:
  * cover`— y a 1280 no se ve nada que exista en un dispositivo real: capturarlo ahí sería
- * fabricar una pantalla que nadie usa. Sin `superficie`, la ruta es web y no se restringe.
+ * fabricar una pantalla que nadie usa. `dev` es el catálogo interno `/dev/ui`, que solo se
+ * mira en escritorio. Sin `superficie`, la ruta es web y no se restringe.
  *
  * Duplicado a propósito en `tests/a11y/routes.spec.ts`: ese `.ts` no puede importar este
  * `.mjs` (ver el comentario de ROUTES). Si cambia acá, cambia allá.
  */
-export const ANCHOS_POR_SUPERFICIE = { m: [390, 768] };
+export const ANCHOS_POR_SUPERFICIE = { m: [390, 768], dev: [1280] };
 
 /** Anchos permitidos para una ruta, o `null` cuando no tiene restricción. */
 export function anchosDe(ruta) {

@@ -112,5 +112,15 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 
 - **`/m/asistente` no está en `routes.json`.** Se añadieron los 15 destinos del drawer ☰, y el chat se alcanza desde la acción del header, no desde el drawer. Queda sin cobertura visual ni de a11y. Pendiente: decidir si entra como ruta 16.
 
+- **Dos formateadores de eje conviviendo: `formatCompact` y `formatAxisCompact`** (`lib/format.ts:162` y `:186`). El área usa uno y la línea el otro, y `/mi-base-financiera` monta las dos en la misma pantalla, así que sus ejes no se leen igual. Unificar en el **delta 7** de esta fase (`refactor/charts-wrappers-delegate`), cuando los tres wrappers pasen por el núcleo y haya un solo sitio donde decidirlo.
+
+- **`MScrubChart` va `aria-hidden` entero** (`m/components/m-scrub-chart.tsx:72,147`): su dato no llega a un lector de pantalla. No se toca en la fase 2 —el núcleo se construye para la web primero— y se resuelve al migrarlo al `ChartFrame` en la fase 4 móvil, que es cuando hereda la tabla.
+
+- **Tres lecturas que escriben, como comportamiento CONOCIDO del arnés**: `ensureTodaySnapshot` (`m/(app)/patrimonio/page.tsx:40` → `portfolio_snapshots`), `ensureCurrentNetWorthSnapshot` (`m/(app)/patrimonio:44`, `(dashboard)/mi-rich-life:25` → `net_worth_snapshots`) y `ensureMonthlyContributions` (`(dashboard)/patrimonio:38`, `m/(app)/inversiones:35` → `holding_contributions` + `investment_transactions`). Las tres alimentan gráficos, y las tres completan su propia serie al mirarla. Ya movieron la base una vez; antes de culpar a un delta por un diff en Patrimonio, comprobar si fue una de estas.
+
+- **Ruido de arnés, ampliado**: a `ingresos` y `control-financiero` a 390 y `asistente` a 768 se suma **`/m/mis-acciones` a 390** (franja del `.m-seg`, ~182 px de valor ≤4 por canal: con umbral 5 la diferencia es 0). Aparece entre builds sucesivos del MISMO código, así que es del arnés, no de un delta. Sigue pendiente localizar la fuente.
+
+- **Dependencias de la fase 2, diferidas a propósito**: `@number-flow/react` entra en el **delta 3** (`feat/kpi-hero-card`), que es cuando hay un KPI que animar; `echarts` **modular** en el **delta 5** (`feat/echarts-wrapper-theme`), con el presupuesto de peso que fija el BLUEPRINT (§14): solo en los chunks de Patrimonio, Deudas, Gastos y Resumen, y `echarts` fuera del chunk cliente de `/dashboard`. Este delta no instaló nada.
+
 Nada de lo anterior toca producción.
 

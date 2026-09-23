@@ -165,5 +165,10 @@
     "path": "/m/perfil",
     "auth": true,
     "superficie": "m"
+  },
+  {
+    "path": "/dev/ui",
+    "auth": true,
+    "superficie": "dev"
   }
 ]
