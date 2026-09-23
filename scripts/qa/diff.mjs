@@ -15,6 +15,16 @@
 import { chromium } from "playwright";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+/**
+ * El conteo vive en `comparar-pixeles.mjs` para poder probarlo sin navegador, y se INYECTA
+ * en la página: ahí es donde están los `ImageData`. Se quita el `export` porque la página lo
+ * carga como script clásico, no como módulo. Una sola implementación para el arnés y su test.
+ */
+const FUENTE_CONTEO = (
+  await readFile(fileURLToPath(new URL("./comparar-pixeles.mjs", import.meta.url)), "utf8")
+).replace(/^export /gm, "");
 
 function parseArgs(argv) {
   const args = {};
@@ -62,9 +72,9 @@ async function dataUri(file) {
  * Compara dos imágenes dentro del navegador. Devuelve píxeles distintos, total y el PNG de
  * diferencias (A al 30 % con los píxeles distintos en rojo), o `sizeMismatch`.
  */
-async function compararEnPagina(page, aUri, bUri, threshold) {
+async function compararEnPagina(page, aUri, bUri, threshold, ignorarDeltaBajo) {
   return page.evaluate(
-    async ([a, b, tol]) => {
+    async ([a, b, tol, ignorar]) => {
       const cargar = (src) =>
         new Promise((resolve, reject) => {
           const img = new Image();
@@ -80,6 +90,7 @@ async function compararEnPagina(page, aUri, bUri, threshold) {
           a: { w: ia.width, h: ia.height },
           b: { w: ib.width, h: ib.height },
           diffPixels: ia.width * ia.height,
+          ignorados: 0,
           maxDelta: 255,
           totalPixels: ia.width * ia.height,
           diffPng: null,
@@ -97,34 +108,37 @@ async function compararEnPagina(page, aUri, bUri, threshold) {
       const da = xa.getImageData(0, 0, w, h);
       const db = xb.getImageData(0, 0, w, h);
 
+      const { diferentes, ignorados, maxDelta, marcas } = contarDiferencias(da.data, db.data, {
+        threshold: tol,
+        ignorarDeltaBajo: ignorar,
+      });
+      const diffPixels = diferentes;
+
       const salida = new ImageData(w, h);
-      let diffPixels = 0;
-      let maxDelta = 0;
-      for (let i = 0; i < da.data.length; i += 4) {
-        const dr = Math.abs(da.data[i] - db.data[i]);
-        const dg = Math.abs(da.data[i + 1] - db.data[i + 1]);
-        const dbl = Math.abs(da.data[i + 2] - db.data[i + 2]);
-        const dal = Math.abs(da.data[i + 3] - db.data[i + 3]);
-        const delta = Math.max(dr, dg, dbl, dal);
-        if (delta > maxDelta) maxDelta = delta;
-        const distinto = dr > tol || dg > tol || dbl > tol || dal > tol;
-        if (distinto) {
-          diffPixels++;
+      for (let p = 0; p < marcas.length; p++) {
+        const i = p << 2;
+        if (marcas[p] === 1) {
+          // Diferencia que CUENTA: rojo.
           salida.data[i] = 255;
           salida.data[i + 1] = 0;
           salida.data[i + 2] = 0;
-          salida.data[i + 3] = 255;
+        } else if (marcas[p] === 2) {
+          // Ignorada por antialiasing: ámbar. Se ve dónde está el ruido sin confundirlo con
+          // una regresión — si se pintara del color del fondo, la imagen mentiría.
+          salida.data[i] = 235;
+          salida.data[i + 1] = 170;
+          salida.data[i + 2] = 40;
         } else {
           // A al 30 % como fondo: ubica la diferencia sin taparla.
           salida.data[i] = 255 - (255 - da.data[i]) * 0.3;
           salida.data[i + 1] = 255 - (255 - da.data[i + 1]) * 0.3;
           salida.data[i + 2] = 255 - (255 - da.data[i + 2]) * 0.3;
-          salida.data[i + 3] = 255;
         }
+        salida.data[i + 3] = 255;
       }
 
       let diffPng = null;
-      if (diffPixels > 0) {
+      if (diffPixels > 0 || ignorados > 0) {
         const cd = new OffscreenCanvas(w, h);
         cd.getContext("2d").putImageData(salida, 0, 0);
         const blob = await cd.convertToBlob({ type: "image/png" });
@@ -137,12 +151,13 @@ async function compararEnPagina(page, aUri, bUri, threshold) {
       return {
         sizeMismatch: false,
         diffPixels,
+        ignorados,
         maxDelta,
         totalPixels: w * h,
         diffPng,
       };
     },
-    [aUri, bUri, threshold],
+    [aUri, bUri, threshold, ignorarDeltaBajo],
   );
 }
 
@@ -163,6 +178,17 @@ async function main() {
   // real de 1-2 niveles en cualquier parte. Con las dos juntas, ese ruido pasa y un cambio de CSS
   // real no: mueve miles de píxeles, o mueve pocos pero con delta >= 3.
   const maxDelta = Number(args["max-delta"] ?? 255);
+  /**
+   * Antialiasing: los píxeles cuyo delta máximo por canal quede POR DEBAJO de este número no
+   * cuentan como diferencia. Por defecto 5, medido: la franja del `.m-seg` de
+   * `/m/mis-acciones` da ~182 px de valor ≤ 4 entre builds del mismo código, con la misma
+   * huella en tres corridas. Es un borde que se redibuja un nivel más claro, no una
+   * regresión — y un rojo que hay que ignorar a mano enseña a ignorarlos todos.
+   *
+   * Los ignorados se siguen CONTANDO y se reportan por ruta: bajar el listón no puede volver
+   * el ruido invisible, o dejaríamos de enterarnos si un día crece.
+   */
+  const ignorarDeltaBajo = Number(args["ignore-delta-below"] ?? 5);
   // Slugs fuera de la comparación ESTRICTA: se comparan y se reportan igual, pero sus diferencias
   // no hacen fallar la salida. Para pantallas con movimiento propio que no cede a reduced-motion.
   const excluidos = new Set(
@@ -183,6 +209,8 @@ async function main() {
   const browser = await chromium.launch();
   const page = await browser.newPage();
   await page.goto("about:blank");
+  // La función de conteo, inyectada tal cual desde `comparar-pixeles.mjs`.
+  await page.addScriptTag({ content: FUENTE_CONTEO });
 
   const filas = [];
   try {
@@ -191,7 +219,7 @@ async function main() {
         dataUri(path.join(dirA, rel)),
         dataUri(path.join(dirB, rel)),
       ]);
-      const r = await compararEnPagina(page, aUri, bUri, threshold);
+      const r = await compararEnPagina(page, aUri, bUri, threshold, ignorarDeltaBajo);
       if (r.diffPng) {
         const destino = path.join(outDiff, rel);
         await mkdir(path.dirname(destino), { recursive: true });
@@ -200,6 +228,7 @@ async function main() {
       filas.push({
         imagen: rel,
         diffPixels: r.diffPixels,
+        ignorados: r.ignorados ?? 0,
         maxDelta: r.maxDelta ?? 0,
         pct: r.totalPixels ? (r.diffPixels / r.totalPixels) * 100 : 0,
         sizeMismatch: Boolean(r.sizeMismatch),
@@ -228,6 +257,20 @@ async function main() {
   const estrictas = conDiff.filter((f) => !f.excluida);
   console.log(
     `\n${comunes.length} comparadas · ${conDiff.length} con diferencias · umbral ${threshold} · permitido hasta ${maxDiffPixels}px Y delta ${maxDelta}`,
+  );
+  const totalIgnorados = filas.reduce((s, f) => s + f.ignorados, 0);
+  console.log(
+    ignorarDeltaBajo > 0
+      ? `antialiasing: ${totalIgnorados} px ignorados por delta < ${ignorarDeltaBajo}` +
+          (totalIgnorados
+            ? ` · ${filas
+                .filter((f) => f.ignorados > 0)
+                .sort((x, y) => y.ignorados - x.ignorados)
+                .slice(0, 6)
+                .map((f) => `${f.imagen} (${f.ignorados})`)
+                .join(", ")}`
+            : "")
+      : "antialiasing: sin filtro (--ignore-delta-below 0)",
   );
   if (excluidos.size) {
     console.log(

@@ -8,7 +8,7 @@
    [`base-actual.md`](./base-actual.md); las capturas viven fuera de git.
 3. **Tras el cambio**: `… npm run qa:snap -- --out qa-snapshots/cambio`.
 4. **Comparar**:
-   `npm run qa:diff -- --a qa-snapshots/base --b qa-snapshots/cambio --exclude home,dev_ui --max-diff-pixels 60 --max-delta 2`
+   `npm run qa:diff -- --a qa-snapshots/base --b qa-snapshots/cambio --exclude home,dev_ui --max-diff-pixels 60 --max-delta 2 --ignore-delta-below 5`
    — imprime píxeles distintos y delta máximo por imagen, escribe los PNG de diferencias y sale
    con 1 si alguna reprueba. Lo excluido se compara y se reporta igual, pero no hace fallar.
 
@@ -74,11 +74,53 @@ El nombre a excluir es el SLUG, no la ruta: `diff.mjs` compara por igualdad cont
 
 ```bash
 npm run qa:diff -- --a qa-snapshots/base --b qa-snapshots/cambio \
-  --exclude home,dev_ui --max-diff-pixels 60 --max-delta 2
+  --exclude home,dev_ui --max-diff-pixels 60 --max-delta 2 --ignore-delta-below 5
 ```
 
 `/dev/ui` se captura y se audita **solo a 1280** (`superficie: "dev"` en `routes.json`): es un
 catálogo de escritorio y nadie lo abre en un teléfono.
+
+## El criterio completo, y por qué cada parte
+
+```bash
+npm run qa:diff -- --a qa-snapshots/base --b qa-snapshots/cambio \
+  --exclude home,dev_ui --max-diff-pixels 60 --max-delta 2 --ignore-delta-below 5
+```
+
+| parámetro | qué hace | por qué |
+| --- | --- | --- |
+| `--exclude home,dev_ui` | esas dos no hacen fallar | la portada tiene movimiento propio que no cede a `reduced-motion`; `/dev/ui` cambia por diseño en cada delta de la fase 2 |
+| `--max-diff-pixels 60` | tope de píxeles distintos | un cambio de CSS real mueve miles |
+| `--max-delta 2` | tope de diferencia por canal | un cambio de color real mueve ≥ 3 niveles |
+| `--ignore-delta-below 5` | los píxeles de delta 1-4 no cuentan | antialiasing (ver abajo) |
+
+**`--ignore-delta-below 5` no es bajar el listón: es dejar de medir lo que el arnés no puede
+medir.** La franja del `.m-seg` de `/m/mis-acciones` produce ~182 px de diferencia entre
+builds del **mismo código**, todos de valor ≤ 4 por canal — con umbral 5 la diferencia es
+exactamente 0. Se comprobó tres veces, con la misma huella: no es el CSS (quitar la hoja
+nueva no lo cambia), no es el render (dos capturas del mismo build dan 0 px) y las capturas de
+builds distintos coinciden entre sí. Es el rasterizado de Chromium redibujando un borde un
+nivel más claro.
+
+El precio de no filtrarlo es peor que el de filtrarlo: un rojo que hay que ignorar a mano
+enseña a ignorarlos todos, y el día que uno sea real nadie lo mirará.
+
+**Lo ignorado se sigue contando y se reporta por ruta**, precisamente para que el ruido no se
+vuelva invisible:
+
+```
+antialiasing: 364 px ignorados por delta < 5 · dark/390/m_mis-acciones.png (191), …
+```
+
+En el PNG de diferencias, lo que cuenta va en **rojo** y lo ignorado en **ámbar**: si se
+pintara del color del fondo, la imagen mentiría sobre dónde hubo cambios.
+
+`maxDelta` solo mira los píxeles que cuentan: un píxel ignorado no puede seguir haciendo
+fallar el criterio de delta por la puerta de atrás.
+
+El conteo vive en `scripts/qa/comparar-pixeles.mjs`, aparte de `diff.mjs`, para poder probarlo
+sin abrir un navegador (`tests/unit/qa-diff-antialiasing.test.ts`). `diff.mjs` inyecta ese
+mismo archivo en la página: una sola implementación para el arnés y su test.
 
 ## Servidor congelado
 
