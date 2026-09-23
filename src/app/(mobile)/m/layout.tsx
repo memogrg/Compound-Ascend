@@ -1,5 +1,8 @@
 import type { Viewport } from "next";
 import "./mobile.css";
+// Después de mobile.css: AÑADE lo que `.m-seg` no tiene (desbordamiento horizontal) sin
+// cambiar ninguna de sus reglas. Solo aplica a `.mn2-tabs`, que únicamente existe bajo bandera.
+import "./nav-v2-movil.css";
 import { MobileIntro } from "./components/mobile-intro";
 
 /**

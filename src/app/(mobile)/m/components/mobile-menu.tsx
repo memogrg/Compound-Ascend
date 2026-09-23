@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { Icon, type IconName } from "@/components/ui/icon";
+import { navV2Enabled } from "@/lib/flags";
+
+import { gruposDrawerV2 } from "../lib/nav-v2-movil";
 import { MobileBell } from "./mobile-bell";
 import { MobilePortal } from "./mobile-portal";
 import { useEdgeSwipe } from "../lib/use-edge-swipe";
@@ -22,9 +26,18 @@ import { pushOverlay } from "../lib/overlay-stack";
  * /m/inversiones · Defensa Patrimonial→/m/proteccion · Patrimonio→/m/patrimonio ·
  * Mercado e indicadores→/m/indicadores · Mi Perfil Financiero→/m/mi-perfil-financiero ·
  * Configuración→/m/perfil.
+ *
+ * Bajo `navV2Enabled()` los grupos los da `gruposDrawerV2()`: los cinco núcleos del modelo
+ * v2 más Configuración, derivados de `nav-v2.ts` y no escritos a mano. La tabla `MENU` de
+ * abajo es la de la bandera APAGADA y se conserva intacta.
  */
 
-type MenuGroup = { label: string; items: { name: string; href: string }[] };
+type MenuGroup = {
+  label: string;
+  /** Solo bajo bandera: el icono del núcleo, junto a su nombre. */
+  icon?: IconName;
+  items: { name: string; href: string }[];
+};
 
 const MENU: MenuGroup[] = [
   {
@@ -73,6 +86,16 @@ const MENU: MenuGroup[] = [
 
 export function MobileMenu() {
   const [open, setOpen] = useState(false);
+  // Bajo bandera, los grupos salen del modelo v2 (5 núcleos + Configuración) en vez de la
+  // tabla de arriba, que replica el sidebar v1. Mismo markup y mismas clases: lo único que
+  // cambia es de dónde salen los destinos, y que el encabezado del grupo lleva su icono.
+  const grupos: MenuGroup[] = navV2Enabled()
+    ? gruposDrawerV2().map((g) => ({
+        label: g.label,
+        icon: g.icon,
+        items: g.items.map((i) => ({ name: i.name, href: i.hrefM })),
+      }))
+    : MENU;
   const pathname = usePathname() ?? "/m";
   const close = () => setOpen(false);
 
@@ -134,9 +157,17 @@ export function MobileMenu() {
                 </button>
               </div>
               <div className="m-menu-scroll">
-                {MENU.map((group) => (
+                {grupos.map((group) => (
                   <div key={group.label} className="m-menu-group">
-                    <div className="m-menu-glabel">{group.label}</div>
+                    <div className="m-menu-glabel">
+                      {group.icon ? (
+                        <Icon
+                          name={group.icon}
+                          style={{ width: 13, height: 13, marginRight: 6, verticalAlign: "-2px" }}
+                        />
+                      ) : null}
+                      {group.label}
+                    </div>
                     {group.items.map((it) => {
                       const active = pathname === it.href;
                       return (
