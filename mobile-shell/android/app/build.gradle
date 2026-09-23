@@ -1,5 +1,30 @@
 apply plugin: 'com.android.application'
 
+// Release signing. Local builds read android/keystore.properties (gitignored; see
+// keystore.properties.example). CI has no such file and passes the same four values as env
+// vars. With neither, release is built unsigned so assembleDebug works without secrets.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+def signingValue = { String prop, String env ->
+    def value = keystoreProperties.getProperty(prop) ?: System.getenv(env)
+    return value?.trim() ? value.trim() : null
+}
+def releaseStoreFile = signingValue('storeFile', 'ANDROID_KEYSTORE_PATH')
+def releaseStorePassword = signingValue('storePassword', 'ANDROID_KEYSTORE_PASSWORD')
+def releaseKeyAlias = signingValue('keyAlias', 'ANDROID_KEY_ALIAS')
+def releaseKeyPassword = signingValue('keyPassword', 'ANDROID_KEY_PASSWORD')
+def hasReleaseSigning = releaseStoreFile != null && file(releaseStoreFile).exists() &&
+        releaseStorePassword != null && releaseKeyAlias != null && releaseKeyPassword != null
+if (!hasReleaseSigning) {
+    def reason = releaseStoreFile != null && !file(releaseStoreFile).exists()
+            ? "no existe el keystore en ${releaseStoreFile}"
+            : "falta keystore.properties (o las variables ANDROID_KEYSTORE_*/ANDROID_KEY_*)"
+    logger.warn("WARNING: release sin firma: ${reason}. El AAB/APK de release no se puede subir a Play.")
+}
+
 android {
     namespace "com.compoundascend.cartera"
     compileSdk rootProject.ext.compileSdkVersion
@@ -7,8 +32,10 @@ android {
         applicationId "com.compoundascend.cartera"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Play requires a strictly increasing versionCode on every upload: CI passes it as
+        // ANDROID_VERSION_CODE; locally, edit the fallback by hand before each bundleRelease.
+        versionCode((System.getenv('ANDROID_VERSION_CODE') ?: '1') as int)
+        versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,9 +43,25 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
+            // v1 ships unobfuscated: R8 can strip classes Capacitor plugins reach by reflection
+            // unless each one ships keep rules. Revisit once the release build is tested with R8.
             minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

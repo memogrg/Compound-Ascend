@@ -65,8 +65,9 @@ npm run open:android   # o open:ios
 
 ## Android
 
-Requiere **Android Studio** (incluye el JDK y el SDK). Este entorno no tenía Java, así que el
-proyecto quedó andamiado pero se compila/abre desde Android Studio:
+Requiere **Android Studio** (trae el SDK) y un **JDK 17–21** para Gradle — el JDK que trae
+Android Studio no sirve, ver [Release para Google Play](#release-para-google-play). El proyecto
+se abre desde Android Studio:
 
 ```bash
 npm run sync
@@ -92,6 +93,109 @@ hace, que sea una decisión, no un descuido. **Mantener los dos archivos en sinc
 También hay un permiso de `CAMERA`: el escáner de recibos de `/m/asistente` usa un
 `<input type="file" capture="environment">` y sin el permiso Capacitor no ofrece la cámara en
 `onShowFileChooser` — cae al selector de archivos, en silencio.
+
+## Release para Google Play
+
+### 1. JDK 17–21
+
+Gradle 8.13 corre sobre JDK 17 a 21. El JBR que trae **Android Studio Quail es Java 25** y
+Gradle 8.13 no arranca sobre él (`Unsupported class file major version 69`). Instalá Temurin 21
+y apuntá `JAVA_HOME` ahí:
+
+```powershell
+winget install EclipseAdoptium.Temurin.21.JDK
+# JAVA_HOME = C:\Program Files\Eclipse Adoptium\jdk-21.x.x-hotspot  (variable de entorno de usuario)
+```
+
+En Android Studio: **Settings → Build, Execution, Deployment → Build Tools → Gradle → Gradle
+JDK** = ese mismo Temurin 21. Así la línea de comandos y el IDE compilan con el mismo JDK.
+
+### 2. Upload key (una sola vez, fuera del repo)
+
+```bash
+mkdir -p ~/.android-keys && cd ~/.android-keys
+keytool -genkeypair -v -keystore cartera-upload.jks -alias cartera-upload -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Guardá el `.jks` y **las dos contraseñas** (keystore y key) en el gestor de contraseñas de la
+empresa. Si se pierde, Play permite pedir un reset de la upload key, pero es un trámite con
+soporte y días de espera.
+
+> El `.gitignore` de `android/` ignora `*.jks`, `*.keystore`, `keystore.properties`, `*.p12` y
+> `*.pem`. Aun así, el `.jks` vive fuera del repo: que el ignore sea la segunda defensa, no la primera.
+
+### 3. `keystore.properties`
+
+Copiá `android/keystore.properties.example` a `android/keystore.properties` y completá
+`storeFile` (ruta absoluta; en Windows con barras normales, `C:/Users/<vos>/.android-keys/cartera-upload.jks`),
+`storePassword`, `keyAlias` (`cartera-upload`) y `keyPassword`.
+
+En CI no hay archivo: `app/build.gradle` lee las mismas cuatro claves de `ANDROID_KEYSTORE_PATH`,
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` y `ANDROID_KEY_PASSWORD`. Sin ninguna de las
+dos fuentes el release se compila **sin firma** y Gradle lo avisa con
+`WARNING: release sin firma: …` — no falla, para que CI pueda compilar sin secretos.
+
+### 4. Google Sign-In nativo — OBLIGATORIO antes del primer AAB
+
+Google solo le entrega el `idToken` a un APK cuyo par **(paquete, SHA-1)** esté registrado como
+cliente OAuth de tipo **Android** en el proyecto de Google Cloud **«CARTERA Plus»** (el mismo del
+`webClientId` `127034942043-…`). Hacen falta **tres** clientes Android con paquete
+`com.compoundascend.cartera`, uno por huella:
+
+1. **Debug de cada desarrollador:**
+   ```bash
+   keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep SHA1
+   ```
+2. **La upload key:**
+   ```bash
+   keytool -list -v -keystore ~/.android-keys/cartera-upload.jks -alias cartera-upload | grep SHA1
+   ```
+3. **La app signing key de Play:** se lee en Play Console → **Configuración → Integridad de la
+   app → Firma de apps**, después de la primera subida. Sin esta, el login con Google falla en
+   la build instalada desde la tienda con `[16] Account reauth failed`.
+
+El campo **«Nombre del paquete»** es el `applicationId` (`com.compoundascend.cartera`), **no**
+el dominio del sitio. Los cambios tardan de 5 minutos a una hora en aplicarse.
+
+### 5. Build
+
+```bash
+cd mobile-shell && npx cap sync android && cd android && ./gradlew clean bundleRelease
+# → app/build/outputs/bundle/release/app-release.aab
+```
+
+### 6. Verificar el alineamiento de 16 KB
+
+[bundletool](https://github.com/google/bundletool/releases) es un `.jar`
+(`java -jar bundletool.jar …`):
+
+```bash
+java -jar bundletool.jar dump config --bundle=app/build/outputs/bundle/release/app-release.aab | grep -i alignment
+# debe decir PAGE_ALIGNMENT_16K
+```
+
+### 7. Probar el AAB como lo instala Play
+
+```bash
+java -jar bundletool.jar build-apks --bundle=app/build/outputs/bundle/release/app-release.aab \
+  --output=app.apks --mode=universal \
+  --ks=$HOME/.android-keys/cartera-upload.jks --ks-key-alias=cartera-upload
+java -jar bundletool.jar install-apks --apks=app.apks   # con el emulador corriendo
+```
+
+Firmado con la upload key, el login con Google funciona si el cliente (2) ya está registrado.
+
+### 8. Play App Signing
+
+En la primera subida elegí **«Let Google manage and protect your app signing key»**. La key que
+firma lo que llega a los teléfonos la genera y guarda Google; la nuestra (el `.jks`) es solo la
+**upload key**. Por eso existe el cliente OAuth (3).
+
+### 9. `versionCode` en cada subida
+
+Play rechaza un `versionCode` igual o menor al último subido. En CI se pasa por
+`ANDROID_VERSION_CODE`; a mano, editá el fallback en `app/build.gradle` antes de cada
+`bundleRelease`. El `versionName` (`1.0.0`) es solo lo que ve el usuario.
 
 ## iOS
 
