@@ -9,9 +9,14 @@
 # `cargar <tarball>`   — si el tarball existe, lo mete en el daemon y dice cuánto pesaba.
 # `guardar <tarball>`  — exporta las imágenes que el stack tiene EN USO ahora mismo.
 #
-# Las imágenes se descubren de los contenedores en marcha (`docker ps`) en vez de
-# escribirlas a mano: la lista y los tags los decide la versión del CLI, y una lista
-# hardcodeada se queda vieja en silencio en cuanto alguien sube esa versión.
+# Las imágenes se descubren del disco (`docker images`) en vez de escribirlas a mano: la
+# lista y los tags los decide la versión del CLI, y una lista hardcodeada se queda vieja en
+# silencio en cuanto alguien sube esa versión.
+#
+# `docker images` y NO `docker ps`, que fue el primer intento y guardaba de menos: `-x`
+# excluye servicios de ARRANCAR, pero el CLI descarga igualmente más imágenes de las que
+# levanta. En el job de migraciones corría 1 contenedor y se habían descargado 4, así que la
+# caché dejaba fuera 3 y la corrida siguiente volvía a bajarlas.
 set -uo pipefail
 
 MODO="${1:-}"
@@ -36,11 +41,15 @@ case "$MODO" in
     ;;
 
   guardar)
-    # `docker ps` y no `docker images`: interesan las que el stack levantó de verdad, no
-    # todo lo que quedó en el disco del runner.
-    mapfile -t IMAGENES < <(docker ps --format '{{.Image}}' | sort -u)
+    # Todas las del stack que hayan acabado en disco, estén corriendo o no.
+    mapfile -t IMAGENES < <(
+      docker images --format '{{.Repository}}:{{.Tag}}' |
+        grep -E '^(public\.ecr\.aws/supabase|ghcr\.io/supabase|supabase)/' |
+        grep -v ':<none>$' |
+        sort -u
+    )
     if [ "${#IMAGENES[@]}" -eq 0 ]; then
-      echo "::warning::no hay contenedores en marcha; no se guarda caché"
+      echo "::warning::no hay imágenes del stack en disco; no se guarda caché"
       exit 0
     fi
     echo "::notice::guardando ${#IMAGENES[@]} imágenes: ${IMAGENES[*]}"

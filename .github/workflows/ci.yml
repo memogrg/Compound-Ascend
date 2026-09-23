@@ -92,6 +92,11 @@ jobs:
       # comportamiento por defecto: **public.ecr.aws primero**, con ghcr.io y docker.io
       # detrás. Comprobado que las ocho imágenes existen en `public.ecr.aws/supabase/*` con
       # exactamente los mismos tags.
+      #
+      # OJO: ponerla acá NO basta, y la primera corrida verde lo demostró bajando igual de
+      # ghcr.io. `setup-cli` la exporta por `$GITHUB_ENV`, y eso GANA al `env` del job en
+      # todos los pasos siguientes. Hay que volver a vaciarla DESPUÉS de ese paso; se deja
+      # aquí igualmente para que el valor sea explícito allá donde se lea.
       SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
       # De las trece imágenes, este job solo necesita **Postgres**: `db reset` aplica SQL y
       # nada más. Vive en el `env` porque lo leen el arranque Y la clave de la caché.
@@ -117,6 +122,13 @@ jobs:
         env:
           SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Deshace lo que `setup-cli` acaba de exportar. Sin esto el CLI se queda con un único
+      # registro y perdemos el fallback — que es exactamente lo que tenía a `main` en rojo.
+      - name: Recuperar el fallback de registros del CLI
+        run: |
+          echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
+          echo "::notice::registro sin fijar: el CLI probará public.ecr.aws, luego ghcr.io y luego docker.io"
 
       # `supabase start` arranca el stack aplicando migraciones; `supabase db reset`
       # fuerza un re-apply LIMPIO de TODA la cadena y sale con código ≠ 0 si alguna
@@ -170,10 +182,14 @@ jobs:
       # La clave lleva la versión del CLI —que es quien decide los tags— y un hash de la
       # lista de exclusiones, que es quien decide CUÁNTAS imágenes son. Cambiar cualquiera de
       # las dos invalida la caché sola, sin que nadie tenga que acordarse.
+      #
+      # El `v2` es a mano: al recuperar el fallback, las imágenes pasan a llamarse
+      # `public.ecr.aws/supabase/*` en vez de `ghcr.io/supabase/*`, y un tarball con los
+      # nombres viejos no le sirve al CLI. Súbelo cada vez que cambie CÓMO se nombran.
       - name: Clave de la caché de imágenes
         id: clave_imagenes
         run: |
-          echo "valor=imagenes-${{ env.SUPABASE_CLI_VERSION }}-migrations-$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-migrations-$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
 
       - name: Caché de imágenes del stack
         id: cache_imagenes
@@ -241,6 +257,11 @@ jobs:
       # comportamiento por defecto: **public.ecr.aws primero**, con ghcr.io y docker.io
       # detrás. Comprobado que las ocho imágenes existen en `public.ecr.aws/supabase/*` con
       # exactamente los mismos tags.
+      #
+      # OJO: ponerla acá NO basta, y la primera corrida verde lo demostró bajando igual de
+      # ghcr.io. `setup-cli` la exporta por `$GITHUB_ENV`, y eso GANA al `env` del job en
+      # todos los pasos siguientes. Hay que volver a vaciarla DESPUÉS de ese paso; se deja
+      # aquí igualmente para que el valor sea explícito allá donde se lea.
       SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
       # El smoke abre un navegador, inicia sesión y navega: necesita Postgres, kong, gotrue,
       # postgrest, realtime y storage. Fuera quedan los cinco que nada de eso toca — Studio,
@@ -266,6 +287,13 @@ jobs:
         env:
           SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Deshace lo que `setup-cli` acaba de exportar. Sin esto el CLI se queda con un único
+      # registro y perdemos el fallback — que es exactamente lo que tenía a `main` en rojo.
+      - name: Recuperar el fallback de registros del CLI
+        run: |
+          echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
+          echo "::notice::registro sin fijar: el CLI probará public.ecr.aws, luego ghcr.io y luego docker.io"
 
 
       # ── Autenticación de registros, ANTES de cualquier `supabase start` ──────────────
@@ -316,10 +344,14 @@ jobs:
       # La clave lleva la versión del CLI —que es quien decide los tags— y un hash de la
       # lista de exclusiones, que es quien decide CUÁNTAS imágenes son. Cambiar cualquiera de
       # las dos invalida la caché sola, sin que nadie tenga que acordarse.
+      #
+      # El `v2` es a mano: al recuperar el fallback, las imágenes pasan a llamarse
+      # `public.ecr.aws/supabase/*` en vez de `ghcr.io/supabase/*`, y un tarball con los
+      # nombres viejos no le sirve al CLI. Súbelo cada vez que cambie CÓMO se nombran.
       - name: Clave de la caché de imágenes
         id: clave_imagenes
         run: |
-          echo "valor=imagenes-${{ env.SUPABASE_CLI_VERSION }}-e2e-$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-e2e-$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
 
       - name: Caché de imágenes del stack
         id: cache_imagenes
