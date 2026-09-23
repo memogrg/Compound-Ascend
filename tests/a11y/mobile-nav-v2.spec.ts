@@ -109,9 +109,16 @@ test("las pestañas del núcleo navegan y marcan la activa", async ({ browser })
 });
 
 test("el eyebrow sale del modelo, y Asesor no tiene barra", async ({ browser }) => {
+  // Donde el núcleo y la pantalla se llaman distinto, el eyebrow es el NÚCLEO y no la
+  // cadena que pasaba la página («Control» en Deudas).
+  const a = await abrirMovil(browser, "/m/deudas");
+  await expect(a.page.locator(".m-topbar .ov").first()).toHaveText("Planes");
+  await a.ctx.close();
+
+  // Y donde dirían lo mismo, no se pinta: «PATRIMONIO» sobre «Patrimonio» solo repite.
   const { ctx, page } = await abrirMovil(browser, "/m/patrimonio");
-  // El eyebrow del header es el NÚCLEO, no la cadena que pasaba la página («Crecimiento»).
-  await expect(page.locator(".m-topbar .ov").first()).toHaveText("Patrimonio");
+  await expect(page.locator(".m-topbar .m-hd-title")).toHaveText("Patrimonio");
+  expect(await page.locator(".m-topbar .ov").count(), "eyebrow repetido").toBe(0);
   await ctx.close();
 
   // Asesor tiene una sola pantalla: una pestaña sola no es una barra.

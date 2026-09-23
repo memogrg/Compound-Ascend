@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
-import { eyebrowDeRuta, pestanasMovilDe } from "../lib/nav-v2-movil";
+import { eyebrowDeRuta, eyebrowRepiteTitulo, pestanasMovilDe } from "../lib/nav-v2-movil";
 
 /**
  * Pestañas del núcleo en `/m`, bajo la barra superior. Detrás de `navV2Enabled()`: quien
@@ -53,10 +53,16 @@ export function NucleoTabsMovil() {
  *
  * Cae al `fallback` cuando la ruta no cuelga de un núcleo (Configuración, `/m/sin-plan`):
  * la prop `eyebrow` de las 18 páginas sigue existiendo y sigue siendo la que manda ahí.
+ *
+ * Y NO se pinta cuando diría lo mismo que el título que tiene debajo. Pasa en Patrimonio,
+ * donde el núcleo y la pantalla se llaman igual: «PATRIMONIO» sobre «Patrimonio» no añade
+ * jerarquía, solo repite. La comprobación se aplica al texto que se iba a mostrar —venga
+ * del modelo o del `fallback`—, porque el problema es el mismo en los dos casos.
  */
-export function EyebrowNucleo({ fallback }: { fallback?: string }) {
+export function EyebrowNucleo({ fallback, title }: { fallback?: string; title?: string }) {
   const pathname = usePathname() ?? "/m";
   const searchParams = useSearchParams();
   const texto = eyebrowDeRuta(pathname, searchParams?.toString() ?? null) ?? fallback;
-  return texto ? <div className="ov">{texto}</div> : null;
+  if (!texto || eyebrowRepiteTitulo(texto, title)) return null;
+  return <div className="ov">{texto}</div>;
 }

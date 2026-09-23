@@ -25,6 +25,33 @@ export type ItemDrawer = { id: string; name: string; hrefM: string };
 export type GrupoDrawer = { id: string; label: string; icon: IconName; items: ItemDrawer[] };
 export type PestanaMovil = { id: string; name: string; hrefM: string; activa: boolean };
 
+/**
+ * Minúsculas y sin diacríticos, para comparar dos textos que la gente lee como el mismo.
+ *
+ * NFD separa la letra de su tilde y el rango borra las marcas combinantes, así que
+ * «PATRIMONIO» y «Patrimonio» son iguales. Es solo para COMPARAR: nada de lo que se muestra
+ * pasa por acá.
+ */
+function normalizarTexto(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * ¿El eyebrow dice lo mismo que el título que tiene justo debajo?
+ *
+ * Pasa en Patrimonio, donde el núcleo y la pantalla se llaman igual: «Patrimonio» sobre
+ * «Patrimonio» es ruido, no jerarquía. Se compara sin tildes ni mayúsculas porque el
+ * eyebrow se pinta en versalitas (`.ov`) y el título no.
+ */
+export function eyebrowRepiteTitulo(eyebrow: string | null, title?: string | null): boolean {
+  if (!eyebrow || !title) return false;
+  return normalizarTexto(eyebrow) === normalizarTexto(title);
+}
+
 /** Quita query y hash. El `pathname` de Next ya viene limpio; esto cubre a quien no. */
 function soloRuta(ruta: string): string {
   return (ruta.split("#")[0] ?? "").split("?")[0] ?? "";

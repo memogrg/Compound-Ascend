@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   eyebrowDeRuta,
+  eyebrowRepiteTitulo,
   gruposDrawerV2,
   pestanasMovilDe,
 } from "@/app/(mobile)/m/lib/nav-v2-movil";
@@ -15,10 +16,7 @@ const grupos = gruposDrawerV2();
 
 describe("grupos del drawer", () => {
   it("son los 5 núcleos en su orden, más Configuración", () => {
-    expect(grupos.map((g) => g.label)).toEqual([
-      ...NUCLEOS.map((n) => n.name),
-      "Configuración",
-    ]);
+    expect(grupos.map((g) => g.label)).toEqual([...NUCLEOS.map((n) => n.name), "Configuración"]);
   });
 
   it("cada grupo lleva el icono de su núcleo", () => {
@@ -121,5 +119,29 @@ describe("pestanasMovilDe", () => {
 
   it("Configuración no tiene pestañas de núcleo", () => {
     expect(pestanasMovilDe("/m/perfil")).toEqual([]);
+  });
+});
+
+describe("eyebrowRepiteTitulo", () => {
+  it("es true cuando dicen lo mismo, aunque cambien tildes y mayúsculas", () => {
+    // El caso real: en Patrimonio el núcleo y la pantalla se llaman igual, y el eyebrow
+    // se pinta en versalitas, así que sobre el papel «PATRIMONIO» y «Patrimonio» difieren.
+    expect(eyebrowRepiteTitulo("Patrimonio", "PATRIMONIO")).toBe(true);
+    expect(eyebrowRepiteTitulo("Patrimonio", "Patrimonio")).toBe(true);
+    expect(eyebrowRepiteTitulo("Proteccion", "Protección")).toBe(true);
+    expect(eyebrowRepiteTitulo("  Patrimonio  ", "Patrimonio")).toBe(true);
+  });
+
+  it("es false cuando aportan jerarquía de verdad", () => {
+    expect(eyebrowRepiteTitulo("Planes", "Deudas y Préstamos")).toBe(false);
+    expect(eyebrowRepiteTitulo("Flujo", "Gastos")).toBe(false);
+    // Contener al otro no es repetirlo: «Patrimonio» sobre «Patrimonio neto» sí orienta.
+    expect(eyebrowRepiteTitulo("Patrimonio", "Patrimonio neto")).toBe(false);
+  });
+
+  it("sin alguno de los dos no hay nada que comparar", () => {
+    expect(eyebrowRepiteTitulo(null, "Patrimonio")).toBe(false);
+    expect(eyebrowRepiteTitulo("Patrimonio", undefined)).toBe(false);
+    expect(eyebrowRepiteTitulo("", "")).toBe(false);
   });
 });

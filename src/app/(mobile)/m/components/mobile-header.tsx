@@ -116,7 +116,7 @@ export function MobileHeader({
                   prop queda de respaldo para donde no hay núcleo — Configuración— y para
                   la app con la bandera apagada. Las 18 páginas que la pasan no se tocan. */}
                 {navV2Enabled() ? (
-                  <EyebrowNucleo fallback={eyebrow} />
+                  <EyebrowNucleo fallback={eyebrow} title={title} />
                 ) : eyebrow ? (
                   <div className="ov">{eyebrow}</div>
                 ) : null}
