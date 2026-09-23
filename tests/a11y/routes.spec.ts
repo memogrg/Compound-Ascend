@@ -22,7 +22,7 @@ import { test, type BrowserContext } from "@playwright/test";
 
 import { iniciarSesion } from "./sesion";
 
-type Ruta = { path: string; auth: boolean };
+type Ruta = { path: string; auth: boolean; superficie?: string };
 
 /**
  * Misma lista que las capturas visuales, leída del JSON compartido.
@@ -37,6 +37,23 @@ const ROUTES: Ruta[] = JSON.parse(
 );
 
 const ANCHOS = [1280, 390] as const;
+
+/**
+ * Anchos por superficie: `/m` es un shell de teléfono y a 1280 no se ve nada que exista en
+ * un dispositivo real. Una ruta sin `superficie` es web y se mide a los dos anchos.
+ *
+ * Duplicado a propósito desde `scripts/qa/snap.mjs` (`ANCHOS_POR_SUPERFICIE`): este `.ts`
+ * no puede importar ese `.mjs` —el cargador de Playwright lo transpila a CommonJS y revienta
+ * con «exports is not defined»—, que es la misma razón por la que `ROUTES` vive en un JSON.
+ * Si cambia allá, cambia acá.
+ */
+const ANCHOS_POR_SUPERFICIE: Record<string, readonly number[]> = { m: [390, 768] };
+
+/** ¿Se mide esta ruta a este ancho? Sin `superficie`, siempre. */
+function seMide(ruta: Ruta, ancho: number): boolean {
+  const permitidos = ruta.superficie ? ANCHOS_POR_SUPERFICIE[ruta.superficie] : undefined;
+  return !permitidos || permitidos.includes(ancho);
+}
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const SALIDA = "qa-snapshots/a11y";
 
@@ -62,6 +79,7 @@ test.beforeAll(async ({ browser }) => {
 
 for (const ruta of ROUTES) {
   for (const ancho of ANCHOS) {
+    if (!seMide(ruta, ancho)) continue;
     test(`a11y ${ruta.path} @${ancho}`, async ({ browser }) => {
       const ctx = await browser.newContext({
         storageState: ruta.auth ? (estadoSesion ?? undefined) : undefined,
@@ -84,6 +102,7 @@ for (const ruta of ROUTES) {
             route: ruta.path,
             width: ancho,
             auth: ruta.auth,
+            superficie: ruta.superficie ?? "web",
             url: page.url(),
             testEngine: resultado.testEngine,
             violations: resultado.violations,

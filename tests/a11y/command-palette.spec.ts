@@ -48,13 +48,30 @@ const REGLAS_CONOCIDAS = new Set(["color-contrast", "nested-interactive", "aria-
 const RUTA = "/dashboard?period=2026-08";
 
 let estadoSesion: Awaited<ReturnType<BrowserContext["storageState"]>> | null = null;
+/** ¿El servidor se construyó con la bandera? Se mide, no se supone (ver `beforeEach`). */
+let banderaEncendida = false;
 
 test.beforeAll(async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await iniciarSesion(page);
+  // El botón buscador del topbar v2 solo existe bajo bandera: es el detector más barato.
+  banderaEncendida = (await page.locator("button.tb2-search").count()) > 0;
   estadoSesion = await ctx.storageState();
   await ctx.close();
+});
+
+/**
+ * Con la bandera apagada la paleta NO existe, así que estos seis tests no tienen nada que
+ * medir y se saltan en vez de fallar.
+ *
+ * Hace falta porque los dos specs de `tests/a11y/` quieren builds opuestos: `routes.spec.ts`
+ * levanta la línea base con la bandera APAGADA —es la app que hay en producción— y este
+ * necesita la ENCENDIDA. `npm run test:a11y` los corre juntos, así que sin este salto la
+ * corrida de la línea base terminaba en rojo por seis fallos que no son fallos.
+ */
+test.beforeEach(() => {
+  test.skip(!banderaEncendida, "requiere NEXT_PUBLIC_NAV_V2=1 en el build del servidor");
 });
 
 async function abrirPanel(browser: Browser, ruta: string = RUTA) {

@@ -90,5 +90,80 @@
   {
     "path": "/empezar",
     "auth": false
+  },
+  {
+    "path": "/m",
+    "auth": true,
+    "superficie": "m"
+  },
+  {
+    "path": "/m/mis-acciones",
+    "auth": true,
+    "superficie": "m"
+  },
+  {
+    "path": "/m/mi-base-financiera",
+    "auth": true,
+    "superficie": "m"
+  },
+  {
+    "path": "/m/ingresos",
+    "auth": true,
+    "superficie": "m"
+  },
+  {
+    "path": "/m/gastos",
+    "auth": true,
+    "superficie": "m"
+  },
+  {
+    "path": "/m/transacciones",
+    "auth": true,
+    "superficie": "m"
+  },
+  {
+    "path": "/m/metas",
+    "auth": true,
+    "superficie": "m"
+  },
+  {
+    "path": "/m/deudas",
+    "auth": true,
+    "superficie": "m"
+  },
+  {
+    "path": "/m/inversiones",
+    "auth": true,
+    "superficie": "m"
+  },
+  {
+    "path": "/m/proteccion",
+    "auth": true,
+    "superficie": "m"
+  },
+  {
+    "path": "/m/patrimonio",
+    "auth": true,
+    "superficie": "m"
+  },
+  {
+    "path": "/m/indicadores",
+    "auth": true,
+    "superficie": "m"
+  },
+  {
+    "path": "/m/mi-perfil-financiero",
+    "auth": true,
+    "superficie": "m"
+  },
+  {
+    "path": "/m/configurar",
+    "auth": true,
+    "superficie": "m"
+  },
+  {
+    "path": "/m/perfil",
+    "auth": true,
+    "superficie": "m"
   }
 ]

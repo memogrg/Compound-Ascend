@@ -90,5 +90,17 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 
 - **Paleta de comandos en `/m` — delta 6.** La paleta se monta en `app-shell`, que es el cascarón web; la app móvil tiene su propio layout y no la ve. En móvil el atajo de teclado no aplica, así que el disparador tendría que ser un control visible en su barra, no un ⌘K.
 
+- **Ruido de fondo del arnés visual**: `ingresos` y `control-financiero` a 390 y `asistente` a 768 difieren entre dos corridas del MISMO build, siempre por debajo de 51 px y delta 1-2. Pasa el criterio de dos condiciones, así que no rompe nada, pero es el suelo por debajo del cual el arnés no puede medir. Pendiente: localizar la fuente (animación de entrada, skeleton que se resuelve tarde, fuente que carga después del `networkidle`) y eliminarla, para poder exigir 0 px de verdad.
+
+- `chore`: **`.env.example` da una URL de producción que ya no existe.** Las líneas `NEXT_PUBLIC_APP_URL` y `ALLOWED_ORIGINS` dicen `https://cartera.vercel.app`; el dominio real es `carteraplus.aitechumbrella.com` (y `carteraplus.vercel.app` / `compound-ascend.vercel.app` como alias). Mordió al escribir el smoke de producción del delta 5: `ERR_NAME_NOT_RESOLVED`.
+
+- **Dos mapeadores de rutas web↔móvil en paralelo.** `aMovil` / `aWeb` (`lib/constants/nav-v2.ts:324,329`) derivan el par de la tabla del modelo y **no los consume nadie en `src/`** — solo `tests/unit/nav-v2.test.ts`. El que sí se usa es `aRutaMobile` (`app/(mobile)/m/lib/rutas-web-a-mobile.ts:51`), anterior y con su propia tabla. Dos fuentes para la misma pregunta: o el delta 6 hace que el móvil consuma el modelo, o `aMovil`/`aWeb` sobran.
+
+- **`/m` entró al inventario de a11y: 104 nodos, 0 critical, 3 reglas** (`color-contrast` 57, `aria-hidden-focus` 32, `meta-viewport` 15). Sin `critical`, así que no hay `fix(a11y)` urgente. Dos apuntes: `meta-viewport` (moderate, 1 nodo por ruta) es la **decisión deliberada** de `m/layout.tsx:24-36` —escalado bloqueado para que el WebView se comporte como app nativa, con el zoom del SISTEMA intacto—; si se quiere cerrar la regla hay que decidir antes si se renuncia a eso. `aria-hidden-focus` pesa el doble que en la web (32 vs 14) y sale sobre todo de `/m/gastos` y `/m/transacciones`.
+
+- **Una lectura de `/m` escribe: `ensureTodaySnapshot()` en `m/(app)/patrimonio/page.tsx:40`.** Cargar la pantalla inserta la fila de hoy en `portfolio_snapshots`, lo que movió el gráfico de `/patrimonio` **web** en cuanto el arnés empezó a visitar `/m`. Es intencional y está documentado en el propio fuente, pero es la misma forma que el bug de #819: quien mide acaba modificando lo medido. Pendiente: decidir si el punto lo escribe el cron (`/api/investments/snapshot`) en vez de la pantalla, o si el arnés visita `/m/patrimonio` con una marca que suprima la escritura.
+
+- **El rate-limit de `auth` no caduca con el reloj congelado.** `QA_FREEZE` congela `Date.now()` en el servidor y la ventana fija del limitador nunca rota, así que los logins del arnés se acumulan hasta agotar el bucket y solo se recupera reiniciando el proceso. Pendiente: que `RATE_LIMITS` use un reloj que el congelador no toque, o exceptuar el bucket cuando `QA_FREEZE` está presente.
+
 Nada de lo anterior toca producción.
 
