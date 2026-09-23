@@ -56,6 +56,8 @@ fix(budget) presupuesto derivado retroactivo: hecho (#819) — base visual regen
 Fase 1 · delta 5 command-palette: hecho (#820).
 chore(qa) cobertura de `/m`: hecho (#821) — routes.json 23 → 38, a11y por superficie.
 Fase 1 · delta 6 mobile-nav-v2: hecho (#822) — alcance A; la barra inferior no vuelve.
-Fase 2 · delta 1 charts-core: en revisión — núcleo compartido (marco con tabla, degradados,
-glow, tooltip, serie activa, leyenda, tema sin colores literales) demostrado en `/dev/ui`.
-Las pantallas reales no cambian: los 3 wrappers viejos siguen intactos hasta el delta 7.
+Fase 2 · delta 1 charts-core: hecho (#823) — núcleo compartido demostrado en `/dev/ui`.
+chore(qa) antialiasing: hecho (#824) — `--ignore-delta-below 5` en el diff visual.
+Fase 2 · delta 2 charts-tooltip-crosshair: en revisión — crosshair sincronizado entre gráficos,
+tooltip fijable con clic y con Enter, táctil anclado arriba, `aria-live` solo en teclado, delta
+vs comparación y tope de 4 filas. Las pantallas reales siguen sin cambiar.
