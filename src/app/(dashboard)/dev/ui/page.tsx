@@ -12,6 +12,7 @@ import {
 } from "@/lib/format";
 
 import { ChartsDemo } from "./charts-demo";
+import { KpiDemo } from "./kpi-demo";
 import { MotionDemo } from "./motion-demo";
 
 /**
@@ -375,8 +376,12 @@ export default function DevUiPage() {
         <ChartsDemo />
       </Seccion>
 
+      <Seccion n={7} titulo="KPI" sub="Una cifra por pantalla, animada; el resto en seco">
+        <KpiDemo />
+      </Seccion>
+
       <Seccion
-        n={7}
+        n={8}
         titulo="Formateadores"
         sub="src/lib/format.ts — miles con punto, siempre, en servidor y cliente"
       >

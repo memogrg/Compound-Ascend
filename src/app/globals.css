@@ -20,6 +20,8 @@
 @import "../styles/primitives-modal.css" layer(ca);
 /* Núcleo de gráficos (fase 2). Prefijo `cf-`; no toca ninguna clase existente. */
 @import "../styles/charts-core.css" layer(ca);
+/* Primitivas de KPI (fase 2). Prefijo `kpi-`; no toca ninguna clase existente. */
+@import "../styles/kpi.css" layer(ca);
 @import "../styles/modules/dashboard.css" layer(ca);
 @import "../styles/modules/setup.css" layer(ca);
 @import "../styles/modules/auth.css" layer(ca);

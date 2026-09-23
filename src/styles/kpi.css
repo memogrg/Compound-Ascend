@@ -1,0 +1,187 @@
+/* ============================================================
+   PRIMITIVAS DE KPI — prefijo `kpi-`
+   ============================================================
+   Como `cf-`, `sb2-`, `tb2-`, `cp-` y `mn2-`: prefijo propio para no chocar ni con el shell
+   ni con una utilidad de Tailwind. `kpi` no es una palabra que Tailwind genere; `card`,
+   `meter`, `hero` o `delta` sí podrían serlo, por eso ninguna va suelta.
+
+   Colores SIEMPRE por token, y por el token DIRECTO (`--success`, `--danger`, `--warning`),
+   nunca por su alias (`--pos`, `--neg`, `--warn`): los alias se resuelven en `:root`, así que
+   un `data-theme="dark"` puesto en un contenedor no los voltearía y la sección oscura
+   seguiría pintando el color claro.
+
+   Los tiempos salen de `--dur-*`, que `tokens.css` ya pone a 0 bajo `prefers-reduced-motion`:
+   acá no se repite la media query. */
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+
+.kpi-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.kpi-hero-etiqueta {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  /* Declarado a propósito: el eyebrow hereda `text-decoration` del contenedor si no. */
+  text-decoration: none;
+  color: var(--muted);
+}
+
+.kpi-hero-cifra {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 42px;
+  line-height: 1.05;
+  font-weight: var(--figure-weight);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  font-style: normal;
+  color: var(--text);
+  /* El número puede crecer un dígito al animar; que no empuje la línea de abajo. */
+  min-height: 1.05em;
+}
+
+@media (max-width: 480px) {
+  .kpi-hero-cifra {
+    font-size: 34px;
+  }
+}
+
+.kpi-hero-contexto {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.kpi-hero-medidor {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kpi-hero-nota {
+  margin: 0;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+/* ── Tarjeta ──────────────────────────────────────────────────────────────── */
+
+.kpi-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.kpi-card-etiqueta {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  color: var(--muted);
+}
+
+.kpi-card-cifra {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 23px;
+  line-height: 1.15;
+  font-weight: var(--figure-weight);
+  letter-spacing: -0.01em;
+  font-style: normal;
+  color: var(--text);
+}
+
+.kpi-card-nota {
+  margin: 0;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+/* ── Chip de variación ────────────────────────────────────────────────────── */
+
+/* El color va SIEMPRE acompañado de flecha y signo. El `data-tono` sale de la dirección
+   cruzada con el sentido de la métrica, no del signo: en Gastos, subir es malo. */
+.kpi-delta {
+  display: inline-flex;
+  align-items: baseline;
+  /* El chip entero puede bajar de línea; sus dos piezas, no (ver `.kpi-delta-valor`). */
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.kpi-delta[data-tono="bueno"] {
+  color: var(--success);
+}
+.kpi-delta[data-tono="malo"] {
+  color: var(--danger);
+}
+.kpi-delta[data-tono="neutro"] {
+  color: var(--muted);
+}
+
+/* `+₡120.000` es UNA cosa. Sin esto, a 390 px el navegador parte la línea justo después del
+   signo —es una oportunidad de corte válida— y el chip queda «↑ +» arriba y «₡120.000» abajo. */
+.kpi-delta-valor {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* La referencia («vs mes anterior») va en `--muted` dentro del chip: es el marco, no el dato,
+   y dejarla del color del tono duplicaría la señal sin añadir información. */
+.kpi-delta-vs {
+  font-weight: 400;
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+/* ── Sparkline ────────────────────────────────────────────────────────────── */
+
+.kpi-spark {
+  display: block;
+  flex: none;
+  overflow: visible; /* el anillo del último punto asoma medio píxel */
+}
+
+/* ── Meter ────────────────────────────────────────────────────────────────── */
+
+.kpi-meter {
+  position: relative;
+  width: 100%;
+  min-width: 120px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--chip);
+  overflow: hidden;
+}
+
+.kpi-meter-relleno {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--success);
+  transition: width var(--dur-range) var(--ease-std);
+}
+.kpi-meter[data-severidad="aviso"] .kpi-meter-relleno {
+  background: var(--warning);
+}
+.kpi-meter[data-severidad="peligro"] .kpi-meter-relleno {
+  background: var(--danger);
+}
