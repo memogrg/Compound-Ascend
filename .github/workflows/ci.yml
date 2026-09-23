@@ -28,7 +28,7 @@ env:
 jobs:
   ci:
     name: Lint, Typecheck, Test & Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
@@ -71,7 +71,7 @@ jobs:
   # NOTA: marcar este check como REQUERIDO en branch protection para que bloquee.
   migrations:
     name: Migraciones aplican en BD fresca
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # Solo para poder preguntar por su existencia en el `if` de los pasos de login.
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -234,7 +234,7 @@ jobs:
   # GitHub permite mergear igual. Aplica lo mismo al job `migrations`.
   e2e:
     name: E2E smoke
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: ci
     if: github.event_name == 'pull_request'
     env:

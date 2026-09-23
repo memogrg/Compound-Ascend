@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   poll:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       # En modo debug el endpoint no consume nada: devuelve, por correo, el remitente,
       # el asunto, las direcciones vistas en cabeceras y en qué nivel resolvería al
