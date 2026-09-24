@@ -13,6 +13,7 @@ import {
 
 import { ChartsDemo } from "./charts-demo";
 import { KpiDemo } from "./kpi-demo";
+import { CalendarioDemo } from "./calendario-demo";
 import { LecturaDemo } from "./lectura-demo";
 import { MotionDemo } from "./motion-demo";
 
@@ -391,6 +392,14 @@ export default function DevUiPage() {
 
       <Seccion
         n={9}
+        titulo="Calendario y zoom"
+        sub="Sin ECharts: SVG propio y presets de rango accesibles por teclado"
+      >
+        <CalendarioDemo />
+      </Seccion>
+
+      <Seccion
+        n={10}
         titulo="Formateadores"
         sub="src/lib/format.ts — miles con punto, siempre, en servidor y cliente"
       >

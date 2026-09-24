@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { ChartEmpty } from "../chart-empty";
 import type { TablaDatos } from "./accesible";
+import { NOMBRE_RANGO, type RangoPreset } from "./rangos";
 import { ALTO_MINIMO } from "./theme";
 
 export type EstadoGrafico = "datos" | "cargando" | "vacio" | "error";
@@ -39,6 +40,9 @@ export function ChartFrame({
   mensajeError = "No se pudo cargar la gráfica.",
   tabla,
   leyenda,
+  rangos,
+  rangoActivo,
+  onRango,
   anuncio,
   onSoltar,
   children,
@@ -62,6 +66,17 @@ export function ChartFrame({
   mensajeError?: string;
   tabla: TablaDatos;
   leyenda?: React.ReactNode;
+  /**
+   * Presets de zoom («6M», «1A», «Todo») como chips sobre el gráfico.
+   *
+   * Chips y no solo un `<Brush>`: el brush se arrastra con el ratón y no tiene equivalente
+   * de teclado documentado, así que como ÚNICO camino dejaría el zoom fuera del alcance de
+   * quien no usa ratón. El brush puede acompañar para el ajuste fino; los chips son el
+   * camino principal. La tabla refleja el rango activo, no la serie entera.
+   */
+  rangos?: readonly RangoPreset[];
+  rangoActivo?: RangoPreset;
+  onRango?: (r: RangoPreset) => void;
   /**
    * Lo que se anuncia por `aria-live` (de `describirPunto`). Se pasa solo en navegación por
    * TECLADO: anunciarlo en cada hover de ratón convierte el lector en ruido continuo.
@@ -128,6 +143,48 @@ export function ChartFrame({
           </button>
         ) : null}
       </figcaption>
+
+      {/* `radiogroup` y no una lista de botones: los presets son una elección entre
+          opciones excluyentes, y así el lector anuncia «2 de 3» y las flechas recorren el
+          grupo. Un botón suelto por rango no diría que solo uno puede estar activo. */}
+      {rangos && rangos.length > 0 && estado === "datos" ? (
+        <div
+          className="cf-rangos"
+          role="radiogroup"
+          aria-label="Rango del gráfico"
+          onKeyDown={(e) => {
+            // Un `radiogroup` promete flechas: es UNA parada de Tab y dentro se recorre con
+            // ← →. Sin esto, Tab pararía en cada chip y el rol estaría mintiendo.
+            const paso =
+              e.key === "ArrowRight" || e.key === "ArrowDown"
+                ? 1
+                : e.key === "ArrowLeft" || e.key === "ArrowUp"
+                  ? -1
+                  : 0;
+            if (paso === 0) return;
+            e.preventDefault();
+            const i = rangos.indexOf(rangoActivo ?? rangos[0]!);
+            const siguiente = rangos[(i + paso + rangos.length) % rangos.length]!;
+            onRango?.(siguiente);
+          }}
+        >
+          {rangos.map((r) => (
+            <button
+              key={r}
+              type="button"
+              role="radio"
+              aria-checked={r === rangoActivo}
+              aria-label={NOMBRE_RANGO[r]}
+              // Solo el activo entra en el orden de tabulación, como manda el patrón.
+              tabIndex={r === rangoActivo ? 0 : -1}
+              className="cf-rango"
+              onClick={() => onRango?.(r)}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {leyenda}
 

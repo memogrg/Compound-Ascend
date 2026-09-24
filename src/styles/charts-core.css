@@ -269,3 +269,168 @@
   outline-offset: 2px;
   border-radius: var(--r-md);
 }
+
+/* ── Presets de rango ─────────────────────────────────────────────────────── */
+
+.cf-rangos {
+  display: flex;
+  gap: 4px;
+  margin: -2px 0 8px;
+}
+
+.cf-rango {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: background var(--dur-micro) var(--ease-std);
+}
+.cf-rango:hover {
+  background: var(--chip);
+}
+/* El activo se marca con relleno Y con el peso del borde, no solo con color: `aria-checked`
+   lo dice al lector, y esto lo dice a quien no distingue tonos. */
+.cf-rango[aria-checked="true"] {
+  background: var(--chip);
+  border-color: var(--text);
+  color: var(--text);
+}
+
+/* ── Calendario de gasto ──────────────────────────────────────────────────── */
+
+.cal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Tope de ancho, y no «lo que dé la tarjeta».
+     Las celdas son cuadradas (`aspect-ratio: 1`), así que en una tarjeta de 940 px crecían a
+     130 px cada una: cinco filas de eso desbordaban el alto del marco y el calendario se
+     pintaba encima del gráfico de abajo. Una celda de día no gana nada por ser enorme — lo
+     que se lee es el patrón del mes, no cada cuadro. 7 × 44 px + separaciones. */
+  max-width: 330px;
+}
+
+.cal-cabecera,
+.cal-fila {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.cal-dow {
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.cal-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cal-dia,
+.cal-hueco {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* El paso más oscuro de la rampa es `--chart-1` puro, y el número del día en tinta sobre él
+   da 3,71:1 — por debajo del 4,5:1 que pide un texto pequeño. Lo cazó axe, no el ojo. Ahí el
+   número se invierte a la superficie. Los pasos más claros no lo necesitan. */
+.cal-dia[data-nivel="4"] {
+  color: var(--surface);
+}
+
+/* Un día sin gasto NO es «poco gasto»: SIN relleno, fuera de la rampa, y un borde fino
+   continuo que dice que la celda existe. Con relleno (`--chip`) competía con el paso más
+   bajo de la rampa —dos grises parecidos, uno dentro de la escala y otro fuera— y el mes
+   se leía como si todos los días tuvieran algo. El borde CONTINUO es lo que lo separa del
+   día futuro, que va punteado. */
+.cal-dia[data-vacio="true"] {
+  background: transparent;
+  border: 1px solid var(--chart-grid);
+  color: var(--muted);
+}
+
+/* Y un día futuro no es un día sin gasto: sin relleno y punteado, o el mes en curso
+   parecería un mes de ahorro ejemplar. */
+.cal-dia[data-futuro="true"] {
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--muted-2);
+}
+
+.cal-dia {
+  cursor: pointer;
+}
+.cal-dia:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+/* HOY: anillo de 2 px en tinta. Es el único ancla temporal de la rejilla — sin él, un mes
+   a medias no dice dónde termina lo ocurrido y empieza lo que falta. Va en `box-shadow`
+   interior y no en `border` para no robarle 2 px a la celda y desalinear la rejilla. */
+.cal-dia[data-hoy="true"] {
+  box-shadow: inset 0 0 0 2px var(--text);
+}
+
+/* La selección usa el ACENTO, no la tinta: con los dos en `--text` el día fijado y el día
+   de hoy se pintaban idénticos y no había forma de saber cuál era cuál. Si hoy está
+   además fijado, gana el acento (esta regla va después). */
+.cal-dia[aria-selected="true"] {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.cal-leyenda {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+.cal-leyenda-t {
+  font-size: 10.5px;
+}
+.cal-leyenda-paso {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex: none;
+}
+
+/* Las muestras de «sin gasto» y «futuro» repiten EXACTAMENTE lo que hace la celda: sin
+   relleno, continua una y punteada la otra. Una leyenda que no se parece a lo que explica
+   no explica nada. */
+.cal-leyenda-vacio {
+  background: transparent;
+  border: 1px solid var(--chart-grid);
+}
+.cal-leyenda-futuro {
+  background: transparent;
+  border: 1px dashed var(--border);
+}
+
+/* Cada entrada es muestra + texto, y el texto no se parte del color que describe. */
+.cal-leyenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.cal-leyenda-rango {
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+}
