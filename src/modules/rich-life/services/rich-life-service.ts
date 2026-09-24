@@ -225,6 +225,7 @@ export type NetWorthAggregate = {
   previousNetWorth: number | null; // patrimonio del último periodo CERRADO (net_worth_snapshots)
   /** Δ entre los dos últimos cierres consecutivos. Único Δ de un mes completo. */
   closedWealthDelta: number | null;
+  closedPeriod: string | null;
 };
 
 /**
@@ -541,6 +542,9 @@ async function aggregarPatrimonio(
       mesesConsecutivos(penultimoCierre.period, ultimoCierre.period)
         ? Number(ultimoCierre.net_worth) - Number(penultimoCierre.net_worth)
         : null,
+    // El mes que CIERRA ese Δ: lo usa la UI para rotular el veredicto y distinguirlo de
+    // la cifra "en lo que va del mes", que va de este cierre a hoy.
+    closedPeriod: ultimoCierre ? ultimoCierre.period : null,
   };
 }
 
@@ -579,6 +583,7 @@ export async function getRichLifeSummary(
     diversification: agg.portfolio.diversification,
     previous: agg.previousNetWorth !== null ? { netWorth: agg.previousNetWorth } : null,
     closedWealthDelta: agg.closedWealthDelta,
+    closedPeriod: agg.closedPeriod,
     currency: agg.currency,
   };
   const snapshot = buildRichLifeSnapshot(input);
@@ -653,6 +658,7 @@ export function buildDemoRichLifeSummary(): RichLifeSummary {
     diversification: "media",
     previous: { netWorth: 29_500_000 },
     closedWealthDelta: 420_000, // demo: dos cierres seguidos → veredicto "más rico"
+    closedPeriod: "2026-08-01", // …y el cierre del que sale ese veredicto: agosto
     currency,
   };
   return {

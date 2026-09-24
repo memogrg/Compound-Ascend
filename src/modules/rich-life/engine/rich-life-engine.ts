@@ -166,6 +166,9 @@ export function computeRichLifeIndicators(input: RichLifeInput): RichLifeIndicat
     wealthVelocity,
     velocityIsPartial,
     trend,
+    // Sólo cuando el veredicto sale de un cierre: con "en curso" o sin histórico no hay
+    // mes que nombrar, y arrastrar el periodo ahí rotularía un veredicto que no existe.
+    closedPeriod: closed !== null ? (input.closedPeriod ?? null) : null,
   };
 }
 
@@ -281,7 +284,7 @@ function buildReading(ind: RichLifeIndicators, input: RichLifeInput): string {
           : "Aún no tenemos historial; este es tu punto de partida.";
   return (
     `Tu patrimonio neto es ${formatMoney(ind.netWorth, input.currency)}. ` +
-    `El ${Math.round(ind.productiveAssetsPct * 100)}% de tus activos trabaja para ti y tus ingresos pasivos cubren el ${Math.round(ind.passiveIncomeCoverage * 100)}% de tus gastos. ` +
+    `El ${Math.round(ind.productiveAssetsPct * 100)}% de tus activos genera renta y tus ingresos pasivos cubren el ${Math.round(ind.passiveIncomeCoverage * 100)}% de tus gastos. ` +
     trendMsg
   );
 }

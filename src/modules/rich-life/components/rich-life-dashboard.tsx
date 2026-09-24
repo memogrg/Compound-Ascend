@@ -9,6 +9,7 @@ import type { RichLifeSummary } from "@/modules/rich-life/services/rich-life-ser
 import { type PatrimonioServiceResult, MilestoneLadder } from "@/modules/wealth";
 import type { RichTrend, Asset, Liability } from "@/modules/rich-life/types";
 import { composeLiquidity } from "@/modules/rich-life/engine/liquidity-composition";
+import { rotuloConCierre } from "@/modules/rich-life/engine/periodo-cierre";
 
 const TREND: Record<RichTrend, { label: string; cls: string; delta: string }> = {
   mas_rico: { label: "Te estás haciendo más rico", cls: "var(--pos)", delta: "up" },
@@ -40,6 +41,10 @@ export function RichLifeDashboard({
   );
   const ind = s.indicators;
   const trend = TREND[ind.trend];
+  // El veredicto NOMBRA su periodo. Sale del Δ entre los dos últimos meses cerrados,
+  // mientras que la cifra de al lado va del último cierre a HOY: sin rótulo, "más rico"
+  // junto a un número negativo se lee como una contradicción en vez de como dos periodos.
+  const trendLabel = rotuloConCierre(trend.label, ind.closedPeriod);
 
   const assetDonut: DonutDatum[] = s.assetsByClass.map((a) => ({
     name: a.label,
@@ -72,7 +77,7 @@ export function RichLifeDashboard({
             }}
           >
             <span className={`delta ${trend.delta}`} style={{ marginTop: 0 }}>
-              {trend.label}
+              {trendLabel}
             </span>
             {ind.wealthVelocity !== null ? (
               <span
@@ -195,7 +200,7 @@ export function RichLifeDashboard({
           <Ind
             label="Activos productivos"
             value={formatPercent(ind.productiveAssetsPct)}
-            note="trabajan para ti"
+            note="generan renta"
           />
           <Ind
             label="Activos líquidos"
