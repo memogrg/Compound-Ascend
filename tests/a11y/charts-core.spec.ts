@@ -48,11 +48,18 @@ async function abrir(browser: Browser, tema: "light" | "dark" = "light", movimie
 
 test("las cuatro muestras se montan, con su tabla", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
-  await expect(page.locator(".cf")).toHaveCount(4);
-  // Una superficie de Recharts por marco: si alguna no midió, no hay SVG.
-  await expect(page.locator(".cf .recharts-surface")).toHaveCount(4);
-  // La tabla está SIEMPRE en el DOM, aunque no se vea: es el canal accesible.
-  await expect(page.locator(".cf table.cf-tabla")).toHaveCount(4);
+  // `toHaveCount(4)` se rompió al añadir el calendario en el PR #842, que trae dos marcos
+  // más a la misma página. Lo que este caso quiere comprobar es que los marcos del catálogo
+  // se montan CON su tabla, no cuántos hay en total: un número exacto convierte cualquier
+  // demo nueva en un fallo.
+  const marcos = page.locator(".cf");
+  expect(await marcos.count(), "no se montó ningún marco").toBeGreaterThanOrEqual(4);
+  // Los cuatro del catálogo dibujan con Recharts. El calendario NO —es SVG propio— así que
+  // se comprueba un mínimo, no una igualdad: si alguna superficie no midió, no hay SVG.
+  expect(await page.locator(".cf .recharts-surface").count()).toBeGreaterThanOrEqual(4);
+  // La tabla está SIEMPRE en el DOM, aunque no se vea: es el canal accesible. Esta sí es una
+  // igualdad, y la que importa: CADA marco tiene la suya, sin excepción.
+  await expect(page.locator(".cf table.cf-tabla")).toHaveCount(await marcos.count());
   await ctx.close();
 });
 
@@ -174,3 +181,48 @@ for (const tema of ["light", "dark"] as const) {
     await ctx.close();
   });
 }
+
+test("las barras: tope de 24 px, y el par del mes MUY junto frente al aire entre meses", async ({
+  browser,
+}) => {
+  /**
+   * Lo que el rótulo prometía —«2 px dentro del mes»— solo es cierto mientras la barra no
+   * toque su ancho máximo. Recharts calcula el ancho desde la banda, coloca las barras con
+   * ESE ancho y después recorta cada una a `maxBarSize`: el sobrante se queda como hueco.
+   * Medido: a 900 px de viewport la barra sale de 17 px y el hueco es exactamente 2; a 1280
+   * el ancho calculado pasa de 24, se recorta, y el hueco sube a 9.
+   *
+   * Así que se fija lo que SÍ se cumple siempre: el tope de 24 px, y que el par de un mes se
+   * lea como un par —su hueco tiene que ser mucho menor que el que separa los meses—.
+   */
+  const { ctx, page } = await abrir(browser);
+  const barras = page.locator(".recharts-bar-rectangle path");
+  const n = await barras.count();
+  expect(n, "no se encontró ninguna barra en /dev/ui").toBeGreaterThan(3);
+
+  const m = await page.evaluate(() => {
+    const rects = Array.from(
+      document.querySelectorAll<SVGPathElement>(".recharts-bar-rectangle path"),
+    )
+      .map((p) => p.getBoundingClientRect())
+      .sort((a, b) => a.x - b.x);
+    const huecos = rects
+      .slice(1)
+      .map((r, i) => r.x - (rects[i]!.x + rects[i]!.width))
+      .sort((a, b) => a - b);
+    return {
+      anchoMaximo: Math.max(...rects.map((r) => r.width)),
+      dentroDelMes: huecos[0]!,
+      entreMeses: huecos[huecos.length - 1]!,
+    };
+  });
+
+  // El tope es la regla deliberada: una barra de 40 px no dice más que una de 24.
+  expect(m.anchoMaximo, `barra de ${m.anchoMaximo.toFixed(1)} px`).toBeLessThanOrEqual(24.5);
+  // Y el agrupamiento tiene que LEERSE: el par junto, los meses separados.
+  expect(
+    m.entreMeses / m.dentroDelMes,
+    `dentro=${m.dentroDelMes.toFixed(1)}px entre=${m.entreMeses.toFixed(1)}px`,
+  ).toBeGreaterThan(4);
+  await ctx.close();
+});

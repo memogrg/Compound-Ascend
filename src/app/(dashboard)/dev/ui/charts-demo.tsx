@@ -518,7 +518,7 @@ function BarrasDemo() {
   return (
     <ChartFrame
       titulo="Ingresos y gastos por mes"
-      subtitulo="Desde cero · barras ≤ 24 px · 2 px dentro del mes y aire entre meses"
+      subtitulo="Desde cero · barras ≤ 24 px · el par del mes junto, y aire entre meses"
       descripcion={describirGrafico({
         titulo: "Ingresos por mes",
         serie: MESES.map((d) => ({ x: formatoEjeX(d.x), y: d.ingresos })),

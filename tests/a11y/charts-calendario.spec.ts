@@ -256,7 +256,9 @@ test("las instrucciones de teclado salen del subtítulo y viven en el «?» y en
   await expect(grid).toHaveCount(1);
   const idDesc = await grid.getAttribute("aria-describedby");
   expect(idDesc, "la rejilla no declara aria-describedby").toBeTruthy();
-  const desc = page.locator(`#${CSS.escape(idDesc!)}`);
+  // `CSS.escape` es un global del NAVEGADOR: en el contexto de Node del test no existe.
+  // Un selector por atributo evita tener que escapar el id que genera `useId` (trae «:»).
+  const desc = page.locator(`[id="${idDesc}"]`);
   await expect(desc).toHaveCount(1);
   expect(await desc.textContent()).toMatch(/flechas/i);
 
@@ -276,8 +278,9 @@ test("el título dice el mes completo y el año", async ({ browser }) => {
   await expect(titulo).toHaveCount(1);
   const texto = await titulo.innerText();
   // «sep 26» obliga a descifrar una abreviatura para saber de qué mes habla la rejilla.
+  // es-CR escribe «septiembre de 2026», con la preposición: el patrón la admite.
   expect(texto).toMatch(
-    /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+\d{4}/i,
+    /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+(de\s+)?\d{4}/i,
   );
   await ctx.close();
 });

@@ -99,7 +99,19 @@ export const CROSSHAIR = {
 export const BARRA = {
   anchoMaximo: 24,
   radio: 4,
-  /** Entre las barras de un MISMO mes: 2 px, solo para que no se toquen. */
+  /**
+   * Entre las barras de un MISMO mes: 2 px, solo para que no se toquen.
+   *
+   * OJO: Recharts lo respeta solo mientras la barra NO toque `anchoMaximo`. Calcula el ancho
+   * a partir de la banda, coloca las barras con ese ancho, y DESPUÉS recorta cada una al
+   * máximo — el sobrante se queda como hueco. Medido en `/dev/ui`: a 640 y 900 px de
+   * viewport la barra sale de 17 px y el hueco es exactamente 2; a 1280 el ancho calculado
+   * pasa de 24, se recorta, y el hueco real sube a 9.
+   *
+   * No se «arregla» subiendo `separacionCategoria` hasta que el recorte no entre: a 390 px
+   * eso dejaría barras de 8 px. El tope de 24 es la regla deliberada; el hueco es lo que
+   * sobra. Por eso el rótulo del catálogo NO promete 2 px — ver `charts-core.spec.ts`.
+   */
   separacion: 2,
   /**
    * Entre grupos de meses. En porcentaje porque Recharts lo mide contra el ancho de la
