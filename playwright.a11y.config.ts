@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { ESTADO_SESION } from "./tests/a11y/sesion";
+
 /**
  * Config APARTE para la auditoría de accesibilidad. No toca `playwright.config.ts` ni el
  * smoke E2E: ese corre contra `npm run dev` en :3000 y lo usa CI; esta corre contra el
@@ -14,6 +16,8 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "tests/a11y",
+  // UN solo login por corrida, guardado en `.auth/`. Ver `tests/a11y/global-setup.ts`.
+  globalSetup: "./tests/a11y/global-setup.ts",
   outputDir: "/tmp/compound-a11y-results",
   reporter: [["list"]],
   timeout: 120_000,
@@ -22,6 +26,9 @@ export default defineConfig({
   retries: 0,
   use: {
     baseURL: process.env.A11Y_BASE_URL ?? "http://localhost:3001",
+    // Para los tests que usan la fixture `page` tal cual. Los que abren su propio contexto
+    // (viewport o tema propios) pasan `storageState: ESTADO_SESION` a `newContext`.
+    storageState: ESTADO_SESION,
     ...devices["Desktop Chrome"],
   },
   projects: [{ name: "chromium" }],

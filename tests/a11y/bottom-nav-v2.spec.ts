@@ -10,21 +10,11 @@
  */
 import { test, expect, type Browser } from "@playwright/test";
 
-import { iniciarSesion } from "./sesion";
-
-let estadoSesion: Awaited<ReturnType<Awaited<ReturnType<Browser["newContext"]>>["storageState"]>>;
-
-test.beforeAll(async ({ browser }) => {
-  const ctx = await browser.newContext();
-  const page = await ctx.newPage();
-  await iniciarSesion(page);
-  estadoSesion = await ctx.storageState();
-  await ctx.close();
-});
+import { ESTADO_SESION } from "./sesion";
 
 async function abrir(browser: Browser, url = "/dashboard") {
   const ctx = await browser.newContext({
-    storageState: estadoSesion,
+    storageState: ESTADO_SESION,
     viewport: { width: 390, height: 844 },
     reducedMotion: "reduce",
   });

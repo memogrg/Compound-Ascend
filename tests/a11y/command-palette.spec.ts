@@ -24,16 +24,9 @@
  *     tests/a11y/command-palette.spec.ts
  */
 import AxeBuilder from "@axe-core/playwright";
-import {
-  test,
-  expect,
-  type Browser,
-  type BrowserContext,
-  type Locator,
-  type Page,
-} from "@playwright/test";
+import { test, expect, type Browser, type Locator, type Page } from "@playwright/test";
 
-import { iniciarSesion } from "./sesion";
+import { ESTADO_SESION } from "./sesion";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -47,19 +40,8 @@ const REGLAS_CONOCIDAS = new Set(["color-contrast", "nested-interactive", "aria-
 /** Ruta de trabajo: el panel, que es donde la paleta se abre en la vida real. */
 const RUTA = "/dashboard?period=2026-08";
 
-let estadoSesion: Awaited<ReturnType<BrowserContext["storageState"]>> | null = null;
 /** ¿El servidor se construyó con la bandera? Se mide, no se supone (ver `beforeEach`). */
 let banderaEncendida = false;
-
-test.beforeAll(async ({ browser }) => {
-  const ctx = await browser.newContext();
-  const page = await ctx.newPage();
-  await iniciarSesion(page);
-  // El botón buscador del topbar v2 solo existe bajo bandera: es el detector más barato.
-  banderaEncendida = (await page.locator("button.tb2-search").count()) > 0;
-  estadoSesion = await ctx.storageState();
-  await ctx.close();
-});
 
 /**
  * Con la bandera apagada la paleta NO existe, así que estos seis tests no tienen nada que
@@ -70,13 +52,28 @@ test.beforeAll(async ({ browser }) => {
  * necesita la ENCENDIDA. `npm run test:a11y` los corre juntos, así que sin este salto la
  * corrida de la línea base terminaba en rojo por seis fallos que no son fallos.
  */
+/**
+ * La bandera se MIDE, no se supone. Ya no hace login —la sesión la deja el `globalSetup`—
+ * pero sí abre una página: sin esta sonda `banderaEncendida` se quedaría en `false` y TODOS
+ * los casos de este archivo se saltarían en silencio, con la suite en verde sin haber
+ * probado nada.
+ */
+test.beforeAll(async ({ browser }) => {
+  const ctx = await browser.newContext({ storageState: ESTADO_SESION });
+  const page = await ctx.newPage();
+  await page.goto(RUTA, { waitUntil: "networkidle", timeout: 60_000 });
+  // El botón buscador del topbar v2 solo existe bajo bandera: es el detector más barato.
+  banderaEncendida = (await page.locator("button.tb2-search").count()) > 0;
+  await ctx.close();
+});
+
 test.beforeEach(() => {
   test.skip(!banderaEncendida, "requiere NEXT_PUBLIC_NAV_V2=1 en el build del servidor");
 });
 
 async function abrirPanel(browser: Browser, ruta: string = RUTA) {
   const ctx = await browser.newContext({
-    storageState: estadoSesion ?? undefined,
+    storageState: ESTADO_SESION,
     viewport: { width: 1280, height: 900 },
     colorScheme: "light",
     reducedMotion: "reduce",
