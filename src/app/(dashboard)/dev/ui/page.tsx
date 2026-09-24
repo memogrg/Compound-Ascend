@@ -13,6 +13,7 @@ import {
 
 import { ChartsDemo } from "./charts-demo";
 import { KpiDemo } from "./kpi-demo";
+import { LecturaDemo } from "./lectura-demo";
 import { MotionDemo } from "./motion-demo";
 
 /**
@@ -382,6 +383,14 @@ export default function DevUiPage() {
 
       <Seccion
         n={8}
+        titulo="Lectura"
+        sub="Dónde exactamente, qué investigar y qué hacer — encadenados"
+      >
+        <LecturaDemo />
+      </Seccion>
+
+      <Seccion
+        n={9}
         titulo="Formateadores"
         sub="src/lib/format.ts — miles con punto, siempre, en servidor y cliente"
       >

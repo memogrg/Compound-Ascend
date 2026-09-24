@@ -1,0 +1,416 @@
+/* ============================================================
+   PRIMITIVAS DE LECTURA — prefijo `lec-`
+   ============================================================
+   `lec` de «lectura»: las cuatro franjas que siguen al titular y al contexto (cabecera,
+   desglose, señales y acción). Prefijo propio como `cf-`, `kpi-`, `sb2-` y `mn2-`: ni
+   colisión con el shell ni con una utilidad de Tailwind — `section`, `header`, `card`,
+   `list` y `strip` son palabras que Tailwind podría generar; `lec-` no.
+
+   Colores SIEMPRE por token DIRECTO (`--success`, `--warning`, `--danger`), nunca por su
+   alias (`--pos`, `--warn`, `--neg`): los alias se resuelven en `:root`, así que un
+   `data-theme="dark"` puesto en un contenedor no los voltearía.
+
+   Los tiempos salen de `--dur-*`, que `tokens.css` ya pone a 0 bajo `prefers-reduced-motion`. */
+
+/* ── Cabecera de sección ──────────────────────────────────────────────────── */
+
+.lec-cab {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.lec-cab-txt {
+  min-width: 0;
+}
+
+.lec-eyebrow {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  /* Declarado: sin esto, un contenedor con `text-decoration` se lo presta. */
+  text-decoration: none;
+  color: var(--muted);
+}
+
+.lec-titulo {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  font-style: normal;
+  color: var(--text);
+}
+
+.lec-ayuda {
+  display: inline-flex;
+  flex: none;
+}
+
+.lec-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+/* Bajo 420 px la toolbar se va debajo del título: apretarlas en una línea deja los dos
+   ilegibles, y el título manda. */
+@media (max-width: 420px) {
+  .lec-cab {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .lec-toolbar {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+/* ── Desglose ─────────────────────────────────────────────────────────────── */
+
+.lec-desglose {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lec-filas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lec-fila-li {
+  display: flex;
+  flex-direction: column;
+}
+
+/* La fila ENTERA es el botón, y no contiene ningún otro control. */
+.lec-fila {
+  display: grid;
+  grid-template-columns: 10px 1fr auto auto;
+  grid-template-areas:
+    "sw etiqueta valor pct"
+    "sw barra barra barra";
+  align-items: center;
+  gap: 4px 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-micro) var(--ease-std),
+    opacity var(--dur-std) var(--ease-std);
+}
+.lec-fila:hover {
+  background: var(--chip);
+}
+.lec-fila[aria-pressed="true"] {
+  background: var(--chip);
+}
+
+/* Atenuar, no ocultar: la fila sigue siendo legible y comparable. */
+.lec-fila[data-atenuada="true"] {
+  opacity: 0.35;
+}
+
+.lec-swatch {
+  grid-area: sw;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  align-self: start;
+  margin-top: 4px;
+}
+
+.lec-etiqueta {
+  grid-area: etiqueta;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.lec-valor {
+  grid-area: valor;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.lec-pct {
+  grid-area: pct;
+  min-width: 42px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.lec-barra {
+  grid-area: barra;
+  display: block;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--chip);
+  overflow: hidden;
+}
+.lec-barra-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  transition: width var(--dur-range) var(--ease-std);
+}
+
+/* Estrecha, el importe y el % bajan a su propia línea. Con la etiqueta compitiendo por el
+   mismo renglón que dos números tabulares, lo que se sacrifica siempre es el nombre — y un
+   desglose de «A..», «P..» y «F..» no desglosa nada. */
+@media (max-width: 420px) {
+  .lec-fila {
+    grid-template-columns: 10px 1fr auto;
+    grid-template-areas:
+      "sw etiqueta etiqueta"
+      "sw valor pct"
+      "sw barra barra";
+  }
+  .lec-etiqueta {
+    white-space: normal;
+  }
+}
+
+/* Hermano del botón de la fila, nunca hijo. */
+.lec-detalle {
+  align-self: flex-start;
+  margin: 2px 0 6px 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-btn);
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  padding: 3px 9px;
+  cursor: pointer;
+}
+.lec-detalle:hover {
+  background: var(--chip);
+}
+
+.lec-ruta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+.lec-ruta ol {
+  list-style: none;
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+}
+.lec-ruta li + li::before {
+  content: "›";
+  margin-right: 6px;
+  color: var(--muted);
+}
+.lec-ruta li[aria-current="true"] {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.lec-subir {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.lec-subir svg {
+  transform: rotate(180deg);
+}
+
+.lec-total {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+/* Esqueleto con la altura EXACTA de la fila con datos. */
+.lec-fila-skel {
+  height: 39px;
+  border-radius: var(--r-sm);
+  background: var(--chip);
+}
+
+/* ── Señales ──────────────────────────────────────────────────────────────── */
+
+.lec-senales {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lec-senal {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--muted);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+/* `accionar` y `observar` en advertencia, NUNCA en rojo: la regla es «nunca alarmistas». */
+.lec-senal[data-tono="aviso"] {
+  border-left-color: var(--warning);
+}
+.lec-senal[data-tono="aviso"] .lec-senal-ic {
+  color: var(--warning);
+}
+.lec-senal[data-tono="acento"] {
+  border-left-color: var(--success);
+}
+.lec-senal[data-tono="acento"] .lec-senal-ic {
+  color: var(--success);
+}
+.lec-senal[data-tono="neutro"] .lec-senal-ic {
+  color: var(--muted);
+}
+
+.lec-senal-ic {
+  flex: none;
+  margin-top: 1px;
+}
+
+.lec-senal-txt {
+  flex: 1;
+  min-width: 0;
+}
+
+.lec-senal-t {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.lec-senal-cifra {
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.lec-senal-causa {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.lec-senal-ev {
+  display: inline-block;
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.lec-senal-x {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.lec-senal-x:hover {
+  background: var(--chip);
+  color: var(--text);
+}
+
+/* ── Acción ───────────────────────────────────────────────────────────────── */
+
+.lec-acciones {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lec-btn {
+  flex: none;
+}
+
+.lec-impacto {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Empuja lo secundario a la derecha cuando hay sitio; en una línea estrecha desaparece. */
+.lec-sep {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lec-todas {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.lec-bloqueada {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* ── Vacío, compartido ────────────────────────────────────────────────────── */
+
+.lec-vacio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 14px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
