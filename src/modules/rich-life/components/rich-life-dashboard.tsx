@@ -1,7 +1,10 @@
+import Link from "next/link";
+
 import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
+import { textoPasivos } from "@/modules/rich-life/engine/pasivos-texto";
 import { DeleteButton } from "./delete-button";
 import { EditRichButton, AddRichButton } from "./rich-actions";
-import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
+import { formatCompact, formatDecimal, formatMoney, formatPercent } from "@/lib/format";
 import type { RichLifeSummary } from "@/modules/rich-life/services/rich-life-service";
 import { type PatrimonioServiceResult, MilestoneLadder } from "@/modules/wealth";
 import type { RichTrend, Asset, Liability } from "@/modules/rich-life/types";
@@ -23,7 +26,18 @@ export function RichLifeDashboard({
   summary: RichLifeSummary;
   patrimonio?: PatrimonioServiceResult;
 }) {
-  const { snapshot: s, assets, liabilities, currency } = summary;
+  const { snapshot: s, assets, liabilities, debtLiabilities, currency } = summary;
+
+  // La tarjeta de pasivos cuenta también las deudas del módulo: sin esto decía «0
+  // registrado(s)» a alguien cuyas deudas ya estaban restando en el neto de arriba.
+  const txtPasivos = textoPasivos(
+    liabilities.length,
+    {
+      cantidad: debtLiabilities.length,
+      total: debtLiabilities.reduce((acc, l) => acc + l.balance, 0),
+    },
+    currency,
+  );
   const ind = s.indicators;
   const trend = TREND[ind.trend];
 
@@ -190,7 +204,7 @@ export function RichLifeDashboard({
           />
           <Ind
             label="Meses de independencia"
-            value={String(ind.monthsOfIndependence)}
+            value={formatDecimal(ind.monthsOfIndependence)}
             note="sin nuevos ingresos"
           />
           <Ind
@@ -293,7 +307,8 @@ export function RichLifeDashboard({
         />
         <ListCard
           title="Mis pasivos"
-          sub={`${liabilities.length} registrado(s)`}
+          sub={txtPasivos.sub}
+          aviso={txtPasivos.deudas}
           currency={currency}
           addKind="liability"
           items={liabilities.map((l) => ({
@@ -305,7 +320,7 @@ export function RichLifeDashboard({
             kind: "liability" as const,
             entity: l,
           }))}
-          emptyText="Agrega hipotecas u otras deudas grandes."
+          emptyText={txtPasivos.vacio}
         />
       </section>
     </div>
@@ -412,13 +427,13 @@ function PatrimonioSections({
         />
         <MetricCard
           label="Años de Libertad"
-          value={`${anios}`}
+          value={formatDecimal(anios, 2)}
           note="años que cubre tu patrimonio"
           tip={`Qué es: cuántos años de tu estilo de vida cubre tu patrimonio invertible. ${contraQue}Por qué importa: traduce tu capital a tiempo de tranquilidad. Qué hago: súbelo invirtiendo más y conteniendo el gasto.`}
         />
         <MetricCard
           label="Meses de colchón"
-          value={`${r.mesesDeColchon}`}
+          value={formatDecimal(r.mesesDeColchon)}
           note="liquidez vs. gasto mensual"
           tip={`Qué es: cuántos meses cubrirías con tu dinero líquido si se cortaran tus ingresos. ${queCuenta}${contraQue}Por qué importa: es tu colchón de seguridad. Qué hago: apunta primero a 3-6 meses de gastos.`}
         />
@@ -546,6 +561,7 @@ function DonutCard({
 function ListCard({
   title,
   sub,
+  aviso,
   items,
   emptyText,
   currency,
@@ -553,6 +569,8 @@ function ListCard({
 }: {
   title: string;
   sub: string;
+  /** Línea de contexto con enlace, para lo que se cuenta acá pero se gestiona en otro sitio. */
+  aviso?: { texto: string; href: string } | null;
   items: {
     id: string;
     name: string;
@@ -574,6 +592,14 @@ function ListCard({
           <div className="card-sub">{sub}</div>
         </div>
       </div>
+      {aviso ? (
+        <p className="muted" style={{ margin: 0, padding: "0 24px 12px", fontSize: 12.5 }}>
+          {aviso.texto}{" "}
+          <Link href={aviso.href} style={{ color: "var(--text)" }}>
+            Ver deudas
+          </Link>
+        </p>
+      ) : null}
       {items.length === 0 ? (
         <div
           className="muted"

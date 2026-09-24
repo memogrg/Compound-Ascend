@@ -117,6 +117,25 @@ export function formatMoney(amount: number, currency: string, decimals?: number)
   return Number(Math.abs(amount).toFixed(dec)) === 0 || amount >= 0 ? body : `${MINUS}${body}`;
 }
 
+/**
+ * Un decimal suelto —no un importe— con la puntuación de la casa: coma decimal.
+ *
+ * Existe porque los indicadores de patrimonio se pintaban con interpolación directa
+ * (`${r.mesesDeColchon}`), que usa el punto de JavaScript: «Años de libertad 0.21» y «Meses
+ * de colchón 1.7» en una pantalla donde todos los importes van con coma. Dos puntuaciones
+ * distintas en la misma tarjeta se leen como un descuido, y en un número pequeño el punto
+ * llega a parecer un separador de miles.
+ *
+ * Determinista, como el resto de `format.ts`: sin `Intl`, mismo resultado en servidor y en
+ * cliente. Agrupa los miles con punto por si el número crece, y usa el menos tipográfico.
+ */
+export function formatDecimal(n: number, digitos = 1): string {
+  if (!Number.isFinite(n)) return "—";
+  const cuerpo = formatAbs(n, digitos);
+  // El redondeo manda, igual que en `formatMoney`: −0,04 con 1 decimal es «0,0», no «−0,0».
+  return Number(Math.abs(n).toFixed(digitos)) === 0 || n >= 0 ? cuerpo : `${MINUS}${cuerpo}`;
+}
+
 /** Formatea una proporción 0-1 como porcentaje entero. */
 export function formatPercent(ratio: number, decimals = 0): string {
   return `${(ratio * 100).toFixed(decimals)}%`;

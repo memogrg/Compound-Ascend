@@ -184,6 +184,14 @@ export type RichLifeSummary = {
    *  el mismo set que usa el motor de patrimonio. Para desgloses (invertido/líquido/otros). */
   allAssets: Asset[];
   liabilities: Liability[];
+  /**
+   * Las deudas del módulo de Deudas, normalizadas a la moneda principal.
+   *
+   * Van APARTE de `liabilities` —que son solo los pasivos manuales— porque la tarjeta «Mis
+   * pasivos» las CUENTA pero no las edita: se gestionan en Planes · Deudas, y poder
+   * escribirlas desde dos sitios daría dos verdades del mismo saldo.
+   */
+  debtLiabilities: Liability[];
   currency: string;
 };
 
@@ -212,6 +220,8 @@ export type NetWorthAggregate = {
   // Extras para preservar EXACTO el resultado de getRichLifeSummary:
   explicitAssets: Asset[]; // solo activos manuales (tabla `assets`)
   explicitLiabilities: Liability[]; // solo pasivos manuales (tabla `liabilities`)
+  /** Las deudas del módulo de Deudas, ya normalizadas. Disjuntas de `explicitLiabilities`. */
+  debtLiabilities: Liability[];
   previousNetWorth: number | null; // patrimonio del último periodo CERRADO (net_worth_snapshots)
   /** Δ entre los dos últimos cierres consecutivos. Único Δ de un mes completo. */
   closedWealthDelta: number | null;
@@ -507,6 +517,11 @@ async function aggregarPatrimonio(
   return {
     assets: assetsForEngine,
     liabilities: liabsForEngine,
+    debtLiabilities: debtLiabs.map((l) => ({
+      ...l,
+      balance: convertCurrency(l.balance, l.currency, currency, rates),
+      currency,
+    })),
     passiveIncomeMonthly,
     monthlyExpenses: base.indicators.expenseMonthly,
     commitment,
@@ -572,6 +587,7 @@ export async function getRichLifeSummary(
     assets: agg.explicitAssets,
     allAssets: agg.assets,
     liabilities: agg.explicitLiabilities,
+    debtLiabilities: agg.debtLiabilities,
     currency: agg.currency,
   };
 }
@@ -644,6 +660,8 @@ export function buildDemoRichLifeSummary(): RichLifeSummary {
     assets,
     allAssets: assets,
     liabilities,
+    // El ejemplo no tiene módulo de Deudas detrás: todos sus pasivos son manuales.
+    debtLiabilities: [],
     currency,
   };
 }
