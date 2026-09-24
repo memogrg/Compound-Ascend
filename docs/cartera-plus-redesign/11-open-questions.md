@@ -139,5 +139,7 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 
 - **`--s-neutral` quedó sin uso.** Lo usaba el `RING_COLORS` de `/m`, que se eliminó; el token sigue declarado en `mobile.css:66` y `:175`. No se quita porque `mobile.css` está fuera de alcance por regla del proyecto.
 
+- **`shell-nav-movil.css:2` no oculta la barra inferior, y no se toca a propósito.** El fichero declara `.bottom-nav { display: none }` sin condición, pero se importa en `globals.css:10`, **antes** de `responsive.css` (línea 11), cuyo `@media (max-width: 820px)` la vuelve a poner en `display: grid` (`responsive.css:90`). Misma especificidad —una clase— así que decide el orden de fuente y gana la segunda. En la práctica ese `display: none` solo la oculta **por encima de 820 px**, que es lo que hace falta; el nombre del fichero y el comentario («NAVEGACIÓN INFERIOR MÓVIL») hacen pensar lo contrario y ya costó un rato entenderlo. Ordenarlo —mover la regla dentro de una media query `min-width` o cambiar el orden de import— cambiaría el comportamiento **con la bandera apagada**, así que no entra en el delta de la barra v2. Pendiente: hacerlo en un PR propio, con diff visual OFF a 0 px como criterio.
+
 Nada de lo anterior toca producción.
 

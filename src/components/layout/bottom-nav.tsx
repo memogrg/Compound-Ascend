@@ -1,35 +1,42 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { BOTTOM_NAV } from "@/lib/constants/nav";
+import { usePathname, useSearchParams } from "next/navigation";
+
+import { itemsDeBarra } from "@/components/layout/bottom-nav-items";
 import { Icon } from "@/components/ui/icon";
+import { navV2Enabled } from "@/lib/flags";
 import { cn } from "@/lib/utils";
 
-/** Etiquetas cortas del tabbar (los nombres completos del NAV no caben en móvil). */
-const SHORT_LABEL: Record<string, string> = {
-  dashboard: "Centro",
-  assistant: "Agente",
-  base: "Base",
-  control: "Ahorro",
-  wealth: "Portafolio",
-  "rich-life": "Patrimonio",
-};
-
-/** Barra de navegación inferior — visible solo en móvil (CSS @media). */
+/**
+ * Barra de navegación inferior — visible solo en pantallas estrechas (CSS @media).
+ *
+ * Con `NAV_V2` encendida pasa a los cinco núcleos, los mismos del sidebar y de `/m`: hasta
+ * ahora la web estrecha era el único sitio de la app que seguía con los seis destinos
+ * viejos, así que la misma persona veía dos modelos de navegación distintos según el ancho
+ * de la ventana.
+ *
+ * `aria-current="page"` en el activo, como en `NucleoTabs`. No lleva `role="tablist"`: un
+ * tablist promete paneles que se intercambian en la misma página, y esto son rutas.
+ */
 export function BottomNav() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/dashboard";
+  const searchParams = useSearchParams();
+  const items = itemsDeBarra(navV2Enabled(), pathname, searchParams?.toString() ?? null);
+
   return (
     <nav className="bottom-nav" aria-label="Navegación principal">
-      {BOTTOM_NAV.map((it) => {
-        const active = pathname === it.href || pathname.startsWith(it.href + "/");
-        return (
-          <Link key={it.id} href={it.href} className={cn("bn-item", active && "active")}>
-            <Icon name={it.icon} />
-            <span>{SHORT_LABEL[it.id] ?? it.name}</span>
-          </Link>
-        );
-      })}
+      {items.map((it) => (
+        <Link
+          key={it.id}
+          href={it.href}
+          aria-current={it.activo ? "page" : undefined}
+          className={cn("bn-item", it.activo && "active")}
+        >
+          <Icon name={it.icon} />
+          <span>{it.etiqueta}</span>
+        </Link>
+      ))}
     </nav>
   );
 }
