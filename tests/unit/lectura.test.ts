@@ -12,6 +12,8 @@ import {
   porcentajesExactos,
   reducirDesglose,
   filasDelNivel,
+  colorDeFila,
+  colorDelNivel,
   ESTADO_INICIAL,
   ID_OTROS,
   desdeInsight,
@@ -19,6 +21,7 @@ import {
   TONO_SEVERIDAD,
   type FilaDesglose,
 } from "@/components/lectura";
+import { SOBRES } from "@/app/(dashboard)/dev/ui/lectura-datos";
 import { suggestedAction } from "@/lib/insights/actions";
 import type { DetectedInsight } from "@/lib/insights/types";
 import type { Action } from "@/modules/actions/types";
@@ -210,6 +213,69 @@ describe("el color sigue a la entidad", () => {
   });
 });
 
+describe("la paleta de la demo", () => {
+  // La galería es donde se mira si una paleta funciona, así que su propia paleta tiene que
+  // cumplir las reglas que predica.
+  const visibles = plegarOtros(SOBRES, 6).filter((f) => f.id !== ID_OTROS);
+
+  it("ningún par de sobres del primer nivel comparte color", () => {
+    const colores = visibles.map((f) => f.color);
+    expect(new Set(colores).size, colores.join(" · ")).toBe(colores.length);
+  });
+
+  it("todos son tokens categóricos `--chart-N`, no semánticos", () => {
+    // `--c-expense` significa «gasto» y `--c-savings` «ahorro»: usarlos para distinguir
+    // sobres entre sí le diría a alguien que Transporte es «ahorro» porque le tocó.
+    for (const f of visibles) {
+      expect(f.color, f.etiqueta).toMatch(/^var\(--chart-[1-6]\)$/);
+    }
+  });
+
+  it("los que se pliegan en «Otros» no llevan color", () => {
+    const plegados = plegarOtros(SOBRES, 6).find((f) => f.id === ID_OTROS)?.hijos ?? [];
+    expect(plegados.length).toBeGreaterThan(0);
+    for (const f of plegados) expect(f.color, f.etiqueta).toBeUndefined();
+  });
+
+  it("todos los hijos de un nivel comparten el color del padre", () => {
+    const padre = SOBRES.find((f) => f.hijos && f.hijos.length > 0)!;
+    const delNivel = colorDelNivel(SOBRES, [padre.id]);
+    expect(delNivel).toBe(padre.color);
+    // Y ninguno trae uno propio que pudiera romper la uniformidad.
+    for (const h of padre.hijos!) expect(h.color, h.etiqueta).toBeUndefined();
+  });
+});
+
+describe("colorDeFila y colorDelNivel", () => {
+  const arbol = [
+    {
+      id: "a",
+      etiqueta: "A",
+      valor: 10,
+      color: "var(--chart-1)",
+      hijos: [{ id: "a1", etiqueta: "A1", valor: 6 }],
+    },
+    { id: "b", etiqueta: "B", valor: 5, color: "var(--chart-2)" },
+  ];
+
+  it("encuentra el color de una fila anidada", () => {
+    expect(colorDeFila(arbol, "b")).toBe("var(--chart-2)");
+    expect(colorDeFila(arbol, "a1")).toBeUndefined();
+  });
+
+  it("en la raíz no hay color de nivel: cada fila usa el suyo", () => {
+    expect(colorDelNivel(arbol, [])).toBeUndefined();
+  });
+
+  it("dentro de un sobre, el nivel toma el color del sobre", () => {
+    expect(colorDelNivel(arbol, ["a"])).toBe("var(--chart-1)");
+  });
+
+  it("un id que no existe no inventa un color", () => {
+    expect(colorDelNivel(arbol, ["zzz"])).toBeUndefined();
+  });
+});
+
 describe("desdeInsight", () => {
   const base: DetectedInsight = {
     kind: "sobre_sobregirado",
@@ -221,9 +287,17 @@ describe("desdeInsight", () => {
   };
 
   it("la ruta sale de ACTIONS, no de un mapa nuevo", () => {
-    const it0 = desdeInsight(base);
-    expect(it0.evidencia?.href).toBe(suggestedAction("sobre_sobregirado")!.route);
-    expect(it0.evidencia?.etiqueta).toBe(suggestedAction("sobre_sobregirado")!.label);
+    expect(desdeInsight(base).evidencia?.href).toBe(suggestedAction("sobre_sobregirado")!.route);
+  });
+
+  it("la etiqueta es la de ACTIONS con la mayúscula inicial, y nada más", () => {
+    // En `ACTIONS` va en infinitivo y minúscula porque allí se usa dentro de una frase del
+    // asesor; acá es un enlace suelto. Se cambia la primera letra y punto: el resto del
+    // texto, y sobre todo la RUTA, no se tocan.
+    const label = suggestedAction("sobre_sobregirado")!.label;
+    const etiqueta = desdeInsight(base).evidencia!.etiqueta;
+    expect(etiqueta).toBe(label.charAt(0).toUpperCase() + label.slice(1));
+    expect(etiqueta.toLowerCase()).toBe(label.toLowerCase());
   });
 
   it("conserva severidad, título y causa", () => {

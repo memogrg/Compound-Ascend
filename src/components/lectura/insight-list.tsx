@@ -75,6 +75,9 @@ export function InsightList({
             {it.evidencia ? (
               <Link className="lec-senal-ev" href={it.evidencia.href}>
                 {it.evidencia.etiqueta}
+                <span className="lec-flecha" aria-hidden="true">
+                  →
+                </span>
               </Link>
             ) : null}
           </div>

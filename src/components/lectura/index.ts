@@ -12,6 +12,8 @@ export {
   porcentajesExactos,
   reducirDesglose,
   filasDelNivel,
+  colorDeFila,
+  colorDelNivel,
   ESTADO_INICIAL,
   ID_OTROS,
 } from "./desglose";

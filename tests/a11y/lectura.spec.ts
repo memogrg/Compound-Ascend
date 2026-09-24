@@ -154,6 +154,76 @@ test("volver al nivel de arriba tampoco deja nada atenuado", async ({ browser })
   await ctx.close();
 });
 
+test("el NIVEL también es contexto: entrar a un sobre mueve el KPI y filtra", async ({
+  browser,
+}) => {
+  // Si el desglose está mostrando el desmenuce de Supermercado, el resto de la pantalla no
+  // puede seguir hablando del total.
+  const { ctx, page } = await abrir(browser);
+  await fila(page, "Supermercado").click();
+  await page.locator(".lec-detalle").click();
+
+  const kpi = page.locator(".kpi-card").filter({ hasText: "Supermercado" });
+  await expect(kpi).toBeVisible();
+  await expect(kpi.locator(".sr-only").first()).toHaveText("₡412.500");
+  await expect(page.locator(".lec-senal")).toHaveCount(1);
+  await expect(page.locator(".lec-senal")).toContainText("Supermercado se pasó del sobre");
+
+  // Volver restablece el total y la lista completa.
+  await page.getByRole("button", { name: "Volver" }).click();
+  await expect(page.locator(".kpi-card").filter({ hasText: "Total del mes" })).toBeVisible();
+  await expect(page.locator(".lec-senal")).toHaveCount(3);
+  await ctx.close();
+});
+
+test("Escape sube de nivel y también restablece el contexto", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser);
+  await fila(page, "Supermercado").click();
+  await page.locator(".lec-detalle").click();
+  await expect(page.locator(".lec-senal")).toHaveCount(1);
+
+  await page.locator(".lec-desglose").click({ position: { x: 4, y: 4 } });
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".kpi-card").filter({ hasText: "Total del mes" })).toBeVisible();
+  await expect(page.locator(".lec-senal")).toHaveCount(3);
+  await ctx.close();
+});
+
+test("dentro de un sobre, todas las filas van del color del sobre", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser);
+  await fila(page, "Supermercado").click();
+  await page.locator(".lec-detalle").click();
+  const colores = await page
+    .locator(".lec-desglose .lec-swatch")
+    .evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor));
+  expect(colores.length).toBe(3);
+  expect(new Set(colores).size, colores.join(" · ")).toBe(1);
+  await ctx.close();
+});
+
+test("en la raíz, ningún par de sobres comparte color", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser);
+  const colores = await page
+    .locator(".lec-desglose .lec-swatch")
+    .evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor));
+  // Seis sobres con su color + «Otros» con el neutro.
+  expect(new Set(colores).size, colores.join(" · ")).toBe(colores.length);
+  await ctx.close();
+});
+
+test("el enlace de evidencia se ve sin depender del color", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser);
+  const ev = page.locator(".lec-senal-ev").first();
+  await expect(ev).toBeVisible();
+  const deco = await ev.evaluate((e) => getComputedStyle(e).textDecorationLine);
+  expect(deco).toContain("underline");
+  await expect(ev).toContainText("→");
+  // Mayúscula inicial: es un enlace suelto, no una frase del asesor.
+  const texto = (await ev.innerText()).trim();
+  expect(texto.charAt(0)).toBe(texto.charAt(0).toUpperCase());
+  await ctx.close();
+});
+
 test("seleccionar un sobre mueve el KPI y filtra las señales", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
   const kpi = page.locator(".kpi-card").filter({ hasText: "Total del mes" });

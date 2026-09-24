@@ -44,9 +44,13 @@ export function desdeInsight(
     titulo: insight.title,
     cifra: opciones?.cifra,
     causa: insight.body,
-    // `label` de ACTIONS está en infinitivo («ajustar el presupuesto…»): sirve tal cual como
-    // texto del enlace, y es el mismo verbo que usa el asesor al cerrar la observación.
-    evidencia: accion ? { etiqueta: accion.label, href: accion.route } : undefined,
+    // `label` de ACTIONS está en infinitivo y minúscula («ajustar el presupuesto…») porque
+    // allí se usa dentro de una frase del asesor («si querés, podemos ajustar…»). Acá es un
+    // enlace suelto, así que empieza en mayúscula. Solo la primera letra: la ruta y el resto
+    // del texto no se tocan, para no divergir de la fuente.
+    evidencia: accion
+      ? { etiqueta: mayusculaInicial(accion.label), href: accion.route }
+      : undefined,
     relacionado:
       insight.relatedKind && insight.relatedId
         ? { tipo: insight.relatedKind, id: insight.relatedId }
@@ -73,3 +77,8 @@ export const LECTURA_SEVERIDAD: Record<InsightSeverity, string> = {
   observar: "Para observar",
   info: "Informativo",
 };
+
+/** Primera letra en mayúscula, el resto intacto. */
+function mayusculaInicial(texto: string): string {
+  return texto.length === 0 ? texto : texto.charAt(0).toUpperCase() + texto.slice(1);
+}

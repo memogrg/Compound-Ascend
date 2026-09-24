@@ -14,150 +14,111 @@ import {
   type InsightItem,
 } from "@/components/lectura";
 import { formatMoney } from "@/lib/format";
-import type { DetectedInsight } from "@/lib/insights/types";
-import type { Action } from "@/modules/actions/types";
+
+import { ACCION, INSIGHTS, SOBRES } from "./lectura-datos";
 
 /**
  * La sección «Lectura» de la galería: una tarjeta compuesta tipo Gastos, con las cuatro
  * franjas encadenadas. Datos fijos e inventados — esta página no lee nada.
  *
- * Lo que demuestra, y que no se ve en una captura suelta, es la **interacción enlazada**:
- * seleccionar un sobre actualiza el KPI de al lado y filtra las señales a las de esa
- * categoría. En la pantalla real ese estado viajará por `?cat=` (fase 3); acá vive en el
- * componente, porque el objetivo es probar las primitivas, no el enrutado.
+ * Lo que demuestra, y que no se ve en una captura suelta, es la **interacción enlazada**: el
+ * foco de la pantalla —el sobre seleccionado, o aquel dentro del que estamos— actualiza el
+ * KPI de al lado y filtra las señales. **Entrar a un sobre cuenta como foco**: si el desglose
+ * está mostrando el desmenuce de Supermercado, el resto de la pantalla no puede seguir
+ * hablando del total.
+ *
+ * Los dos estados (`seleccion` y `ruta`) viven acá y no dentro de la tarjeta, que es lo que
+ * permitirá atarlos a `?cat=` en la fase 3 sin tocar la primitiva.
  */
-
-/** Ocho sobres: con `max = 6` se pliegan los dos últimos en «Otros». */
-const SOBRES: FilaDesglose[] = [
-  {
-    id: "supermercado",
-    etiqueta: "Supermercado",
-    valor: 412500,
-    color: "var(--s1)",
-    hijos: [
-      { id: "super-automercado", etiqueta: "Automercado", valor: 231000, color: "var(--s1)" },
-      { id: "super-pali", etiqueta: "Palí", valor: 118500, color: "var(--s4)" },
-      { id: "super-feria", etiqueta: "Feria", valor: 63000, color: "var(--s5)" },
-    ],
-  },
-  { id: "casa", etiqueta: "Casa y servicios", valor: 298000, color: "var(--s2)" },
-  { id: "transporte", etiqueta: "Transporte", valor: 164300, color: "var(--s4)" },
-  { id: "salud", etiqueta: "Salud", valor: 97800, color: "var(--s5)" },
-  { id: "disfrute", etiqueta: "Disfrute", valor: 86400, color: "var(--s6)" },
-  { id: "educacion", etiqueta: "Educación", valor: 52000, color: "var(--info)" },
-  { id: "mascotas", etiqueta: "Mascotas", valor: 31200, color: "var(--warning)" },
-  { id: "regalos", etiqueta: "Regalos", valor: 18900, color: "var(--muted)" },
-];
-
-/** Tres señales, una por severidad distinta; la primera cuelga de una categoría. */
-const INSIGHTS: (DetectedInsight & { id: string })[] = [
-  {
-    id: "i1",
-    kind: "sobre_sobregirado",
-    severity: "accionar",
-    title: "Supermercado se pasó del sobre",
-    body: "Llevás ₡42.500 por encima de lo asignado y quedan 9 días de mes.",
-    relatedKind: "category",
-    relatedId: "supermercado",
-  },
-  {
-    id: "i2",
-    kind: "sobre_ocioso",
-    severity: "info",
-    title: "Regalos casi no se usó",
-    body: "₡18.900 de un presupuesto de ₡60.000 en los últimos tres meses.",
-    relatedKind: "category",
-    relatedId: "regalos",
-  },
-  {
-    id: "i3",
-    kind: "racha_positiva",
-    severity: "celebrar",
-    title: "Tercer mes seguido cerrando en verde",
-    body: "El flujo libre creció ₡61.000 respecto al promedio del trimestre.",
-  },
-];
-
 const CIFRAS: Record<string, string> = {
   i1: formatMoney(42500, "CRC"),
   i2: formatMoney(18900, "CRC"),
   i3: formatMoney(61000, "CRC"),
 };
 
-const ACCION = {
-  key: "demo:gasto:supermercado",
-  kind: "orden",
-  title: "Ajustar el sobre de Supermercado",
-  why: "Es el único que se pasó este mes.",
-  impact: { kind: "monto", value: 42500, currency: "CRC", label: "Cierra una brecha de ₡42.500" },
-  effort: "2 minutos",
-  route: "/gastos",
-  teach: "",
-  source: "motor",
-  weights: {},
-} as unknown as Action;
+/** Una fila por id, en todo el árbol. */
+function buscar(filas: readonly FilaDesglose[], id: string): FilaDesglose | undefined {
+  for (const f of filas) {
+    if (f.id === id) return f;
+    const dentro = f.hijos ? buscar(f.hijos, id) : undefined;
+    if (dentro) return dentro;
+  }
+  return undefined;
+}
 
 export function LecturaDemo() {
   const [sobre, setSobre] = useState<string | null>(null);
+  const [ruta, setRuta] = useState<string[]>([]);
 
   const items: InsightItem[] = useMemo(
     () => INSIGHTS.map((i) => desdeInsight(i, { cifra: CIFRAS[i.id] })),
     [],
   );
 
-  // Enlazado: el sobre fijado filtra las señales a las de esa categoría. Sin selección se
-  // ven las tres; con una categoría que no tiene señales, la lista queda vacía a propósito
-  // —es información, no un error— y el estado vacío lo dice.
-  const filtradas = sobre ? items.filter((i) => i.relacionado?.id === sobre) : items;
-  const filaSel = SOBRES.find((s) => s.id === sobre);
+  // El foco de la pantalla: lo seleccionado manda; si no hay nada, el sobre en el que
+  // estamos. Volver o soltar la selección devuelve el total.
+  const foco = sobre ?? ruta[ruta.length - 1] ?? null;
+  const filaFoco = foco ? buscar(SOBRES, foco) : undefined;
+
+  // Un id de nivel 2 no tiene señales propias, así que la lista queda vacía a propósito: es
+  // información («de esto no hay nada que señalar»), no un error, y el estado vacío lo dice.
+  const filtradas = foco ? items.filter((i) => i.relacionado?.id === foco) : items;
 
   return (
-    <div style={{ display: "grid", gap: 18 }}>
-      <SectionHeader
-        titulo="A dónde se fue"
-        eyebrow="Septiembre"
-        nivel={3}
-        ayuda="Suma de los movimientos del mes por sobre, después de descontar traslados entre cuentas. Un sobre puede pasarse sin que el mes cierre en rojo."
-        toolbar={
-          <>
-            <span className="chip">vs mes anterior</span>
-            <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }}>
-              Ver tabla
-            </button>
-          </>
-        }
-      />
-
-      {/* `auto-fit` con un mínimo real: por debajo de ~620 px las dos columnas no caben sin
-          estrangular el desglose, y una tarjeta de 190 px trunca todas las etiquetas. */}
-      <div
-        style={{
-          display: "grid",
-          gap: 18,
-          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-          alignItems: "start",
-        }}
-      >
-        <BreakdownCard
-          filas={SOBRES}
-          max={6}
-          seleccion={sobre}
-          onSeleccionar={setSobre}
-          etiquetaRaiz="Gastos del mes"
+    <div className="lec-demo">
+      <div className="lec-bloque">
+        <SectionHeader
+          titulo="A dónde se fue"
+          eyebrow="Septiembre"
+          nivel={3}
+          ayuda="Suma de los movimientos del mes por sobre, después de descontar traslados entre cuentas. Un sobre puede pasarse sin que el mes cierre en rojo."
+          toolbar={
+            <>
+              <span className="chip">vs mes anterior</span>
+              <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }}>
+                Ver tabla
+              </button>
+            </>
+          }
         />
 
-        <KpiCard
-          etiqueta={filaSel ? filaSel.etiqueta : "Total del mes"}
-          valor={filaSel ? filaSel.valor : SOBRES.reduce((s, f) => s + f.valor, 0)}
-          nota={filaSel ? "Seleccionado en el desglose" : "Seleccioná un sobre para desglosarlo"}
-        />
+        {/* `auto-fit` con un mínimo real: por debajo de ~620 px las dos columnas no caben sin
+            estrangular el desglose, y una tarjeta de 190 px trunca todas las etiquetas. */}
+        <div
+          style={{
+            display: "grid",
+            gap: 18,
+            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+            alignItems: "start",
+          }}
+        >
+          <BreakdownCard
+            filas={SOBRES}
+            max={6}
+            seleccion={sobre}
+            onSeleccionar={setSobre}
+            ruta={ruta}
+            onRuta={setRuta}
+            etiquetaRaiz="Gastos del mes"
+          />
+
+          <KpiCard
+            etiqueta={filaFoco ? filaFoco.etiqueta : "Total del mes"}
+            valor={filaFoco ? filaFoco.valor : SOBRES.reduce((s, f) => s + f.valor, 0)}
+            nota={filaFoco ? "En foco en el desglose" : "Seleccioná un sobre para desglosarlo"}
+          />
+        </div>
       </div>
 
-      <SectionHeader titulo="Qué investigar" nivel={3} />
-      <InsightList items={filtradas} onDescartar={() => {}} />
+      <div className="lec-bloque">
+        <SectionHeader titulo="Qué investigar" nivel={3} />
+        <InsightList items={filtradas} onDescartar={() => {}} />
+      </div>
 
-      <SectionHeader titulo="Qué hacer" nivel={3} />
-      <ActionStrip {...desdeAction(ACCION)} />
+      <div className="lec-bloque">
+        <SectionHeader titulo="Qué hacer" nivel={3} />
+        <ActionStrip {...desdeAction(ACCION)} />
+      </div>
     </div>
   );
 }

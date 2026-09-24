@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Icon } from "@/components/ui/icon";
 import { formatMoney } from "@/lib/format";
 
 import {
-  ESTADO_INICIAL,
   ID_OTROS,
+  colorDelNivel,
   filasDelNivel,
   plegarOtros,
   porcentajesExactos,
@@ -37,6 +37,8 @@ export function BreakdownCard({
   moneda = "CRC",
   seleccion,
   onSeleccionar,
+  ruta,
+  onRuta,
   cargando = false,
   vacio = "Sin movimientos en este período.",
   etiquetaRaiz = "Todo",
@@ -49,34 +51,48 @@ export function BreakdownCard({
   /** Controlado por quien lo usa: así la selección puede filtrar otras tarjetas. */
   seleccion?: string | null;
   onSeleccionar?: (id: string | null) => void;
+  /**
+   * El NIVEL, controlado igual que la selección: entrar a un sobre es contexto de pantalla,
+   * no un detalle interno de la tarjeta. Quien nos usa decide qué hacer con él —en la fase 3,
+   * atarlo a `?cat=`— y mientras tanto el KPI y las señales de al lado se filtran con él.
+   * Si no se pasa, la tarjeta lo lleva por su cuenta.
+   */
+  ruta?: string[];
+  onRuta?: (ruta: string[]) => void;
   cargando?: boolean;
   vacio?: string;
   /** Primer tramo del breadcrumb. */
   etiquetaRaiz?: string;
 }) {
-  // La RUTA del drill-down es estado propio; la SELECCIÓN la manda quien nos usa.
-  const [estado, despachar] = useReducer(reducirDesglose, ESTADO_INICIAL);
+  // Estado interno SOLO para el caso sin controlar. Si llega `ruta`, manda ella.
+  const [rutaInterna, setRutaInterna] = useState<string[]>([]);
+  const rutaActiva = ruta ?? rutaInterna;
   const contenedor = useRef<HTMLDivElement>(null);
 
   /**
    * Cambiar de nivel limpia la selección EN LOS DOS SITIOS.
    *
-   * El reducer ya limpia la suya, pero cuando la selección es controlada la manda el padre,
-   * y un id del nivel anterior no existe en el siguiente: ninguna fila lo iguala, así que
-   * `activa !== null` y **todas** quedan atenuadas. Se veía como un nivel entero en gris sin
-   * nada seleccionado — lo encontró una captura, no un test.
+   * La transición la calcula el reducer puro —el mismo que prueban los unitarios— y el
+   * resultado se propaga a los dos estados. Limpiar la selección no es un detalle: un id del
+   * nivel anterior no existe en el siguiente, ninguna fila lo iguala, y **todas** quedarían
+   * atenuadas. Se veía como un nivel entero en gris sin nada seleccionado — lo encontró una
+   * captura, no un test.
    */
   const cambiarNivel = (accion: { tipo: "entrar"; id: string } | { tipo: "subir" }) => {
-    despachar(accion);
+    const siguiente = reducirDesglose({ seleccion: null, ruta: rutaActiva }, accion);
+    setRutaInterna(siguiente.ruta);
+    onRuta?.(siguiente.ruta);
     onSeleccionar?.(null);
   };
 
-  const delNivel = filasDelNivel(filas, estado.ruta);
+  const delNivel = filasDelNivel(filas, rutaActiva);
+  // Dentro de un sobre, el nivel entero va del color del sobre. Ver `colorDelNivel`.
+  const colorNivel = colorDelNivel(filas, rutaActiva);
   const visibles = plegarOtros(delNivel, max);
   const base = total ?? visibles.reduce((s, f) => s + f.valor, 0);
   const pcts = porcentajesExactos(
     visibles.map((f) => f.valor),
-    estado.ruta.length === 0 ? total : undefined,
+    rutaActiva.length === 0 ? total : undefined,
   );
   const mayor = visibles.reduce((m, f) => Math.max(m, f.valor), 0);
 
@@ -93,11 +109,12 @@ export function BreakdownCard({
       if (e.key !== "Escape") return;
       if (activa) {
         onSeleccionar?.(null);
-      } else if (estado.ruta.length > 0) {
+      } else if (rutaActiva.length > 0) {
         // Inline y no `cambiarNivel`: esa función se recrea en cada render, así que como
-        // dependencia del efecto re-registraría el listener sin parar. `despachar` es
-        // estable y `onSeleccionar` ya está en la lista.
-        despachar({ tipo: "subir" });
+        // dependencia re-registraría el listener sin parar.
+        const siguiente = reducirDesglose({ seleccion: null, ruta: rutaActiva }, { tipo: "subir" });
+        setRutaInterna(siguiente.ruta);
+        onRuta?.(siguiente.ruta);
         onSeleccionar?.(null);
       } else {
         return;
@@ -106,7 +123,7 @@ export function BreakdownCard({
     };
     el.addEventListener("keydown", onKey);
     return () => el.removeEventListener("keydown", onKey);
-  }, [activa, estado.ruta.length, onSeleccionar]);
+  }, [activa, rutaActiva, onSeleccionar, onRuta]);
 
   if (cargando) {
     // Misma altura que con datos: si el esqueleto fuera más bajo, la página saltaría al
@@ -124,11 +141,11 @@ export function BreakdownCard({
     return <p className="lec-vacio">{vacio}</p>;
   }
 
-  const tramos = [etiquetaRaiz, ...estado.ruta.map((id) => etiquetaDe(filas, id))];
+  const tramos = [etiquetaRaiz, ...rutaActiva.map((id) => etiquetaDe(filas, id))];
 
   return (
     <div className="lec-desglose" ref={contenedor}>
-      {estado.ruta.length > 0 ? (
+      {rutaActiva.length > 0 ? (
         <nav className="lec-ruta" aria-label="Nivel del desglose">
           <button
             type="button"
@@ -150,7 +167,7 @@ export function BreakdownCard({
 
       {/* El nivel se anuncia: quien navega por teclado no ve el breadcrumb aparecer. */}
       <p className="sr-only" aria-live="polite">
-        {estado.ruta.length === 0
+        {rutaActiva.length === 0
           ? `Desglose de ${etiquetaRaiz}, ${visibles.length} filas`
           : `Nivel ${tramos.length}: ${tramos[tramos.length - 1]}, ${visibles.length} filas`}
       </p>
@@ -160,7 +177,7 @@ export function BreakdownCard({
           const pct = pcts[i] ?? 0;
           const esActiva = f.id === activa;
           const atenuada = activa !== null && !esActiva;
-          const color = f.color ?? "var(--muted-2)";
+          const color = colorNivel ?? f.color ?? "var(--muted-2)";
           return (
             <li key={f.id} className="lec-fila-li">
               <button

@@ -142,3 +142,33 @@ export function filasDelNivel(
   }
   return filas;
 }
+
+/** El color de una fila por id, buscando en todo el árbol. `undefined` si no lo tiene. */
+export function colorDeFila(filas: readonly FilaDesglose[], id: string): string | undefined {
+  for (const f of filas) {
+    if (f.id === id) return f.color;
+    if (f.hijos) {
+      const hallado = colorDeFila(f.hijos, id);
+      if (hallado !== undefined) return hallado;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * El color con el que se pinta un nivel del desglose.
+ *
+ * Dentro de un sobre, **todas las filas van del color del sobre**. Repartir seis colores
+ * categóricos entre las partes de una sola categoría diría que son cosas distintas cuando son
+ * la misma cosa desmenuzada; el color ya lo gastó el nivel de arriba para separar sobres
+ * entre sí. Uniforme, el nivel se lee como «esto es todo Supermercado».
+ *
+ * En la raíz no hay padre, así que cada fila usa el suyo.
+ */
+export function colorDelNivel(
+  filas: readonly FilaDesglose[],
+  ruta: readonly string[],
+): string | undefined {
+  const padre = ruta[ruta.length - 1];
+  return padre === undefined ? undefined : colorDeFila(filas, padre);
+}

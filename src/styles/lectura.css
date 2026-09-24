@@ -14,12 +14,24 @@
 
 /* ── Cabecera de sección ──────────────────────────────────────────────────── */
 
+/* Una subsección: cabecera + contenido. El aire entre los dos sale de UN token
+   (`--sp3`), y el aire entre subsecciones de otro (`--sp6`). Antes la cabecera llevaba su
+   propio `margin-bottom` y encima heredaba el `gap` del contenedor, así que «Qué investigar»
+   —que era hermano directo del grid— respiraba 30 px mientras las otras respiraban 12. */
+.lec-demo {
+  display: grid;
+  gap: var(--sp6);
+}
+.lec-bloque {
+  display: grid;
+  gap: var(--sp3);
+}
+
 .lec-cab {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
 }
 
 .lec-cab-txt {
@@ -340,11 +352,28 @@
   color: var(--muted);
 }
 
+/* Subrayado y flecha, no color.
+   Va dentro de un bloque de texto, así que el color por sí solo no basta para distinguirlo
+   —es la regla `link-in-text-block` de axe, y antes que una regla es sentido común: quien no
+   separa tonos no vería que ahí hay algo que pulsar—. El subrayado con `offset` lo hace
+   legible sin cortar las descendentes, y la «→» dice a dónde lleva. */
 .lec-senal-ev {
-  display: inline-block;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
   margin-top: 5px;
   font-size: 12px;
+  font-weight: 600;
   color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.lec-senal-ev:hover {
+  text-decoration-thickness: 2px;
+}
+.lec-senal-ev .lec-flecha {
+  text-decoration: none;
 }
 
 .lec-senal-x {
