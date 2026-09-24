@@ -58,3 +58,15 @@ export {
   type SerieDef,
 } from "./theme";
 export { dominioBarras, niceDomain } from "./escala";
+
+export { CalendarioGasto, type DiaGasto } from "./calendario-gasto";
+export {
+  cuantiles,
+  diaDeLaSemana,
+  diasDelMes,
+  gridDelMes,
+  nivelDe,
+  rangosDeNivel,
+  type CeldaCalendario,
+} from "./calendario";
+export { recortar, presetsUtiles, NOMBRE_RANGO, type RangoPreset } from "./rangos";
