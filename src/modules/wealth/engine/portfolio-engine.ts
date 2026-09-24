@@ -400,11 +400,22 @@ const NATURE_LABEL: Record<InvestmentNature, string> = {
 /**
  * Color por NATURALEZA de la inversión. Categórico, igual que `ASSET_COLOR` y `LIAB_COLOR`
  * en rich-life-engine: «Crecimiento» no es «a favor» ni «Flujo de caja» es «ahorro», así que
- * no llevan `--pos` ni el teal del ahorro. Dos clases, dos tokens distintos.
+ * no llevan `--pos` ni el teal del ahorro.
+ *
+ * En `/patrimonio` este anillo convive con el de CATEGORÍAS, y de ahí salen estos dos tokens
+ * en concreto: `--chart-1` y `--chart-2` resuelven al mismo valor que `--pos` y `--info`, que
+ * son las dos primeras entradas de `CONC_PALETTE`, así que «Crecimiento» habría salido del
+ * mismo color exacto que la categoría más grande de al lado. `--chart-4` y `--chart-6` son de
+ * los pocos que no chocan con ninguna entrada de esa paleta.
+ *
+ * Aviso para quien venga después: `CONC_PALETTE` sigue repartiendo NUEVE colores por posición
+ * entre hasta VEINTITRÉS categorías, con tokens de estado y una colisión interna (`--gold` y
+ * `--warn` son los dos #b07a2e). Arreglar eso es otro cambio; hasta entonces, la unicidad por
+ * pantalla en `/patrimonio` está garantizada para este anillo pero no para el de categorías.
  */
 const NATURE_COLOR: Record<InvestmentNature, string> = {
   cashflow: "var(--chart-6)",
-  growth: "var(--chart-1)",
+  growth: "var(--chart-4)",
 };
 
 /** Paleta cíclica para las categorías (sin color fijo por slug). */

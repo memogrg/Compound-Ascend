@@ -196,19 +196,58 @@ describe("paletas de entidad: categóricas y sin colisiones", () => {
     }
   });
 
-  it("todas son `--chart-N`, la paleta categórica validada", () => {
-    for (const color of [...Object.values(colorActivos), ...Object.values(colorPasivos)]) {
+  it("todas se construyen sobre la paleta categórica validada", () => {
+    // Los activos usan el token directo; los pasivos, una mezcla sobre `--chart-4` contra el
+    // fondo —contra `--bg` y no contra blanco, para que la rampa siga funcionando en oscuro—.
+    for (const color of Object.values(colorActivos)) {
       expect(color).toMatch(/^var\(--chart-[1-6]\)$/);
+    }
+    for (const color of Object.values(colorPasivos)) {
+      expect(color).toMatch(
+        /^(var\(--chart-4\)|color-mix\(in srgb, var\(--chart-4\) \d+%, var\(--bg\)\))$/,
+      );
     }
   });
 
-  it("activos y pasivos PUEDEN repetir tokens entre sí, y es deliberado", () => {
-    // Son dos anillos distintos, cada uno con su leyenda: seis tokens no alcanzan para nueve
-    // clases, y lo que importa es que no se repitan DENTRO del mismo gráfico. Queda escrito
-    // para que nadie lo tome por un descuido.
-    const compartidos = Object.values(colorActivos).filter((c) =>
-      Object.values(colorPasivos).includes(c),
-    );
-    expect(compartidos.length).toBeGreaterThan(0);
+  it("UNA PANTALLA, UN COLOR: /mi-rich-life no repite entre sus dos anillos", () => {
+    // Que estén en gráficos distintos no basta. Quien mira la pantalla ve nueve porciones a
+    // la vez, y si dos comparten color la lectura es ambigua aunque cada leyenda sea
+    // correcta. Nueve entidades, nueve colores.
+    const dePantalla = [...Object.values(colorActivos), ...Object.values(colorPasivos)];
+    expect(dePantalla).toHaveLength(9);
+    expect(new Set(dePantalla).size, dePantalla.join(" · ")).toBe(9);
+  });
+
+  it("los pasivos son una rampa de un tono que ningún activo usa", () => {
+    // Son dos familias, no nueve cosas equivalentes: el anillo de deudas se lee de un vistazo
+    // como «esto es todo lo que debo», y la intensidad ordena por gravedad.
+    for (const c of Object.values(colorPasivos)) {
+      expect(c, "pasivo").toMatch(/--chart-4/);
+    }
+    for (const c of Object.values(colorActivos)) {
+      expect(c, "activo").not.toMatch(/--chart-4/);
+    }
+  });
+
+  it("/m/patrimonio muestra solo activos: cinco entidades, cinco colores", () => {
+    const solo = Object.values(colorActivos);
+    expect(new Set(solo).size).toBe(solo.length);
+  });
+
+  it("en /patrimonio, la naturaleza no choca con las primeras categorías", () => {
+    // `CONC_PALETTE` arranca con `--pos` y `--info`, que resuelven al mismo valor que
+    // `--chart-1` y `--chart-2`. Si la naturaleza usara esos, «Crecimiento» saldría del color
+    // exacto de la categoría más grande de al lado.
+    //
+    // PENDIENTE, y queda declarado acá: el anillo de categorías reparte NUEVE colores por
+    // POSICIÓN entre hasta 23 categorías, con tokens de estado y una colisión interna
+    // (`--gold` y `--warn` son los dos #b07a2e). La unicidad por pantalla en `/patrimonio`
+    // está garantizada para el anillo de naturaleza, no para el de categorías.
+    const nat = allocationByNature([
+      holding("bono", "cashflow", 100),
+      holding("etf", "growth", 100),
+    ]).map((s) => s.color);
+    expect(new Set(nat).size).toBe(2);
+    for (const c of nat) expect(c).not.toMatch(/--chart-[12]\b/);
   });
 });
