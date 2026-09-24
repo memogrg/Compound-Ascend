@@ -40,6 +40,7 @@ import {
   CUR_OPTS,
 } from "../../components/form-kit";
 import { DebtForm, type DebtValues } from "./debt-form";
+import { formatDecimal } from "@/lib/format";
 
 /** Meses → "15 años" / "4 años 6 m" / "8 meses". */
 function plazoTexto(meses: number): string {
@@ -297,7 +298,7 @@ export function DebtCalculatorMobile({
                 />
                 <MMetricCard
                   label="Por cada 100"
-                  value={sim.costPer100.toFixed(0)}
+                  value={formatDecimal(sim.costPer100, 0)}
                   sub="es lo que devuelves"
                   tone="warning"
                 />
