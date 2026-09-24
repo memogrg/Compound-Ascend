@@ -5,6 +5,7 @@ import { describe, it, expect } from "vitest";
 
 import { curvaDe } from "@/components/charts/core/theme";
 import { escalaNice, incluyeCero } from "@/components/charts/core/escala-nice";
+import { niceEscala } from "@/components/charts/scale";
 import { formatAxisCompact } from "@/lib/format";
 
 const M = 1_000_000;
@@ -162,5 +163,38 @@ describe("curvaDe: el presupuesto va en escalón", () => {
   it("y una serie real conserva su curva", () => {
     expect(curvaDe({})).toBe("monotone");
     expect(curvaDe({ escalon: false })).toBe("monotone");
+  });
+});
+
+describe("niceEscala: el dominio SIN los ticks no basta", () => {
+  it("devuelve ticks, no solo el dominio", () => {
+    const e = niceEscala([1_000_000, 3_300_000], { ticks: 5 });
+    expect(e.ticks.length).toBeGreaterThanOrEqual(4);
+    expect(e.ticks[0]).toBe(e.dominio[0]);
+    expect(e.ticks.at(-1)).toBe(e.dominio[1]);
+  });
+
+  it("y esos ticks no se rotulan con un valor distinto al suyo", () => {
+    // El caso real de `/gastos`: con solo el dominio, Recharts repartía cinco ticks a
+    // partes iguales y uno caía en 2,25 M → «₡2,3M». Pasándole los ticks, no puede.
+    for (const rango of [
+      [1_000_000, 3_300_000],
+      [1_000_000, 3_500_000],
+      [0, 2_250_000],
+      [-500_000, 4_100_000],
+    ] as [number, number][]) {
+      const e = niceEscala(rango, { ticks: 5 });
+      expect(e.ticks.length).toBeGreaterThan(0);
+      for (const t of e.ticks) {
+        const rotulo = formatAxisCompact(t, "CRC");
+        expect(valorDelRotulo(rotulo), `tick ${t} se rotula «${rotulo}»`).toBe(t);
+      }
+    }
+  });
+
+  it("respeta symmetric y zeroBased como antes", () => {
+    expect(niceEscala([-3_000_000, 1_000_000], { symmetric: true }).dominio[0]).toBeLessThan(0);
+    const z = niceEscala([1_200_000, 1_900_000], { zeroBased: true });
+    expect(z.dominio[0]).toBe(0);
   });
 });

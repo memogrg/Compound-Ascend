@@ -16,7 +16,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { formatMoney, formatCompact } from "@/lib/format";
-import { niceDomain } from "./scale";
+import { niceEscala } from "./scale";
 import { ChartEmpty } from "./chart-empty";
 
 export type LineSeries = { key: string; label: string; color: string; dashed?: boolean };
@@ -45,7 +45,7 @@ export function PremiumLineChart({
   const values = data.flatMap((d) =>
     series.map((s) => Number(d[s.key])).filter((v) => Number.isFinite(v)),
   );
-  const domain = niceDomain(values, { symmetric: true, ticks: 5 });
+  const escala = niceEscala(values, { symmetric: true, ticks: 5 });
 
   return (
     <div role="img" aria-label="Gráfico de líneas: evolución en el tiempo">
@@ -67,7 +67,8 @@ export function PremiumLineChart({
               minTickGap={24}
             />
             <YAxis
-              domain={domain}
+              domain={escala.dominio}
+              ticks={escala.ticks}
               tick={{ fill: "var(--muted)", fontSize: 10.5, fontFamily: "var(--font-mono)" }}
               axisLine={false}
               tickLine={false}

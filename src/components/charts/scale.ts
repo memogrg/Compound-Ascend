@@ -28,8 +28,29 @@ export function niceDomain(
     paddingRatio?: number;
   } = {},
 ): [number, number] {
+  return niceEscala(values, opts).dominio;
+}
+
+/**
+ * La escala COMPLETA —dominio Y ticks—, con las mismas opciones que `niceDomain`.
+ *
+ * Existe porque devolver solo el dominio NO basta: Recharts elige entonces sus propios ticks
+ * dentro de él (cinco a partes iguales), y esos caen donde caigan. En `/gastos` el dominio
+ * [1 M, 3,5 M] dejaba un tick en 2,25 M que `formatAxisCompact` rotula «₡2,3M» — justo el
+ * defecto que este cambio venía a arreglar, escapándose por la puerta de atrás. Quien pinte
+ * un eje tiene que pasar los DOS.
+ */
+export function niceEscala(
+  values: number[],
+  opts: {
+    symmetric?: boolean;
+    zeroBased?: boolean;
+    ticks?: number;
+    paddingRatio?: number;
+  } = {},
+): { dominio: [number, number]; ticks: number[] } {
   const nums = values.filter((v) => Number.isFinite(v));
-  if (nums.length === 0) return [0, 1];
+  if (nums.length === 0) return { dominio: [0, 1], ticks: [0, 1] };
 
   let min = Math.min(...nums);
   let max = Math.max(...nums);
@@ -58,8 +79,9 @@ export function niceDomain(
   // `ticks` era un número APROXIMADO de divisiones; `escalaNice` trabaja con un rango, así
   // que se le da una ventana alrededor del valor pedido en vez de un número exacto.
   const pedidos = Math.max(2, opts.ticks ?? 4);
-  return escalaNice([min, max], {
+  const e = escalaNice([min, max], {
     minTicks: Math.max(2, pedidos - 1),
     maxTicks: pedidos + 2,
-  }).dominio;
+  });
+  return { dominio: e.dominio, ticks: e.ticks };
 }
