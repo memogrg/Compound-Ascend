@@ -21,13 +21,13 @@ const TEMAS = {
     surface: "#ffffff",
     bg: "#f4f2ec",
     text: "#1e1c16",
-    chart: ["#378451", "#3a6ea5", "#be862d", "#7b5ea7", "#c34f4b", "#0f9aa8"],
+    chart: ["#378451", "#36679b", "#be862d", "#8163b0", "#bc4845", "#0f9aa8"],
   },
   oscuro: {
     surface: "#1e1c16",
     bg: "#15140f",
     text: "#f4f2ec",
-    chart: ["#3f9560", "#5a8ccb", "#c4862c", "#9b7cc8", "#d46460", "#28a2b0"],
+    chart: ["#3f9560", "#689ce0", "#c4862c", "#9a7bc7", "#ce605d", "#28a2b0"],
   },
 } as const;
 
@@ -166,6 +166,32 @@ describe("la copia de tokens sigue al día", () => {
     expect(claro).toContain(`--surface: ${TEMAS.claro.surface}`);
     expect(oscuro).toContain(`--surface: ${TEMAS.oscuro.surface}`);
   });
+
+  /**
+   * La galería `/dev/ui` imprime los hex de la paleta ESCRITOS A MANO, al lado de las
+   * muestras que sí salen del token. Cuando los dos dejan de coincidir, la galería —que es
+   * justo donde alguien va a mirar cuál es el color de una serie— anuncia un color que la
+   * app no usa.
+   *
+   * No es hipotético: `--chart-3` pasó a `#be862d` en el PR #844 y la tabla se quedó en
+   * `#c48a2e`. Nadie lo vio porque la muestra de al lado seguía pintándose bien.
+   */
+  it("la tabla de /dev/ui declara los MISMOS hex que tokens.css", () => {
+    const galeria = readFileSync(
+      join(process.cwd(), "src/app/(dashboard)/dev/ui/page.tsx"),
+      "utf8",
+    );
+    const filas = [
+      ...galeria.matchAll(/\{ token: "(--chart-\d)", claro: "(#\w{6})", oscuro: "(#\w{6})"/g),
+    ];
+    expect(filas.length, "no se encontró la tabla SERIES en /dev/ui").toBe(6);
+
+    for (const [, token, claro, oscuro] of filas) {
+      const i = Number(token!.slice(-1)) - 1;
+      expect(claro, `${token} claro en la galería`).toBe(TEMAS.claro.chart[i]);
+      expect(oscuro, `${token} oscuro en la galería`).toBe(TEMAS.oscuro.chart[i]);
+    }
+  });
 });
 
 /**
@@ -219,34 +245,41 @@ describe.each(Object.entries(TEMAS))("separación de la paleta en tema %s", (nom
   });
 
   /**
-   * Con dicromacia la paleta NO cumple, y el test lo dice en vez de callarlo.
+   * Con dicromacia la paleta CUMPLE, y esto es lo que lo sostiene.
    *
-   * El par que se cae es siempre el mismo: `--chart-2` (azul) y `--chart-4` (morado), que se
-   * diferencian sobre todo en el canal rojo — justo el que pierde la protanopía. En oscuro
-   * quedan en ΔE 1,2, por debajo del umbral de percepción (~2,3): para esa persona son el
-   * MISMO color. Y los dos conviven en `/mi-rich-life` (inversión y la rampa de pasivos).
+   * La versión anterior no cumplía y este caso solo fijaba el piso medido. Tres pares se
+   * caían, no uno: `--chart-2`/`--chart-4` (azul y morado) en ΔE 1,2 bajo protanopía
+   * oscuro —por debajo del umbral de percepción, o sea el MISMO color—, `--chart-1`/
+   * `--chart-5` (el verde y el rojo, la confusión clásica) en 5,3-6,0, y `--chart-1`/
+   * `--chart-2` en 3,6 bajo tritanopía. El test viejo solo miraba el mínimo global, así
+   * que los otros dos pasaban sin que nadie los viera.
    *
-   * El umbral de este test es el valor MEDIDO, no el deseable: sirve para que no empeore
-   * mientras se decide qué hacer. Arreglarlo es re-espaciar los tonos de la paleta
-   * categórica, que es una decisión de diseño y no un ajuste. Anotado en 11-open-questions.
+   * Se mide TODO par contra TODO par, no solo los adyacentes: «adyacente» es un orden de
+   * la leyenda, no del ojo, y el par que se caía no era adyacente.
    */
-  it("con dicromacia hay pares que se confunden, y queda registrado", () => {
-    const medidos = (["prot", "deut", "trit"] as const).map((t) => ({
-      tipo: t,
-      ...parMasParecido(T.chart, (c) => comoLoVe(c, t)),
-    }));
-    const resumen = medidos
-      .map((m) => `${m.tipo}: --chart-${m.a}/${m.b} ΔE ${m.d.toFixed(1)}`)
-      .join(" · ");
-
-    // Piso medido hoy. Si baja, algo se juntó todavía más.
-    // Medido con ESTA implementación (que redondea y acota a 0-255, como haría una pantalla).
-    const piso = nombre === "claro" ? 3.2 : 1.1;
-    for (const m of medidos) {
-      expect(m.d, `${nombre} · ${resumen}`).toBeGreaterThan(piso);
+  it("con dicromacia, ningún par de la paleta se confunde", () => {
+    const visiones = ["prot", "deut", "trit"] as const;
+    for (const t of visiones) {
+      const p = parMasParecido(T.chart, (c) => comoLoVe(c, t));
+      expect(
+        p.d,
+        `${nombre} · ${t} · --chart-${p.a} vs --chart-${p.b} → ΔE ${p.d.toFixed(1)}`,
+      ).toBeGreaterThanOrEqual(8);
     }
-    // Y el par problemático es el conocido: si cambia, es que se movió la paleta.
-    const peor = medidos.reduce((x, y) => (y.d < x.d ? y : x));
-    expect([peor.a, peor.b], resumen).toEqual([2, 4]);
+  });
+
+  it("y con visión normal tampoco, obviamente", () => {
+    const p = parMasParecido(T.chart);
+    expect(
+      p.d,
+      `${nombre} · --chart-${p.a} vs --chart-${p.b} → ΔE ${p.d.toFixed(1)}`,
+    ).toBeGreaterThanOrEqual(8);
+  });
+
+  it("todos los tokens llegan a 3:1 contra la superficie de tarjeta", () => {
+    T.chart.forEach((c, i) => {
+      const r = contraste(rgb(c), rgb(T.surface));
+      expect(r, `${nombre} · --chart-${i + 1} → ${r.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
+    });
   });
 });
