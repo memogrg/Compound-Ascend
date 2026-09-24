@@ -66,16 +66,35 @@ const ASSET_LABEL: Record<AssetClass, string> = {
 /**
  * Rampa de un solo tono para los pasivos. Ver el bloque de `ASSET_COLOR`.
  *
- * La intensidad ordena por gravedad, no por tamaño: un crédito productivo que se paga solo
- * no pesa lo mismo que una deuda crítica aunque el saldo sea mayor. Se mezcla contra `--bg`
- * y no contra blanco para que la rampa siga funcionando en tema oscuro.
+ * **Más grave = más contraste contra la superficie**, y eso vale en los DOS temas sin
+ * escribir dos rampas. El truco es de dónde se mezcla: `--text` es, por definición, el color
+ * de máximo contraste de cada tema —tinta casi negra en claro, crema casi blanca en oscuro—,
+ * y `--bg` el de mínimo. Mezclar hacia `--text` sube el énfasis y hacia `--bg` lo baja, en
+ * claro y en oscuro por igual, así que el orden de gravedad se lee igual en ambos.
+ *
+ * Los porcentajes NO son estéticos: salen de medir. Con la rampa anterior —100/74/50/30 %,
+ * toda ella mezclada hacia `--bg`— los dos pasos más claros **no llegaban a 3:1** contra la
+ * superficie (WCAG 1.4.11): «Patrimoniales» daba 2,21:1 en claro y 2,08:1 en oscuro, y
+ * «Productivos» 1,65:1 y 1,43:1. Mezclando solo hacia el fondo, el suelo de 3:1 está en el
+ * 72 %, y cuatro pasos entre 100 y 72 quedan demasiado juntos. Abriendo el extremo grave
+ * hacia `--text` la rampa respira sin bajar de 3:1 en ningún paso:
+ *
+ *     paso            claro     oscuro
+ *     Críticos        8,11:1    7,65:1
+ *     Consumo         5,25:1    4,96:1
+ *     Patrimoniales   4,04:1    3,93:1
+ *     Productivos     3,18:1    3,10:1
+ *
+ * y los pasos contiguos se distinguen con ΔE ≥ 8,6 (el umbral de percepción está en ~2,3).
+ * El validador vive en `tests/unit/color-por-entidad.test.ts`.
  */
 const LIAB_COLOR: Record<LiabilityClass, string> = {
-  critico: "var(--chart-4)",
-  consumo: "color-mix(in srgb, var(--chart-4) 74%, var(--bg))",
-  patrimonial: "color-mix(in srgb, var(--chart-4) 50%, var(--bg))",
-  productivo: "color-mix(in srgb, var(--chart-4) 30%, var(--bg))",
+  critico: "color-mix(in srgb, var(--chart-4) 65%, var(--text))",
+  consumo: "var(--chart-4)",
+  patrimonial: "color-mix(in srgb, var(--chart-4) 86%, var(--bg))",
+  productivo: "color-mix(in srgb, var(--chart-4) 72%, var(--bg))",
 };
+
 const LIAB_LABEL: Record<LiabilityClass, string> = {
   consumo: "Consumo",
   patrimonial: "Patrimoniales",

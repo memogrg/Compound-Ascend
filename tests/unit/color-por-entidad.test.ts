@@ -197,14 +197,17 @@ describe("paletas de entidad: categóricas y sin colisiones", () => {
   });
 
   it("todas se construyen sobre la paleta categórica validada", () => {
-    // Los activos usan el token directo; los pasivos, una mezcla sobre `--chart-4` contra el
-    // fondo —contra `--bg` y no contra blanco, para que la rampa siga funcionando en oscuro—.
+    // Los activos usan el token directo; los pasivos, mezclas sobre `--chart-4` hacia
+    // `--text` (más énfasis) o hacia `--bg` (menos). Nunca hacia un color literal: `--text` y
+    // `--bg` son los extremos de contraste de CADA tema, y por eso la rampa se lee igual en
+    // claro y en oscuro sin escribir dos. El contraste de cada paso lo mide
+    // `tests/unit/contraste-paleta.test.ts`.
     for (const color of Object.values(colorActivos)) {
       expect(color).toMatch(/^var\(--chart-[1-6]\)$/);
     }
     for (const color of Object.values(colorPasivos)) {
       expect(color).toMatch(
-        /^(var\(--chart-4\)|color-mix\(in srgb, var\(--chart-4\) \d+%, var\(--bg\)\))$/,
+        /^(var\(--chart-4\)|color-mix\(in srgb, var\(--chart-4\) \d+%, var\(--(text|bg)\)\))$/,
       );
     }
   });
