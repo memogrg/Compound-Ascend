@@ -84,6 +84,11 @@ sistema, sin opt-out). No hay nada que hacer del lado nativo porque los safe-are
 el CSS con `env(safe-area-inset-*)` + `viewport-fit=cover` — un solo criterio para las dos
 plataformas, como explica `capacitor.config.ts`.
 
+Ese CSS solo funciona con **Android System WebView >= 136** (mayo 2025): en uno más viejo
+`env(safe-area-inset-*)` devuelve 0 y el header queda bajo la barra de estado. La
+orientación queda fija en **portrait** en teléfonos; en tablets (>= 600 dp) Android 16 ignora
+esa restricción para apps con target 36 y la app rota — aceptado para v1.
+
 El `AndroidManifest.xml` declara **`allowBackup="false"`** más `data_extraction_rules.xml`
 (API 31+) y `backup_rules.xml` (API < 31), que excluyen `shared_prefs`, bases de datos,
 archivos y `app_webview/`. El motivo es concreto: ahí viven las **cookies de sesión de
