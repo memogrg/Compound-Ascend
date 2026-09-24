@@ -33,7 +33,7 @@ import {
   TRAZO,
   describirGrafico,
   curvaDe,
-  dominioBarras,
+  escalaBarras,
   formatoEjeX,
   niceDomain,
   opacidadDe,
@@ -513,7 +513,7 @@ function LineaDemo() {
 function BarrasDemo() {
   const it = useInteraccion();
   const visibles = seriesVisibles(SERIES_MESES, it.estado);
-  const dominio = useMemo(() => dominioBarras(MESES.flatMap((d) => [d.ingresos, d.gastos])), []);
+  const escala = useMemo(() => escalaBarras(MESES.flatMap((d) => [d.ingresos, d.gastos])), []);
 
   return (
     <ChartFrame
@@ -559,7 +559,8 @@ function BarrasDemo() {
             <YAxis
               {...EJE_PROPS}
               width={56}
-              domain={dominio}
+              domain={escala.dominio}
+              ticks={escala.ticks}
               tickFormatter={(v: number) => formatAxisCompact(v, MONEDA)}
             />
             <Tooltip

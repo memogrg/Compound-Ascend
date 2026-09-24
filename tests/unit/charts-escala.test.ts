@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 import { curvaDe } from "@/components/charts/core/theme";
 import { escalaNice, incluyeCero } from "@/components/charts/core/escala-nice";
 import { niceEscala } from "@/components/charts/scale";
+import { escalaBarras } from "@/components/charts/core/escala";
 import { formatAxisCompact } from "@/lib/format";
 
 const M = 1_000_000;
@@ -196,5 +197,40 @@ describe("niceEscala: el dominio SIN los ticks no basta", () => {
     expect(niceEscala([-3_000_000, 1_000_000], { symmetric: true }).dominio[0]).toBeLessThan(0);
     const z = niceEscala([1_200_000, 1_900_000], { zeroBased: true });
     expect(z.dominio[0]).toBe(0);
+  });
+});
+
+describe("escalaBarras: barras desde cero, y sin rótulos que mientan", () => {
+  it("el catálogo ya no rotula un tick de 2,25 M como «₡2,3M»", () => {
+    // El caso real: ingresos y gastos de seis meses, máximo 2,52 M.
+    const valores = [2_310_000, 1_820_000, 2_300_000, 1_990_000, 2_430_000, 1_800_000];
+    const e = escalaBarras(valores);
+    expect(e.ticks.length).toBeGreaterThan(0);
+    for (const t of e.ticks) {
+      const rotulo = formatAxisCompact(t, "CRC");
+      expect(valorDelRotulo(rotulo), `tick ${t} se rotula «${rotulo}»`).toBe(t);
+    }
+  });
+
+  it("la base es 0 sin negativos, y el tope cubre el máximo", () => {
+    const valores = [100, 250, 180];
+    const e = escalaBarras(valores);
+    expect(e.dominio[0]).toBe(0);
+    expect(e.dominio[1]).toBeGreaterThanOrEqual(250);
+    expect(e.ticks[0]).toBe(0);
+  });
+
+  it("con negativos la base baja, y ningún tick queda fuera del dominio", () => {
+    const e = escalaBarras([-400, 900, 300]);
+    expect(e.dominio[0]).toBeLessThan(0);
+    for (const t of e.ticks) {
+      expect(t).toBeGreaterThanOrEqual(e.dominio[0]);
+      expect(t).toBeLessThanOrEqual(e.dominio[1]);
+    }
+  });
+
+  it("una serie toda a cero no arranca la barra por encima del eje", () => {
+    const e = escalaBarras([0, 0, 0]);
+    expect(e.dominio[0]).toBe(0);
   });
 });

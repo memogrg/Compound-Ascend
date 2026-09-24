@@ -58,7 +58,7 @@ export {
   type MarcaSerie,
   type SerieDef,
 } from "./theme";
-export { dominioBarras, niceDomain } from "./escala";
+export { dominioBarras, escalaBarras, niceDomain } from "./escala";
 export { escalaNice, incluyeCero, type Escala, type OpcionesEscala } from "./escala-nice";
 
 export { CalendarioGasto, INSTRUCCIONES_TECLADO, type DiaGasto } from "./calendario-gasto";
