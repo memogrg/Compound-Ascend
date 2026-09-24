@@ -15,12 +15,33 @@ import type {
 import { formatMoney } from "@/lib/format";
 import { mesesDeColchon, gastoDeReferencia } from "@/lib/wealth-math";
 
+/**
+ * Color por CLASE de activo. Categórico, en orden fijo, y el orden no se reordena nunca:
+ * el color pertenece a la clase, no a su tamaño ni a su puesto en la lista.
+ *
+ * Son tokens `--chart-N` y no tokens semánticos, y eso es el arreglo.
+ *
+ *  - `--pos`, `--c-expense`, `--c-savings` significan «a favor», «gasto» y «ahorro». Un
+ *    activo productivo no es «positivo» en el sentido de la app, y uno de uso personal no es
+ *    un gasto: son clases de patrimonio, no estados. Pintarlas con el vocabulario de los
+ *    estados le dice al usuario algo que no queríamos decir.
+ *  - Y hacía algo peor: `--c-expense` y `--gold` resuelven **los dos a `--s2`** (#b07a2e),
+ *    así que «Uso personal» y «Especiales» salían del mismo color exacto y el anillo mostraba
+ *    dos porciones indistinguibles. Igual en los pasivos: `--c-debt` y `--neg` son los dos
+ *    #c34f4b, y «Consumo» y «Críticos» se confundían.
+ *
+ * Los seis `--chart-N` están validados para daltonismo y contraste (ver la sección de color
+ * de `/dev/ui`) y existen justamente para nombrar series sin opinar sobre ellas. Hay cinco
+ * clases de activo y cuatro de pasivo, así que a cada una le toca uno distinto DENTRO de su
+ * anillo; los dos anillos son gráficos separados, con su leyenda cada uno, y por eso pueden
+ * repetir tokens entre sí sin ambigüedad. Hay un test que lo vigila.
+ */
 const ASSET_COLOR: Record<AssetClass, string> = {
-  liquido: "var(--c-savings)",
-  inversion: "var(--c-invest)",
-  productivo: "var(--pos)",
-  uso_personal: "var(--c-expense)",
-  especial: "var(--gold)",
+  liquido: "var(--chart-6)",
+  inversion: "var(--chart-2)",
+  productivo: "var(--chart-1)",
+  uso_personal: "var(--chart-3)",
+  especial: "var(--chart-4)",
 };
 const ASSET_LABEL: Record<AssetClass, string> = {
   liquido: "Líquidos",
@@ -29,11 +50,21 @@ const ASSET_LABEL: Record<AssetClass, string> = {
   uso_personal: "Uso personal",
   especial: "Especiales",
 };
+/**
+ * Color por CLASE de pasivo. Mismo criterio que `ASSET_COLOR`, y el mismo motivo urgente:
+ * `--c-debt` y `--neg` resolvían los dos a #c34f4b, así que «Consumo» y «Críticos» salían
+ * idénticos en el anillo.
+ *
+ * Se pierde algo al hacerlo, y conviene decirlo: el rojo para «Críticos» era una señal, no
+ * un color arbitrario. Pero un anillo donde dos clases distintas comparten color no informa
+ * de nada, y la criticidad se comunica donde corresponde —en el orden, en el texto y en las
+ * señales—, no repitiendo el mismo rojo en dos porciones.
+ */
 const LIAB_COLOR: Record<LiabilityClass, string> = {
-  consumo: "var(--c-debt)",
-  patrimonial: "var(--info)",
-  productivo: "var(--c-protect)",
-  critico: "var(--neg)",
+  consumo: "var(--chart-3)",
+  patrimonial: "var(--chart-2)",
+  productivo: "var(--chart-4)",
+  critico: "var(--chart-5)",
 };
 const LIAB_LABEL: Record<LiabilityClass, string> = {
   consumo: "Consumo",

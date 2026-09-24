@@ -397,9 +397,14 @@ const NATURE_LABEL: Record<InvestmentNature, string> = {
   cashflow: "Flujo de caja",
   growth: "Crecimiento",
 };
+/**
+ * Color por NATURALEZA de la inversión. Categórico, igual que `ASSET_COLOR` y `LIAB_COLOR`
+ * en rich-life-engine: «Crecimiento» no es «a favor» ni «Flujo de caja» es «ahorro», así que
+ * no llevan `--pos` ni el teal del ahorro. Dos clases, dos tokens distintos.
+ */
 const NATURE_COLOR: Record<InvestmentNature, string> = {
-  cashflow: "var(--teal)",
-  growth: "var(--pos)",
+  cashflow: "var(--chart-6)",
+  growth: "var(--chart-1)",
 };
 
 /** Paleta cíclica para las categorías (sin color fijo por slug). */
