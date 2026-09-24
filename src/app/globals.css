@@ -22,6 +22,8 @@
 @import "../styles/charts-core.css" layer(ca);
 /* Primitivas de KPI (fase 2). Prefijo `kpi-`; no toca ninguna clase existente. */
 @import "../styles/kpi.css" layer(ca);
+/* Primitivas de lectura (fase 2). Prefijo `lec-`; no toca ninguna clase existente. */
+@import "../styles/lectura.css" layer(ca);
 @import "../styles/modules/dashboard.css" layer(ca);
 @import "../styles/modules/setup.css" layer(ca);
 @import "../styles/modules/auth.css" layer(ca);

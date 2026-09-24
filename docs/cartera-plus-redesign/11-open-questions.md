@@ -131,5 +131,13 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 
 - **Los runners quedan fijados a `ubuntu-24.04`, y eso es una deuda con fecha.** `ubuntu-latest` migra a **Ubuntu 26 el 19 de octubre de 2026**, y una migración de imagen que llega sola el día que toca no es una decisión: es una sorpresa que aparece como CI en rojo sin que nadie haya tocado el repo. Pendiente: probar Ubuntu 26 en una rama —`runs-on: ubuntu-26.04` en los 7 sitios, las tres corridas verdes de rigor— y subir el pin a conciencia antes de esa fecha, no después.
 
+- **`KIND_HREF` de la campana vive en paralelo a `ACTIONS`.** `bell-notifications.tsx:23` tiene su propio mapa de cinco tipos, mientras `lib/insights/actions.ts` cubre los 26 y es lo que usa el asesor —y ahora `desdeInsight` de las primitivas de lectura—. Los tipos que no están en el mapa de la campana no llevan enlace, y el que difiera no se nota hasta que alguien compara. Pendiente: que la campana lea `suggestedAction(kind)` y borrar `KIND_HREF`. No se toca en la fase 2 porque `bell-notifications.tsx` está fuera del alcance del delta.
+
+- **`MSectionHeader` y `.card-title` a migrar a `SectionHeader` (fase 3).** Hoy la cabecera de sección existe tres veces: `MSectionHeader` en `/m` (14 líneas, solo título y acción), la clase `.card-title` repetida a mano en la web, y ahora `SectionHeader` con nivel, eyebrow, ayuda y toolbar. Las tres conviven a propósito hasta que las pantallas migren; el objetivo del audit (§17) es que quede una.
+
+- **`ASSET_COLOR` tiene una colisión de color entre dos clases.** `uso_personal` → `--c-expense` y `especial` → `--gold` resuelven **los dos a `--s2`** (`#b07a2e`), así que una cartera con activos «especiales» pinta dos porciones idénticas en el anillo de patrimonio. Es preexistente y ya afecta a la web (`rich-life-dashboard.tsx`); salió a la luz al hacer que `/m` usara el color de la entidad. Arreglarlo es tocar la paleta compartida del engine, que merece su propio PR.
+
+- **`--s-neutral` quedó sin uso.** Lo usaba el `RING_COLORS` de `/m`, que se eliminó; el token sigue declarado en `mobile.css:66` y `:175`. No se quita porque `mobile.css` está fuera de alcance por regla del proyecto.
+
 Nada de lo anterior toca producción.
 
