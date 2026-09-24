@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
@@ -19,11 +20,7 @@ import { cn } from "@/lib/utils";
  * `aria-current="page"` en el activo, como en `NucleoTabs`. No lleva `role="tablist"`: un
  * tablist promete paneles que se intercambian en la misma página, y esto son rutas.
  */
-export function BottomNav() {
-  const pathname = usePathname() ?? "/dashboard";
-  const searchParams = useSearchParams();
-  const items = itemsDeBarra(navV2Enabled(), pathname, searchParams?.toString() ?? null);
-
+function Barra({ items }: { items: ReturnType<typeof itemsDeBarra> }) {
   return (
     <nav className="bottom-nav" aria-label="Navegación principal">
       {items.map((it) => (
@@ -38,5 +35,35 @@ export function BottomNav() {
         </Link>
       ))}
     </nav>
+  );
+}
+
+/** La barra que SÍ lee la query, para poder propagar el periodo. */
+function BarraConPeriodo() {
+  const pathname = usePathname() ?? "/dashboard";
+  const searchParams = useSearchParams();
+  return <Barra items={itemsDeBarra(navV2Enabled(), pathname, searchParams?.toString() ?? null)} />;
+}
+
+export function BottomNav() {
+  const pathname = usePathname() ?? "/dashboard";
+
+  /**
+   * `Suspense` obligatorio, y aprendido a la mala: `useSearchParams` obliga a Next a
+   * renderizar la página en cliente, y sin un límite que acote esa decisión el prerender de
+   * las rutas estáticas —`/configuracion` fue la primera en caer— falla con
+   * «useSearchParams() should be wrapped in a suspense boundary».
+   *
+   * `NucleoTabs` usa el mismo hook y nunca dio problema porque vive dentro del topbar v2, que
+   * solo se monta con la bandera encendida; esta barra se monta SIEMPRE.
+   *
+   * El fallback pinta la misma barra sin periodo en vez de un hueco: los ítems y el activo no
+   * dependen de la query —solo los `href` lo hacen—, así que no hay salto de layout ni un
+   * parpadeo de cinco huecos mientras se hidrata.
+   */
+  return (
+    <Suspense fallback={<Barra items={itemsDeBarra(navV2Enabled(), pathname, null)} />}>
+      <BarraConPeriodo />
+    </Suspense>
   );
 }
