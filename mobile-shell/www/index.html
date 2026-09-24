@@ -3,110 +3,239 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>CARTERA+ · configuración incorrecta</title>
-    <!--
-      Esto NO es la app: es el contenido que viaja dentro del binario y que solo se ve si
-      el WebView no logró cargar el servidor (o si se compiló a propósito con CAP_BUNDLED=1).
+    <title>Sin conexión · CARTERA+</title>
 
-      Antes, este webDir contenía el prototipo estático de diseño: una cuenta ficticia con
-      datos verosímiles. Cuando alguien compilaba sin CAP_SERVER_URL, la app abría esa
-      cuenta falsa sin avisar de nada, y el error pasaba por app real. Por eso aquí ya no
-      hay datos, ni gráficos, ni nombres: solo un cartel que dice qué pasó y cómo salir.
-      El prototipo se conserva en ../design-prototipo/ como referencia de diseño.
+    <!--
+      Esto NO es la app: es la pantalla que el WebView muestra cuando no logra cargar
+      server.url (sin red, DNS caído, servidor abajo), declarada como errorPath en
+      capacitor.config.ts. Es lo único que viaja dentro del binario, así que no tiene
+      datos ni finanzas. El prototipo de diseño se conserva en ../design-prototipo/.
     -->
+    <!--
+      Nota para quien compila: si ves esta pantalla con red buena, lo más probable es
+      que el binario se haya compilado con CAP_BUNDLED=1, o que PROD_URL no responda.
+      Revisá mobile-shell/README.md («De dónde carga la app»). Este aviso va en un
+      comentario a propósito: la persona que usa la app no tiene que leer nada de esto.
+    -->
+
     <style>
-      :root { color-scheme: light dark; }
-      * { box-sizing: border-box; }
+      :root {
+        color-scheme: light dark;
+        --fondo: #f1efe8;
+        --texto: #1a1815;
+        --tenue: #6b6659;
+        --acento: #378451;
+        --superficie: #e9e6dc;
+        --borde: #d8d4c7;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fondo: #15140f;
+          --texto: #ece8dc;
+          --tenue: #8a8578;
+          --superficie: #24221b;
+          --borde: #34312a;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
       body {
         margin: 0;
         min-height: 100svh;
         display: grid;
         place-items: center;
-        padding: calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px);
-        background: #f1efe8;
-        color: #1a1815;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        line-height: 1.55;
+        padding: calc(env(safe-area-inset-top) + 24px) calc(env(safe-area-inset-right) + 24px)
+          calc(env(safe-area-inset-bottom) + 24px) calc(env(safe-area-inset-left) + 24px);
+        background: var(--fondo);
+        color: var(--texto);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+        line-height: 1.5;
         -webkit-text-size-adjust: 100%;
       }
-      /* min-width:0 es imprescindible, no decorativo: como grid item, `main` tiene
-         min-width:auto y el <pre> de abajo (una línea larga que no parte) fijaría su
-         ancho mínimo, empujando toda la página más allá del viewport y cortando el
-         texto por la derecha. Con esto el bloque de código scrollea dentro de su caja. */
-      main { width: 100%; max-width: 30rem; min-width: 0; }
-      .marca {
-        font-size: 0.6875rem;
+
+      main {
+        width: 100%;
+        max-width: 22rem;
+        min-width: 0;
+        text-align: center;
+      }
+
+      /* Isotipo: mismo trazo que /m/login (arco «C» + cruz verde). */
+      .iso {
+        width: 64px;
+        height: 64px;
+        border-radius: 20px;
+        margin: 0 auto 20px;
+        display: grid;
+        place-items: center;
+        background: var(--superficie);
+        border: 1px solid var(--borde);
+        color: var(--texto);
+      }
+
+      h1 {
+        font-size: 1.5rem;
         font-weight: 700;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-        color: #6b6659;
-        margin: 0 0 0.75rem;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        margin: 0 0 0.625rem;
       }
-      h1 { font-size: 1.375rem; line-height: 1.25; margin: 0 0 0.75rem; }
-      p { margin: 0 0 1rem; color: #46423a; }
-      .aviso {
-        border-left: 3px solid #c34f4b;
-        padding-left: 0.875rem;
-        margin-bottom: 1.5rem;
+
+      .explica {
+        margin: 0 0 1.75rem;
+        color: var(--tenue);
+        font-size: 0.9375rem;
       }
-      .aviso strong { color: #c34f4b; }
-      h2 {
+
+      button {
+        width: 100%;
+        min-height: 44px;
+        padding: 0.75rem 1rem;
+        border: 0;
+        border-radius: 12px;
+        background: var(--acento);
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+      button:disabled {
+        opacity: 0.65;
+        cursor: default;
+      }
+      /* Foco visible: en un WebView sin teclado casi no se ve, pero el que navega con
+         uno conectado necesita saber dónde está parado. */
+      button:focus-visible {
+        outline: 2px solid var(--acento);
+        outline-offset: 3px;
+      }
+
+      /* Zona de estado de alto fijo: si apareciera y desapareciera, el botón saltaría
+         bajo el dedo justo cuando la persona lo va a tocar de nuevo. */
+      .estado {
+        min-height: 1.25rem;
+        margin: 0.875rem 0 0;
         font-size: 0.8125rem;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: #6b6659;
-        margin: 1.75rem 0 0.5rem;
+        color: var(--tenue);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
       }
-      pre {
-        background: #e5e2d8;
-        border-radius: 10px;
-        padding: 0.875rem;
-        overflow-x: auto;
-        margin: 0 0 0.75rem;
+      .estado[hidden] {
+        display: none;
       }
-      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8125rem; }
-      .pie { font-size: 0.75rem; color: #6b6659; margin-top: 2rem; }
-      @media (prefers-color-scheme: dark) {
-        body { background: #15140f; color: #f0eee6; }
-        p { color: #b8b3a6; }
-        pre { background: #24221b; }
-        .marca, h2, .pie { color: #8a8578; }
+
+      .giro {
+        width: 12px;
+        height: 12px;
+        border: 2px solid var(--borde);
+        border-top-color: var(--tenue);
+        border-radius: 50%;
+        animation: girar 0.7s linear infinite;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .giro {
+          animation: none;
+          border-top-color: var(--borde);
+        }
+      }
+      @keyframes girar {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .calma {
+        margin: 1.75rem 0 0;
+        font-size: 0.8125rem;
+        color: var(--tenue);
       }
     </style>
   </head>
+
   <body>
     <main>
-      <p class="marca">CARTERA+</p>
-      <h1>Esta compilación no apunta a ningún servidor</h1>
+      <span class="iso" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none" width="42" height="42">
+          <path
+            d="M44 19 A 18 18 0 1 0 44 45"
+            stroke="currentColor"
+            stroke-width="6.4"
+            stroke-linecap="round"
+            fill="none"
+          />
+          <path d="M45 27 V37 M40 32 H50" stroke="#51AF6F" stroke-width="3.6" stroke-linecap="round" />
+        </svg>
+      </span>
 
-      <div class="aviso">
-        <p>
-          <strong>No estás viendo tus datos.</strong> La app no logró cargar el servidor de
-          CARTERA+, así que está mostrando el contenido de emergencia que lleva dentro.
-          Nada de lo que veas aquí son tus finanzas.
-        </p>
-      </div>
-
-      <p>
-        Suele pasar por una de dos razones: se compiló en modo empaquetado a propósito
-        (<code>CAP_BUNDLED=1</code>), o el dispositivo no tiene conexión con el servidor.
+      <h1>Sin conexión</h1>
+      <p class="explica">
+        No pudimos conectar con CARTERA+. Revisá tu conexión a internet y volvé a intentarlo.
       </p>
 
-      <h2>Cómo arreglarlo</h2>
-      <p>Vuelve a compilar apuntando al servidor y reinstala la app:</p>
-      <pre><code>cd mobile-shell
-npm run sync
-npx cap run ios      # o: npx cap run android</code></pre>
-      <p>
-        El servidor de producción ya es el valor por defecto, así que no necesitas exportar
-        nada. Para probar contra tu máquina en la red local, indica la dirección:
-      </p>
-      <pre><code>CAP_SERVER_URL="http://10.0.2.2:3000/m" npm run sync</code></pre>
+      <button type="button" id="reintentar">Reintentar</button>
 
-      <p class="pie">
-        Si ves esta pantalla en un dispositivo de alguien más, avísale: su app está mal
-        configurada y no está mostrando información real.
+      <p class="estado" id="estado" hidden>
+        <span class="giro" aria-hidden="true"></span>
+        <span>Reintentando…</span>
       </p>
+
+      <p class="calma">Tus datos están seguros; nada se pierde mientras no hay conexión.</p>
     </main>
+
+    <script>
+      (function () {
+        "use strict";
+
+        var APP_URL = "https://carteraplus.vercel.app/m";
+
+        var boton = document.getElementById("reintentar");
+        var estado = document.getElementById("estado");
+        var yendo = false;
+
+        /**
+         * Un intento = volver a pedir la URL de la app. Si sigue sin cargar, el WebView
+         * vuelve a mostrar esta misma página (es el errorPath), así que no hace falta
+         * detectar el fallo: reaparecer YA es el fallo.
+         *
+         * El retardo corto antes de navegar es deliberado: sin él, tocar "Reintentar"
+         * sin red no produce ninguna señal visible y parece que el botón está roto.
+         */
+        function intentar() {
+          if (yendo) return;
+          yendo = true;
+          boton.disabled = true;
+          estado.hidden = false;
+          setTimeout(function () {
+            window.location.replace(APP_URL);
+          }, 400);
+        }
+
+        boton.addEventListener("click", intentar);
+
+        // Volvió la red: entrar sola, sin que la persona tenga que tocar nada.
+        window.addEventListener("online", intentar);
+
+        /**
+         * Reintento automático cada 15 s, SOLO con red declarada. Cubre el caso en que
+         * el teléfono sí tiene internet y el que está caído es el servidor: ahí el
+         * evento `online` no llega nunca, porque desde el punto de vista del sistema
+         * nunca se perdió la conexión.
+         *
+         * Sin red no se intenta: navegar para volver a fallar gasta batería y hace
+         * parpadear la pantalla sin acercar a nadie a ningún lado.
+         */
+        setInterval(function () {
+          if (navigator.onLine === true) intentar();
+        }, 15000);
+      })();
+    </script>
   </body>
 </html>
