@@ -24,10 +24,6 @@ import { InversionesManager } from "./inversiones-manager";
  */
 export const dynamic = "force-dynamic"; // datos por sesión + precios en vivo
 
-// El anillo de composición NO usa --s3: es el mismo rojo que --danger, y aquí las
-// porciones son naturalezas, no pérdidas. Va el neutro cálido de series.
-const RING_COLORS = ["var(--s1)", "var(--s2)", "var(--s-neutral)", "var(--s4)", "var(--s5)"];
-
 export default async function MobileInversiones() {
   // Brecha DCA: registra el aporte del mes de los holdings recurrentes (best-effort,
   // idempotente). Mismo patrón que la web /patrimonio — sin esto, un usuario solo-móvil
@@ -44,12 +40,16 @@ export default async function MobileInversiones() {
   // de activo, cuyo "Acciones" es un cajón de sastre (incluye CDP/bono/pensión) y etiquetaba
   // un certificado como "Acciones 100%". `allocationByNature` cubre todos los holdings
   // (naturaleza explícita → derivada de categoría → 'growth'), sin descartar ninguno.
+  //
+  // El color sale de `NATURE_COLOR` (el que `allocationByNature` ya devuelve), no de una
+  // paleta indexada por posición: si «Crecimiento» adelanta a «Flujo de caja», las dos se
+  // intercambiaban el color y el anillo mentía. Va con la naturaleza, no con el puesto.
   const slices: MSlice[] = allocationByNature(a.holdingsWithPerformance)
     .filter((s) => s.value > 0)
-    .map((s, i) => ({
+    .map((s) => ({
       label: s.label,
       value: s.value,
-      color: RING_COLORS[i % RING_COLORS.length]!,
+      color: s.color,
     }));
 
   const holdings = [...a.holdingsWithPerformance].sort((x, y) => y.currentValue - x.currentValue);

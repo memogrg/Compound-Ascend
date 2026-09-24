@@ -23,10 +23,6 @@ import { PatrimonioManager } from "./patrimonio-manager";
  */
 export const dynamic = "force-dynamic"; // datos por sesión
 
-// El anillo de composición NO usa --s3: es el mismo rojo que --danger, y aquí las
-// porciones son clases de activo, no pérdidas. Va el neutro cálido de series.
-const RING_COLORS = ["var(--s1)", "var(--s2)", "var(--s-neutral)", "var(--s4)", "var(--s5)"];
-
 export default async function MobilePatrimonio() {
   const summary = await getRichLifeSummary();
   const { snapshot, assets, allAssets, liabilities, currency } = summary;
@@ -54,14 +50,22 @@ export default async function MobilePatrimonio() {
     value: s.netWorth,
   }));
 
-  // Distribución por clase (ya agrupada por el engine); mapeamos a los colores del móvil.
+  // Distribución por clase, con el color que YA trae cada clase del engine
+  // (`ASSET_COLOR` en rich-life-engine). Antes se pintaba con una paleta cíclica indexada
+  // por posición, así que el color seguía al RANKING: el mes en que «Inversión» adelantaba
+  // a «Líquidos» las dos intercambiaban color y el anillo contaba otra historia sin que
+  // nada hubiera cambiado. El color pertenece a la entidad, nunca a su puesto — y la web
+  // ya lo hacía así (`rich-life-dashboard.tsx`), así que además estaban discrepando.
+  //
+  // El motivo por el que la paleta vieja evitaba `--s3` sigue cubierto: ninguna clase lo
+  // usa (líquidos teal, inversión azul, productivos verde, uso personal y especiales ámbar).
   const slices: MSlice[] = snapshot.assetsByClass
     .filter((c) => c.value > 0)
     .slice(0, 5)
-    .map((c, i) => ({
+    .map((c) => ({
       label: c.label,
       value: c.value,
-      color: RING_COLORS[i % RING_COLORS.length]!,
+      color: c.color,
     }));
 
   // 0 no es ni positivo ni negativo: sin signo y en neutro. Los agregados (netWorth,
