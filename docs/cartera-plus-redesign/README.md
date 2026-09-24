@@ -46,7 +46,7 @@ después —por ejemplo, `useSearchParams` sin un límite de `Suspense`—, ese 
 el comando sale con 1. Filtrar la salida por «Compiled successfully» dio por bueno un build
 que CI tumbó a los diez minutos. Lo correcto:
 
-```bash
+````bash
 npm run build > /tmp/build.log 2>&1; echo "EXIT=$?"
 
 **Una compilación por carpeta de trabajo a la vez.** `next build` escribe en `.next`, que es
@@ -57,4 +57,4 @@ basura a mitad. Para trabajar dos ramas en paralelo, una carpeta cada una:
 
 ```bash
 git worktree add ../ca-delta feat/mi-rama
-```
+````
