@@ -12,8 +12,14 @@
         <!-- windowSoftInputMode explícito: capacitor.config.ts (Keyboard.resize) da por sentado
              que en Android el teclado lo resuelve el adjustResize del manifest. Sin declararlo
              queda en ADJUST_UNSPECIFIED y lo decide el sistema. -->
+        <!-- screenOrientation: /m es phone-first, sin layout landscape. Android 16 ignora esta
+             restricción en pantallas >= 600 dp para apps con target 36: en tablet la app rota y
+             el layout se estira. Aceptado para v1 (P-04 punto 8). -->
+        <!-- density|fontScale: evita recrear la actividad (y recargar el WebView) al cambiar
+             tamaño de fuente o de pantalla del sistema. Capacitor 8 lo recomienda; inocuo en 7. -->
         <activity
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density|fontScale"
+            android:screenOrientation="portrait"
             android:name=".MainActivity"
             android:windowSoftInputMode="adjustResize"
             android:label="@string/title_activity_main"
