@@ -57,3 +57,26 @@ export function presetsUtiles(largo: number, todos: readonly RangoPreset[]): Ran
   if (todos.includes("Todo")) utiles.push("Todo");
   return utiles;
 }
+
+/**
+ * Los `n` meses que TERMINAN en `final`, en orden ascendente ("2024-10" … "2026-09").
+ *
+ * Una serie de demostración escrita como «36 meses a partir de 2024-01» envejece: llegado
+ * 2027 sigue terminando en 2026-12 y los presets («6M», «1A») recortan desde un final que ya
+ * es pasado, así que «los últimos 6 meses» dejan de ser los últimos. Contando HACIA ATRÁS
+ * desde el periodo actual la serie nunca cae en el futuro y los presets siempre recortan
+ * contra el presente.
+ *
+ * `final` es "YYYY-MM". Se calcula en meses absolutos para que diciembre→enero cruce bien.
+ */
+export function mesesHaciaAtras(final: string, n: number): string[] {
+  const [y, m] = final.split("-").map(Number);
+  if (!Number.isInteger(y) || !Number.isInteger(m) || m! < 1 || m! > 12 || n <= 0) return [];
+  const fin = y! * 12 + (m! - 1);
+  return Array.from({ length: n }, (_, i) => {
+    const abs = fin - (n - 1 - i);
+    const yy = Math.floor(abs / 12);
+    const mm = (abs % 12) + 1;
+    return `${yy}-${String(mm).padStart(2, "0")}`;
+  });
+}

@@ -3,7 +3,12 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { recortar, presetsUtiles, NOMBRE_RANGO } from "@/components/charts/core/rangos";
+import {
+  recortar,
+  presetsUtiles,
+  NOMBRE_RANGO,
+  mesesHaciaAtras,
+} from "@/components/charts/core/rangos";
 
 const serie = (n: number) => Array.from({ length: n }, (_, i) => i);
 
@@ -57,5 +62,33 @@ describe("presetsUtiles", () => {
     // «6M» no se lee bien en voz alta.
     expect(NOMBRE_RANGO["6M"]).toBe("últimos 6 meses");
     expect(NOMBRE_RANGO.Todo).toBe("todo el historial");
+  });
+});
+
+describe("mesesHaciaAtras", () => {
+  it("devuelve n meses ascendentes que TERMINAN en el periodo dado", () => {
+    expect(mesesHaciaAtras("2026-09", 4)).toEqual(["2026-06", "2026-07", "2026-08", "2026-09"]);
+  });
+
+  it("cruza el cambio de año hacia atrás", () => {
+    expect(mesesHaciaAtras("2026-02", 4)).toEqual(["2025-11", "2025-12", "2026-01", "2026-02"]);
+  });
+
+  it("NINGÚN punto cae después del periodo actual", () => {
+    // La razón de existir de esta función: la serie escrita «hacia adelante desde 2024-01»
+    // seguía terminando en 2026-12, así que en 2026-09 tenía tres meses de futuro y los
+    // presets recortaban «los últimos 6 meses» contra un final que no había llegado.
+    const actual = "2026-09";
+    const serie = mesesHaciaAtras(actual, 36);
+    expect(serie).toHaveLength(36);
+    expect(serie.at(-1)).toBe(actual);
+    for (const p of serie) expect(p <= actual).toBe(true);
+  });
+
+  it("no inventa serie con entradas imposibles", () => {
+    expect(mesesHaciaAtras("2026-13", 3)).toEqual([]);
+    expect(mesesHaciaAtras("2026-00", 3)).toEqual([]);
+    expect(mesesHaciaAtras("2026", 3)).toEqual([]);
+    expect(mesesHaciaAtras("2026-09", 0)).toEqual([]);
   });
 });

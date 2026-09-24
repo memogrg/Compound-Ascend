@@ -160,6 +160,11 @@ export function CalendarioGasto({
                   tabIndex={propio === foco ? 0 : -1}
                   aria-label={etiqueta(c)}
                   aria-selected={fijado === c.fecha}
+                  // El día de hoy se marca en la SEMÁNTICA, no solo con el anillo: sin
+                  // `aria-current` un lector de pantalla recorre 30 celdas iguales y no hay
+                  // forma de saber en cuál está parado el mes.
+                  aria-current={c.fecha === hoy ? "date" : undefined}
+                  data-hoy={c.fecha === hoy ? "true" : undefined}
                   data-futuro={futuro ? "true" : undefined}
                   data-vacio={!futuro && nivel < 0 ? "true" : undefined}
                   data-nivel={nivel >= 0 ? nivel : undefined}
@@ -184,26 +189,30 @@ export function CalendarioGasto({
 
       {rangos.length > 0 ? (
         <div className="cal-leyenda">
-          <span className="cal-leyenda-t">Menos</span>
+          {/* Los tres estados y los cinco pasos, CON su rango en texto. Un degradado de
+              «menos» a «más» no dice cuánto es «más», y el `title` de cada muestra no lo
+              dice tampoco: no hay hover en táctil y ningún lector de pantalla lo anuncia. */}
+          <span className="cal-leyenda-item">
+            <span className="cal-leyenda-paso cal-leyenda-vacio" aria-hidden="true" />
+            Sin gasto
+          </span>
           {rangos.map((r, i) => (
-            <span
-              key={i}
-              className="cal-leyenda-paso"
-              style={{
-                background: `color-mix(in srgb, var(--chart-1) ${Math.round((OPACIDAD[i] ?? 1) * 100)}%, var(--surface))`,
-              }}
-              title={
-                r.hasta === null
-                  ? `${formatMoney(r.desde, moneda)} o más`
-                  : `${formatMoney(r.desde, moneda)} – ${formatMoney(r.hasta, moneda)}`
-              }
-            />
+            <span key={i} className="cal-leyenda-item">
+              <span
+                className="cal-leyenda-paso"
+                aria-hidden="true"
+                style={{
+                  background: `color-mix(in srgb, var(--chart-1) ${Math.round((OPACIDAD[i] ?? 1) * 100)}%, var(--surface))`,
+                }}
+              />
+              {r.hasta === null
+                ? `${formatMoney(r.desde, moneda)} o más`
+                : `${formatMoney(r.desde, moneda)} – ${formatMoney(r.hasta, moneda)}`}
+            </span>
           ))}
-          <span className="cal-leyenda-t">Más</span>
-          {/* Los rangos también en texto: un degradado sin números no dice cuánto es «más». */}
-          <span className="cal-leyenda-rango">
-            {formatMoney(rangos[0]!.desde, moneda)} –{" "}
-            {formatMoney(Math.max(...montos.filter((m) => m > 0)), moneda)}
+          <span className="cal-leyenda-item">
+            <span className="cal-leyenda-paso cal-leyenda-futuro" aria-hidden="true" />
+            Futuro
           </span>
         </div>
       ) : null}

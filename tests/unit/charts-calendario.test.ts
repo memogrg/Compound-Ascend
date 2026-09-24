@@ -6,6 +6,13 @@
  */
 import { describe, it, expect } from "vitest";
 
+// El validador de contraste vive en su propio test y exporta las dos medidas; importarlo
+// evita una segunda implementación de ΔE que podría discrepar de la que valida la paleta.
+import { contraste, deltaE } from "./contraste-paleta.test";
+
+type RGB = [number, number, number];
+const rgbDe = (h: string): RGB => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as RGB;
+
 import {
   cuantiles,
   diaDeLaSemana,
@@ -161,4 +168,56 @@ describe("rangosDeNivel", () => {
   it("sin datos positivos no hay leyenda que pintar", () => {
     expect(rangosDeNivel([0, 0], 5)).toEqual([]);
   });
+});
+
+/**
+ * La rampa del calendario, medida.
+ *
+ * El paso más bajo tiene que distinguirse de una celda SIN gasto: si no, un mes con gasto
+ * pequeño todos los días se lee igual que un mes de ahorro. Se mide con ΔE (diferencia de
+ * color percibida) y con contraste WCAG, porque responden a preguntas distintas y acá solo
+ * una de las dos se puede cumplir — ver el comentario de cada caso.
+ */
+describe("rampa del calendario contra la celda sin gasto", () => {
+  const OPACIDAD = [0.18, 0.36, 0.55, 0.76, 1];
+  const TEMAS = {
+    claro: { surface: "#ffffff", chart1: "#378451" },
+    oscuro: { surface: "#1e1c16", chart1: "#3f9560" },
+  } as const;
+  // `color-mix(in srgb, A p%, B)` interpola en sRGB CON gamma, que es justo esto.
+  const mezcla = (a: RGB, b: RGB, p: number): RGB =>
+    a.map((v, i) => Math.round(v * p + b[i]! * (1 - p))) as RGB;
+
+  for (const [nombre, T] of Object.entries(TEMAS)) {
+    it(`en ${nombre}, el paso 1 se distingue de la celda vacía`, () => {
+      const sup = rgbDe(T.surface);
+      const paso1 = mezcla(rgbDe(T.chart1), sup, OPACIDAD[0]!);
+      // Una celda sin gasto NO tiene relleno: su color ES la superficie.
+      const d = deltaE(paso1, sup);
+      // El umbral de percepción está en ~2,3 (una JND). Con 11-13 la diferencia es
+      // cómoda incluso en una pantalla mal calibrada.
+      expect(d, `${nombre}: ΔE paso1 vs superficie = ${d.toFixed(1)}`).toBeGreaterThan(8);
+    });
+
+    it(`en ${nombre}, la rampa crece de forma monótona y separada`, () => {
+      const sup = rgbDe(T.surface);
+      const pasos = OPACIDAD.map((o) => mezcla(rgbDe(T.chart1), sup, o));
+      for (let i = 0; i < pasos.length - 1; i++) {
+        const d = deltaE(pasos[i]!, pasos[i + 1]!);
+        expect(d, `${nombre}: ΔE paso${i + 1}→${i + 2} = ${d.toFixed(1)}`).toBeGreaterThan(8);
+      }
+    });
+
+    it(`en ${nombre}, el paso 1 NO llega a 3:1 — por eso la celda lleva borde`, () => {
+      // Deliberado y documentado: una rampa secuencial de 5 pasos no puede tener todos sus
+      // pasos a 3:1 contra la superficie; el paso más bajo tiene que ser casi la superficie
+      // o la rampa deja de ser una rampa. Quien delimita la celda como objeto gráfico es el
+      // BORDE (`--chart-grid`), no el relleno, y el «cuánto» lo repiten el número del día y
+      // la columna «Paso» de la tabla. Este caso fija esa decisión para que nadie la
+      // «arregle» subiendo la opacidad y aplastando la escala.
+      const sup = rgbDe(T.surface);
+      const paso1 = mezcla(rgbDe(T.chart1), sup, OPACIDAD[0]!);
+      expect(contraste(paso1, sup)).toBeLessThan(3);
+    });
+  }
 });

@@ -69,4 +69,4 @@ export {
   rangosDeNivel,
   type CeldaCalendario,
 } from "./calendario";
-export { recortar, presetsUtiles, NOMBRE_RANGO, type RangoPreset } from "./rangos";
+export { recortar, presetsUtiles, mesesHaciaAtras, NOMBRE_RANGO, type RangoPreset } from "./rangos";

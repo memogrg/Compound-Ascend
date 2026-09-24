@@ -353,9 +353,14 @@
   color: var(--surface);
 }
 
-/* Un día sin gasto NO es «poco gasto»: neutro de superficie, fuera de la rampa. */
+/* Un día sin gasto NO es «poco gasto»: SIN relleno, fuera de la rampa, y un borde fino
+   continuo que dice que la celda existe. Con relleno (`--chip`) competía con el paso más
+   bajo de la rampa —dos grises parecidos, uno dentro de la escala y otro fuera— y el mes
+   se leía como si todos los días tuvieran algo. El borde CONTINUO es lo que lo separa del
+   día futuro, que va punteado. */
 .cal-dia[data-vacio="true"] {
-  background: var(--chip);
+  background: transparent;
+  border: 1px solid var(--chart-grid);
   color: var(--muted);
 }
 
@@ -374,8 +379,18 @@
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
-.cal-dia[aria-selected="true"] {
+/* HOY: anillo de 2 px en tinta. Es el único ancla temporal de la rejilla — sin él, un mes
+   a medias no dice dónde termina lo ocurrido y empieza lo que falta. Va en `box-shadow`
+   interior y no en `border` para no robarle 2 px a la celda y desalinear la rejilla. */
+.cal-dia[data-hoy="true"] {
   box-shadow: inset 0 0 0 2px var(--text);
+}
+
+/* La selección usa el ACENTO, no la tinta: con los dos en `--text` el día fijado y el día
+   de hoy se pintaban idénticos y no había forma de saber cuál era cuál. Si hoy está
+   además fijado, gana el acento (esta regla va después). */
+.cal-dia[aria-selected="true"] {
+  box-shadow: inset 0 0 0 2px var(--accent);
 }
 
 .cal-leyenda {
@@ -393,6 +408,27 @@
   width: 14px;
   height: 14px;
   border-radius: 3px;
+  flex: none;
+}
+
+/* Las muestras de «sin gasto» y «futuro» repiten EXACTAMENTE lo que hace la celda: sin
+   relleno, continua una y punteada la otra. Una leyenda que no se parece a lo que explica
+   no explica nada. */
+.cal-leyenda-vacio {
+  background: transparent;
+  border: 1px solid var(--chart-grid);
+}
+.cal-leyenda-futuro {
+  background: transparent;
+  border: 1px dashed var(--border);
+}
+
+/* Cada entrada es muestra + texto, y el texto no se parte del color que describe. */
+.cal-leyenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
 }
 .cal-leyenda-rango {
   margin-left: 6px;
