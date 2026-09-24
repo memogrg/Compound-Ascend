@@ -9,11 +9,11 @@ Medición del 2026-09-24. Método: sRGB → CIELAB (D65), **ΔE76**, y simulaci�
 `tokens.css` y `12-progress.md` decían «paleta validada para daltonismo» desde el 16 de
 septiembre. **Nadie lo había medido.** Al medirlo fallaban **tres** pares, no uno:
 
-| par | visión | ΔE claro | ΔE oscuro | qué significa |
-| --- | --- | --- | --- | --- |
-| `--chart-2` / `--chart-4` (azul / morado) | protanopía | 3,3 | **1,2** | por debajo del umbral de percepción (~2,3): el **mismo color** |
-| `--chart-1` / `--chart-5` (verde / rojo) | protanopía | 5,3 | 6,0 | la confusión clásica, y son «positivo» y «negativo» |
-| `--chart-1` / `--chart-2` (verde / azul) | tritanopía | 6,9 | 3,6 | |
+| par                                       | visión     | ΔE claro | ΔE oscuro | qué significa                                                  |
+| ----------------------------------------- | ---------- | -------- | --------- | -------------------------------------------------------------- |
+| `--chart-2` / `--chart-4` (azul / morado) | protanopía | 3,3      | **1,2**   | por debajo del umbral de percepción (~2,3): el **mismo color** |
+| `--chart-1` / `--chart-5` (verde / rojo)  | protanopía | 5,3      | 6,0       | la confusión clásica, y son «positivo» y «negativo»            |
+| `--chart-1` / `--chart-2` (verde / azul)  | tritanopía | 6,9      | 3,6       |                                                                |
 
 Los dos últimos se escaparon del test anterior porque solo miraba el **mínimo global**.
 
@@ -38,14 +38,14 @@ mismo piso.
 
 ## Las dos candidatas
 
-| | `--chart-2` | `--chart-4` | `--chart-5` | desvío total (claro / oscuro) | mín. ΔE |
-| --- | --- | --- | --- | --- | --- |
-| actual claro | `#3a6ea5` | `#7b5ea7` | `#c34f4b` | — | **3,3** ✗ |
-| actual oscuro | `#5a8ccb` | `#9b7cc8` | `#d46460` | — | **1,2** ✗ |
-| **A** claro | `#36679b` | `#8163b0` | `#bc4845` | **8,7** | 8,0 ✓ |
-| **A** oscuro | `#689ce0` | `#9a7bc7` | `#ce605d` | **8,8** | 8,0 ✓ |
-| B claro | `#356da5` | `#965186` | `#bc4845` | 23,6 | 8,0 ✓ |
-| B oscuro | `#4584c9` | `#b56fa4` | `#ce605d` | 27,3 | 8,1 ✓ |
+|               | `--chart-2` | `--chart-4` | `--chart-5` | desvío total (claro / oscuro) | mín. ΔE   |
+| ------------- | ----------- | ----------- | ----------- | ----------------------------- | --------- |
+| actual claro  | `#3a6ea5`   | `#7b5ea7`   | `#c34f4b`   | —                             | **3,3** ✗ |
+| actual oscuro | `#5a8ccb`   | `#9b7cc8`   | `#d46460`   | —                             | **1,2** ✗ |
+| **A** claro   | `#36679b`   | `#8163b0`   | `#bc4845`   | **8,7**                       | 8,0 ✓     |
+| **A** oscuro  | `#689ce0`   | `#9a7bc7`   | `#ce605d`   | **8,8**                       | 8,0 ✓     |
+| B claro       | `#356da5`   | `#965186`   | `#bc4845`   | 23,6                          | 8,0 ✓     |
+| B oscuro      | `#4584c9`   | `#b56fa4`   | `#ce605d`   | 27,3                          | 8,1 ✓     |
 
 `--chart-1`, `--chart-3` y `--chart-6` no cambian en ninguna de las dos.
 
@@ -64,15 +64,43 @@ deja en 3,06:1.
 La rampa de **pasivos** se construye con `color-mix` sobre `--chart-4`; la del **calendario**,
 sobre `--chart-1` (que no cambia, así que el calendario queda idéntico en las dos).
 
-| | peor ΔE de la rampa de pasivos | escalón más bajo vs tarjeta |
-| --- | --- | --- |
-| actual claro / oscuro | 7,1 / 6,5 (tritanopía) | 3,18:1 / 3,10:1 |
-| A claro / oscuro | 6,7 / 6,4 | 3,01:1 / 3,06:1 |
-| B claro / oscuro | 6,8 / 6,7 | 3,30:1 / **2,97:1** ✗ |
+|                       | peor ΔE de la rampa de pasivos | escalón más bajo vs tarjeta |
+| --------------------- | ------------------------------ | --------------------------- |
+| actual claro / oscuro | 7,1 / 6,5 (tritanopía)         | 3,18:1 / 3,10:1             |
+| A claro / oscuro      | 6,7 / 6,4                      | 3,01:1 / 3,06:1             |
+| B claro / oscuro      | 6,8 / 6,7                      | 3,30:1 / **2,97:1** ✗       |
 
 La rampa se queda por debajo de 8 en las tres, hoy incluida: es una rampa **secuencial** de
 un solo tono, donde el orden y la posición ya codifican la magnitud, y el objetivo de ΔE 8
-se fijó para los seis tokens **categóricos**. Queda anotado, no resuelto.
+se fijó para los seis tokens **categóricos**.
+
+### Por qué eso se admite: la codificación secundaria
+
+El piso duro de 6 solo vale «con codificación secundaria documentada». Esta es la de la rampa
+de pasivos, medida sobre el render real (dona de 132 × 132 px, radio 66):
+
+| canal                                 | qué aporta                                                                     | medida                                                                                         |
+| ------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| **Separación entre sectores**         | dice dónde acaba uno y empieza el siguiente sin depender del color             | `paddingAngle` de 1,5° → arco de **1,73 px** en el borde exterior y **1,18 px** en el interior |
+| **Leyenda con el nombre de la clase** | «Crítico», «Consumo», «Patrimonial», «Productivo» en texto, junto a su muestra | siempre visible, no en `title` ni en hover                                                     |
+| **Importe de cada clase**             | el dato que la dona representa, en cifras                                      | `formatMoney`, en la misma fila que el nombre                                                  |
+
+O sea: quien no distingue dos escalones contiguos bajo tritanopía **no pierde información**,
+porque el nombre y el importe están escritos al lado. El color ordena; el texto informa. Es
+lo que pide WCAG 1.4.1 (el color no puede ser el único canal).
+
+Dos honestidades sobre esa tabla:
+
+1. **El hueco no es de 2 px, es de 1,73.** `paddingAngle` se declara en GRADOS, no en píxeles,
+   así que el arco depende del radio: 1,73 px fuera y 1,18 px dentro. A 1,18 px un hueco
+   sigue viéndose, pero conviene saber que la cifra no es constante — en una dona más pequeña
+   encogería.
+2. **La demo solo tiene 2 clases de pasivo**, así que las capturas enseñan 2 sectores de los
+   4 posibles. El peor par de la rampa (`productivo` / `patrimonial` bajo tritanopía, ΔE 6,4)
+   no llega a verse junto en la cuenta de demostración.
+
+Queda anotado, no resuelto: subir la rampa a ΔE 8 exige re-espaciar los cuatro escalones, y
+eso es otra decisión.
 
 ## Tablas completas del validador
 
