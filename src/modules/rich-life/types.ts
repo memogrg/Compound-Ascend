@@ -48,6 +48,10 @@ export type RichLifeInput = {
    *  único Δ que compara periodos completos, así que de acá —y sólo de acá— sale el
    *  veredicto "más rico / más pobre". null = todavía no hay dos cierres seguidos. */
   closedWealthDelta?: number | null;
+  /** Periodo (primer día del mes, "2026-08-01") del ÚLTIMO cierre de los dos que forman
+   *  `closedWealthDelta`. Existe sólo para que la UI pueda NOMBRAR el mes del veredicto;
+   *  no entra en ningún cálculo. */
+  closedPeriod?: string | null;
   currency: string;
 };
 
@@ -68,6 +72,9 @@ export type RichLifeIndicators = {
    *  que rotularlo así: el 2 de septiembre son dos días de movimiento, no un mes. */
   velocityIsPartial: boolean;
   trend: RichTrend;
+  /** Mes que cierra el Δ del que sale `trend` ("2026-08-01"), para rotularlo. null cuando
+   *  no hay veredicto de cierre (`sin_historico` / `en_curso`) o no se conoce el periodo. */
+  closedPeriod: string | null;
 };
 
 export type RichLifeScoreDim = { label: string; weight: number; score: number };
