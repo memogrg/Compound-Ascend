@@ -17,7 +17,20 @@ const eslintrc = JSON.parse(readFileSync(new URL("./.eslintrc.json", import.meta
 const eslintConfig = [
   // `next lint` ignoraba estos por defecto; en flat config hay que declararlo explícito.
   {
-    ignores: [".next/**", "node_modules/**", "mobile-shell/**", "coverage/**", "next-env.d.ts"],
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "mobile-shell/**",
+      "coverage/**",
+      "next-env.d.ts",
+      // `.claude/worktrees/**` son COPIAS enteras del repo que crea Claude Code para trabajar
+      // en paralelo. Están en .gitignore, CI nunca las ve, y sin embargo aportaban 5960 de
+      // los 5962 errores del `npm run lint` local: el 99,97 % del número que usábamos como
+      // listón era ruido de checkouts viejos. Con esto, el criterio pasa a ser el de verdad
+      // —0 errores— y un error nuevo se ve en cuanto aparece, en vez de esconderse entre
+      // miles. Se ignora `.claude/**` entero: nada de ahí es código del producto.
+      ".claude/**",
+    ],
   },
   ...nextCoreWebVitals,
   ...nextTypescript,
