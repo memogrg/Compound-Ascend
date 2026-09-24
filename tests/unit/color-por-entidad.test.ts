@@ -14,17 +14,17 @@ import { describe, it, expect } from "vitest";
 
 import { buildRichLifeSnapshot } from "@/modules/rich-life/engine/rich-life-engine";
 import { allocationByNature } from "@/modules/wealth/engine/portfolio-engine";
-import type { RichLifeInput, Asset } from "@/modules/rich-life/types";
+import type { RichLifeInput, Asset, Liability } from "@/modules/rich-life/types";
 import type { HoldingPerformance } from "@/modules/wealth/types";
 
 function activo(id: string, assetClass: Asset["assetClass"], value: number): Asset {
   return { id, name: id, assetClass, value, currency: "CRC", generatesIncome: false };
 }
 
-function entrada(assets: Asset[]): RichLifeInput {
+function entrada(assets: Asset[], liabilities: Liability[] = []): RichLifeInput {
   return {
     assets,
-    liabilities: [],
+    liabilities,
     passiveIncomeMonthly: 0,
     monthlyExpenses: 1000,
     freeCashflow: 0,
@@ -112,5 +112,145 @@ describe("naturaleza de la inversión", () => {
     const s = allocationByNature([holding("etf", "growth", 1000)]);
     expect(s).toHaveLength(2);
     expect(s.find((x) => x.value === 0)?.color).toMatch(/^var\(--/);
+  });
+});
+
+/**
+ * Las paletas de ENTIDAD no usan el vocabulario de los ESTADOS.
+ *
+ * `--pos`, `--neg`, `--warn`, `--c-expense`, `--c-savings` y `--c-debt` significan «a favor»,
+ * «en contra», «atención», «gasto», «ahorro» y «deuda». Una clase de activo no es un estado:
+ * un activo productivo no es «positivo» y uno de uso personal no es un gasto. Pintarlas con
+ * esos tokens le dice al usuario algo que no queríamos decir.
+ *
+ * Y tenía una consecuencia dura, no solo conceptual: dos alias distintos resolvían al mismo
+ * color (`--c-expense` y `--gold` → #b07a2e; `--c-debt` y `--neg` → #c34f4b), así que dos
+ * clases salían indistinguibles en el anillo.
+ */
+const SEMANTICOS_DE_ESTADO =
+  /--(pos|neg|warn|success|danger|warning|c-expense|c-savings|c-debt|c-income|gold|teal)\b/;
+
+function todosDistintos(mapa: Record<string, string>, etiqueta: string) {
+  const valores = Object.values(mapa);
+  expect(new Set(valores).size, `${etiqueta}: ${JSON.stringify(mapa)}`).toBe(valores.length);
+}
+
+describe("paletas de entidad: categóricas y sin colisiones", () => {
+  const TODAS_LAS_CLASES: Asset["assetClass"][] = [
+    "liquido",
+    "inversion",
+    "productivo",
+    "uso_personal",
+    "especial",
+  ];
+  const TODAS_LAS_DEUDAS: Liability["liabilityClass"][] = [
+    "consumo",
+    "patrimonial",
+    "productivo",
+    "critico",
+  ];
+
+  const snap = buildRichLifeSnapshot(
+    entrada(
+      TODAS_LAS_CLASES.map((c, i) => activo(c, c, 1000 + i)),
+      TODAS_LAS_DEUDAS.map((c, i) => ({
+        id: c,
+        name: c,
+        liabilityClass: c,
+        balance: 500 + i,
+        currency: "CRC",
+      })),
+    ),
+  );
+  const colorActivos = Object.fromEntries(snap.assetsByClass.map((c) => [c.label, c.color]));
+  const colorPasivos = Object.fromEntries(snap.liabilitiesByClass.map((c) => [c.label, c.color]));
+
+  it("las cinco clases de activo aparecen, cada una con un token distinto", () => {
+    expect(Object.keys(colorActivos)).toHaveLength(5);
+    todosDistintos(colorActivos, "activos");
+  });
+
+  it("las cuatro clases de pasivo aparecen, cada una con un token distinto", () => {
+    // `--c-debt` y `--neg` eran los DOS #c34f4b: «Consumo» y «Críticos» salían idénticos.
+    expect(Object.keys(colorPasivos)).toHaveLength(4);
+    todosDistintos(colorPasivos, "pasivos");
+  });
+
+  it("las dos naturalezas de inversión llevan tokens distintos", () => {
+    const nat = Object.fromEntries(
+      allocationByNature([holding("bono", "cashflow", 100), holding("etf", "growth", 100)]).map(
+        (s) => [s.label, s.color],
+      ),
+    );
+    todosDistintos(nat, "naturalezas");
+  });
+
+  it("ninguna paleta de entidad usa un token semántico de estado", () => {
+    for (const [nombre, mapa] of [
+      ["activos", colorActivos],
+      ["pasivos", colorPasivos],
+    ] as const) {
+      for (const [clase, color] of Object.entries(mapa)) {
+        expect(color, `${nombre} → ${clase}`).not.toMatch(SEMANTICOS_DE_ESTADO);
+      }
+    }
+  });
+
+  it("todas se construyen sobre la paleta categórica validada", () => {
+    // Los activos usan el token directo; los pasivos, mezclas sobre `--chart-4` hacia
+    // `--text` (más énfasis) o hacia `--bg` (menos). Nunca hacia un color literal: `--text` y
+    // `--bg` son los extremos de contraste de CADA tema, y por eso la rampa se lee igual en
+    // claro y en oscuro sin escribir dos. El contraste de cada paso lo mide
+    // `tests/unit/contraste-paleta.test.ts`.
+    for (const color of Object.values(colorActivos)) {
+      expect(color).toMatch(/^var\(--chart-[1-6]\)$/);
+    }
+    for (const color of Object.values(colorPasivos)) {
+      expect(color).toMatch(
+        /^(var\(--chart-4\)|color-mix\(in srgb, var\(--chart-4\) \d+%, var\(--(text|bg)\)\))$/,
+      );
+    }
+  });
+
+  it("UNA PANTALLA, UN COLOR: /mi-rich-life no repite entre sus dos anillos", () => {
+    // Que estén en gráficos distintos no basta. Quien mira la pantalla ve nueve porciones a
+    // la vez, y si dos comparten color la lectura es ambigua aunque cada leyenda sea
+    // correcta. Nueve entidades, nueve colores.
+    const dePantalla = [...Object.values(colorActivos), ...Object.values(colorPasivos)];
+    expect(dePantalla).toHaveLength(9);
+    expect(new Set(dePantalla).size, dePantalla.join(" · ")).toBe(9);
+  });
+
+  it("los pasivos son una rampa de un tono que ningún activo usa", () => {
+    // Son dos familias, no nueve cosas equivalentes: el anillo de deudas se lee de un vistazo
+    // como «esto es todo lo que debo», y la intensidad ordena por gravedad.
+    for (const c of Object.values(colorPasivos)) {
+      expect(c, "pasivo").toMatch(/--chart-4/);
+    }
+    for (const c of Object.values(colorActivos)) {
+      expect(c, "activo").not.toMatch(/--chart-4/);
+    }
+  });
+
+  it("/m/patrimonio muestra solo activos: cinco entidades, cinco colores", () => {
+    const solo = Object.values(colorActivos);
+    expect(new Set(solo).size).toBe(solo.length);
+  });
+
+  it("en /patrimonio, la naturaleza no choca con las primeras categorías", () => {
+    // `CONC_PALETTE` arranca con `--pos` y `--info`, que resuelven al mismo valor que
+    // `--chart-1` y `--chart-2`. Si la naturaleza usara esos, «Crecimiento» saldría del color
+    // exacto de la categoría más grande de al lado.
+    //
+    // PENDIENTE, y queda declarado acá: el anillo de categorías reparte NUEVE colores por
+    // POSICIÓN entre hasta 23 categorías, con tokens de estado y una colisión interna
+    // (`--gold` y `--warn` son los dos #b07a2e). La unicidad por pantalla en `/patrimonio`
+    // está garantizada para el anillo de naturaleza, no para el de categorías.
+    const nat = allocationByNature([
+      holding("bono", "cashflow", 100),
+      holding("etf", "growth", 100),
+    ]).map((s) => s.color);
+    expect(new Set(nat).size).toBe(2);
+    for (const c of nat) expect(c).not.toMatch(/--chart-[12]\b/);
   });
 });

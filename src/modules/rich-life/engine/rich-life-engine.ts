@@ -15,12 +15,46 @@ import type {
 import { formatMoney } from "@/lib/format";
 import { mesesDeColchon, gastoDeReferencia } from "@/lib/wealth-math";
 
+/**
+ * ══ Paleta de ENTIDAD, única por PANTALLA ══
+ *
+ * `/mi-rich-life` pinta los dos anillos —activos y pasivos— uno al lado del otro. Que estén
+ * en gráficos distintos no basta: quien mira la pantalla ve nueve porciones a la vez, y si
+ * dos comparten color la lectura es ambigua aunque cada leyenda sea correcta.
+ *
+ * Nueve entidades y seis tokens categóricos. La salida NO es repartir seis y repetir tres,
+ * sino reconocer que **no son nueve cosas equivalentes: son dos familias**.
+ *
+ *  · Los cinco tipos de ACTIVO llevan cinco tokens categóricos distintos. Son cosas
+ *    diferentes entre sí y el color lo dice.
+ *  · Los cuatro tipos de PASIVO llevan una **rampa de un solo tono** (`--chart-4`), que no
+ *    usa ningún activo. Así el anillo de deudas se lee de un vistazo como «esto es todo lo
+ *    que debo», y dentro de él la intensidad ordena por gravedad: los críticos al 100 %, los
+ *    productivos —una hipoteca que genera renta— al 34 %.
+ *
+ * Nueve colores distintos en pantalla, cero repeticiones, y la rampa además dice algo que
+ * cinco colores sueltos no dirían.
+ *
+ * Todos son tokens de gráfico y ninguno es un token de ESTADO. `--pos`, `--neg`,
+ * `--c-expense` y `--c-savings` significan «a favor», «en contra», «gasto» y «ahorro»: un
+ * activo productivo no es «positivo» en el sentido de la app ni uno de uso personal es un
+ * gasto. Y varios de esos alias apuntan al mismo valor —`--c-expense` y `--gold` son ambos
+ * `--s2`; `--c-debt` y `--neg` son ambos `--danger`—, así que usarlos para distinguir
+ * entidades era colisionar tarde o temprano. Pasaba en los dos anillos:
+ *
+ *     activos   uso_personal (--c-expense) = especial (--gold)  → los dos #b07a2e
+ *     pasivos   consumo (--c-debt) = critico (--neg)            → los dos #c34f4b
+ *
+ * El orden es FIJO por clase y no se reordena nunca: el color pertenece a la clase, no a su
+ * tamaño ni a su puesto en la lista. Hay un test que lo vigila, y otro que comprueba que los
+ * tokens de una misma pantalla no se repiten.
+ */
 const ASSET_COLOR: Record<AssetClass, string> = {
-  liquido: "var(--c-savings)",
-  inversion: "var(--c-invest)",
-  productivo: "var(--pos)",
-  uso_personal: "var(--c-expense)",
-  especial: "var(--gold)",
+  liquido: "var(--chart-6)",
+  inversion: "var(--chart-2)",
+  productivo: "var(--chart-1)",
+  uso_personal: "var(--chart-3)",
+  especial: "var(--chart-5)",
 };
 const ASSET_LABEL: Record<AssetClass, string> = {
   liquido: "Líquidos",
@@ -29,12 +63,38 @@ const ASSET_LABEL: Record<AssetClass, string> = {
   uso_personal: "Uso personal",
   especial: "Especiales",
 };
+/**
+ * Rampa de un solo tono para los pasivos. Ver el bloque de `ASSET_COLOR`.
+ *
+ * **Más grave = más contraste contra la superficie**, y eso vale en los DOS temas sin
+ * escribir dos rampas. El truco es de dónde se mezcla: `--text` es, por definición, el color
+ * de máximo contraste de cada tema —tinta casi negra en claro, crema casi blanca en oscuro—,
+ * y `--bg` el de mínimo. Mezclar hacia `--text` sube el énfasis y hacia `--bg` lo baja, en
+ * claro y en oscuro por igual, así que el orden de gravedad se lee igual en ambos.
+ *
+ * Los porcentajes NO son estéticos: salen de medir. Con la rampa anterior —100/74/50/30 %,
+ * toda ella mezclada hacia `--bg`— los dos pasos más claros **no llegaban a 3:1** contra la
+ * superficie (WCAG 1.4.11): «Patrimoniales» daba 2,21:1 en claro y 2,08:1 en oscuro, y
+ * «Productivos» 1,65:1 y 1,43:1. Mezclando solo hacia el fondo, el suelo de 3:1 está en el
+ * 72 %, y cuatro pasos entre 100 y 72 quedan demasiado juntos. Abriendo el extremo grave
+ * hacia `--text` la rampa respira sin bajar de 3:1 en ningún paso:
+ *
+ *     paso            claro     oscuro
+ *     Críticos        8,11:1    7,65:1
+ *     Consumo         5,25:1    4,96:1
+ *     Patrimoniales   4,04:1    3,93:1
+ *     Productivos     3,18:1    3,10:1
+ *
+ * y los pasos contiguos se distinguen con ΔE ≥ 8,6 (el umbral de percepción está en ~2,3).
+ * El validador vive en `tests/unit/color-por-entidad.test.ts`.
+ */
 const LIAB_COLOR: Record<LiabilityClass, string> = {
-  consumo: "var(--c-debt)",
-  patrimonial: "var(--info)",
-  productivo: "var(--c-protect)",
-  critico: "var(--neg)",
+  critico: "color-mix(in srgb, var(--chart-4) 65%, var(--text))",
+  consumo: "var(--chart-4)",
+  patrimonial: "color-mix(in srgb, var(--chart-4) 86%, var(--bg))",
+  productivo: "color-mix(in srgb, var(--chart-4) 72%, var(--bg))",
 };
+
 const LIAB_LABEL: Record<LiabilityClass, string> = {
   consumo: "Consumo",
   patrimonial: "Patrimoniales",

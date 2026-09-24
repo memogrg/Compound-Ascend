@@ -269,14 +269,35 @@
 /* 03-navigation: en móvil el selector de periodo va BAJO el título, no arriba — por alcance
    del pulgar. El contenedor del título pasa a columna y el control cae a su propia línea. */
 @media (max-width: 768px) {
+  /* El periodo baja a su propia línea SIN arrastrar a nadie.
+     Antes envolvía dentro de `.crumbs`, que pasaba a medir dos líneas; como `.tb2-fila`
+     centra verticalmente, los íconos de la derecha se centraban contra ese bloque de dos
+     líneas y quedaban a media altura, desalineados del título.
+     `display: contents` disuelve la caja de `.crumbs` y sube sus hijos al flex de
+     `.tb2-fila`: así el salto de línea lo da el periodo solo, y la primera fila —hamburguesa,
+     título e íconos— se alinea entre sí. */
   .tb2-fila > .crumbs {
-    flex-wrap: wrap;
+    display: contents;
   }
-  .tb2-period {
-    margin-left: 0;
-    margin-top: 8px;
-    /* Ocupa su propia línea: `.crumbs` envuelve y este es el único que fuerza el salto. */
+  .tb2-fila {
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    row-gap: 8px;
+  }
+  /* Descendiente y NO `>`: `display: contents` cambia las CAJAS, no el árbol del DOM, así
+     que estos siguen siendo nietos de `.tb2-fila` para el selector aunque sean hijos para
+     flexbox. Con `>` la regla no casaba y el periodo se quedaba arriba. */
+  .tb2-fila .tb2-titulo {
+    margin-right: auto;
+    min-width: 0;
+  }
+  .tb2-fila .tb2-period {
+    /* Después de las acciones en el orden visual, aunque en el DOM venga antes. */
+    order: 3;
     flex-basis: 100%;
+    margin-left: 0;
+    margin-top: 0;
     justify-content: flex-start;
   }
   /* La comparación es lo primero que sobra cuando no hay ancho: el mes sí tiene que caber. */
