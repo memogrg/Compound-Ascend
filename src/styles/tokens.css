@@ -135,7 +135,11 @@
      --s1..--s6 sigue vigente para lo que ya la usa. ---------------------- */
   --chart-1: #378451;
   --chart-2: #3a6ea5;
-  --chart-3: #c48a2e;
+  /* #c48a2e daba 2,99:1 sobre `--surface` blanca: a una centésima del 3:1 que WCAG 1.4.11
+     pide para un objeto gráfico. Oscurecido un 3 % —ΔE 2,29 frente al anterior, justo en el
+     umbral de percepción, así que en pantalla no se nota— sube a 3,16:1. En oscuro no hacía
+     falta tocarlo (5,51:1). Lo mide `tests/unit/contraste-paleta.test.ts`. */
+  --chart-3: #be862d;
   --chart-4: #7b5ea7;
   --chart-5: #c34f4b;
   --chart-6: #0f9aa8;
