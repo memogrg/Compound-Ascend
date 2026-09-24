@@ -129,19 +129,26 @@
      1 ingresos/positivo · 2 inversiones · 3 gasto fijo · 4 gasto variable
      5 deudas/negativo · 6 ahorro y metas. El orden es parte del lenguaje:
      la misma categoría lleva el mismo color en toda la app.
-     Paleta validada para daltonismo (ΔE >= 8 entre adyacentes, contraste
-     >= 3:1 contra el fondo) en claro y en oscuro.
+     Separación medida con dicromacia simulada (Viénot-Brettel): ΔE >= 8 entre
+     TODOS los pares —no solo los adyacentes— bajo visión normal, protanopía,
+     deuteranopía y tritanopía, en claro y en oscuro, con contraste >= 3:1
+     contra la superficie de tarjeta. Lo verifica `contraste-paleta.test.ts`.
+     Los adyacentes no bastaban: el par que se caía (--chart-2/--chart-4, ΔE
+     1,2 en protanopía oscuro) no es adyacente, y los dos conviven en
+     /mi-rich-life. La separación la sostiene la LUMINOSIDAD, que sobrevive al
+     daltonismo; el tono no. Por eso mover un --chart-N «solo un poco más
+     bonito» puede romper esto sin tocar su tono: hay que volver a medir.
      Sustituyen a los alias --chart-N de shadcn (eran --s1..--s5); la paleta
      --s1..--s6 sigue vigente para lo que ya la usa. ---------------------- */
   --chart-1: #378451;
-  --chart-2: #3a6ea5;
+  --chart-2: #36679b;
   /* #c48a2e daba 2,99:1 sobre `--surface` blanca: a una centésima del 3:1 que WCAG 1.4.11
      pide para un objeto gráfico. Oscurecido un 3 % —ΔE 2,29 frente al anterior, justo en el
      umbral de percepción, así que en pantalla no se nota— sube a 3,16:1. En oscuro no hacía
      falta tocarlo (5,51:1). Lo mide `tests/unit/contraste-paleta.test.ts`. */
   --chart-3: #be862d;
-  --chart-4: #7b5ea7;
-  --chart-5: #c34f4b;
+  --chart-4: #8163b0;
+  --chart-5: #bc4845;
   --chart-6: #0f9aa8;
   --chart-grid: rgba(30, 28, 22, 0.08);
   --chart-axis: #8a857b;
@@ -202,10 +209,10 @@
 
   /* ---- Gráficos · series (mismo orden fijo que en claro) ---- */
   --chart-1: #3f9560;
-  --chart-2: #5a8ccb;
+  --chart-2: #689ce0;
   --chart-3: #c4862c;
-  --chart-4: #9b7cc8;
-  --chart-5: #d46460;
+  --chart-4: #9a7bc7;
+  --chart-5: #ce605d;
   --chart-6: #28a2b0;
   --chart-grid: rgba(236, 232, 221, 0.08);
   --chart-axis: #7d786e;

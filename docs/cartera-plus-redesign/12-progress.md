@@ -13,7 +13,8 @@
 | 2026-09-16 | Shell A/B/C (Artifact) | Entregado, pendiente de elección | https://claude.ai/artifact/A4nqpvEJTH5co3sGUgWaH8 · prototipos/01-shell.html |
 | 2026-09-16 | /dev/ui — 8 primitivas y lenguaje de gráficos (Artifact) | Entregado, pendiente de aprobación | https://claude.ai/artifact/NuWuoNDAnW3gvfQw6zrfFV · prototipos/02-dev-ui.html |
 | 2026-09-16 | Hoy A/B/C (Artifact) | Entregado, pendiente de elección | https://claude.ai/artifact/Mbhw3WTFdXFqWNiSYYt8Gk · prototipos/03-hoy.html |
-| 2026-09-16 | Paleta de gráfico validada (daltonismo, contraste) claro y oscuro | Hecho | prototipos/tokens.css (`--chart-1..6`) |
+| 2026-09-16 | Paleta de gráfico validada (contraste) claro y oscuro | Hecho | prototipos/tokens.css (`--chart-1..6`) |
+| 2026-09-24 | Paleta de gráfico validada para DALTONISMO (ΔE ≥ 8, todos los pares, 4 visiones, 2 temas) | Hecho | `feat/paleta-cvd` · la fila de arriba decía «daltonismo» desde el 16-sep sin que nadie lo hubiera medido: al medirlo fallaban 3 pares |
 | 2026-09-16 | Decisiones 15-17 aprobadas (shell B+, /dev/ui, Hoy B+) | Hecho | 10-decisions.md |
 | 2026-09-16 | Prompts delta de la fase 0 (0.1-0.6) redactados | Entregados | prompts/ |
 
