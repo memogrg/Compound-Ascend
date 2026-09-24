@@ -135,9 +135,10 @@ Mientras tanto, los archivos `docs/cartera-plus-redesign/00-current-state.md` �
 
 - **`MSectionHeader` y `.card-title` a migrar a `SectionHeader` (fase 3).** Hoy la cabecera de sección existe tres veces: `MSectionHeader` en `/m` (14 líneas, solo título y acción), la clase `.card-title` repetida a mano en la web, y ahora `SectionHeader` con nivel, eyebrow, ayuda y toolbar. Las tres conviven a propósito hasta que las pantallas migren; el objetivo del audit (§17) es que quede una.
 
-- **`ASSET_COLOR` tiene una colisión de color entre dos clases.** `uso_personal` → `--c-expense` y `especial` → `--gold` resuelven **los dos a `--s2`** (`#b07a2e`), así que una cartera con activos «especiales» pinta dos porciones idénticas en el anillo de patrimonio. Es preexistente y ya afecta a la web (`rich-life-dashboard.tsx`); salió a la luz al hacer que `/m` usara el color de la entidad. Arreglarlo es tocar la paleta compartida del engine, que merece su propio PR.
-
 - **`--s-neutral` quedó sin uso.** Lo usaba el `RING_COLORS` de `/m`, que se eliminó; el token sigue declarado en `mobile.css:66` y `:175`. No se quita porque `mobile.css` está fuera de alcance por regla del proyecto.
+- **`CONC_PALETTE` de `/patrimonio` se resuelve en la fase 4, cambiando la dona.** El anillo de categorías reparte NUEVE colores por POSICIÓN entre hasta **23** categorías: con tokens de estado, una colisión interna (`--gold` y `--warn` son los dos `#b07a2e`) y el color siguiendo al ranking. No tiene arreglo por asignación —**23 entidades no admiten colores únicos**— así que la salida es cambiar la pieza: en la fase 4 esa dona pasa a `BreakdownCard`, barras ordenadas **en un solo tono**, donde el color deja de ser el canal que distingue y lo hacen el orden, la etiqueta y la longitud. Hasta entonces, la unicidad por pantalla en `/patrimonio` está garantizada para el anillo de naturaleza y no para el de categorías.
+
+- **`--chart-3` se queda a una centésima de 3:1 sobre blanco (2,99:1).** Medido sobre `--surface` en claro; en oscuro cumple de sobra (5,51:1). Afecta a **cualquier** gráfico que lo use como relleno sobre una tarjeta blanca, no solo al anillo de activos, así que no se disimula cambiando de token la clase que lo tiene: es el token el que hay que mover. Un empujón mínimo —de `#c48a2e` a algo como `#b8801f`— lo cruza sin que se note en pantalla. Está declarado como excepción en `tests/unit/contraste-paleta.test.ts`, con el rango acotado, para que el día que se corrija el test lo cante.
 
 Nada de lo anterior toca producción.
 
