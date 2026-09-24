@@ -21,7 +21,7 @@ const TEMAS = {
     surface: "#ffffff",
     bg: "#f4f2ec",
     text: "#1e1c16",
-    chart: ["#378451", "#3a6ea5", "#c48a2e", "#7b5ea7", "#c34f4b", "#0f9aa8"],
+    chart: ["#378451", "#3a6ea5", "#be862d", "#7b5ea7", "#c34f4b", "#0f9aa8"],
   },
   oscuro: {
     surface: "#1e1c16",
@@ -123,18 +123,19 @@ describe.each(Object.entries(TEMAS))("contraste en tema %s", (nombre, T) => {
     }
   });
 
-  it("las clases de activo llegan a 3:1, salvo la excepción documentada", () => {
+  it("las clases de activo llegan a 3:1, sin excepciones", () => {
+    // Hubo una: `--chart-3` daba 2,99:1 sobre blanco. Se corrigió en el TOKEN, no
+    // cambiándole el color a la clase — lo usan todos los gráficos, no solo este anillo.
     for (const [clase, n] of Object.entries(ACTIVOS)) {
       const r = contraste(rgb(T.chart[n - 1]!), surface);
-      if (nombre === "claro" && clase === "uso_personal") {
-        // `--chart-3` (#c48a2e) da 2,99:1 sobre blanco: se queda a una centésima. NO es de
-        // esta paleta —es el token, y lo usan todos los gráficos—, así que se declara acá
-        // en vez de disimularlo cambiando esta clase de token. Anotado en 11-open-questions.
-        expect(r).toBeGreaterThan(2.95);
-        expect(r).toBeLessThan(3);
-        continue;
-      }
       expect(r, `${nombre} · ${clase} → ${r.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("los SEIS tokens de gráfico llegan a 3:1, no solo los que usa esta paleta", () => {
+    for (let i = 0; i < 6; i++) {
+      const r = contraste(rgb(T.chart[i]!), surface);
+      expect(r, `${nombre} · --chart-${i + 1} → ${r.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
     }
   });
 
@@ -164,5 +165,88 @@ describe("la copia de tokens sigue al día", () => {
     }
     expect(claro).toContain(`--surface: ${TEMAS.claro.surface}`);
     expect(oscuro).toContain(`--surface: ${TEMAS.oscuro.surface}`);
+  });
+});
+
+/**
+ * Simulación de daltonismo (Viénot–Brettel en espacio LMS). Devuelve el color tal y como lo
+ * percibiría alguien con esa dicromacia.
+ */
+function comoLoVe([r, g, b]: RGB, tipo: "prot" | "deut" | "trit"): RGB {
+  const f = (v: number) => {
+    const s = v / 255;
+    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  const inv = (v: number) =>
+    (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055) * 255;
+  const [R, G, B] = [f(r), f(g), f(b)];
+  const L = 0.31399 * R + 0.63951 * G + 0.04649 * B;
+  const M = 0.15537 * R + 0.75789 * G + 0.0867 * B;
+  const S = 0.01775 * R + 0.10945 * G + 0.87262 * B;
+  let [l, m, s2] = [L, M, S];
+  if (tipo === "prot") l = 1.05118294 * M - 0.05116099 * S;
+  if (tipo === "deut") m = 0.9513092 * L + 0.04866992 * S;
+  if (tipo === "trit") s2 = -0.86744736 * L + 1.86727089 * M;
+  return [
+    inv(5.47221206 * l - 4.6419601 * m + 0.16963708 * s2),
+    inv(-1.1252419 * l + 2.29317094 * m - 0.1678952 * s2),
+    inv(0.02980165 * l - 0.19318073 * m + 1.16364789 * s2),
+  ].map((v) => Math.max(0, Math.min(255, Math.round(v)))) as RGB;
+}
+
+/** El par más parecido de la paleta, con su ΔE. */
+function parMasParecido(
+  chart: readonly string[],
+  ver: (c: RGB) => RGB = (c) => c,
+): { a: number; b: number; d: number } {
+  let peor = { a: 0, b: 1, d: Number.POSITIVE_INFINITY };
+  for (let i = 0; i < chart.length; i++) {
+    for (let j = i + 1; j < chart.length; j++) {
+      const d = deltaE(ver(rgb(chart[i]!)), ver(rgb(chart[j]!)));
+      if (d < peor.d) peor = { a: i + 1, b: j + 1, d };
+    }
+  }
+  return peor;
+}
+
+describe.each(Object.entries(TEMAS))("separación de la paleta en tema %s", (nombre, T) => {
+  it("con visión normal, ningún par se confunde", () => {
+    const p = parMasParecido(T.chart);
+    expect(
+      p.d,
+      `${nombre} · --chart-${p.a} vs --chart-${p.b} → ΔE ${p.d.toFixed(1)}`,
+    ).toBeGreaterThan(20);
+  });
+
+  /**
+   * Con dicromacia la paleta NO cumple, y el test lo dice en vez de callarlo.
+   *
+   * El par que se cae es siempre el mismo: `--chart-2` (azul) y `--chart-4` (morado), que se
+   * diferencian sobre todo en el canal rojo — justo el que pierde la protanopía. En oscuro
+   * quedan en ΔE 1,2, por debajo del umbral de percepción (~2,3): para esa persona son el
+   * MISMO color. Y los dos conviven en `/mi-rich-life` (inversión y la rampa de pasivos).
+   *
+   * El umbral de este test es el valor MEDIDO, no el deseable: sirve para que no empeore
+   * mientras se decide qué hacer. Arreglarlo es re-espaciar los tonos de la paleta
+   * categórica, que es una decisión de diseño y no un ajuste. Anotado en 11-open-questions.
+   */
+  it("con dicromacia hay pares que se confunden, y queda registrado", () => {
+    const medidos = (["prot", "deut", "trit"] as const).map((t) => ({
+      tipo: t,
+      ...parMasParecido(T.chart, (c) => comoLoVe(c, t)),
+    }));
+    const resumen = medidos
+      .map((m) => `${m.tipo}: --chart-${m.a}/${m.b} ΔE ${m.d.toFixed(1)}`)
+      .join(" · ");
+
+    // Piso medido hoy. Si baja, algo se juntó todavía más.
+    // Medido con ESTA implementación (que redondea y acota a 0-255, como haría una pantalla).
+    const piso = nombre === "claro" ? 3.2 : 1.1;
+    for (const m of medidos) {
+      expect(m.d, `${nombre} · ${resumen}`).toBeGreaterThan(piso);
+    }
+    // Y el par problemático es el conocido: si cambia, es que se movió la paleta.
+    const peor = medidos.reduce((x, y) => (y.d < x.d ? y : x));
+    expect([peor.a, peor.b], resumen).toEqual([2, 4]);
   });
 });
