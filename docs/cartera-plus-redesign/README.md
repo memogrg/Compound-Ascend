@@ -31,3 +31,13 @@ directiva `eslint-disable` que sobra en un test—. Ninguna está en código de 
 
 Un error nuevo ahora se ve en cuanto aparece. Si el conteo sube, algo se rompió: no hay margen que
 lo disimule.
+
+**Una compilación por carpeta de trabajo a la vez.** `next build` escribe en `.next`, que es
+único por carpeta: si una captura de QA está corriendo contra `npm run qa:start` y mientras
+tanto construís otra rama, el servidor se queda sirviendo un `.next` a medio sobrescribir y
+las capturas salen mezcladas sin avisar. Pasó el 24-sep-2026: una tanda de 200 se fue a la
+basura a mitad. Para trabajar dos ramas en paralelo, una carpeta cada una:
+
+```bash
+git worktree add ../ca-delta feat/mi-rama
+```
