@@ -32,6 +32,7 @@ import {
   SYNC_METHOD,
   TRAZO,
   describirGrafico,
+  curvaDe,
   dominioBarras,
   formatoEjeX,
   niceDomain,
@@ -113,7 +114,13 @@ const SERIES_FLUJO: SerieDef[] = [
     marca: "linea",
     sentidoBueno: "abajo",
   },
-  { clave: "presupuesto", etiqueta: "Presupuesto", color: "var(--chart-3)", marca: "linea" },
+  {
+    clave: "presupuesto",
+    etiqueta: "Presupuesto",
+    color: "var(--chart-3)",
+    marca: "linea",
+    escalon: true,
+  },
   {
     clave: "proyeccion",
     etiqueta: "Proyección",
@@ -388,7 +395,7 @@ function AreaDemo() {
             {visibles.map((s) => (
               <Area
                 key={s.clave}
-                type="monotone"
+                type={curvaDe(s)}
                 dataKey={s.clave}
                 stroke={s.color}
                 strokeWidth={TRAZO.ancho}
@@ -476,7 +483,7 @@ function LineaDemo() {
             {visibles.map((s) => (
               <Line
                 key={s.clave}
-                type="monotone"
+                type={curvaDe(s)}
                 dataKey={s.clave}
                 stroke={s.color}
                 strokeWidth={TRAZO.ancho}
@@ -638,7 +645,7 @@ function SobresDemo() {
             {visibles.map((s) => (
               <Line
                 key={s.clave}
-                type="monotone"
+                type={curvaDe(s)}
                 dataKey={s.clave}
                 stroke={s.color}
                 strokeWidth={TRAZO.ancho}

@@ -239,6 +239,64 @@ test("la serie termina en el mes en curso, no en el futuro", async ({ browser })
   await ctx.close();
 });
 
+test("las instrucciones de teclado salen del subtítulo y viven en el «?» y en aria-describedby", async ({
+  browser,
+}) => {
+  const { ctx, page } = await abrir(browser);
+  const marco = marcoCon(page, ".cal-grid");
+  await expect(marco).toHaveCount(1);
+
+  // Ya no están en el subtítulo, que lo lee todo el mundo aunque no vaya a tabular nunca.
+  const sub = marco.locator(".cf-sub");
+  await expect(sub).toHaveCount(1);
+  expect(await sub.innerText()).not.toMatch(/flecha|Enter/i);
+
+  // Sí están en `aria-describedby` de la rejilla, que es donde las oye quien las necesita.
+  const grid = marco.locator(".cal-grid");
+  await expect(grid).toHaveCount(1);
+  const idDesc = await grid.getAttribute("aria-describedby");
+  expect(idDesc, "la rejilla no declara aria-describedby").toBeTruthy();
+  const desc = page.locator(`#${CSS.escape(idDesc!)}`);
+  await expect(desc).toHaveCount(1);
+  expect(await desc.textContent()).toMatch(/flechas/i);
+
+  // Y hay un «?» junto al título que dice lo mismo.
+  const ayuda = marco.getByRole("button", { name: "Cómo se usa este gráfico" });
+  await expect(ayuda).toHaveCount(1);
+  await ayuda.click();
+  const burbuja = page.getByRole("tooltip");
+  await expect(burbuja).toHaveCount(1);
+  expect(await burbuja.textContent()).toMatch(/flechas/i);
+  await ctx.close();
+});
+
+test("el título dice el mes completo y el año", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser);
+  const titulo = marcoCon(page, ".cal-grid").locator(".cf-titulo");
+  await expect(titulo).toHaveCount(1);
+  const texto = await titulo.innerText();
+  // «sep 26» obliga a descifrar una abreviatura para saber de qué mes habla la rejilla.
+  expect(texto).toMatch(
+    /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+\d{4}/i,
+  );
+  await ctx.close();
+});
+
+test("ningún importe de la leyenda aparece en dos pasos", async ({ browser }) => {
+  // El techo de un paso no puede repetirse como suelo del siguiente: quien mira no sabría en
+  // cuál de los dos cae un gasto de ese importe exacto.
+  const { ctx, page } = await abrir(browser);
+  const items = marcoCon(page, ".cal-grid").locator(".cal-leyenda-item");
+  const n = await items.count();
+  expect(n, "la leyenda no tiene entradas").toBeGreaterThan(0);
+
+  const textos = await items.allInnerTexts();
+  const cifras = textos.flatMap((t) => t.match(/[\d.]+/g) ?? []).filter((c) => c.length > 2);
+  expect(cifras.length, "la leyenda no imprime cifras").toBeGreaterThan(0);
+  expect(new Set(cifras).size, `repetido en: ${textos.join(" · ")}`).toBe(cifras.length);
+  await ctx.close();
+});
+
 test("los presets recortan la serie y la tabla a la vez", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
   const grupo = page.locator("[role='radiogroup'][aria-label='Rango del gráfico']");

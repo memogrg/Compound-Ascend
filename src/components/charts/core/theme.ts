@@ -27,6 +27,17 @@ export type SerieDef = {
    * subida de gasto. Si no se declara, el delta va en neutro.
    */
   sentidoBueno?: "arriba" | "abajo";
+  /**
+   * La serie es un VALOR VIGENTE hasta que cambia, no una medición continua: presupuesto,
+   * meta mensual, límite. Se dibuja en escalón.
+   *
+   * Un presupuesto de 1,9 M en junio y 1,95 M en julio no pasó por 1,92 M a mediados de mes:
+   * saltó el día 1. La curva `monotone` dibuja esa rampa inexistente y, peor, hace que en la
+   * segunda quincena de junio el presupuesto pintado esté por encima del real cuando la
+   * regla todavía era 1,9 M. Las series REALES (gasto, ingreso, patrimonio) sí son continuas
+   * y conservan su curva.
+   */
+  escalon?: boolean;
 };
 
 /**
@@ -146,6 +157,15 @@ export const ALTO_MINIMO = 160;
  * Delega en `formatMonthShort` de `format.ts` —determinista, sin `Intl`— y deja pasar lo que
  * no sea una fecha ISO: las etiquetas ya legibles («abr», «may») se escriben tal cual.
  */
+/**
+ * La curva con la que se dibuja una serie. `stepAfter` mantiene el valor hasta el punto
+ * siguiente, que es exactamente la semántica de «esto rige desde hoy»: el escalón cae en el
+ * punto nuevo, no a mitad de camino.
+ */
+export function curvaDe(s: Pick<SerieDef, "escalon">): "monotone" | "stepAfter" {
+  return s.escalon ? "stepAfter" : "monotone";
+}
+
 export function formatoEjeX(label: string | number | undefined): string {
   if (label === undefined || label === null) return "";
   const s = String(label);

@@ -20,6 +20,7 @@ import {
   gridDelMes,
   nivelDe,
   rangosDeNivel,
+  etiquetasDeRango,
 } from "@/components/charts/core/calendario";
 
 describe("diasDelMes", () => {
@@ -220,4 +221,62 @@ describe("rampa del calendario contra la celda sin gasto", () => {
       expect(contraste(paso1, sup)).toBeLessThan(3);
     });
   }
+});
+
+describe("etiquetasDeRango · el techo de un paso no se repite como suelo del siguiente", () => {
+  const fmt = (n: number) => `₡${n.toLocaleString("de-DE")}`;
+
+  it("usa «menos de» arriba y «o más» abajo, y cierra los de en medio", () => {
+    const rangos = [
+      { desde: 9_920, hasta: 12_860 },
+      { desde: 12_860, hasta: 16_220 },
+      { desde: 16_220, hasta: 19_160 },
+      { desde: 19_160, hasta: 52_800 },
+      { desde: 52_800, hasta: null },
+    ];
+    expect(etiquetasDeRango(rangos, fmt)).toEqual([
+      "hasta ₡12.860",
+      "₡12.861 a ₡16.220",
+      "₡16.221 a ₡19.160",
+      "₡19.161 a ₡52.800",
+      "₡52.801 o más",
+    ]);
+  });
+
+  it("ningún importe aparece en dos etiquetas", () => {
+    const rangos = [
+      { desde: 100, hasta: 200 },
+      { desde: 200, hasta: 300 },
+      { desde: 300, hasta: 400 },
+      { desde: 400, hasta: null },
+    ];
+    const etiquetas = etiquetasDeRango(rangos, (n) => String(n));
+    const numeros = etiquetas.flatMap((e) => e.match(/\d+/g) ?? []);
+    expect(new Set(numeros).size, `repetido en ${etiquetas.join(" · ")}`).toBe(numeros.length);
+  });
+
+  it("los suelos y techos son contiguos, sin hueco ni solapamiento", () => {
+    const rangos = [
+      { desde: 1, hasta: 10 },
+      { desde: 10, hasta: 25 },
+      { desde: 25, hasta: null },
+    ];
+    // «hasta 10» · «11 a 25» · «26 o más»: 10 y 11 contiguos, 25 y 26 contiguos.
+    expect(etiquetasDeRango(rangos, (n) => String(n))).toEqual(["hasta 10", "11 a 25", "26 o más"]);
+  });
+
+  it("un paso que cubre un solo importe se imprime como ese importe", () => {
+    const rangos = [
+      { desde: 5, hasta: 5 },
+      { desde: 5, hasta: 6 },
+      { desde: 6, hasta: null },
+    ];
+    const e = etiquetasDeRango(rangos, (n) => String(n));
+    expect(e[1]).toBe("6");
+    expect(e.every((t) => !t.includes("NaN"))).toBe(true);
+  });
+
+  it("sin rangos no inventa etiquetas", () => {
+    expect(etiquetasDeRango([], (n) => String(n))).toEqual([]);
+  });
 });
