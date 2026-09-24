@@ -86,3 +86,14 @@ Tres lecciones que costaron una corrida cada una:
   **3 corridas verdes consecutivas**.
 - **`-x` excluye servicios de ARRANCAR, no de descargarse.** La caché basada en `docker ps`
   guardaba 1 imagen de las 4 descargadas; va por `docker images`.
+
+Fase 2 · delta 4 breakdown-insight-action: en revisión — `SectionHeader`, `BreakdownCard`,
+`InsightList` y `ActionStrip` en `src/components/lectura/`, encadenados en `/dev/ui` con
+interacción enlazada (seleccionar un sobre mueve el KPI y filtra las señales). Las cuatro se
+diseñaron alrededor de una regla: **un control no va dentro de otro**, que es la causa de los
+44 nodos de `nested-interactive` de la línea base.
+
+`fix(m)` color por entidad: el anillo de `/m/patrimonio` y `/m/inversiones` pintaba con una
+paleta indexada por posición sobre una lista ordenada por valor, así que el color seguía al
+ranking y dos clases intercambiaban color al adelantarse. Ahora usan el que ya traía el dato,
+igual que la web.
