@@ -46,6 +46,23 @@ async function abrir(browser: Browser, tema: "light" | "dark" = "light") {
   return { ctx, page };
 }
 
+/**
+ * El marco (`figure.cf`) que CONTIENE algo. `/dev/ui` tiene varios gráficos, así que
+ * `page.locator("table").first()` apuntaba a otro demo; y la tabla vive siempre en el DOM
+ * pero en `.sr-only` hasta que se pulsa «Ver tabla», que es lo que hace una persona.
+ */
+function marcoCon(page: import("@playwright/test").Page, selector: string) {
+  return page.locator("figure.cf").filter({ has: page.locator(selector) });
+}
+
+async function abrirTabla(page: import("@playwright/test").Page, selector: string) {
+  const marco = marcoCon(page, selector);
+  await marco.scrollIntoViewIfNeeded();
+  const boton = marco.getByRole("button", { name: "Ver tabla" });
+  if (await boton.isVisible()) await boton.click();
+  return marco.locator("table.cf-tabla");
+}
+
 test("la rejilla es UNA sola parada de Tab", async ({ browser }) => {
   // Con 30 días, tabular treinta veces para cruzar el calendario es inaceptable.
   const { ctx, page } = await abrir(browser);
@@ -151,7 +168,7 @@ test("la leyenda nombra los tres estados y da los rangos en texto", async ({ bro
 test("la tabla de datos trae la columna del paso", async ({ browser }) => {
   // El color era el único canal que decía «cuánto» en la rejilla (WCAG 1.4.1).
   const { ctx, page } = await abrir(browser);
-  const tabla = page.locator("table").first();
+  const tabla = await abrirTabla(page, ".cal-grid");
   await expect(tabla.locator("th", { hasText: "Paso" })).toHaveCount(1);
   await ctx.close();
 });
@@ -162,18 +179,26 @@ test("el eje Y del zoom es visible y su dominio sigue al rango", async ({ browse
   const { ctx, page } = await abrir(browser);
   const grupo = page.locator("[role='radiogroup'][aria-label='Rango del gráfico']");
   await grupo.scrollIntoViewIfNeeded();
-  const marco = page.locator(".recharts-wrapper").last();
-  const ticksY = () =>
-    marco.locator(".recharts-yAxis .recharts-cartesian-axis-tick-value").allInnerTexts();
+  const marco = marcoCon(page, "[aria-label='Rango del gráfico']");
+  // Los rótulos de AMBOS ejes comparten clase (`recharts-cartesian-axis-tick-value`) y
+  // Recharts no los cuelga del `<g>` del eje al que pertenecen, así que no se pueden separar
+  // por selector. Se separan por lo que dicen: los del eje Y llevan importe («₡30M») y los
+  // del X, meses («oct 25»). Que el eje Y muestre cifras es justo lo que se quiere probar.
+  // `allInnerTexts()` NO sirve acá: `innerText` es de `HTMLElement` y estos rótulos son
+  // `<text>` de SVG, así que devuelve `undefined` por cada uno. `textContent` sí existe.
+  const ticksY = async () =>
+    (await marco.locator(".recharts-cartesian-axis-tick-value").allTextContents()).filter((t) =>
+      t.includes("₡"),
+    );
 
   const conTodo = await (async () => {
-    await grupo.getByRole("radio", { name: "Todo" }).click();
+    await grupo.getByRole("radio").filter({ hasText: "Todo" }).click();
     await page.waitForTimeout(400);
     return ticksY();
   })();
   expect(conTodo.length).toBeGreaterThan(1);
 
-  await grupo.getByRole("radio", { name: "6M" }).click();
+  await grupo.getByRole("radio").filter({ hasText: "6M" }).click();
   await page.waitForTimeout(400);
   const con6M = await ticksY();
   expect(con6M.length).toBeGreaterThan(1);
@@ -189,14 +214,13 @@ test("la serie termina en el mes en curso, no en el futuro", async ({ browser })
   const { ctx, page } = await abrir(browser);
   const grupo = page.locator("[role='radiogroup'][aria-label='Rango del gráfico']");
   await grupo.scrollIntoViewIfNeeded();
-  await grupo.getByRole("radio", { name: "Todo" }).click();
+  await grupo.getByRole("radio").filter({ hasText: "Todo" }).click();
   await page.waitForTimeout(400);
 
-  const filas = await page
-    .locator("table")
-    .last()
-    .locator("tbody tr td:first-child")
-    .allInnerTexts();
+  const tabla = await abrirTabla(page, "[aria-label='Rango del gráfico']");
+  // La primera celda de cada fila es `<th scope="row">`, no `<td>`: la tabla rotula sus
+  // filas, que es lo que la hace navegable con lector de pantalla.
+  const filas = await tabla.locator("tbody tr th").allInnerTexts();
   expect(filas).toHaveLength(36);
 
   // La tabla rotula los meses como el eje ("sep 26"), así que se compara contra el mismo
@@ -210,7 +234,7 @@ test("la serie termina en el mes en curso, no en el futuro", async ({ browser })
   });
   const ultima = filas.at(-1)!.toLowerCase().replace(".", "");
   expect(ultima, `última fila "${ultima}" debería ser el mes en curso "${esperado}"`).toContain(
-    esperado.toLowerCase().split(" ")[0]!,
+    esperado.toLowerCase().slice(0, 3),
   );
   await ctx.close();
 });

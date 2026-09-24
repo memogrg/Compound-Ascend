@@ -20,7 +20,7 @@ import {
   type RangoPreset,
 } from "@/components/charts/core";
 import { REJILLA, EJE, TRAZO, type SerieDef } from "@/components/charts/core/theme";
-import { formatAxisCompact, formatMoney } from "@/lib/format";
+import { formatAxisCompact, formatMonthShort, formatMoney } from "@/lib/format";
 import { currentPeriodInTz, todayISOInTz } from "@/lib/time/user-time-core";
 
 /**
@@ -94,13 +94,13 @@ export function CalendarioDemo() {
     <div style={{ display: "grid", gap: 26 }}>
       <ChartFrame
         titulo="Gasto diario"
-        subtitulo={`${HOY} · flechas para moverse, Enter fija el día`}
+        subtitulo={`${formatMonthShort(`${HOY}-01`)} · flechas para moverse, Enter fija el día`}
         descripcion={describirGrafico({
           titulo: "Gasto diario de septiembre",
           serie: DIAS.map((d) => ({ x: d.fecha, y: d.monto })),
           formato: (v) => formatMoney(v, MONEDA),
         })}
-        alto={300}
+        alto={400}
         tabla={tablaDeDatos(
           // El PASO de la rampa va como columna: el color es el único canal que dice
           // «cuánto» en la rejilla, y quien no lo distingue —daltonismo, contraste bajo,
