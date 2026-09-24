@@ -169,6 +169,53 @@
   align-items: center;
   gap: 6px;
 }
+/* ── Fila de transacción: el enlace estirado ───────────────────────────────
+   La fila era `role="button"` y contenía el botón de «Acciones»: un control dentro de otro,
+   que axe reporta como `nested-interactive` (44 nodos, todos en /transacciones).
+
+   El patrón: el control real es el NOMBRE, y un pseudo-elemento suyo cubre la fila entera.
+   Se conserva el área de clic de antes, el foco de teclado cae en UN solo sitio con su
+   propio nombre accesible, y cualquier hermano con `z-index` queda por encima y sigue
+   siendo pulsable. `.list-row` no se toca: la comparten 16 sitios más. */
+.txn-row {
+  position: relative;
+  cursor: pointer;
+}
+
+.txn-row-abrir {
+  /* Es un `<button>` pero tiene que verse exactamente como el `<div>` que reemplaza: se
+     neutralizan los estilos del navegador y NADA más.
+
+     Sin `font: inherit`, a propósito. Es un shorthand, así que resetea también el
+     `font-weight`, y como esta regla va después de `.env-name` le pisaba su 600: los nombres
+     de comercio salían en regular. Lo cazó el diff visual —24.000 px— no el typecheck ni
+     axe. La tipografía ya la pone `.env-name` sobre el mismo elemento, y cualquier regla de
+     autor gana a la del navegador, así que no hace falta declararla acá. */
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+.txn-row-abrir::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+/* El anillo de foco lo dibuja la FILA, no el texto: si lo llevara el botón, se vería un
+   rectángulo alrededor del nombre y no de lo que se va a abrir. */
+.txn-row:has(.txn-row-abrir:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: var(--r-sm);
+}
+.txn-row-abrir:focus-visible {
+  outline: none;
+}
+
 .env-sub {
   font-size: 12px;
   color: var(--text-muted);
