@@ -36,13 +36,20 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/** Orden FIJO de series. El mismo dato lleva el mismo color en toda la app. */
+/**
+ * Orden FIJO de series. El mismo dato lleva el mismo color en toda la app.
+ *
+ * Los hex van escritos: son lo que la galería ANUNCIA, al lado de la muestra que sale del
+ * token. `contraste-paleta.test.ts` los compara contra `tokens.css` y falla si se separan —
+ * se separaron una vez (`--chart-3` en el PR #844) y nadie lo vio, porque la muestra de al
+ * lado seguía pintándose bien.
+ */
 const SERIES = [
   { token: "--chart-1", claro: "#378451", oscuro: "#3f9560", rol: "Ingresos · positivo" },
-  { token: "--chart-2", claro: "#3a6ea5", oscuro: "#5a8ccb", rol: "Inversiones" },
-  { token: "--chart-3", claro: "#c48a2e", oscuro: "#c4862c", rol: "Gasto fijo" },
-  { token: "--chart-4", claro: "#7b5ea7", oscuro: "#9b7cc8", rol: "Gasto variable" },
-  { token: "--chart-5", claro: "#c34f4b", oscuro: "#d46460", rol: "Deudas · negativo" },
+  { token: "--chart-2", claro: "#36679b", oscuro: "#689ce0", rol: "Inversiones" },
+  { token: "--chart-3", claro: "#be862d", oscuro: "#c4862c", rol: "Gasto fijo" },
+  { token: "--chart-4", claro: "#8163b0", oscuro: "#9a7bc7", rol: "Gasto variable" },
+  { token: "--chart-5", claro: "#bc4845", oscuro: "#ce605d", rol: "Deudas · negativo" },
   { token: "--chart-6", claro: "#0f9aa8", oscuro: "#28a2b0", rol: "Ahorro y metas" },
 ] as const;
 

@@ -166,6 +166,32 @@ describe("la copia de tokens sigue al día", () => {
     expect(claro).toContain(`--surface: ${TEMAS.claro.surface}`);
     expect(oscuro).toContain(`--surface: ${TEMAS.oscuro.surface}`);
   });
+
+  /**
+   * La galería `/dev/ui` imprime los hex de la paleta ESCRITOS A MANO, al lado de las
+   * muestras que sí salen del token. Cuando los dos dejan de coincidir, la galería —que es
+   * justo donde alguien va a mirar cuál es el color de una serie— anuncia un color que la
+   * app no usa.
+   *
+   * No es hipotético: `--chart-3` pasó a `#be862d` en el PR #844 y la tabla se quedó en
+   * `#c48a2e`. Nadie lo vio porque la muestra de al lado seguía pintándose bien.
+   */
+  it("la tabla de /dev/ui declara los MISMOS hex que tokens.css", () => {
+    const galeria = readFileSync(
+      join(process.cwd(), "src/app/(dashboard)/dev/ui/page.tsx"),
+      "utf8",
+    );
+    const filas = [
+      ...galeria.matchAll(/\{ token: "(--chart-\d)", claro: "(#\w{6})", oscuro: "(#\w{6})"/g),
+    ];
+    expect(filas.length, "no se encontró la tabla SERIES en /dev/ui").toBe(6);
+
+    for (const [, token, claro, oscuro] of filas) {
+      const i = Number(token!.slice(-1)) - 1;
+      expect(claro, `${token} claro en la galería`).toBe(TEMAS.claro.chart[i]);
+      expect(oscuro, `${token} oscuro en la galería`).toBe(TEMAS.oscuro.chart[i]);
+    }
+  });
 });
 
 /**
