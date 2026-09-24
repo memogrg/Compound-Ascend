@@ -104,6 +104,117 @@ test("los días futuros se distinguen de los días sin gasto", async ({ browser 
   await ctx.close();
 });
 
+test("hoy está marcado en la semántica, no solo con el anillo", async ({ browser }) => {
+  // Sin `aria-current` un lector de pantalla recorre 30 celdas iguales y no hay forma de
+  // saber en cuál está parado el mes: el anillo de 2 px no existe para quien no lo ve.
+  const { ctx, page } = await abrir(browser);
+  const hoy = page.locator(".cal-dia[aria-current='date']");
+  await expect(hoy).toHaveCount(1);
+  await expect(page.locator(".cal-dia[data-hoy='true']")).toHaveCount(1);
+  // Y hoy NO es un día futuro: el mes está a medias justo ahí.
+  await expect(page.locator(".cal-dia[aria-current='date'][data-futuro='true']")).toHaveCount(0);
+  await ctx.close();
+});
+
+test("la celda sin gasto no lleva relleno, sino borde continuo", async ({ browser }) => {
+  // Con relleno competía con el paso más bajo de la rampa: dos grises parecidos, uno
+  // DENTRO de la escala y otro fuera, y el mes parecía tener gasto todos los días.
+  const { ctx, page } = await abrir(browser);
+  const vacio = page.locator(".cal-dia[data-vacio='true']").first();
+  const estilo = await vacio.evaluate((el) => {
+    const c = getComputedStyle(el);
+    return { fondo: c.backgroundColor, borde: c.borderStyle, ancho: c.borderWidth };
+  });
+  expect(estilo.fondo).toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
+  expect(estilo.borde).toBe("solid");
+
+  // El futuro, en cambio, va PUNTEADO: es lo que los separa a simple vista.
+  const futuro = page.locator(".cal-dia[data-futuro='true']").first();
+  expect(await futuro.evaluate((el) => getComputedStyle(el).borderStyle)).toBe("dashed");
+  await ctx.close();
+});
+
+test("la leyenda nombra los tres estados y da los rangos en texto", async ({ browser }) => {
+  // Un degradado de «menos» a «más» no dice cuánto es «más», y el `title` de cada muestra
+  // no existe en táctil ni lo anuncia ningún lector de pantalla.
+  const { ctx, page } = await abrir(browser);
+  const leyenda = page.locator(".cal-leyenda");
+  await expect(leyenda).toContainText("Sin gasto");
+  await expect(leyenda).toContainText("Futuro");
+  // Cinco pasos + «sin gasto» + «futuro» = siete entradas.
+  await expect(leyenda.locator(".cal-leyenda-item")).toHaveCount(7);
+  // Y los pasos traen cifras, no solo color.
+  expect(await leyenda.innerText()).toMatch(/₡/);
+  await ctx.close();
+});
+
+test("la tabla de datos trae la columna del paso", async ({ browser }) => {
+  // El color era el único canal que decía «cuánto» en la rejilla (WCAG 1.4.1).
+  const { ctx, page } = await abrir(browser);
+  const tabla = page.locator("table").first();
+  await expect(tabla.locator("th", { hasText: "Paso" })).toHaveCount(1);
+  await ctx.close();
+});
+
+test("el eje Y del zoom es visible y su dominio sigue al rango", async ({ browser }) => {
+  // Con el eje oculto, recortar la serie cambiaba la escala en silencio y dos capturas del
+  // mismo gráfico no eran comparables.
+  const { ctx, page } = await abrir(browser);
+  const grupo = page.locator("[role='radiogroup'][aria-label='Rango del gráfico']");
+  await grupo.scrollIntoViewIfNeeded();
+  const marco = page.locator(".recharts-wrapper").last();
+  const ticksY = () =>
+    marco.locator(".recharts-yAxis .recharts-cartesian-axis-tick-value").allInnerTexts();
+
+  const conTodo = await (async () => {
+    await grupo.getByRole("radio", { name: "Todo" }).click();
+    await page.waitForTimeout(400);
+    return ticksY();
+  })();
+  expect(conTodo.length).toBeGreaterThan(1);
+
+  await grupo.getByRole("radio", { name: "6M" }).click();
+  await page.waitForTimeout(400);
+  const con6M = await ticksY();
+  expect(con6M.length).toBeGreaterThan(1);
+  // El dominio se RECALCULA: con 36 meses y con 6 los topes no pueden ser los mismos.
+  expect(con6M.join("|")).not.toBe(conTodo.join("|"));
+  await ctx.close();
+});
+
+test("la serie termina en el mes en curso, no en el futuro", async ({ browser }) => {
+  // La serie se cuenta HACIA ATRÁS desde hoy. Escrita «hacia adelante desde 2024-01» seguía
+  // terminando en 2026-12, así que tenía meses de futuro y «los últimos 6 meses» se
+  // recortaban contra un final que no había llegado.
+  const { ctx, page } = await abrir(browser);
+  const grupo = page.locator("[role='radiogroup'][aria-label='Rango del gráfico']");
+  await grupo.scrollIntoViewIfNeeded();
+  await grupo.getByRole("radio", { name: "Todo" }).click();
+  await page.waitForTimeout(400);
+
+  const filas = await page
+    .locator("table")
+    .last()
+    .locator("tbody tr td:first-child")
+    .allInnerTexts();
+  expect(filas).toHaveLength(36);
+
+  // La tabla rotula los meses como el eje ("sep 26"), así que se compara contra el mismo
+  // formato construido desde el reloj de la página —congelado en la captura, real en CI—
+  // en lugar de parsear la etiqueta.
+  const esperado = await page.evaluate(() => {
+    const d = new Date();
+    return new Intl.DateTimeFormat("es-CR", { month: "short", year: "2-digit" })
+      .format(new Date(d.getFullYear(), d.getMonth(), 1))
+      .replace(".", "");
+  });
+  const ultima = filas.at(-1)!.toLowerCase().replace(".", "");
+  expect(ultima, `última fila "${ultima}" debería ser el mes en curso "${esperado}"`).toContain(
+    esperado.toLowerCase().split(" ")[0]!,
+  );
+  await ctx.close();
+});
+
 test("los presets recortan la serie y la tabla a la vez", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
   const grupo = page.locator("[role='radiogroup'][aria-label='Rango del gráfico']");
