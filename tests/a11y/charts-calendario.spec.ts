@@ -8,23 +8,13 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Browser } from "@playwright/test";
 
-import { iniciarSesion } from "./sesion";
+import { ESTADO_SESION } from "./sesion";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
-let estadoSesion: Awaited<ReturnType<Awaited<ReturnType<Browser["newContext"]>>["storageState"]>>;
-
-test.beforeAll(async ({ browser }) => {
-  const ctx = await browser.newContext();
-  const page = await ctx.newPage();
-  await iniciarSesion(page);
-  estadoSesion = await ctx.storageState();
-  await ctx.close();
-});
-
 async function abrir(browser: Browser, tema: "light" | "dark" = "light") {
   const ctx = await browser.newContext({
-    storageState: estadoSesion,
+    storageState: ESTADO_SESION,
     viewport: { width: 1280, height: 1000 },
     colorScheme: tema,
     reducedMotion: "reduce",

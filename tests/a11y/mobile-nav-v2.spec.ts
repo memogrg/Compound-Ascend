@@ -11,9 +11,9 @@
  *     tests/a11y/mobile-nav-v2.spec.ts
  */
 import AxeBuilder from "@axe-core/playwright";
-import { test, expect, type Browser, type BrowserContext } from "@playwright/test";
+import { test, expect, type Browser } from "@playwright/test";
 
-import { iniciarSesion } from "./sesion";
+import { ESTADO_SESION } from "./sesion";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -27,15 +27,20 @@ const REGLAS_M = new Set(["color-contrast", "aria-hidden-focus", "meta-viewport"
 /** `/m` es un teléfono: no se mide a otro ancho. */
 const ANCHO = { width: 390, height: 900 };
 
-let estadoSesion: Awaited<ReturnType<BrowserContext["storageState"]>> | null = null;
 let banderaEncendida = false;
 
+/**
+ * La bandera se MIDE, no se supone. Ya no hace login —la sesión la deja el `globalSetup`—
+ * pero sí abre una página: sin esta sonda `banderaEncendida` se quedaría en `false` y TODOS
+ * los casos de este archivo se saltarían en silencio, con la suite en verde sin haber
+ * probado nada.
+ */
 test.beforeAll(async ({ browser }) => {
-  const ctx = await browser.newContext();
+  const ctx = await browser.newContext({ storageState: ESTADO_SESION });
   const page = await ctx.newPage();
-  await iniciarSesion(page);
+  await page.goto("/m", { waitUntil: "networkidle", timeout: 60_000 });
+  // El botón buscador del topbar v2 solo existe bajo bandera: es el detector más barato.
   banderaEncendida = (await page.locator("button.tb2-search").count()) > 0;
-  estadoSesion = await ctx.storageState();
   await ctx.close();
 });
 
@@ -45,7 +50,7 @@ test.beforeEach(() => {
 
 async function abrirMovil(browser: Browser, ruta: string) {
   const ctx = await browser.newContext({
-    storageState: estadoSesion ?? undefined,
+    storageState: ESTADO_SESION,
     viewport: ANCHO,
     colorScheme: "light",
     reducedMotion: "reduce",

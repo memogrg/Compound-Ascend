@@ -54,3 +54,6 @@ design-handoff/
 
 # Capturas de regresión visual (qa:snap) — no se versionan
 qa-snapshots/
+
+# Sesión guardada por el globalSetup de Playwright: son cookies de un usuario real.
+.auth/

@@ -9,20 +9,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Browser, type Locator, type Page } from "@playwright/test";
 
-import { iniciarSesion } from "./sesion";
+import { ESTADO_SESION } from "./sesion";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const RUTA = "/dev/ui";
-
-let estadoSesion: Awaited<ReturnType<Awaited<ReturnType<Browser["newContext"]>>["storageState"]>>;
-
-test.beforeAll(async ({ browser }) => {
-  const ctx = await browser.newContext();
-  const page = await ctx.newPage();
-  await iniciarSesion(page);
-  estadoSesion = await ctx.storageState();
-  await ctx.close();
-});
 
 async function abrir(
   browser: Browser,
@@ -30,7 +20,7 @@ async function abrir(
 ) {
   const tema = opciones.tema ?? "light";
   const ctx = await browser.newContext({
-    storageState: estadoSesion,
+    storageState: ESTADO_SESION,
     viewport: opciones.tactil ? { width: 390, height: 780 } : { width: 1280, height: 1000 },
     colorScheme: tema,
     reducedMotion: "reduce",

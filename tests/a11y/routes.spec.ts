@@ -18,9 +18,9 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import AxeBuilder from "@axe-core/playwright";
-import { test, type BrowserContext } from "@playwright/test";
+import { test } from "@playwright/test";
 
-import { iniciarSesion } from "./sesion";
+import { ESTADO_SESION } from "./sesion";
 
 type Ruta = { path: string; auth: boolean; superficie?: string };
 
@@ -68,22 +68,12 @@ function slug(routePath: string): string {
   return s === "" ? "home" : s;
 }
 
-let estadoSesion: Awaited<ReturnType<BrowserContext["storageState"]>> | null = null;
-
-test.beforeAll(async ({ browser }) => {
-  const ctx = await browser.newContext();
-  const page = await ctx.newPage();
-  await iniciarSesion(page);
-  estadoSesion = await ctx.storageState();
-  await ctx.close();
-});
-
 for (const ruta of ROUTES) {
   for (const ancho of ANCHOS) {
     if (!seMide(ruta, ancho)) continue;
     test(`a11y ${ruta.path} @${ancho}`, async ({ browser }) => {
       const ctx = await browser.newContext({
-        storageState: ruta.auth ? (estadoSesion ?? undefined) : undefined,
+        storageState: ruta.auth ? ESTADO_SESION : undefined,
         viewport: { width: ancho, height: 900 },
         colorScheme: "light",
         reducedMotion: "reduce",
