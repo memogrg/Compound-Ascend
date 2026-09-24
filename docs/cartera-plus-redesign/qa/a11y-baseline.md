@@ -7,11 +7,11 @@ Las dos superficies van **separadas**: la web (`/dashboard`, `/gastos`…) y la 
 (`/m/*`). Son dos apps con su propio shell y su propia hoja de estilos, y un total común
 no le serviría a ninguna para compararse consigo misma con el tiempo.
 
-- **SHA**: `845ca4a6e40b48b5cb4595c74a3f7b2e35d810f8`
+- **SHA**: `86e95ed980127c57331216ae7487dfeccbb10632`
 - **Instante congelado**: `(sin QA_FREEZE)`
 - **Motor**: axe-core 4.13.0
 - **Reglas**: `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`
-- **Combinaciones**: 61 · web 46 · `/m` 15 · tema claro
+- **Combinaciones**: 62 · web 46 · `/m` 15 · tema claro
 
 Regenerar:
 
@@ -38,21 +38,19 @@ Anchos 1280 y 390.
 | Impacto | Nodos |
 | --- | --- |
 | critical | 0 |
-| serious | 352 |
+| serious | 308 |
 | moderate | 0 |
 | minor | 0 |
-| **total** | **352** |
+| **total** | **308** |
 
 ### Las 5 reglas más frecuentes
 
 | Regla | Impacto | Nodos | Rutas | Ejemplo de selector |
 | --- | --- | --- | --- | --- |
 | `color-contrast` | serious | 294 | 22 | `a[data-nav="assistant"] > span:nth-child(2)` |
-| `nested-interactive` | serious | 44 | 1 | `div:nth-child(3) > .list-row[role="button"]` |
 | `aria-hidden-focus` | serious | 14 | 5 | `div[role="img"] > div[aria-hidden="true"]` |
 
 - **`color-contrast`** — Elements must meet minimum color contrast ratio thresholds
-- **`nested-interactive`** — Interactive controls must not be nested
 - **`aria-hidden-focus`** — ARIA hidden element must not be focusable or contain focusable elements
 
 ### Por ruta y ancho
@@ -103,8 +101,8 @@ Anchos 1280 y 390.
 | `/patrimonio/proteccion` | 390 | 0 | 6 | 0 | 0 | **6** |
 | `/suscripcion` | 1280 | 0 | 1 | 0 | 0 | **1** |
 | `/suscripcion` | 390 | 0 | 0 | 0 | 0 | **0** |
-| `/transacciones` | 1280 | 0 | 25 | 0 | 0 | **25** |
-| `/transacciones` | 390 | 0 | 24 | 0 | 0 | **24** |
+| `/transacciones` | 1280 | 0 | 3 | 0 | 0 | **3** |
+| `/transacciones` | 390 | 0 | 2 | 0 | 0 | **2** |
 
 ## Superficie `/m` (app móvil)
 
