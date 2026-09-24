@@ -4,6 +4,7 @@ import {
   type IndicatorCard,
 } from "@/modules/wealth/services/indicators-service";
 import { getMacroInsights } from "@/modules/wealth";
+import { formatDecimal } from "@/lib/format";
 import {
   MSummaryCard,
   MSectionHeader,
@@ -30,7 +31,7 @@ export const dynamic = "force-dynamic";
  *  un precio ₡/$, no un monto redondeable —antes salía "₡512" perdiendo los céntimos. */
 function fmtValue(card: IndicatorCard): string {
   if (card.value == null) return "—";
-  if (card.unit === "percent") return `${card.value.toFixed(2)}%`;
+  if (card.unit === "percent") return `${formatDecimal(card.value, 2)}%`;
   if (card.unit === "currency")
     return `₡${card.value.toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   return card.value.toLocaleString("es-CR", { maximumFractionDigits: 0 });
@@ -42,12 +43,18 @@ function fmtChange(card: IndicatorCard): { text: string; dir: -1 | 0 | 1 } | nul
     if (card.change6mAbs == null) return null;
     const v = card.change6mAbs;
     const dir = v > 0 ? 1 : v < 0 ? -1 : 0;
-    return { text: `${dir > 0 ? "+" : dir < 0 ? "−" : ""}${Math.abs(v).toFixed(2)} pp vs 6m`, dir };
+    return {
+      text: `${dir > 0 ? "+" : dir < 0 ? "−" : ""}${formatDecimal(Math.abs(v), 2)} pp vs 6m`,
+      dir,
+    };
   }
   if (card.change6mPct == null) return null;
   const v = card.change6mPct * 100;
   const dir = v > 0 ? 1 : v < 0 ? -1 : 0;
-  return { text: `${dir > 0 ? "+" : dir < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}% vs 6m`, dir };
+  return {
+    text: `${dir > 0 ? "+" : dir < 0 ? "−" : ""}${formatDecimal(Math.abs(v), 1)}% vs 6m`,
+    dir,
+  };
 }
 
 /**

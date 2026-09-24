@@ -9,7 +9,7 @@ import {
   EditHoldingButton,
 } from "./add-holding-wizard";
 import { HoldingDetailButton } from "./holding-detail-modal";
-import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
+import { formatCompact, formatDecimal, formatMoney, formatPercent } from "@/lib/format";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
 import type { AssetType, HoldingNativo } from "@/modules/wealth/types";
 
@@ -410,7 +410,7 @@ function HoldingRow({
         >
           <span>{holding.symbol}</span>
           <span>·</span>
-          <span>{holding.quantity.toFixed(holding.quantity < 1 ? 6 : 4)} uds.</span>
+          <span>{formatDecimal(holding.quantity, holding.quantity < 1 ? 6 : 4)} uds.</span>
           {currentValue !== null ? (
             <span>{formatMoney(currentValue, liveH?.currency ?? holding.currency)}</span>
           ) : (
