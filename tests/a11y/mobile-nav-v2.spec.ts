@@ -38,9 +38,13 @@ let banderaEncendida = false;
 test.beforeAll(async ({ browser }) => {
   const ctx = await browser.newContext({ storageState: ESTADO_SESION });
   const page = await ctx.newPage();
-  await page.goto("/m", { waitUntil: "networkidle", timeout: 60_000 });
-  // El botón buscador del topbar v2 solo existe bajo bandera: es el detector más barato.
-  banderaEncendida = (await page.locator("button.tb2-search").count()) > 0;
+  await page.goto("/m/gastos", { waitUntil: "networkidle", timeout: 60_000 });
+  // `button.tb2-search` es del topbar de la WEB y no existe en el shell móvil: con esa
+  // sonda estos cuatro casos se saltaban incluso con la bandera encendida — verde sin
+  // haber probado nada, que es justo lo que la sonda venía a evitar. El detector móvil son
+  // las pestañas de núcleo (`.mn2-tabs`), que `mobile-header` solo pinta bajo bandera. Se
+  // mira en `/m/gastos` y no en `/m`: el Inicio no lleva pestañas de núcleo.
+  banderaEncendida = (await page.locator(".mn2-tabs").count()) > 0;
   await ctx.close();
 });
 
