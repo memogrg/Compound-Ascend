@@ -452,3 +452,20 @@
     transition: none;
   }
 }
+
+/* ── Periodo en curso ─────────────────────────────────────────────────────── */
+
+/* El mes a medias se dice con PALABRAS además de con el trazo punteado: quien usa lector de
+   pantalla no ve el punteado, y quien no distingue el punto hueco tampoco. */
+.cf-en-curso {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* «· parcial» dentro del tooltip: el dato es real, pero el periodo no terminó. */
+.cf-parcial {
+  color: var(--muted);
+  font-weight: 400;
+}

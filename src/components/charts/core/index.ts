@@ -61,6 +61,14 @@ export {
 export { dominioBarras, escalaBarras, niceDomain } from "./escala";
 export { useAncho, anchoDeBarra } from "./use-ancho";
 export { escalaNice, incluyeCero, type Escala, type OpcionesEscala } from "./escala-nice";
+export {
+  estaEnCurso,
+  rotuloEnCurso,
+  esTramoParcial,
+  partirSerieEnCurso,
+  type PeriodoEnCurso,
+} from "./periodo-en-curso";
+export { HistoricoGasto, type PuntoHistorico } from "./historico-gasto";
 
 export { CalendarioGasto, INSTRUCCIONES_TECLADO, type DiaGasto } from "./calendario-gasto";
 export {
