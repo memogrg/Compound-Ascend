@@ -234,3 +234,40 @@ describe("escalaBarras: barras desde cero, y sin rótulos que mientan", () => {
     expect(e.dominio[0]).toBe(0);
   });
 });
+
+describe("heurística de cero: el área solo cuando el 0 no distorsiona", () => {
+  it("«Todo» del patrimonio (18M a 40,5M) incluye el 0 y se mantiene el área", () => {
+    // El mínimo (18 M) es el 44 % del máximo (40,5 M): por debajo del 50 %, arrancar en 0
+    // NO aplasta la serie —ocupa más de la mitad del alto— y el área sigue siendo honesta.
+    const serie = Array.from({ length: 36 }, (_, i) => 18 * M + i * 640_000 + (i % 5) * 180_000);
+    const e = escalaNice(serie, { moneda: "CRC", desdeCeroSiCabe: true });
+    expect(e.dominio[0]).toBe(0);
+    expect(incluyeCero(e.dominio)).toBe(true);
+  });
+
+  it("«6M» (37M a 40,5M) NO lo incluye: el 0 dejaría la serie en una franja", () => {
+    // El mínimo es el 91 % del máximo. Desde 0, los 36 meses viven en el 9 % superior del
+    // gráfico y no se ve ningún movimiento: ahí la línea dice más que el área.
+    const serie = Array.from({ length: 36 }, (_, i) => 18 * M + i * 640_000 + (i % 5) * 180_000);
+    const e = escalaNice(serie.slice(-6), { moneda: "CRC", desdeCeroSiCabe: true });
+    expect(e.dominio[0]).toBeGreaterThan(0);
+    expect(incluyeCero(e.dominio)).toBe(false);
+  });
+
+  it("el umbral es el 50 % exacto", () => {
+    // mínimo = mitad del máximo → entra el 0.
+    expect(escalaNice([500, 1000], { desdeCeroSiCabe: true }).dominio[0]).toBe(0);
+    // un pelo por encima de la mitad → no entra.
+    expect(escalaNice([501, 1000], { desdeCeroSiCabe: true }).dominio[0]).toBeGreaterThan(0);
+  });
+
+  it("sin la opción, nada cambia", () => {
+    const serie = [18 * M, 40.5 * M];
+    expect(escalaNice(serie, { moneda: "CRC" }).dominio[0]).toBeGreaterThan(0);
+  });
+
+  it("con negativos no fuerza nada: el 0 ya está dentro", () => {
+    const e = escalaNice([-2 * M, 5 * M], { desdeCeroSiCabe: true });
+    expect(incluyeCero(e.dominio)).toBe(true);
+  });
+});

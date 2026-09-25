@@ -434,3 +434,21 @@
   margin-left: 6px;
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Área ⇄ línea: el relleno se desvanece, no salta ──────────────────────── */
+
+/* El zoom decide entre área y línea según si el 0 cabe en el dominio (`desdeCeroSiCabe`).
+   Al cambiar de chip, ese relleno aparece o desaparece: sin transición es un parpadeo que
+   parece un error de render. 200 ms es lo que tarda en leerse como «lo mismo, cambiando» en
+   vez de «otra cosa». Solo la OPACIDAD se anima — el trazo y los ejes se mueven a la vez,
+   y animar tres cosas a destiempo se ve peor que no animar nada. */
+.cf .recharts-area-area {
+  transition: fill-opacity 200ms ease;
+}
+
+/* Quien pide menos movimiento no lo pide a medias: el cambio es instantáneo. */
+@media (prefers-reduced-motion: reduce) {
+  .cf .recharts-area-area {
+    transition: none;
+  }
+}

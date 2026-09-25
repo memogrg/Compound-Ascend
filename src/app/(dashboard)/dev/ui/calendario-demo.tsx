@@ -1,15 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  Area,
-  ComposedChart,
-  CartesianGrid,
-  Line,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Area, ComposedChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
 
 import {
   CalendarioGasto,
@@ -107,7 +99,11 @@ export function CalendarioDemo() {
     () =>
       escalaNice(
         datos.map((d) => d.neto),
-        { moneda: MONEDA },
+        // El 0 entra SI CABE: con los 36 meses (18 a 40,5 M) el mínimo es el 44 % del
+        // máximo y la serie sigue ocupando más de la mitad del alto, así que el área es
+        // honesta. Con «6M» (37 a 40,5 M) el mínimo es el 91 % y desde 0 la serie viviría
+        // en el 9 % superior: ahí la línea dice más.
+        { moneda: MONEDA, desdeCeroSiCabe: true },
       ),
     [datos],
   );
@@ -202,47 +198,38 @@ export function CalendarioDemo() {
               axisLine={false}
               width={52}
             />
-            {conBaseCero ? (
-              <Area
-                type="monotone"
-                dataKey="neto"
-                stroke="var(--chart-1)"
-                strokeWidth={TRAZO.ancho}
-                fill="var(--chart-1)"
-                fillOpacity={0.14}
-                isAnimationActive={false}
-              />
-            ) : (
-              <Line
-                type="monotone"
-                dataKey="neto"
-                stroke="var(--chart-1)"
-                strokeWidth={TRAZO.ancho}
-                // Sin relleno, el extremo derecho de la línea se pierde contra el borde: el
-                // punto final dice DÓNDE termina la serie. Solo ese, no los 36.
-                dot={(props: {
-                  cx?: number;
-                  cy?: number;
-                  index?: number;
-                  key?: React.Key | null;
-                }) =>
-                  props.index === datos.length - 1 &&
-                  typeof props.cx === "number" &&
-                  typeof props.cy === "number" ? (
-                    <circle
-                      key={props.key ?? "fin"}
-                      cx={props.cx}
-                      cy={props.cy}
-                      r={3.5}
-                      fill="var(--chart-1)"
-                    />
-                  ) : (
-                    <g key={props.key ?? `v-${props.index}`} />
-                  )
-                }
-                isAnimationActive={false}
-              />
-            )}
+            {/* UNA sola serie, no dos que se intercambian. El relleno se apaga con una
+                transición de opacidad (`charts-core.css`), así que pasar de área a línea al
+                cambiar de chip es un desvanecido de 200 ms y no un salto. Montar y
+                desmontar componentes distintos hacía que Recharts volviera a dibujar el
+                trazo desde cero, y el cambio se veía como un parpadeo. */}
+            <Area
+              type="monotone"
+              dataKey="neto"
+              stroke="var(--chart-1)"
+              strokeWidth={TRAZO.ancho}
+              fill="var(--chart-1)"
+              fillOpacity={conBaseCero ? 0.14 : 0}
+              // Sin relleno, el extremo derecho se pierde contra el borde: el punto final
+              // dice DÓNDE termina la serie. Solo ese, no los 36.
+              dot={(props: { cx?: number; cy?: number; index?: number; key?: React.Key | null }) =>
+                !conBaseCero &&
+                props.index === datos.length - 1 &&
+                typeof props.cx === "number" &&
+                typeof props.cy === "number" ? (
+                  <circle
+                    key={props.key ?? "fin"}
+                    cx={props.cx}
+                    cy={props.cy}
+                    r={3.5}
+                    fill="var(--chart-1)"
+                  />
+                ) : (
+                  <g key={props.key ?? `v-${props.index}`} />
+                )
+              }
+              isAnimationActive={false}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </ChartFrame>
