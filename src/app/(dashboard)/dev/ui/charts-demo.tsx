@@ -35,7 +35,7 @@ import {
   curvaDe,
   anchoDeBarra,
   escalaBarras,
-  usarAncho,
+  useAncho,
   formatoEjeX,
   niceDomain,
   opacidadDe,
@@ -522,7 +522,7 @@ function BarrasDemo() {
   // El ancho de barra se CALCULA, no se recorta. `maxBarSize` encoge cada barra DESPUÉS de
   // colocarla y el sobrante se queda como hueco: a 1280 los 2 px prometidos se volvían 9.
   // Midiendo el contenedor se pide el `barSize` exacto que deja 2 px, con el mismo tope.
-  const [refAncho, anchoCaja] = usarAncho<HTMLDivElement>();
+  const [refAncho, anchoCaja] = useAncho<HTMLDivElement>();
   const anchoBarra = anchoDeBarra(Math.max(0, anchoCaja - ANCHO_EJE_Y), MESES.length, 2);
 
   return (

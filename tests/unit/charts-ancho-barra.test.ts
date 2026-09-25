@@ -3,7 +3,7 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { anchoDeBarra } from "@/components/charts/core/usar-ancho";
+import { anchoDeBarra } from "@/components/charts/core/use-ancho";
 
 describe("anchoDeBarra", () => {
   it("a 1280 el tope de 24 px manda, y es lo que deja hueco de sobra", () => {

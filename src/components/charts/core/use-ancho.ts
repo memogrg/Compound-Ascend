@@ -11,7 +11,13 @@
  */
 import { useEffect, useRef, useState } from "react";
 
-export function usarAncho<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
+/**
+ * Se llama `useAncho` y no `anchoDe…` porque `react-hooks/rules-of-hooks` solo reconoce
+ * como hook lo que empieza por `use`: con otro nombre la regla marca error en cada
+ * `useRef`/`useState`/`useEffect` de dentro, y con razón — no podría comprobar el orden de
+ * las llamadas.
+ */
+export function useAncho<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
   const ref = useRef<T>(null);
   const [ancho, setAncho] = useState(0);
 
