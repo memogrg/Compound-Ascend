@@ -1,10 +1,17 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { formatMoney } from "@/lib/format";
 
-import { cuantiles, gridDelMes, nivelDe, rangosDeNivel, type CeldaCalendario } from "./calendario";
+import {
+  cuantiles,
+  etiquetasDeRango,
+  gridDelMes,
+  nivelDe,
+  rangosDeNivel,
+  type CeldaCalendario,
+} from "./calendario";
 
 /**
  * El gasto de un mes, día a día. SVG propio: ni Recharts ni ECharts.
@@ -26,6 +33,16 @@ import { cuantiles, gridDelMes, nivelDe, rangosDeNivel, type CeldaCalendario } f
  * WAI-ARIA). `Enter` fija el día y lo anuncia.
  */
 export type DiaGasto = { fecha: string; monto: number; movimientos?: number };
+
+/**
+ * Cómo se recorre la rejilla con el teclado. Vive aquí, en una constante exportada, porque
+ * lo dicen DOS sitios: el `aria-describedby` de la rejilla (para quien no ve el icono) y el
+ * tooltip del «?» (para quien no usa lector). Duplicar la frase es garantizar que un día
+ * digan cosas distintas.
+ */
+export const INSTRUCCIONES_TECLADO =
+  "Usá las flechas para moverte por los días, Inicio y Fin para ir al primero o al último, " +
+  "y Enter para fijar un día y oírlo en voz alta.";
 
 const DIAS = ["L", "M", "X", "J", "V", "S", "D"];
 const NOMBRE_DIA = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
@@ -51,11 +68,13 @@ export function CalendarioGasto({
   /** Se llama al fijar un día con Enter o con un clic, y al soltarlo (con `null`). */
   onFijar?: (dia: DiaGasto | null) => void;
 }) {
+  const idInstrucciones = useId();
   const grid = gridDelMes(anio, mes);
   const porFecha = new Map(dias.map((d) => [d.fecha, d]));
   const montos = dias.map((d) => d.monto);
   const cortes = cuantiles(montos, PASOS);
   const rangos = rangosDeNivel(montos, PASOS);
+  const etiquetas = etiquetasDeRango(rangos, (n) => formatMoney(n, moneda));
 
   const celdas = grid.flat().filter((c) => c.fecha !== null);
   const [foco, setFoco] = useState(0);
@@ -117,6 +136,9 @@ export function CalendarioGasto({
 
   return (
     <div className="cal">
+      <p id={idInstrucciones} className="sr-only">
+        {INSTRUCCIONES_TECLADO}
+      </p>
       <div className="cal-cabecera" aria-hidden="true">
         {DIAS.map((d, i) => (
           <span key={`${d}-${i}`} className="cal-dow">
@@ -129,6 +151,9 @@ export function CalendarioGasto({
         className="cal-grid"
         role="grid"
         aria-label={`Gasto diario, ${mes}/${anio}`}
+        // Las instrucciones de teclado ya no están en el subtítulo, que las leía TODO el
+        // mundo aunque no fuera a tabular nunca. Acá las oye quien está dentro de la rejilla.
+        aria-describedby={idInstrucciones}
         onKeyDown={onKey}
       >
         {grid.map((fila, f) => (
@@ -196,7 +221,7 @@ export function CalendarioGasto({
             <span className="cal-leyenda-paso cal-leyenda-vacio" aria-hidden="true" />
             Sin gasto
           </span>
-          {rangos.map((r, i) => (
+          {rangos.map((_r, i) => (
             <span key={i} className="cal-leyenda-item">
               <span
                 className="cal-leyenda-paso"
@@ -205,9 +230,7 @@ export function CalendarioGasto({
                   background: `color-mix(in srgb, var(--chart-1) ${Math.round((OPACIDAD[i] ?? 1) * 100)}%, var(--surface))`,
                 }}
               />
-              {r.hasta === null
-                ? `${formatMoney(r.desde, moneda)} o más`
-                : `${formatMoney(r.desde, moneda)} – ${formatMoney(r.hasta, moneda)}`}
+              {etiquetas[i]}
             </span>
           ))}
           <span className="cal-leyenda-item">

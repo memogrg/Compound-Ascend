@@ -27,6 +27,17 @@ export type SerieDef = {
    * subida de gasto. Si no se declara, el delta va en neutro.
    */
   sentidoBueno?: "arriba" | "abajo";
+  /**
+   * La serie es un VALOR VIGENTE hasta que cambia, no una medición continua: presupuesto,
+   * meta mensual, límite. Se dibuja en escalón.
+   *
+   * Un presupuesto de 1,9 M en junio y 1,95 M en julio no pasó por 1,92 M a mediados de mes:
+   * saltó el día 1. La curva `monotone` dibuja esa rampa inexistente y, peor, hace que en la
+   * segunda quincena de junio el presupuesto pintado esté por encima del real cuando la
+   * regla todavía era 1,9 M. Las series REALES (gasto, ingreso, patrimonio) sí son continuas
+   * y conservan su curva.
+   */
+  escalon?: boolean;
 };
 
 /**
@@ -88,7 +99,19 @@ export const CROSSHAIR = {
 export const BARRA = {
   anchoMaximo: 24,
   radio: 4,
-  /** Entre las barras de un MISMO mes: 2 px, solo para que no se toquen. */
+  /**
+   * Entre las barras de un MISMO mes: 2 px, solo para que no se toquen.
+   *
+   * OJO: Recharts lo respeta solo mientras la barra NO toque `anchoMaximo`. Calcula el ancho
+   * a partir de la banda, coloca las barras con ese ancho, y DESPUÉS recorta cada una al
+   * máximo — el sobrante se queda como hueco. Medido en `/dev/ui`: a 640 y 900 px de
+   * viewport la barra sale de 17 px y el hueco es exactamente 2; a 1280 el ancho calculado
+   * pasa de 24, se recorta, y el hueco real sube a 9.
+   *
+   * No se «arregla» subiendo `separacionCategoria` hasta que el recorte no entre: a 390 px
+   * eso dejaría barras de 8 px. El tope de 24 es la regla deliberada; el hueco es lo que
+   * sobra. Por eso el rótulo del catálogo NO promete 2 px — ver `charts-core.spec.ts`.
+   */
   separacion: 2,
   /**
    * Entre grupos de meses. En porcentaje porque Recharts lo mide contra el ancho de la
@@ -146,6 +169,15 @@ export const ALTO_MINIMO = 160;
  * Delega en `formatMonthShort` de `format.ts` —determinista, sin `Intl`— y deja pasar lo que
  * no sea una fecha ISO: las etiquetas ya legibles («abr», «may») se escriben tal cual.
  */
+/**
+ * La curva con la que se dibuja una serie. `stepAfter` mantiene el valor hasta el punto
+ * siguiente, que es exactamente la semántica de «esto rige desde hoy»: el escalón cae en el
+ * punto nuevo, no a mitad de camino.
+ */
+export function curvaDe(s: Pick<SerieDef, "escalon">): "monotone" | "stepAfter" {
+  return s.escalon ? "stepAfter" : "monotone";
+}
+
 export function formatoEjeX(label: string | number | undefined): string {
   if (label === undefined || label === null) return "";
   const s = String(label);

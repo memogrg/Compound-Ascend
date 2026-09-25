@@ -32,7 +32,8 @@ import {
   SYNC_METHOD,
   TRAZO,
   describirGrafico,
-  dominioBarras,
+  curvaDe,
+  escalaBarras,
   formatoEjeX,
   niceDomain,
   opacidadDe,
@@ -113,7 +114,13 @@ const SERIES_FLUJO: SerieDef[] = [
     marca: "linea",
     sentidoBueno: "abajo",
   },
-  { clave: "presupuesto", etiqueta: "Presupuesto", color: "var(--chart-3)", marca: "linea" },
+  {
+    clave: "presupuesto",
+    etiqueta: "Presupuesto",
+    color: "var(--chart-3)",
+    marca: "linea",
+    escalon: true,
+  },
   {
     clave: "proyeccion",
     etiqueta: "Proyección",
@@ -388,7 +395,7 @@ function AreaDemo() {
             {visibles.map((s) => (
               <Area
                 key={s.clave}
-                type="monotone"
+                type={curvaDe(s)}
                 dataKey={s.clave}
                 stroke={s.color}
                 strokeWidth={TRAZO.ancho}
@@ -476,7 +483,7 @@ function LineaDemo() {
             {visibles.map((s) => (
               <Line
                 key={s.clave}
-                type="monotone"
+                type={curvaDe(s)}
                 dataKey={s.clave}
                 stroke={s.color}
                 strokeWidth={TRAZO.ancho}
@@ -506,12 +513,12 @@ function LineaDemo() {
 function BarrasDemo() {
   const it = useInteraccion();
   const visibles = seriesVisibles(SERIES_MESES, it.estado);
-  const dominio = useMemo(() => dominioBarras(MESES.flatMap((d) => [d.ingresos, d.gastos])), []);
+  const escala = useMemo(() => escalaBarras(MESES.flatMap((d) => [d.ingresos, d.gastos])), []);
 
   return (
     <ChartFrame
       titulo="Ingresos y gastos por mes"
-      subtitulo="Desde cero · barras ≤ 24 px · 2 px dentro del mes y aire entre meses"
+      subtitulo="Desde cero · barras ≤ 24 px · el par del mes junto, y aire entre meses"
       descripcion={describirGrafico({
         titulo: "Ingresos por mes",
         serie: MESES.map((d) => ({ x: formatoEjeX(d.x), y: d.ingresos })),
@@ -552,7 +559,8 @@ function BarrasDemo() {
             <YAxis
               {...EJE_PROPS}
               width={56}
-              domain={dominio}
+              domain={escala.dominio}
+              ticks={escala.ticks}
               tickFormatter={(v: number) => formatAxisCompact(v, MONEDA)}
             />
             <Tooltip
@@ -638,7 +646,7 @@ function SobresDemo() {
             {visibles.map((s) => (
               <Line
                 key={s.clave}
-                type="monotone"
+                type={curvaDe(s)}
                 dataKey={s.clave}
                 stroke={s.color}
                 strokeWidth={TRAZO.ancho}

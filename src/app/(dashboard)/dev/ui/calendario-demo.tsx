@@ -1,10 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  ComposedChart,
+  CartesianGrid,
+  Line,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import {
   CalendarioGasto,
+  INSTRUCCIONES_TECLADO,
   ChartFrame,
   describirGrafico,
   formatoEjeX,
@@ -12,7 +21,8 @@ import {
   diaDeLaSemana,
   mesesHaciaAtras,
   nivelDe,
-  niceDomain,
+  escalaNice,
+  incluyeCero,
   recortar,
   tablaDeDatos,
   presetsUtiles,
@@ -20,7 +30,7 @@ import {
   type RangoPreset,
 } from "@/components/charts/core";
 import { REJILLA, EJE, TRAZO, type SerieDef } from "@/components/charts/core/theme";
-import { formatAxisCompact, formatMonthShort, formatMoney } from "@/lib/format";
+import { formatAxisCompact, formatMoney } from "@/lib/format";
 import { currentPeriodInTz, todayISOInTz } from "@/lib/time/user-time-core";
 
 /**
@@ -31,6 +41,11 @@ const MONEDA = "CRC";
 
 /** El mes en curso, una sola vez: lo usan la rejilla y la serie de 36 meses. */
 const AHORA = currentPeriodInTz("America/Costa_Rica");
+/** «septiembre 2026»: mes completo y año. «sep 26» obliga a descifrar una abreviatura para
+ *  saber de qué mes habla la rejilla, que es lo primero que hay que saber. */
+const MES_LARGO = new Intl.DateTimeFormat("es-CR", { month: "long", year: "numeric" }).format(
+  new Date(AHORA.year, AHORA.month - 1, 1),
+);
 const PERIODO_ACTUAL = `${AHORA.year}-${String(AHORA.month).padStart(2, "0")}`;
 
 /**
@@ -88,13 +103,27 @@ export function CalendarioDemo() {
   const datos = useMemo(() => recortar(PATRIMONIO, rango), [rango]);
   // El dominio se recalcula sobre lo VISIBLE, no sobre los 36 meses: con el eje fijo al
   // total, «6M» pintaba una línea casi plana pegada al techo y el zoom no mostraba nada.
-  const dominio = useMemo(() => niceDomain(datos.map((d) => d.neto)) as [number, number], [datos]);
+  const escala = useMemo(
+    () =>
+      escalaNice(
+        datos.map((d) => d.neto),
+        { moneda: MONEDA },
+      ),
+    [datos],
+  );
+  // **Área honesta.** El relleno de un área codifica «cuánto hay» con su superficie, y eso
+  // solo es cierto si la base es el CERO. Con el eje recortado a 36-42 M, el relleno mide la
+  // distancia al borde inferior del gráfico —un número que no existe— y un mes que sube un
+  // 4 % parece duplicarse. Sin el 0 dentro, la serie se dibuja como LÍNEA: ahí lo que se lee
+  // es la pendiente, que sí es honesta con el eje cortado.
+  const conBaseCero = incluyeCero(escala.dominio);
 
   return (
     <div style={{ display: "grid", gap: 26 }}>
       <ChartFrame
-        titulo="Gasto diario"
-        subtitulo={`${formatMonthShort(`${HOY}-01`)} · flechas para moverse, Enter fija el día`}
+        titulo={`Gasto diario · ${MES_LARGO}`}
+        subtitulo="Cada celda es un día; el color, cuánto se gastó"
+        ayuda={INSTRUCCIONES_TECLADO}
         descripcion={describirGrafico({
           titulo: "Gasto diario de septiembre",
           serie: DIAS.map((d) => ({ x: d.fecha, y: d.monto })),
@@ -146,7 +175,7 @@ export function CalendarioDemo() {
         )}
       >
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={datos} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <ComposedChart data={datos} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid
               stroke={REJILLA.color}
               strokeDasharray={REJILLA.discontinua ? "3 3" : undefined}
@@ -164,7 +193,8 @@ export function CalendarioDemo() {
                 dos capturas del mismo gráfico no son comparables. Compacto porque un
                 ₡20.560.000 completo se come un tercio del ancho. */}
             <YAxis
-              domain={dominio}
+              domain={escala.dominio}
+              ticks={escala.ticks}
               tickFormatter={(v: number) => formatAxisCompact(v, MONEDA)}
               stroke={EJE.color}
               tick={{ fontSize: EJE.tamanoFuente }}
@@ -172,16 +202,48 @@ export function CalendarioDemo() {
               axisLine={false}
               width={52}
             />
-            <Area
-              type="monotone"
-              dataKey="neto"
-              stroke="var(--chart-1)"
-              strokeWidth={TRAZO.ancho}
-              fill="var(--chart-1)"
-              fillOpacity={0.14}
-              isAnimationActive={false}
-            />
-          </AreaChart>
+            {conBaseCero ? (
+              <Area
+                type="monotone"
+                dataKey="neto"
+                stroke="var(--chart-1)"
+                strokeWidth={TRAZO.ancho}
+                fill="var(--chart-1)"
+                fillOpacity={0.14}
+                isAnimationActive={false}
+              />
+            ) : (
+              <Line
+                type="monotone"
+                dataKey="neto"
+                stroke="var(--chart-1)"
+                strokeWidth={TRAZO.ancho}
+                // Sin relleno, el extremo derecho de la línea se pierde contra el borde: el
+                // punto final dice DÓNDE termina la serie. Solo ese, no los 36.
+                dot={(props: {
+                  cx?: number;
+                  cy?: number;
+                  index?: number;
+                  key?: React.Key | null;
+                }) =>
+                  props.index === datos.length - 1 &&
+                  typeof props.cx === "number" &&
+                  typeof props.cy === "number" ? (
+                    <circle
+                      key={props.key ?? "fin"}
+                      cx={props.cx}
+                      cy={props.cy}
+                      r={3.5}
+                      fill="var(--chart-1)"
+                    />
+                  ) : (
+                    <g key={props.key ?? `v-${props.index}`} />
+                  )
+                }
+                isAnimationActive={false}
+              />
+            )}
+          </ComposedChart>
         </ResponsiveContainer>
       </ChartFrame>
     </div>

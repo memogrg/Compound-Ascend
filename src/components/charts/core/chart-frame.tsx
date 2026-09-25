@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+
+import { HelpTip } from "@/components/shared/help-tip";
 
 import { ChartEmpty } from "../chart-empty";
 import type { TablaDatos } from "./accesible";
@@ -38,6 +40,7 @@ export function ChartFrame({
   estado = "datos",
   mensajeVacio = "No hay suficiente historial para mostrar la gráfica.",
   mensajeError = "No se pudo cargar la gráfica.",
+  ayuda,
   tabla,
   leyenda,
   rangos,
@@ -64,6 +67,12 @@ export function ChartFrame({
   estado?: EstadoGrafico;
   mensajeVacio?: string;
   mensajeError?: string;
+  /**
+   * Ayuda del gráfico, en un «?» junto al título. Va acá y no en el subtítulo porque el
+   * subtítulo lo lee todo el mundo: unas instrucciones de teclado ahí son ruido para quien
+   * usa el ratón, y quien SÍ teclea las encuentra igual por `aria-describedby`.
+   */
+  ayuda?: ReactNode;
   tabla: TablaDatos;
   leyenda?: React.ReactNode;
   /**
@@ -128,7 +137,10 @@ export function ChartFrame({
     <figure className="cf" ref={figuraRef}>
       <figcaption className="cf-cab">
         <div className="cf-titulos">
-          <h3 className="cf-titulo">{titulo}</h3>
+          <h3 className="cf-titulo">
+            {titulo}
+            {ayuda ? <HelpTip text={ayuda} label="Cómo se usa este gráfico" /> : null}
+          </h3>
           {subtitulo ? <p className="cf-sub">{subtitulo}</p> : null}
         </div>
         {estado === "datos" ? (

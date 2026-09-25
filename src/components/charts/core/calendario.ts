@@ -129,3 +129,45 @@ export function rangosDeNivel(
   const bordes = [min, ...cortes];
   return bordes.map((desde, i) => ({ desde, hasta: i < cortes.length ? cortes[i]! : null }));
 }
+
+/**
+ * Los rangos de la leyenda EN TEXTO, sin que el techo de un paso se repita como suelo del
+ * siguiente.
+ *
+ * `nivelDe` cierra cada nivel por arriba: el nivel i son los valores `> corte[i-1]` y
+ * `<= corte[i]`. La leyenda, en cambio, imprimía `desde`/`hasta` crudos, así que el mismo
+ * importe salía dos veces —«₡9.920 – ₡12.860» seguido de «₡12.860 – ₡16.220»— y quien mira
+ * no sabe en cuál de los dos pasos cae un gasto de ₡12.860. Es exactamente el dato que la
+ * leyenda existe para responder.
+ *
+ * Se resuelve en la UNIDAD MÍNIMA de la moneda (el colón no tiene céntimos): el techo de un
+ * paso es `floor(corte)` y el suelo del siguiente, `floor(corte) + 1`.
+ *
+ * `formato` se inyecta para que esto siga siendo puro y testeable sin arrastrar `formatMoney`
+ * ni una moneda.
+ */
+export function etiquetasDeRango(
+  rangos: readonly { desde: number; hasta: number | null }[],
+  formato: (n: number) => string,
+): string[] {
+  if (rangos.length === 0) return [];
+  return rangos.map((r, i) => {
+    const anterior = i > 0 ? rangos[i - 1]!.hasta : null;
+    const suelo = anterior === null ? Math.floor(r.desde) : Math.floor(anterior) + 1;
+    const techo = r.hasta === null ? null : Math.floor(r.hasta);
+
+    // El último paso está abierto por arriba.
+    if (techo === null) return `${formato(suelo)} o más`;
+    // El primero se lee como un tope, no como un intervalo: su suelo es el gasto más pequeño
+    // del mes, un número arbitrario que no aporta nada. Y va con «hasta», no con «menos de»:
+    // el nivel INCLUYE su techo (`nivelDe` cierra por arriba), así que «menos de ₡12.860»
+    // dejaría fuera justo el importe que sí cae en este paso — y además obligaría a imprimir
+    // ₡12.861, el mismo número que abre el paso siguiente.
+    if (i === 0) return `hasta ${formato(techo)}`;
+    // Cuantiles muy juntos pueden dejar el suelo por encima del techo: ahí el paso cubre un
+    // solo importe y un intervalo invertido sería una mentira.
+    if (suelo > techo) return formato(techo);
+    if (suelo === techo) return formato(techo);
+    return `${formato(suelo)} a ${formato(techo)}`;
+  });
+}

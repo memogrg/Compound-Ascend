@@ -46,6 +46,7 @@ export {
   AREA,
   CROSSHAIR_FIJO,
   SYNC_METHOD,
+  curvaDe,
   formatoEjeX,
   BARRA,
   CROSSHAIR,
@@ -57,9 +58,10 @@ export {
   type MarcaSerie,
   type SerieDef,
 } from "./theme";
-export { dominioBarras, niceDomain } from "./escala";
+export { dominioBarras, escalaBarras, niceDomain } from "./escala";
+export { escalaNice, incluyeCero, type Escala, type OpcionesEscala } from "./escala-nice";
 
-export { CalendarioGasto, type DiaGasto } from "./calendario-gasto";
+export { CalendarioGasto, INSTRUCCIONES_TECLADO, type DiaGasto } from "./calendario-gasto";
 export {
   cuantiles,
   diaDeLaSemana,
@@ -67,6 +69,7 @@ export {
   gridDelMes,
   nivelDe,
   rangosDeNivel,
+  etiquetasDeRango,
   type CeldaCalendario,
 } from "./calendario";
 export { recortar, presetsUtiles, mesesHaciaAtras, NOMBRE_RANGO, type RangoPreset } from "./rangos";
