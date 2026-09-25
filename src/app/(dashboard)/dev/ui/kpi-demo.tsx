@@ -87,7 +87,11 @@ export function KpiDemo() {
         </button>
       </div>
 
+      {/* Ancla estable: la galería tiene más de una `KpiCard` suelta (la de `lectura-demo`),
+          así que un `.kpi-card` a secas recoge tarjetas de otra sección. Los tests miden
+          ESTA fila. */}
       <div
+        id="kpi-tarjetas"
         style={{
           display: "grid",
           gap: 12,

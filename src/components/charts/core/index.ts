@@ -59,6 +59,7 @@ export {
   type SerieDef,
 } from "./theme";
 export { dominioBarras, escalaBarras, niceDomain } from "./escala";
+export { useAncho, anchoDeBarra } from "./use-ancho";
 export { escalaNice, incluyeCero, type Escala, type OpcionesEscala } from "./escala-nice";
 
 export { CalendarioGasto, INSTRUCCIONES_TECLADO, type DiaGasto } from "./calendario-gasto";

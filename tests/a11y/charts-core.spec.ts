@@ -172,18 +172,11 @@ for (const tema of ["light", "dark"] as const) {
   });
 }
 
-test("las barras: tope de 24 px, y el par del mes MUY junto frente al aire entre meses", async ({
-  browser,
-}) => {
+test("las barras: tope de 24 px y exactamente 2 px dentro del mes", async ({ browser }) => {
   /**
-   * Lo que el rótulo prometía —«2 px dentro del mes»— solo es cierto mientras la barra no
-   * toque su ancho máximo. Recharts calcula el ancho desde la banda, coloca las barras con
-   * ESE ancho y después recorta cada una a `maxBarSize`: el sobrante se queda como hueco.
-   * Medido: a 900 px de viewport la barra sale de 17 px y el hueco es exactamente 2; a 1280
-   * el ancho calculado pasa de 24, se recorta, y el hueco sube a 9.
-   *
-   * Así que se fija lo que SÍ se cumple siempre: el tope de 24 px, y que el par de un mes se
-   * lea como un par —su hueco tiene que ser mucho menor que el que separa los meses—.
+   * Los 2 px del rótulo ahora se cumplen a cualquier ancho, porque el ancho de barra se
+   * CALCULA (`anchoDeBarra`) en vez de recortarse con `maxBarSize` — que encogía la barra
+   * después de colocarla y dejaba el sobrante como hueco (9 px a 1280).
    */
   const { ctx, page } = await abrir(browser);
   const barras = page.locator(".recharts-bar-rectangle path");
@@ -209,10 +202,59 @@ test("las barras: tope de 24 px, y el par del mes MUY junto frente al aire entre
 
   // El tope es la regla deliberada: una barra de 40 px no dice más que una de 24.
   expect(m.anchoMaximo, `barra de ${m.anchoMaximo.toFixed(1)} px`).toBeLessThanOrEqual(24.5);
-  // Y el agrupamiento tiene que LEERSE: el par junto, los meses separados.
+  // Y los 2 px son EXACTOS, no «pequeños»: es lo que el rótulo promete.
+  expect(m.dentroDelMes, `hueco del par: ${m.dentroDelMes.toFixed(2)} px`).toBeCloseTo(2, 0);
+  // El agrupamiento además tiene que LEERSE: el par junto, los meses separados.
   expect(
     m.entreMeses / m.dentroDelMes,
     `dentro=${m.dentroDelMes.toFixed(1)}px entre=${m.entreMeses.toFixed(1)}px`,
   ).toBeGreaterThan(4);
   await ctx.close();
 });
+
+for (const ancho of [390, 1280]) {
+  test(`ningún rótulo del eje X se sale del rectángulo del gráfico (${ancho})`, async ({
+    browser,
+  }) => {
+    /**
+     * El primero y el último son los que se recortan: van centrados bajo su tick, y el
+     * primero cae sobre el borde izquierdo. Medido hoy no se sale ninguno a 390, 900 ni
+     * 1280 — este caso existe para que siga siendo cierto cuando alguien cambie un margen,
+     * el ancho del eje Y o el formato de la fecha.
+     */
+    const ctx = await browser.newContext({
+      storageState: ESTADO_SESION,
+      viewport: { width: ancho, height: 1100 },
+      colorScheme: "light",
+      reducedMotion: "reduce",
+    });
+    const page = await ctx.newPage();
+    await page.goto("/dev/ui", { waitUntil: "networkidle", timeout: 60_000 });
+    await page.waitForTimeout(1200);
+
+    const superficies = page.locator(".recharts-surface");
+    expect(await superficies.count(), "no se montó ninguna superficie").toBeGreaterThan(0);
+
+    const fuera = await page.evaluate(() => {
+      const malos: string[] = [];
+      document.querySelectorAll<SVGSVGElement>(".recharts-surface").forEach((svg, i) => {
+        const caja = svg.getBoundingClientRect();
+        svg
+          .querySelectorAll<SVGTextElement>(".recharts-xAxis .recharts-cartesian-axis-tick-value")
+          .forEach((t) => {
+            const b = t.getBoundingClientRect();
+            if (b.width === 0) return;
+            // Medio píxel de tolerancia: el redondeo del layout mueve el borde sin recortar.
+            if (b.left < caja.left - 0.5 || b.right > caja.right + 0.5)
+              malos.push(
+                `gráfico ${i} · «${t.textContent}» [${b.left.toFixed(1)}, ${b.right.toFixed(1)}] fuera de [${caja.left.toFixed(1)}, ${caja.right.toFixed(1)}]`,
+              );
+          });
+      });
+      return malos;
+    });
+
+    expect(fuera.join("\n")).toBe("");
+    await ctx.close();
+  });
+}

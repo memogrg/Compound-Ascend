@@ -12,12 +12,18 @@ import { ESTADO_SESION } from "./sesion";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
-async function abrir(browser: Browser, tema: "light" | "dark" = "light") {
+async function abrir(
+  browser: Browser,
+  tema: "light" | "dark" = "light",
+  // Por defecto se pide MENOS movimiento: es lo que hace las capturas reproducibles. Solo
+  // el caso que mide la transición abre un contexto que sí lo permite.
+  movimiento = false,
+) {
   const ctx = await browser.newContext({
     storageState: ESTADO_SESION,
     viewport: { width: 1280, height: 1000 },
     colorScheme: tema,
-    reducedMotion: "reduce",
+    reducedMotion: movimiento ? "no-preference" : "reduce",
   });
   await ctx.addInitScript(
     ([k, v]) => {
@@ -287,6 +293,56 @@ test("ningún importe de la leyenda aparece en dos pasos", async ({ browser }) =
   const cifras = textos.flatMap((t) => t.match(/[\d.]+/g) ?? []).filter((c) => c.length > 2);
   expect(cifras.length, "la leyenda no imprime cifras").toBeGreaterThan(0);
   expect(new Set(cifras).size, `repetido en: ${textos.join(" · ")}`).toBe(cifras.length);
+  await ctx.close();
+});
+
+test("el área se mantiene en «Todo» y se apaga en «6M», con transición", async ({ browser }) => {
+  // La heurística de cero: con los 36 meses el mínimo es el 44 % del máximo y el 0 cabe sin
+  // aplastar la serie, así que el área es honesta. Con «6M» el mínimo es el 91 % y desde 0
+  // la serie viviría en una franja del 9 %: ahí la línea dice más.
+  const { ctx, page } = await abrir(browser);
+  const marco = marcoCon(page, "[aria-label='Rango del gráfico']");
+  await expect(marco).toHaveCount(1);
+  await marco.scrollIntoViewIfNeeded();
+
+  const relleno = marco.locator(".recharts-area-area");
+  await expect(relleno).toHaveCount(1);
+
+  const opacidad = async () =>
+    Number(await relleno.evaluate((el) => getComputedStyle(el).fillOpacity));
+
+  await marco.getByRole("radio").filter({ hasText: "Todo" }).click();
+  await page.waitForTimeout(600);
+  const conTodo = await opacidad();
+  expect(conTodo, "«Todo» debería llevar relleno").toBeGreaterThan(0.05);
+
+  await marco.getByRole("radio").filter({ hasText: "6M" }).click();
+  await page.waitForTimeout(600);
+  expect(await opacidad(), "«6M» debería quedar sin relleno").toBeLessThan(0.02);
+
+  // Este contexto pide MENOS movimiento, así que la transición tiene que estar apagada.
+  // Que el relleno cambie igual es lo que importa: la animación adorna, no informa.
+  expect(
+    await relleno.evaluate((el) => getComputedStyle(el).transitionProperty),
+    "con prefers-reduced-motion la transición debe estar apagada",
+  ).toBe("none");
+  await ctx.close();
+});
+
+test("y con movimiento permitido, el relleno se desvanece en 200 ms", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser, "light", true);
+  const marco = marcoCon(page, "[aria-label='Rango del gráfico']");
+  await expect(marco).toHaveCount(1);
+  await marco.scrollIntoViewIfNeeded();
+  const relleno = marco.locator(".recharts-area-area");
+  await expect(relleno).toHaveCount(1);
+
+  const estilo = await relleno.evaluate((el) => {
+    const c = getComputedStyle(el);
+    return { propiedad: c.transitionProperty, duracion: c.transitionDuration };
+  });
+  expect(estilo.propiedad).toContain("fill-opacity");
+  expect(estilo.duracion).toBe("0.2s");
   await ctx.close();
 });
 

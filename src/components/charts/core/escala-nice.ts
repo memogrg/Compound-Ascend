@@ -27,6 +27,17 @@ const MANTISAS = [1, 2, 2.5, 5] as const;
 export type OpcionesEscala = {
   /** Fuerza el 0 dentro del dominio (montos acumulados, barras). */
   desdeCero?: boolean;
+  /**
+   * Incluye el 0 **si cabe sin aplastar la serie**: solo cuando el mínimo no pasa del 50 %
+   * del máximo.
+   *
+   * Es la decisión de «¿área o línea?». El relleno de un área solo dice la verdad con la
+   * base en 0, pero forzar el 0 siempre tiene su propio precio: con el patrimonio de los
+   * últimos 6 meses (37 a 40,5 M) la serie entera viviría en el 9 % superior del gráfico y
+   * no se vería ningún movimiento. El umbral del 50 % es el punto donde la serie todavía
+   * ocupa más de la mitad del alto: ahí el área informa. Por encima, la línea informa más.
+   */
+  desdeCeroSiCabe?: boolean;
   /** Rango de divisiones aceptable. Por defecto 4-6. */
   minTicks?: number;
   maxTicks?: number;
@@ -106,6 +117,8 @@ export function escalaNice(valores: readonly number[], opts: OpcionesEscala = {}
   if (opts.desdeCero) {
     min = Math.min(0, min);
     max = Math.max(0, max);
+  } else if (opts.desdeCeroSiCabe && min > 0 && max > 0 && min <= max * 0.5) {
+    min = 0;
   }
   if (min === max) {
     // Serie plana: se abre un rango alrededor del valor en vez de un eje de altura cero.

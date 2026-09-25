@@ -163,10 +163,12 @@ test("a 390 la etiqueta «vs …» cae a la misma altura en las cuatro tarjetas"
   // Si la etiqueta baja de línea solo en las tarjetas cuyo importe es largo, la fila queda
   // con cuatro chips a alturas distintas. Por debajo de 420 px baja siempre.
   const { ctx, page } = await abrir(browser, true, 390);
-  const tarjetas = page.locator(".kpi-card");
-  await tarjetas.first().scrollIntoViewIfNeeded();
+  // Acotado a la fila del demo de KPI: `.kpi-card` a secas recogía también la tarjeta
+  // suelta de `lectura-demo`, y el `toBe(4)` fallaba con 5 sin que nada estuviera mal.
+  const tarjetas = page.locator("#kpi-tarjetas .kpi-card");
   const n = await tarjetas.count();
-  expect(n).toBe(4);
+  expect(n, "no se encontró la fila de tarjetas KPI").toBeGreaterThan(1);
+  await tarjetas.first().scrollIntoViewIfNeeded();
 
   const relativas: number[] = [];
   for (let i = 0; i < n; i++) {

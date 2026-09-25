@@ -33,7 +33,9 @@ import {
   TRAZO,
   describirGrafico,
   curvaDe,
+  anchoDeBarra,
   escalaBarras,
+  useAncho,
   formatoEjeX,
   niceDomain,
   opacidadDe,
@@ -58,6 +60,9 @@ import { formatAxisCompact, formatMoney } from "@/lib/format";
  * permite que `syncMethod="value"` empareje dos gráficos por el MES y no por la posición.
  */
 const MONEDA = "CRC";
+
+/** Lo que ocupa el eje Y (`<YAxis width={56}>`): no es área de dibujo para las barras. */
+const ANCHO_EJE_Y = 56;
 const GRUPO = "dev-ui-periodo";
 
 const PATRIMONIO = [
@@ -514,11 +519,16 @@ function BarrasDemo() {
   const it = useInteraccion();
   const visibles = seriesVisibles(SERIES_MESES, it.estado);
   const escala = useMemo(() => escalaBarras(MESES.flatMap((d) => [d.ingresos, d.gastos])), []);
+  // El ancho de barra se CALCULA, no se recorta. `maxBarSize` encoge cada barra DESPUÉS de
+  // colocarla y el sobrante se queda como hueco: a 1280 los 2 px prometidos se volvían 9.
+  // Midiendo el contenedor se pide el `barSize` exacto que deja 2 px, con el mismo tope.
+  const [refAncho, anchoCaja] = useAncho<HTMLDivElement>();
+  const anchoBarra = anchoDeBarra(Math.max(0, anchoCaja - ANCHO_EJE_Y), MESES.length, 2);
 
   return (
     <ChartFrame
       titulo="Ingresos y gastos por mes"
-      subtitulo="Desde cero · barras ≤ 24 px · el par del mes junto, y aire entre meses"
+      subtitulo="Desde cero · barras ≤ 24 px · 2 px dentro del mes y aire entre meses"
       descripcion={describirGrafico({
         titulo: "Ingresos por mes",
         serie: MESES.map((d) => ({ x: formatoEjeX(d.x), y: d.ingresos })),
@@ -544,13 +554,16 @@ function BarrasDemo() {
         />
       }
     >
-      <div {...it.propsContenedor} style={{ height: "100%" }}>
+      <div {...it.propsContenedor} ref={refAncho} style={{ height: "100%" }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={MESES}
             margin={it.margen}
             barGap={BARRA.separacion}
             barCategoryGap={BARRA.separacionCategoria}
+            // 0 = todavía no se midió el contenedor; ahí decide Recharts en vez de pintar
+            // barras de cero en el primer render.
+            {...(anchoBarra > 0 ? { barSize: anchoBarra } : {})}
             accessibilityLayer
             {...it.propsChart}
           >
@@ -575,7 +588,6 @@ function BarrasDemo() {
                 key={s.clave}
                 dataKey={s.clave}
                 fill={s.color}
-                maxBarSize={BARRA.anchoMaximo}
                 radius={[BARRA.radio, BARRA.radio, 0, 0]}
                 opacity={opacidadDe(it.estado, s.clave)}
                 isAnimationActive={ANIMACION_ACTIVA}
