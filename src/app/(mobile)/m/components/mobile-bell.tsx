@@ -142,6 +142,9 @@ export function MobileBell() {
         <Icon name="bell" />
         {count > 0 ? (
           <span
+            // Misma clase que el badge de la web: es el ancla con la que la captura de QA lo
+            // oculta. Ver `OCULTAR_EN_CAPTURA` en `scripts/qa/snap.mjs`.
+            className="bell-badge"
             style={{
               position: "absolute",
               top: 0,
