@@ -142,21 +142,96 @@ test("cada fila dice nombre, porcentaje y monto, con el monto a la derecha", asy
   await ctx.close();
 });
 
-test("el sobrante del panel se dice, no desaparece", async ({ browser }) => {
-  // `/dashboard` muestra cinco categorías. Antes cortaba en cinco EN SILENCIO; ahora la fila
-  // «Otras N» lleva su monto y su porcentaje, y por eso la columna sigue sumando 100.
+test("los bloques de la taxonomía se muestran TODOS, sin plegar", async ({ browser }) => {
+  // El panel cortaba en cinco y agrupaba el resto en «Otras N». Los bloques de gasto son
+  // nueve y cada uno significa algo: plegarlos tapa justo lo que la tarjeta viene a
+  // responder, y que un bloque desaparezca porque este mes gastó poco hace imposible
+  // comparar dos meses.
   const { ctx, page } = await abrir(browser, "/dashboard", 1280);
-  const resto = page.locator(".dl-fila-resto");
-  const n = await resto.count();
-  // Si la cuenta de demo tuviera cinco categorías o menos no habría sobrante, y el caso no
-  // tendría nada que decir — pero entonces tampoco habría corte, y eso sí se afirma.
-  const filas = await page.locator(".dl").first().locator(".dl-fila").count();
-  if (n === 0) {
-    expect(filas, "sin fila de sobrante, tiene que estar todo").toBeLessThanOrEqual(5);
-  } else {
-    expect(n).toBe(1);
-    expect(await resto.first().locator(".dl-nombre").innerText()).toMatch(/^Otras \d+$/);
-    expect(aNumero(await resto.first().locator(".dl-monto").innerText())).toBeGreaterThan(0);
+  const dona = page.locator(".dl").first();
+  await expect(dona.locator(".dl-fila-resto"), "el panel no debe agrupar nada").toHaveCount(0);
+  await expect(dona.locator(".dl-vertodas"), "ni ofrecer desplegable").toHaveCount(0);
+
+  // Y el orden es el canónico de EXPENSE_NATURES, no el del monto.
+  const CANONICO = [
+    "Esencial",
+    "Estilo de vida",
+    "Financiero (deudas)",
+    "Protección",
+    "Crecimiento",
+    "Ahorro planificado",
+    "Inversión",
+    "Donación",
+    "Misceláneo",
+  ];
+  const vistos = (await dona.locator(".dl-nombre").allTextContents()).map((t) => t.trim());
+  expect(vistos.length, "sin bloques no hay nada que ordenar").toBeGreaterThan(2);
+  const esperado = CANONICO.filter((n) => vistos.includes(n));
+  expect(vistos, `bloques: ${vistos.join(" · ")}`).toEqual(esperado);
+  await ctx.close();
+});
+
+test("la lista de categorías se ordena por monto y agrupa el resto", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser, "/gastos?range=3m", 1280);
+  const titulo = page.getByText("Composición por categoría").first();
+  const tarjeta = titulo.locator("xpath=ancestor::*[contains(@class,'card')][1]");
+  const dona = tarjeta.locator(".dl");
+
+  const filas = dona.locator(".dl-fila");
+  expect(await filas.count(), "seis mayores más la del resto").toBe(7);
+  const resto = dona.locator(".dl-fila-resto");
+  await expect(resto).toHaveCount(1);
+  expect(await resto.locator(".dl-nombre").innerText()).toMatch(/^Otras \d+$/);
+
+  // De mayor a menor, las seis primeras.
+  const montos = (
+    await dona.locator(".dl-fila:not(.dl-fila-resto) .dl-monto").allTextContents()
+  ).map(aNumero);
+  expect(montos).toHaveLength(6);
+  for (let i = 1; i < montos.length; i++) {
+    expect(montos[i]!, `${montos.join(" ≥ ")}`).toBeLessThanOrEqual(montos[i - 1]!);
   }
   await ctx.close();
+});
+
+test("«Ver todas» despliega la leyenda y NO toca el anillo", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser, "/gastos?range=3m", 1280);
+  const titulo = page.getByText("Composición por categoría").first();
+  const tarjeta = titulo.locator("xpath=ancestor::*[contains(@class,'card')][1]");
+  const dona = tarjeta.locator(".dl");
+
+  const porciones = dona.locator(".recharts-pie-sector path, .recharts-sector");
+  const antesPorciones = await porciones.count();
+  const antesFilas = await dona.locator(".dl-fila").count();
+
+  const boton = dona.locator(".dl-vertodas");
+  await expect(boton).toHaveCount(1);
+  expect(await boton.getAttribute("aria-expanded")).toBe("false");
+  await boton.click();
+  await page.waitForTimeout(300);
+
+  expect(await boton.getAttribute("aria-expanded")).toBe("true");
+  expect(await dona.locator(".dl-fila").count(), "la leyenda tiene que crecer").toBeGreaterThan(
+    antesFilas,
+  );
+  expect(await dona.locator(".dl-fila-oculta").count()).toBeGreaterThan(0);
+  // El anillo NO cambia: veinte porciones no se leen por muchas veces que se dibujen.
+  expect(await porciones.count(), "el anillo no debe cambiar").toBe(antesPorciones);
+  await ctx.close();
+});
+
+test("ninguna porción visible del anillo repite color", async ({ browser }) => {
+  for (const ruta of ["/gastos?range=3m", "/dashboard"]) {
+    const { ctx, page } = await abrir(browser, ruta, 1280);
+    const donas = page.locator(".dl");
+    for (let i = 0; i < (await donas.count()); i++) {
+      const fills = await donas
+        .nth(i)
+        .locator(".recharts-pie-sector path, .recharts-sector")
+        .evaluateAll((ns) => ns.map((n) => (n as SVGElement).getAttribute("fill") ?? ""));
+      if (fills.length === 0) continue;
+      expect(new Set(fills).size, `${ruta} · dona ${i}: ${fills.join(", ")}`).toBe(fills.length);
+    }
+    await ctx.close();
+  }
 });
