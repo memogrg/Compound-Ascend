@@ -137,6 +137,46 @@ export async function getExpenseJars(args: {
  * que los holdings emitan su línea derivada esto devolverá 0 solo y nada se contará dos
  * veces.
  */
+/**
+ * El mismo fallback, para VARIOS periodos de una vez.
+ *
+ * El histórico de `/gastos` lo necesita mes a mes, y llamar N veces a
+ * `getEntityFallbackBudget` repetiría el catálogo de entidades y las tasas en cada una —el
+ * grueso del coste— cuando ninguna de las dos depende del mes. Acá se leen una sola vez y
+ * solo lo que SÍ depende del periodo se pide por mes, en paralelo.
+ *
+ * LÍMITE CONOCIDO: `listLinkableEntitiesDetailed()` trae el aporte ACTUAL de cada holding o
+ * renta, no el que tenía en julio. Aplicarlo a meses pasados atribuye el nivel de aporte de
+ * hoy a meses donde pudo ser otro —o ninguno—. Es una aproximación deliberada: la
+ * alternativa que había (sumarlo una sola vez, al último mes) dejaba los meses anteriores
+ * cojos y hacía que el titular no cuadrara con su propio gráfico. Se cierra de verdad el día
+ * que los holdings emitan su línea derivada con historia.
+ */
+export async function getEntityFallbackBudgetPorPeriodo(
+  periods: readonly Period[],
+  currency: string,
+): Promise<number[]> {
+  if (periods.length === 0) return [];
+  const [detailed, rates] = await Promise.all([listLinkableEntitiesDetailed(), getFxRates()]);
+  const entidades = [...detailed.holding, ...detailed.rental];
+
+  return Promise.all(
+    periods.map(async (period) => {
+      const [bySource, advancedIds] = await Promise.all([
+        getLinkedBudgetBySource(period, "holding"),
+        getAdvancedHoldingIds(period),
+      ]);
+      let total = 0;
+      for (const e of entidades) {
+        if (bySource[e.id] != null) continue; // ya cuenta vía budget_items
+        if (advancedIds.has(e.id)) continue; // mes adelantado: no se cobra este mes
+        total += convertCurrency(e.amount, e.currency, currency, rates);
+      }
+      return total;
+    }),
+  );
+}
+
 export async function getEntityFallbackBudget(period: Period, currency: string): Promise<number> {
   const [detailed, rates, bySource, advancedIds] = await Promise.all([
     listLinkableEntitiesDetailed(),

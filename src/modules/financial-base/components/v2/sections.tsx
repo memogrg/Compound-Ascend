@@ -12,6 +12,11 @@ import {
 } from "@/components/shared/financial-insight-card";
 import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
 import { PremiumLineChart, PerformanceChart } from "@/components/charts/lazy";
+import { HistoricoGasto, type PeriodoEnCurso } from "@/components/charts/core";
+import {
+  rotuloDelRango,
+  type MesPresupuestado,
+} from "@/modules/financial-base/engine/presupuesto-por-mes";
 import { LiquidityCard } from "@/modules/financial-base/components/v2/liquidity-card";
 import { TransactionsBrowser } from "@/modules/financial-base/components/v2/transactions-browser";
 import { IncomeSources } from "@/modules/financial-base/components/v2/income-sources";
@@ -108,6 +113,12 @@ export type V2View = {
   budget: BudgetTotals;
   real: RealTotals;
   history: HistoryPoint[];
+  /** El presupuesto de CADA mes del rango, alineado con `history`. Solo lo arma `/gastos`. */
+  budgetByMonth?: MesPresupuestado[];
+  /** Cuántos meses cubre el rango: lo confiesan los rótulos de los KPI. */
+  rangeMonths?: number;
+  /** El mes a medias, si el periodo de la vista ES el actual. */
+  enCurso?: PeriodoEnCurso | null;
   financialPressure: FinancialPressure;
   transactions: Transaction[];
   categories: Category[];
@@ -496,21 +507,25 @@ export function IncomeExpenseSection({
   const diff = realTotal - budgetTotal;
   const complPct = budgetTotal > 0 ? realTotal / budgetTotal : 0;
   const items = budget.items.filter((b) => b.type === "expense");
+  // Estas tres tarjetas muestran un total del RANGO, no del mes. Sin decirlo, quien mira
+  // compara un trimestre contra su presupuesto mensual y cree que va sobrado. El cálculo NO
+  // cambia; cambia lo que el rótulo confiesa.
+  const delRango = rotuloDelRango(range ?? "3m", view.rangeMonths ?? 1);
 
   const summary: SumCard[] = [
     {
       ttl: "Gasto planificado",
       val: formatMoney(budgetTotal, currency),
-      sub: `${items.length} categoría(s)`,
+      sub: `${delRango} · ${items.length} categoría(s)`,
     },
     { ttl: "Gasto real", val: formatMoney(realTotal, currency), sub: "hasta hoy" },
     {
       ttl: "Diferencia",
       val: `${diff >= 0 ? "+" : ""}${formatMoney(diff, currency)}`,
-      sub: "real − planificado",
+      sub: `real − planificado, ${delRango}`,
       tone: diff <= 0 ? "pos" : "neg",
     },
-    { ttl: "% ejecución", val: formatPercent(complPct), sub: "del presupuesto" },
+    { ttl: "% ejecución", val: formatPercent(complPct), sub: `del presupuesto ${delRango}` },
   ];
 
   return (
@@ -523,14 +538,16 @@ export function IncomeExpenseSection({
       <SummaryStrip cards={summary} />
 
       <section className="cols-2">
-        <ChartCard title="Histórico de gastos" hint="real vs presupuesto">
-          <PerformanceChart
-            data={history.map((h) => ({ date: h.label, value: h.realExpense }))}
-            currency={currency}
-            tone="neg"
-            goalValue={Math.round(budgetTotal)}
-            height={160}
-            axes="full"
+        <ChartCard title="Histórico de gastos" hint="real vs presupuesto mensual">
+          <HistoricoGasto
+            datos={history.map((h, i) => ({
+              label: h.label,
+              real: h.realExpense,
+              presupuesto: view.budgetByMonth?.[i]?.total ?? 0,
+            }))}
+            moneda={currency}
+            enCurso={view.enCurso ?? null}
+            alto={180}
           />
         </ChartCard>
         <DonutCard

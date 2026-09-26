@@ -3,6 +3,7 @@ import { EssentialExpenseSummary } from "@/modules/wealth/components/essential-s
 import { getExpenseJarsAsOf } from "@/modules/financial-base/services/expense-jars-service";
 import { getExpenseRangeView } from "@/modules/financial-base/services/expense-range-service";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
+import { diasDelMes } from "@/components/charts/core";
 import { IncomeExpenseSection } from "@/modules/financial-base/components/v2/sections";
 import { createSavingsSobreAction } from "@/modules/control";
 import { PagoVinculadoButton } from "@/modules/control";
@@ -56,10 +57,24 @@ export default async function Page({
     getExpenseRangeView(sp.range, view.period),
   ]);
 
+  // El periodo EN CURSO, para que el último tramo del histórico no se pinte como un mes
+  // cerrado. Solo cuando el periodo de la vista ES el mes actual: mirando agosto desde
+  // septiembre, agosto está cerrado y no hay nada a medias.
+  const hoyIso = await userToday();
+  const enCurso = isCurrentMonth(view.period, hoyIso)
+    ? {
+        dia: Number(hoyIso.slice(8, 10)),
+        diasDelMes: diasDelMes(view.period.year, view.period.month),
+      }
+    : null;
+
   const expenseView = {
     ...view,
     jars,
     history: rangeView.history,
+    budgetByMonth: rangeView.budgetByMonth,
+    rangeMonths: rangeView.months,
+    enCurso,
     budget: { ...view.budget, budgetExpense: rangeView.budgetExpense },
     real: {
       ...view.real,
