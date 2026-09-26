@@ -558,3 +558,124 @@
 .cf-tip-nota[data-tono="alerta"] {
   color: var(--neg);
 }
+
+/* ── Dona con leyenda ─────────────────────────────────────────────────────── */
+
+/* El corte es del CONTENEDOR, no de la ventana: la misma tarjeta se estrecha en `/gastos` a
+   1280 (va en `cols-2`) y ocupa todo en `/m`. Una media query de viewport acertaría en una y
+   fallaría en la otra. `container-type: inline-size` solo declara el eje horizontal, que es
+   el único que se consulta — `size` haría que el alto dejase de depender del contenido. */
+.dl {
+  container-type: inline-size;
+}
+.dl-caja {
+  display: flex;
+  /* `flex-start` y no `center`: con veinte categorías la leyenda mide 500 px y una dona
+     centrada contra ella queda flotando a media altura, con un hueco arriba que parece un
+     error de maquetación. Arriba, la dona y la primera fila empiezan juntas. */
+  align-items: flex-start;
+  gap: 18px;
+  margin-top: 14px;
+}
+/* El lado de la leyenda: la lista más el botón de «Ver todas». */
+.dl-lado {
+  flex: 1;
+  min-width: 0;
+}
+.dl-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dl-vertodas {
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  padding: 2px 0;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  border-radius: var(--r-btn);
+}
+.dl-vertodas:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+/* Lo que hay DENTRO de «Otras N» va sangrado y atenuado: es el desglose de una porción, no
+   una porción más. Y sin punto de color, porque su color no está en el anillo. */
+.dl-fila-oculta {
+  padding-left: 18px;
+}
+.dl-fila-oculta .dl-nombre,
+.dl-fila-oculta .dl-pct,
+.dl-fila-oculta .dl-monto {
+  color: var(--muted);
+}
+.dl-fila {
+  display: grid;
+  /* punto · nombre · % · monto. El nombre se lleva el espacio sobrante; el % y el monto
+     ocupan lo suyo y quedan pegados a la derecha, uno debajo de otro en todas las filas. */
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12.5px;
+}
+.dl-punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+  /* `align-items: baseline` deja el punto colgando de la primera línea del nombre; este
+     desplazamiento lo sube al centro del renglón. */
+  transform: translateY(-1px);
+}
+/* SIN `ellipsis`: el nombre envuelve. Un nombre cortado no se puede emparejar con su color,
+   que es lo único para lo que existe una leyenda. `anywhere` para que una palabra sola más
+   larga que la columna —«Mantenimiento»— no desborde la tarjeta. */
+.dl-nombre {
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.dl-pct {
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+.dl-monto {
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+/* La fila del sobrante se dice atenuada: es un agregado, no una categoría con nombre. Y su
+   punto va hueco, porque sus porciones sí están en la dona con su propio color. */
+.dl-fila-resto .dl-nombre {
+  color: var(--muted);
+}
+.dl-fila-resto .dl-punto {
+  background: transparent;
+  border: 1px dashed var(--muted-2);
+  box-sizing: border-box;
+}
+.dl-vacio {
+  font-size: 12.5px;
+}
+
+/* Contenedor estrecho: la leyenda baja y se lleva el ancho entero. El tramo intermedio —la
+   leyenda al lado, en una columna de 90 px— era el peor de los dos mundos. */
+@container (max-width: 419px) {
+  .dl-caja {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dl-caja > [role="img"] {
+    align-self: center;
+  }
+  .dl-lado {
+    width: 100%;
+  }
+}
