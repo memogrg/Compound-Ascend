@@ -105,7 +105,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Supabase CLI
-        uses: supabase/setup-cli@v2
+        uses: supabase/setup-cli@v3
         with:
           # Versión FIJA, nunca "latest". Con "latest" la acción resuelve la release por red
           # en cada corrida (api.github.com/repos/supabase/cli/releases/latest) y ese único
@@ -280,7 +280,7 @@ jobs:
       - run: npm ci
 
       - name: Supabase CLI
-        uses: supabase/setup-cli@v2
+        uses: supabase/setup-cli@v3
         with:
           # Misma versión que el job de migraciones, y del mismo sitio: el `env` del workflow.
           version: ${{ env.SUPABASE_CLI_VERSION }}
