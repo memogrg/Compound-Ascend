@@ -70,6 +70,71 @@ test("una columna por mes, y una marca de presupuesto por mes", async ({ browser
   await ctx.close();
 });
 
+test("la columna se parte: lo que cupo en el presupuesto, y el exceso encima", async ({
+  browser,
+}) => {
+  // Con una columna de un solo color, saber cuánto se pasó exige comparar dos alturas contra
+  // una marca. Partida, el exceso ES un rectángulo con su propia altura.
+  const { ctx, page } = await abrir(browser, "/gastos?range=6m");
+  const tarjeta = await tarjetaHistorico(page);
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(300);
+
+  const excesos = tarjeta.locator(".cf-col-exceso");
+  const dentros = tarjeta.locator(".cf-col-dentro");
+  expect(await dentros.count(), "todo mes con gasto tiene tramo dentro").toBe(6);
+  expect(await excesos.count(), "ningún mes se pasó del presupuesto").toBeGreaterThan(0);
+
+  // El exceso va ARRIBA: su borde inferior toca el borde superior del tramo de dentro.
+  const ex = tarjeta.locator(".cf-col-exceso").first();
+  const x = Number(await ex.getAttribute("x"));
+  const dentroMismo = tarjeta.locator(`.cf-col-dentro[x="${x}"]`);
+  await expect(dentroMismo).toHaveCount(1);
+  const yEx = Number(await ex.getAttribute("y"));
+  const hEx = Number(await ex.getAttribute("height"));
+  const yDe = Number(await dentroMismo.getAttribute("y"));
+  expect(yDe, `exceso ${yEx}+${hEx} · dentro ${yDe}`).toBeGreaterThanOrEqual(yEx + hEx);
+
+  // Y los dos tramos NO son del mismo color: uno es el tono claro de la rampa.
+  expect(await ex.getAttribute("fill")).toBe("var(--neg)");
+  expect(await dentroMismo.getAttribute("fill")).toContain("color-mix");
+  await ctx.close();
+});
+
+test("la leyenda nombra el exceso cuando lo hay", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser, "/gastos?range=6m");
+  const tarjeta = await tarjetaHistorico(page);
+  expect(await tarjeta.locator(".cf-leyenda-fija").innerText()).toContain(
+    "Exceso sobre el presupuesto",
+  );
+  await ctx.close();
+});
+
+test("el mes a medias dice lo que QUEDA, sin signo y sin verde", async ({ browser }) => {
+  // A mitad de mes, «−₡559.067» se lee como «vas ahorrando» cuando lo cierto es «todavía no
+  // gastaste lo que te toca». Los días salen del servidor: con el reloj congelado, 12.
+  const { ctx, page } = await abrir(browser, "/gastos?range=3m");
+  const tarjeta = await tarjetaHistorico(page);
+  await tarjeta.locator(".cf-datos-abrir").click();
+  await page.waitForTimeout(300);
+
+  const celda = tarjeta.locator(".cf-tabla-avance");
+  await expect(celda).toHaveCount(1);
+  const texto = await celda.innerText();
+  expect(texto, `la celda dice: ${texto}`).toMatch(
+    /^(Te quedan ₡[\d.]+ para 12 días \(≈ ₡[\d.]+\/día\)|Excedido por ₡[\d.]+ con 12 días por delante)$/,
+  );
+  expect(texto, "no lleva diferencia con signo").not.toMatch(/^[+−-]/);
+
+  // Y el mismo criterio en el tooltip del último mes.
+  await tarjeta.locator(".cf-datos-abrir").click();
+  const filas = await leerTooltips(page, tarjeta);
+  const ultimo = filas[filas.length - 1]!;
+  expect(ultimo, `tooltip: ${ultimo}`).toMatch(/Te quedan|Excedido por/);
+  expect(ultimo, `tooltip: ${ultimo}`).not.toMatch(/bajo presupuesto|sobre presupuesto/);
+  await ctx.close();
+});
+
 test("la marca sobresale de su columna, mide 2 px y no invade la del vecino", async ({
   browser,
 }) => {
@@ -80,7 +145,7 @@ test("la marca sobresale de su columna, mide 2 px y no invade la del vecino", as
   await page.mouse.move(0, 0);
   await page.waitForTimeout(300);
 
-  const columnas = tarjeta.locator(".cf-col");
+  const columnas = tarjeta.locator(".cf-col-dentro");
   const marcas = tarjeta.locator(".cf-marca");
   expect(await columnas.count(), "sin columnas no hay nada que medir").toBe(6);
   expect(await marcas.count()).toBe(6);
@@ -117,7 +182,9 @@ test("el presupuesto es mensual, no el total del rango", async ({ browser }) => 
 
   const planificado = page.getByText(/Gasto planificado/i).first();
   await expect(planificado).toHaveCount(1);
-  const total = aNumero(/₡[\d.]+/.exec(await planificado.locator("xpath=..").innerText())?.[0] ?? "0");
+  const total = aNumero(
+    /₡[\d.]+/.exec(await planificado.locator("xpath=..").innerText())?.[0] ?? "0",
+  );
   expect(total, "no se leyó el titular").toBeGreaterThan(0);
   for (const p of presupuestos) expect(p, `mes ${p} contra total ${total}`).toBeLessThan(total);
   const suma = presupuestos.reduce((a, b) => a + b, 0);
@@ -171,13 +238,14 @@ test("el mes a medias es la única columna parcial, y el día viene del servidor
   // Una sola columna parcial: la última.
   const parciales = tarjeta.locator(".cf-col-parcial");
   expect(await parciales.count()).toBe(1);
-  const todas = tarjeta.locator(".cf-col");
+  const todas = tarjeta.locator(".cf-col-dentro");
   const ultimaX = Number(await todas.last().getAttribute("x"));
   expect(Number(await parciales.first().getAttribute("x"))).toBe(ultimaX);
 
-  // Lavada Y punteada: el color no puede ser el único canal (WCAG 1.4.1).
+  // Lavada Y punteada: el color no puede ser el único canal (WCAG 1.4.1). El contorno es su
+  // propio rect —rodea la columna entera y no cada tramo—, y el lavado va en el relleno.
   expect(await parciales.first().getAttribute("stroke-dasharray")).toBeTruthy();
-  expect(Number(await parciales.first().getAttribute("fill-opacity"))).toBeLessThan(1);
+  expect(Number(await todas.last().getAttribute("fill-opacity"))).toBeLessThan(1);
 
   // Y el tooltip del último punto lo dice con palabras.
   const filas = await leerTooltips(page, tarjeta);
@@ -202,7 +270,9 @@ test("el tooltip da la diferencia y el % de ejecución", async ({ browser }) => 
   const tarjeta = await tarjetaHistorico(page);
   const filas = await leerTooltips(page, tarjeta);
   const primera = filas[0]!;
-  expect(primera, `tooltip: ${primera}`).toMatch(/(bajo|sobre) presupuesto|justo en el presupuesto/);
+  expect(primera, `tooltip: ${primera}`).toMatch(
+    /(bajo|sobre) presupuesto|justo en el presupuesto/,
+  );
   expect(primera, `tooltip: ${primera}`).toMatch(/\d+ % ejecutado/);
   await ctx.close();
 });
@@ -213,7 +283,9 @@ test("la tabla de datos trae los cuatro números de cada mes, y cuadran", async 
   await tarjeta.locator(".cf-datos-abrir").click();
   await page.waitForTimeout(300);
 
-  const filas = tarjeta.locator(".cf-tabla tbody tr");
+  // `:not(.cf-tabla-nota)`: el mes abierto añade una fila de nota a todo el ancho, que no
+  // es un mes.
+  const filas = tarjeta.locator(".cf-tabla tbody tr:not(.cf-tabla-nota)");
   expect(await filas.count(), "la tabla no tiene una fila por mes").toBe(3);
 
   // La diferencia y el % no se escriben a mano en la tabla: tienen que salir del gasto y del
@@ -274,4 +346,49 @@ test("axe no encuentra nada nuevo en la tarjeta, ni con la tabla abierta", async
   const nuevas = r.violations.filter((v) => !conocidas.has(v.id));
   expect(nuevas.map((v) => `${v.id} ×${v.nodes.length}`).join("\n")).toBe("");
   await ctx.close();
+});
+
+test("«Composición por categoría» confiesa el rango que suma, igual que los KPI", async ({
+  browser,
+}) => {
+  // El centro sumaba el RANGO y el subtítulo decía «al mes»: a tres meses, la Hipoteca son
+  // tres cuotas y el total un trimestre, pero la tarjeta lo presentaba como un mes.
+  for (const [rango, esperado] of [
+    ["1m", "del mes"],
+    ["3m", "de 3 meses"],
+    ["6m", "de 6 meses"],
+  ] as const) {
+    const { ctx, page } = await abrir(browser, `/gastos?range=${rango}`);
+    const titulo = page.getByText("Composición por categoría").first();
+    await expect(titulo).toHaveCount(1);
+    const tarjeta = titulo.locator("xpath=ancestor::*[contains(@class,'card')][1]");
+    const sub = tarjeta.locator(".donut-sub");
+    await expect(sub).toHaveCount(1);
+    expect(await sub.innerText(), `rango ${rango}`).toBe(esperado);
+    await ctx.close();
+  }
+});
+
+test("y el dato lo respalda: a 3 meses la Hipoteca vale tres veces la de un mes", async ({
+  browser,
+}) => {
+  // Se compara contra el propio mes en vez de contra una cuota escrita a mano: así el caso
+  // no depende de los montos de la demo, solo de que el rango de verdad multiplique.
+  const leerHipoteca = async (rango: string) => {
+    const { ctx, page } = await abrir(browser, `/gastos?range=${rango}`);
+    const titulo = page.getByText("Composición por categoría").first();
+    const tarjeta = titulo.locator("xpath=ancestor::*[contains(@class,'card')][1]");
+    // Por el TEXTO exacto y no por un `div` con `hasText`: la leyenda es una rejilla y
+    // `hasText` matchea también cada contenedor de arriba.
+    const nombre = tarjeta.getByText("Hipoteca", { exact: true }).first();
+    await expect(nombre).toHaveCount(1);
+    const texto = await nombre.locator("xpath=..").innerText();
+    const v = aNumero(/₡[\d.]+/.exec(texto)?.[0] ?? "0");
+    await ctx.close();
+    return v;
+  };
+  const unMes = await leerHipoteca("1m");
+  const tresMeses = await leerHipoteca("3m");
+  expect(unMes, "no se leyó la Hipoteca del mes").toBeGreaterThan(0);
+  expect(tresMeses, `1m=${unMes} · 3m=${tresMeses}`).toBe(unMes * 3);
 });

@@ -12,6 +12,8 @@ import {
   anchoMarca,
   diferencia,
   filasHistorico,
+  mensajeEnCurso,
+  partesColumna,
   porcentajeEjecucion,
 } from "@/components/charts/core/historico-columnas";
 import { rotuloParcial } from "@/components/charts/core/periodo-en-curso";
@@ -90,5 +92,54 @@ describe("rotuloParcial", () => {
   it("el último día del mes no es parcial", () => {
     expect(rotuloParcial({ dia: 30, diasDelMes: 30 })).toBeNull();
     expect(rotuloParcial(null)).toBeNull();
+  });
+});
+
+describe("partesColumna", () => {
+  it("parte la columna en lo que cabe en el presupuesto y lo que se pasa", () => {
+    expect(partesColumna(800_000, 1_000_000)).toEqual({ dentro: 800_000, exceso: 0 });
+    expect(partesColumna(1_200_000, 1_000_000)).toEqual({ dentro: 1_000_000, exceso: 200_000 });
+    expect(partesColumna(1_000_000, 1_000_000)).toEqual({ dentro: 1_000_000, exceso: 0 });
+  });
+
+  it("sin presupuesto TODO es exceso: no hay nada dentro de lo que no existe", () => {
+    expect(partesColumna(300_000, 0)).toEqual({ dentro: 0, exceso: 300_000 });
+  });
+
+  it("sin gasto no hay ninguna de las dos partes", () => {
+    expect(partesColumna(0, 1_000_000)).toEqual({ dentro: 0, exceso: 0 });
+  });
+});
+
+describe("mensajeEnCurso", () => {
+  const enCurso = { dia: 18, diasDelMes: 30 };
+
+  it("por debajo dice lo que queda, para cuántos días y a cuánto por día", () => {
+    // ₡1.726.097 − ₡1.167.030 = ₡559.067 para 12 días → ₡46.589/día.
+    const m = mensajeEnCurso(1_167_030, 1_726_097, enCurso);
+    expect(m?.tono).toBe("neutro");
+    expect(m?.texto).toBe("Te quedan ₡559.067 para 12 días (≈ ₡46.589/día)");
+  });
+
+  it("por encima lo dice en alerta, y NO con un signo en verde", () => {
+    const m = mensajeEnCurso(1_900_000, 1_726_097, enCurso);
+    expect(m?.tono).toBe("alerta");
+    expect(m?.texto).toBe("Excedido por ₡173.903 con 12 días por delante");
+  });
+
+  it("justo en el presupuesto quedan ₡0, y no es alerta", () => {
+    const m = mensajeEnCurso(1_726_097, 1_726_097, enCurso);
+    expect(m?.tono).toBe("neutro");
+    expect(m?.texto).toBe("Te quedan ₡0 para 12 días (≈ ₡0/día)");
+  });
+
+  it("los días salen del periodo del SERVIDOR, no de ningún reloj", () => {
+    expect(mensajeEnCurso(0, 100, { dia: 1, diasDelMes: 31 })?.texto).toContain("para 30 días");
+    expect(mensajeEnCurso(0, 100, { dia: 28, diasDelMes: 29 })?.texto).toContain("para 1 días");
+  });
+
+  it("sin periodo a medias no hay mensaje: el mes cerrado no tiene «lo que queda»", () => {
+    expect(mensajeEnCurso(100, 200, null)).toBeNull();
+    expect(mensajeEnCurso(100, 200, { dia: 30, diasDelMes: 30 })).toBeNull();
   });
 });

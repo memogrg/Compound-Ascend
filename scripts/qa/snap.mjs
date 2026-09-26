@@ -317,6 +317,32 @@ async function main() {
     process.exit(2);
   }
 
+  /**
+   * `--rutas /gastos,/dashboard` captura SOLO esas, por coincidencia exacta de `path`.
+   *
+   * Para comprobar un cambio acotado, las 200 pantallas son 40 minutos para mirar dos. El
+   * inventario completo sigue siendo el defecto: esto se pide a propósito, y la corrida
+   * imprime cuáles quedaron para que nadie confunda un diff parcial con uno completo.
+   */
+  const soloRutas = args.rutas
+    ? new Set(
+        String(args.rutas)
+          .split(",")
+          .map((r) => r.trim())
+          .filter(Boolean),
+      )
+    : null;
+  const rutas = soloRutas ? ROUTES.filter((r) => soloRutas.has(r.path)) : ROUTES;
+  if (soloRutas) {
+    const encontradas = rutas.map((r) => r.path);
+    const faltan = [...soloRutas].filter((r) => !encontradas.includes(r));
+    if (faltan.length > 0) {
+      console.error(`Rutas que no están en routes.json: ${faltan.join(", ")}`);
+      process.exit(2);
+    }
+    console.log(`SOLO ${encontradas.length} ruta(s): ${encontradas.join(", ")}`);
+  }
+
   const freeze = instanteCongelado(args.freeze);
   // Render determinista: sin esto, dos corridas idénticas difieren en ±1-2 niveles de color en los
   // bordes (antialiasing de texto y degradados). Son 200 px invisibles, pero rompen la comparación
@@ -341,7 +367,7 @@ async function main() {
 
     for (const tema of temas) {
       for (const width of widths) {
-        for (const ruta of ROUTES) {
+        for (const ruta of rutas) {
           // Una superficie con anchos propios se salta el resto: no es un fallo, es que esa
           // pantalla no existe a ese ancho.
           const permitidos = anchosDe(ruta);
