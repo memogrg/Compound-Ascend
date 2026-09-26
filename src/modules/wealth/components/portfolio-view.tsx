@@ -13,7 +13,7 @@ import { parseAsStringLiteral, useQueryState } from "nuqs";
 
 import { navV2Enabled } from "@/lib/flags";
 import "./portfolio-view.css";
-import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
+import { DonutConLeyenda, type DonutDatum } from "@/components/charts/lazy";
 import { PerformanceChart, type AreaPoint } from "@/components/charts/lazy";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
@@ -428,7 +428,6 @@ function PortfolioPanel({
           centerTop={formatCompact(toDisplay(analytics.totalPortfolioValue), displayCurrency)}
           centerSub="total"
           currency={displayCurrency}
-          showAmount
         />
         <DonutCard
           title="Distribución por categoría"
@@ -529,14 +528,12 @@ function DonutCard({
   centerTop,
   centerSub,
   currency,
-  showAmount,
 }: {
   title: string;
   slices: AllocationSlice[];
   centerTop: string;
   centerSub: string;
   currency: string;
-  showAmount?: boolean;
 }) {
   const visible = slices.filter((s) => s.value > 0);
   const data: DonutDatum[] = visible.map((s) => ({
@@ -549,31 +546,13 @@ function DonutCard({
       <div className="card-title" style={{ fontSize: 14 }}>
         {title}
       </div>
-      <div className="donut-row">
-        <div className="ring-wrap">
-          <DonutChart data={data} centerLabel={centerTop} centerSub={centerSub} />
-        </div>
-        <div className="leg">
-          {visible.length === 0 ? (
-            <span className="muted" style={{ fontSize: 12.5 }}>
-              Agrega inversiones para ver su distribución.
-            </span>
-          ) : (
-            visible.map((s) => (
-              <div key={s.label} className="leg-row">
-                <span className="sw" style={{ background: s.color }} />
-                <span className="nm" title={s.label}>
-                  {s.label}
-                </span>
-                <span className="pc">
-                  {formatPercent(s.pct)}
-                  {showAmount ? ` · ${formatCompact(s.value, currency)}` : ""}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      <DonutConLeyenda
+        data={data}
+        currency={currency}
+        centerLabel={centerTop}
+        centerSub={centerSub}
+        vacio="Agrega inversiones para ver su distribución."
+      />
     </div>
   );
 }

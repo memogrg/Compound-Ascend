@@ -10,7 +10,7 @@ import {
   FinancialInsightCard,
   type FinancialReading,
 } from "@/components/shared/financial-insight-card";
-import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
+import { DonutConLeyenda, type DonutDatum } from "@/components/charts/lazy";
 import { PremiumLineChart, PerformanceChart } from "@/components/charts/lazy";
 import { HistoricoGasto, type PeriodoEnCurso } from "@/components/charts/core";
 import {
@@ -428,44 +428,13 @@ function DonutCard({
   return (
     <div className="card card-pad">
       <div className="card-title">{title}</div>
-      <div
-        style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14, flexWrap: "wrap" }}
-      >
-        <DonutChart data={data} centerLabel={formatCompact(total, currency)} centerSub="al mes" />
-        <div style={{ flex: 1, minWidth: 150, display: "flex", flexDirection: "column", gap: 7 }}>
-          {data.length === 0 ? (
-            <span className="muted" style={{ fontSize: 12.5 }}>
-              Sin datos este mes.
-            </span>
-          ) : (
-            data.map((d) => (
-              <div
-                key={d.name}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "10px 1fr auto",
-                  gap: 8,
-                  alignItems: "center",
-                  fontSize: 12.5,
-                }}
-              >
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
-                <span
-                  style={{
-                    color: "var(--ink-2)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {d.name}
-                </span>
-                <span className="muted tnum">{formatMoney(d.value, currency)}</span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      <DonutConLeyenda
+        data={data}
+        currency={currency}
+        centerLabel={formatCompact(total, currency)}
+        centerSub="al mes"
+        vacio="Sin datos este mes."
+      />
     </div>
   );
 }
