@@ -188,6 +188,34 @@ async function recorrerPagina(page) {
 }
 
 /**
+ * Lo que se OCULTA en toda captura porque no es determinista y no depende del diseño.
+ *
+ * Solo el badge de la campana, por ahora. Muestra el número de insights activos, y ese
+ * número cambia entre corridas: los detectores crean y resuelven filas según el estado de la
+ * cuenta, y con el reloj CONGELADO la guarda de frescura de `refreshInsights()` no rota
+ * nunca, así que la primera lectura de una corrida puede refrescar y la siguiente no. El
+ * resultado era un cuadrito rojo de 16 px que aparecía, desaparecía o cambiaba de cifra en
+ * media docena de pantallas, y cada diff visual había que mirarlo para descartarlo.
+ *
+ * `visibility: hidden` y no `display: none`: el badge está en posición absoluta, así que
+ * ninguna de las dos mueve nada — pero con `visibility` la caja sigue ahí y un cambio de
+ * TAMAÑO del badge seguiría saliendo en el diff como corrimiento de lo que tenga al lado.
+ * Lo que se renuncia a vigilar es su color y su cifra, a cambio de que el resto del diff
+ * signifique algo.
+ */
+const OCULTAR_EN_CAPTURA = [".bell-badge"];
+
+async function enmascararNoDeterminista(page) {
+  try {
+    await page.addStyleTag({
+      content: `${OCULTAR_EN_CAPTURA.join(",")}{visibility:hidden !important}`,
+    });
+  } catch {
+    /* la página se fue: la captura fallará por su cuenta y con mejor mensaje */
+  }
+}
+
+/**
  * Lleva toda animación y TRANSICIÓN a su estado final.
  *
  * `animations: "disabled"` del screenshot congela animaciones, no transiciones: el revelado del
@@ -360,6 +388,7 @@ async function main() {
           await recorrerPagina(page);
           await esperarFuentes(page);
           await finalizarAnimaciones(page);
+          await enmascararNoDeterminista(page);
           const loadingResidual = await esperarSinCargando(page);
           const termsModal = await hayModalTerminos(page);
           if (termsModal) conTerminos++;

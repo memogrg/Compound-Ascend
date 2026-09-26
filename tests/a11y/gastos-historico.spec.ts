@@ -1,9 +1,9 @@
 /**
  * La tarjeta «Histórico de gastos» de `/gastos`, que pasó a usar el núcleo.
  *
- * Lo que solo se ve corriendo: que el presupuesto sea una serie MENSUAL en escalón y no un
- * total del rango pintado como línea horizontal, que el mes a medias se marque, y que los
- * rótulos de los KPI confiesen el rango que están sumando.
+ * Lo que solo se ve corriendo: que haya una COLUMNA por mes con su marca de presupuesto, que
+ * el presupuesto sea mensual y no un total del rango, que el mes a medias se marque con el
+ * día que dice el SERVIDOR, y que los rótulos de los KPI confiesen el rango que suman.
  */
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Browser } from "@playwright/test";
@@ -57,11 +57,54 @@ async function leerTooltips(
 
 const aNumero = (s: string) => Number(s.replace(/[^\d]/g, ""));
 
-test("el presupuesto es una serie mensual en escalón, no un total del rango", async ({
+test("una columna por mes, y una marca de presupuesto por mes", async ({ browser }) => {
+  // Antes eran dos LÍNEAS. Una línea une el total de julio con el de agosto y dibuja una
+  // pendiente que nadie recorrió: un mes es un total cerrado, y un total es una columna.
+  const { ctx, page } = await abrir(browser, "/gastos?range=3m");
+  const tarjeta = await tarjetaHistorico(page);
+
+  const columnas = tarjeta.locator(".cf-col");
+  const marcas = tarjeta.locator(".cf-marca");
+  expect(await columnas.count(), "no hay columnas").toBe(3);
+  expect(await marcas.count(), "no hay marcas de presupuesto").toBe(3);
+  await ctx.close();
+});
+
+test("la marca sobresale de su columna, mide 2 px y no invade la del vecino", async ({
   browser,
 }) => {
+  const { ctx, page } = await abrir(browser, "/gastos?range=6m");
+  const tarjeta = await tarjetaHistorico(page);
+  // El ratón fuera: el `cursor` del tooltip pinta un rect sobre la banda y desplaza las
+  // medidas de lo que hay debajo.
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(300);
+
+  const columnas = tarjeta.locator(".cf-col");
+  const marcas = tarjeta.locator(".cf-marca");
+  expect(await columnas.count(), "sin columnas no hay nada que medir").toBe(6);
+  expect(await marcas.count()).toBe(6);
+
+  const anchoCol = Number(await columnas.first().getAttribute("width"));
+  const anchoMar = Number(await marcas.first().getAttribute("width"));
+  const altoMar = Number(await marcas.first().getAttribute("height"));
+  expect(anchoCol, "la columna no tiene ancho").toBeGreaterThan(0);
+  expect(anchoMar, `marca ${anchoMar} vs columna ${anchoCol}`).toBeGreaterThan(anchoCol);
+  expect(altoMar, "el grosor de la marca").toBe(2);
+
+  // Dos marcas seguidas no se pueden tocar: si lo hacen, el ojo las une y vuelve a leer la
+  // línea horizontal única que el escalón mensual vino a eliminar.
+  const x0 = Number(await marcas.nth(0).getAttribute("x"));
+  const x1 = Number(await marcas.nth(1).getAttribute("x"));
+  expect(x1 - x0, `x0=${x0} x1=${x1} ancho=${anchoMar}`).toBeGreaterThan(anchoMar);
+  await ctx.close();
+});
+
+test("el presupuesto es mensual, no el total del rango", async ({ browser }) => {
   // Antes se pintaba UNA línea horizontal con la suma del rango: con «3m», tres meses de
-  // presupuesto contra el gasto de cada mes suelto.
+  // presupuesto contra el gasto de cada mes suelto. Se compara contra el TITULAR —que sí es
+  // el total— porque «los meses difieren entre sí» no es la propiedad: un presupuesto
+  // estable tres meses seguidos es normal, y de hecho es el de la demo.
   const { ctx, page } = await abrir(browser, "/gastos?range=3m");
   const tarjeta = await tarjetaHistorico(page);
   const filas = await leerTooltips(page, tarjeta);
@@ -72,27 +115,17 @@ test("el presupuesto es una serie mensual en escalón, no un total del rango", a
     .map(aNumero);
   expect(presupuestos.length, `no se leyeron presupuestos de: ${filas.join(" // ")}`).toBe(3);
 
-  // La versión anterior exigía que los meses DIFIRIERAN entre sí, y eso no es la
-  // propiedad: un presupuesto estable tres meses seguidos es perfectamente normal —de
-  // hecho es lo que tiene la demo desde que se resembraron sus partidas derivadas—. Lo que
-  // se quiere demostrar es otra cosa: que cada punto lleva el presupuesto de SU MES y no el
-  // total del rango. Se compara contra el titular, que sí es el total.
   const planificado = page.getByText(/Gasto planificado/i).first();
   await expect(planificado).toHaveCount(1);
-  const total = aNumero(
-    /₡[\d.]+/.exec(await planificado.locator("xpath=..").innerText())?.[0] ?? "0",
-  );
+  const total = aNumero(/₡[\d.]+/.exec(await planificado.locator("xpath=..").innerText())?.[0] ?? "0");
   expect(total, "no se leyó el titular").toBeGreaterThan(0);
-  for (const p of presupuestos) {
-    expect(p, `mes ${p} contra total ${total}`).toBeLessThan(total);
-  }
-  // Y el total tiene que ser la SUMA de los meses, no otra cosa.
+  for (const p of presupuestos) expect(p, `mes ${p} contra total ${total}`).toBeLessThan(total);
   const suma = presupuestos.reduce((a, b) => a + b, 0);
   expect(Math.abs(suma - total), `suma ${suma} vs total ${total}`).toBeLessThanOrEqual(3);
   await ctx.close();
 });
 
-test("el escalón del mes en curso coincide con el presupuesto de Mi Base Financiera", async ({
+test("el presupuesto del mes en curso coincide con el de Mi Base Financiera", async ({
   browser,
 }) => {
   // El mismo dinero, contado igual en las dos pantallas. Antes `/gastos` mostraba el total
@@ -111,9 +144,6 @@ test("el escalón del mes en curso coincide con el presupuesto de Mi Base Financ
   // hacía tan fácil no notar que tampoco contaban lo mismo.
   const planificado = page.getByText("Gastos presup.", { exact: true }).first();
   await expect(planificado).toHaveCount(1);
-  // El PADRE directo: la tarjeta no tiene una clase estable que buscar por ancestro, y un
-  // `contains(@class,'metric')` que no matchea deja el test colgado hasta el timeout en vez
-  // de fallar diciendo qué pasó.
   const tarjetaBase = planificado.locator("xpath=..");
   const textoBase = await tarjetaBase.innerText();
   const delBase = aNumero(/₡[\d.]+/.exec(textoBase)?.[0] ?? "0");
@@ -123,26 +153,98 @@ test("el escalón del mes en curso coincide con el presupuesto de Mi Base Financ
   await ctx.close();
 });
 
-test("el mes a medias se marca «parcial» y lo dice en palabras", async ({ browser }) => {
+test("el mes a medias es la única columna parcial, y el día viene del servidor", async ({
+  browser,
+}) => {
   const { ctx, page } = await abrir(browser, "/gastos?range=3m");
   const tarjeta = await tarjetaHistorico(page);
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(300);
 
-  // El rótulo, que es lo que oye quien no ve el trazo punteado.
+  // El rótulo, que es lo que lee quien no ve el contorno punteado. El día es el del reloj
+  // CONGELADO del servidor (18), no el de la máquina que corre el navegador: si el
+  // componente llamara a `new Date()` acá saldría el día real.
   const enCurso = tarjeta.locator(".cf-en-curso");
   await expect(enCurso).toHaveCount(1);
-  expect(await enCurso.innerText()).toMatch(/en curso · día \d+ de \d+/);
+  expect(await enCurso.innerText()).toMatch(/^parcial · día 18 de \d+$/);
 
-  // Y el tooltip del último punto.
+  // Una sola columna parcial: la última.
+  const parciales = tarjeta.locator(".cf-col-parcial");
+  expect(await parciales.count()).toBe(1);
+  const todas = tarjeta.locator(".cf-col");
+  const ultimaX = Number(await todas.last().getAttribute("x"));
+  expect(Number(await parciales.first().getAttribute("x"))).toBe(ultimaX);
+
+  // Lavada Y punteada: el color no puede ser el único canal (WCAG 1.4.1).
+  expect(await parciales.first().getAttribute("stroke-dasharray")).toBeTruthy();
+  expect(Number(await parciales.first().getAttribute("fill-opacity"))).toBeLessThan(1);
+
+  // Y el tooltip del último punto lo dice con palabras.
   const filas = await leerTooltips(page, tarjeta);
   expect(filas[filas.length - 1], `último tooltip: ${filas.join(" // ")}`).toContain("parcial");
+  await ctx.close();
+});
 
-  // Un solo aro: el punto de unión del tramo en curso NO lleva aro, que ya está cerrado.
-  // El ratón se retira primero: mientras está encima, Recharts pinta sus `activeDot`, que
-  // también son círculos y contaminaban la cuenta (salían 3).
-  await page.mouse.move(0, 0);
-  await page.waitForTimeout(400);
-  const aros = tarjeta.locator("circle[fill='var(--surface)'][stroke='var(--neg)']");
-  expect(await aros.count()).toBe(1);
+test("la leyenda nombra el gasto, el presupuesto y lo parcial", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser, "/gastos?range=3m");
+  const tarjeta = await tarjetaHistorico(page);
+  const leyenda = tarjeta.locator(".cf-leyenda-fija");
+  await expect(leyenda).toHaveCount(1);
+  const texto = await leyenda.innerText();
+  for (const t of ["Gasto del mes", "Presupuesto del mes", "Parcial"]) {
+    expect(texto, `la leyenda dice: ${texto.replace(/\n/g, " · ")}`).toContain(t);
+  }
+  await ctx.close();
+});
+
+test("el tooltip da la diferencia y el % de ejecución", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser, "/gastos?range=3m");
+  const tarjeta = await tarjetaHistorico(page);
+  const filas = await leerTooltips(page, tarjeta);
+  const primera = filas[0]!;
+  expect(primera, `tooltip: ${primera}`).toMatch(/(bajo|sobre) presupuesto|justo en el presupuesto/);
+  expect(primera, `tooltip: ${primera}`).toMatch(/\d+ % ejecutado/);
+  await ctx.close();
+});
+
+test("la tabla de datos trae los cuatro números de cada mes, y cuadran", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser, "/gastos?range=3m");
+  const tarjeta = await tarjetaHistorico(page);
+  await tarjeta.locator(".cf-datos-abrir").click();
+  await page.waitForTimeout(300);
+
+  const filas = tarjeta.locator(".cf-tabla tbody tr");
+  expect(await filas.count(), "la tabla no tiene una fila por mes").toBe(3);
+
+  // La diferencia y el % no se escriben a mano en la tabla: tienen que salir del gasto y del
+  // presupuesto de ESA fila. Se comprueba en la primera, que es un mes cerrado.
+  const celdas = await filas.first().locator("th, td").allTextContents();
+  expect(celdas.length, `celdas: ${celdas.join(" | ")}`).toBe(5);
+  const gasto = aNumero(celdas[1]!);
+  const presupuesto = aNumero(celdas[2]!);
+  const dif = aNumero(celdas[3]!);
+  const pct = Number(/(\d+)/.exec(celdas[4]!)?.[1] ?? "-1");
+  expect(gasto, `fila: ${celdas.join(" | ")}`).toBeGreaterThan(0);
+  expect(presupuesto).toBeGreaterThan(0);
+  expect(dif).toBe(Math.abs(gasto - presupuesto));
+  expect(celdas[3]).toContain(gasto > presupuesto ? "+" : "−");
+  expect(pct).toBe(Math.round((gasto / presupuesto) * 100));
+  await ctx.close();
+});
+
+// Invariante, no regresión: el eje de este gráfico ya incluía el 0 con estos datos. Vigila
+// que nadie lo devuelva a `desdeCeroSiCabe`, que con un gasto mínimo alto recorta el eje — y
+// en un gráfico de BARRAS el área de la barra es el dato, así que recortar el eje multiplica
+// visualmente las diferencias. En el de líneas se podía, porque ahí el dato es la altura.
+test("el eje Y arranca en 0: en barras el área es el dato", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser, "/gastos?range=6m");
+  const tarjeta = await tarjetaHistorico(page);
+  // Los rótulos del eje NO son hijos del `<g>` del eje en Recharts; se seleccionan por su
+  // clase de tick y se separan los del eje Y por llevar el símbolo de moneda.
+  const ticks = await tarjeta.locator(".recharts-cartesian-axis-tick-value").allTextContents();
+  const ejeY = ticks.filter((t) => t.includes("₡"));
+  expect(ejeY.length, `ticks: ${ticks.join(", ")}`).toBeGreaterThan(2);
+  expect(Math.min(...ejeY.map(aNumero)), `eje Y: ${ejeY.join(", ")}`).toBe(0);
   await ctx.close();
 });
 
@@ -161,9 +263,11 @@ for (const [rango, esperado] of [
   });
 }
 
-test("axe no encuentra nada nuevo en la tarjeta", async ({ browser }) => {
+test("axe no encuentra nada nuevo en la tarjeta, ni con la tabla abierta", async ({ browser }) => {
   const { ctx, page } = await abrir(browser, "/gastos?range=3m");
-  await tarjetaHistorico(page);
+  const tarjeta = await tarjetaHistorico(page);
+  await tarjeta.locator(".cf-datos-abrir").click();
+  await page.waitForTimeout(300);
   const r = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   // La línea base de `/gastos` ya reporta contraste; el portón es de INCLUSIÓN.
   const conocidas = new Set(["color-contrast", "nested-interactive", "aria-hidden-focus"]);
