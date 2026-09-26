@@ -10,6 +10,7 @@
  */
 import { test, expect, type Browser } from "@playwright/test";
 
+import { irA } from "./navegar";
 import { ESTADO_SESION } from "./sesion";
 
 async function abrir(browser: Browser, url = "/dashboard") {
@@ -19,8 +20,8 @@ async function abrir(browser: Browser, url = "/dashboard") {
     reducedMotion: "reduce",
   });
   const page = await ctx.newPage();
-  await page.goto(url, { waitUntil: "networkidle", timeout: 60_000 });
-  await page.waitForTimeout(900);
+  // La barra ES lo que mide este spec: se espera ella, no un hueco en la red.
+  await irA(page, url, ".bottom-nav");
   return { ctx, page };
 }
 
