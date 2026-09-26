@@ -557,6 +557,8 @@
 /* Lo mismo en el tooltip. */
 .cf-tip-nota[data-tono="alerta"] {
   color: var(--neg);
+}
+
 /* ── Dona con leyenda ─────────────────────────────────────────────────────── */
 
 /* El corte es del CONTENEDOR, no de la ventana: la misma tarjeta se estrecha en `/gastos` a
