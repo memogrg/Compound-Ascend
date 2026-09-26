@@ -469,3 +469,92 @@
   color: var(--muted);
   font-weight: 400;
 }
+
+/* ── Leyenda estática, tabla del histórico ────────────────────────────────── */
+
+/* La leyenda del histórico de gastos no es interactiva: no hay series que apagar, hay tres
+   cosas que nombrar. Por eso no usa `.cf-leyenda-btn` (que es un botón) sino esto, con el
+   mismo aire y el mismo tamaño para que las dos leyendas del repo se lean igual. */
+.cf-leyenda-fija {
+  margin-top: 8px;
+}
+.cf-leyenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+/* «Parcial»: el swatch tiene que decir lavado Y punteado, igual que la columna. Solo con la
+   opacidad, en oscuro, un bloque al 35 % y uno al 100 % se distinguen mal. */
+.cf-swatch-parcial {
+  background: color-mix(in srgb, var(--neg) 35%, transparent);
+  border: 1px dashed var(--neg);
+  box-sizing: border-box;
+}
+
+/* El desplegable de datos. Cerrado por defecto: la tarjeta no puede doblar su alto por una
+   tabla que casi nadie abre, pero la alternativa no visual del gráfico tiene que existir. */
+.cf-datos {
+  margin-top: 8px;
+}
+.cf-datos-abrir {
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  width: fit-content;
+  border-radius: var(--r-btn);
+}
+.cf-datos-abrir:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.cf-datos-caja {
+  margin-top: 6px;
+  /* 420 y no 260: con 260 cabían cinco meses y el sexto —que en un rango que incluye el mes
+     en curso es justamente el PARCIAL, el único con mensaje— quedaba fuera de vista sin que
+     nada lo indicara. Con doce meses sigue habiendo scroll, que es lo que se quiere. */
+  max-height: 420px;
+  overflow: auto;
+}
+
+/* Los importes no se parten. `+₡1.177.383` daba salto de línea entre el signo y el símbolo
+   de moneda —hay oportunidad de corte ahí— y una celda de dos renglones desalinea la fila
+   entera, que es justo lo que una tabla de cifras no puede permitirse. El mes tampoco: «abr
+   2026» en dos renglones duplica el alto de la fila para nada. */
+.cf-tabla td,
+.cf-tabla tbody th {
+  white-space: nowrap;
+}
+
+/* El signo de la diferencia con color, y además con signo: el color no es el único canal
+   (WCAG 1.4.1). En gasto, POR ENCIMA del presupuesto es lo malo. */
+.cf-tabla td[data-tono="bueno"] {
+  color: var(--pos);
+}
+.cf-tabla td[data-tono="malo"] {
+  color: var(--neg);
+}
+
+/* La celda del mes ABIERTO no es un importe sino una frase («Te quedan ₡X para N días»), así
+   que envuelve en vez de forzar la tabla a lo ancho. Va en NEUTRO: la cifra que queda no es
+   un logro, es dinero que todavía no se gastó. Solo si ya se pasó cambia de tono. */
+.cf-tabla td.cf-tabla-avance {
+  white-space: normal;
+  text-align: left;
+  color: var(--muted);
+}
+/* La fila de la nota no lleva su propia línea: pertenece a la fila de arriba. */
+.cf-tabla tbody tr.cf-tabla-nota td {
+  border-top: 0;
+  padding-top: 0;
+}
+.cf-tabla td.cf-tabla-avance[data-tono="alerta"] {
+  color: var(--neg);
+}
+
+/* Lo mismo en el tooltip. */
+.cf-tip-nota[data-tono="alerta"] {
+  color: var(--neg);
+}

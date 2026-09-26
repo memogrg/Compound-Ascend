@@ -63,3 +63,15 @@ export function partirSerieEnCurso<T extends Record<string, unknown>>(
   );
   return { cerrada, enCurso };
 }
+
+/**
+ * «parcial · día 18 de 30». `null` cuando el periodo no está a medias.
+ *
+ * Hermano de `rotuloEnCurso` y no el mismo: en el histórico de COLUMNAS la palabra tiene que
+ * ser la misma que dice la leyenda («Parcial»), o el lector tiene que traducir entre dos
+ * nombres para la misma cosa. El día y el total vienen del SERVIDOR (`userToday`, en la zona
+ * del perfil); este módulo no consulta ningún reloj.
+ */
+export function rotuloParcial(p: PeriodoEnCurso | null | undefined): string | null {
+  return estaEnCurso(p) ? `parcial · día ${p.dia} de ${p.diasDelMes}` : null;
+}

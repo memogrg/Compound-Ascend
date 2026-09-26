@@ -419,11 +419,17 @@ function DonutCard({
   data,
   total,
   currency,
+  sub = "al mes",
 }: {
   title: string;
   data: DonutDatum[];
   total: number;
   currency: string;
+  /**
+   * Qué periodo describe el total del centro. Por defecto «al mes», que es lo que era
+   * cuando todas estas tarjetas miraban un mes.
+   */
+  sub?: string;
 }) {
   return (
     <div className="card card-pad">
@@ -431,7 +437,7 @@ function DonutCard({
       <div
         style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14, flexWrap: "wrap" }}
       >
-        <DonutChart data={data} centerLabel={formatCompact(total, currency)} centerSub="al mes" />
+        <DonutChart data={data} centerLabel={formatCompact(total, currency)} centerSub={sub} />
         <div style={{ flex: 1, minWidth: 150, display: "flex", flexDirection: "column", gap: 7 }}>
           {data.length === 0 ? (
             <span className="muted" style={{ fontSize: 12.5 }}>
@@ -550,11 +556,15 @@ export function IncomeExpenseSection({
             alto={180}
           />
         </ChartCard>
+        {/* El centro suma el RANGO, igual que los KPI de arriba — la Hipoteca a tres meses
+            son tres cuotas, no una. El cálculo no cambia; cambia lo que el rótulo confiesa.
+            Decía «al mes» mientras mostraba un trimestre. */}
         <DonutCard
           title="Composición por categoría"
           data={donutData(real.expenseByKey)}
           total={realTotal}
           currency={currency}
+          sub={delRango}
         />
       </section>
 
