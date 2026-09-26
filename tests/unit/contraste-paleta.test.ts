@@ -283,3 +283,94 @@ describe.each(Object.entries(TEMAS))("separación de la paleta en tema %s", (nom
     });
   });
 });
+
+/**
+ * La paleta de NATURALEZAS de gasto (los nueve bloques de la taxonomía).
+ *
+ * Es una paleta categórica como la de `--chart-N`, y hasta ahora nadie la había medido. Tenía
+ * **tres colisiones exactas** —el mismo hex para dos bloques distintos— que ningún test podía
+ * ver porque los tokens que las producen son alias: `--c-expense` y `--warn` desembocan los
+ * dos en `--s2`, `--c-invest` en `--info` igual que `crecimiento`, y `--teal` en `--s6` igual
+ * que `ahorro`. Leyendo `constants.ts` los nueve valores parecen distintos; resueltos, son
+ * seis.
+ */
+const NATURALEZAS = [
+  "esencial",
+  "estilo_vida",
+  "financiero",
+  "proteccion",
+  "crecimiento",
+  "ahorro",
+  "inversion",
+  "donacion",
+  "miscelaneo",
+] as const;
+
+/** Los nueve, RESUELTOS a hex, igual que `tokens.css` los resuelve. */
+const NATURA = {
+  claro: [
+    "#be862d",
+    "#80913b",
+    "#bc4845",
+    "#378451",
+    "#36679b",
+    "#0f9aa8",
+    "#8163b0",
+    "#981f68",
+    "#625e57",
+  ],
+  oscuro: [
+    "#c4862c",
+    "#afc167",
+    "#ce605d",
+    "#3f9560",
+    "#689ce0",
+    "#28a2b0",
+    "#9a7bc7",
+    "#d73c99",
+    "#a6a199",
+  ],
+} as const;
+
+describe.each(Object.entries(TEMAS))("paleta de naturalezas en tema %s", (nombre, T) => {
+  const paleta = NATURA[nombre as keyof typeof NATURA];
+
+  it("no hay dos bloques con el mismo color", () => {
+    const porColor = new Map<string, string[]>();
+    paleta.forEach((c, i) => {
+      const k = c.toLowerCase();
+      porColor.set(k, [...(porColor.get(k) ?? []), NATURALEZAS[i]!]);
+    });
+    const repetidos = [...porColor.entries()].filter(([, ns]) => ns.length > 1);
+    expect(repetidos.map(([c, ns]) => `${c}: ${ns.join(" = ")}`).join(" · ")).toBe("");
+  });
+
+  it("los nueve llegan a 3:1 contra la superficie", () => {
+    paleta.forEach((c, i) => {
+      const r = contraste(rgb(c), rgb(T.surface));
+      expect(r, `${nombre} · ${NATURALEZAS[i]} → ${r.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  it("y con dicromacia ningún par de bloques se confunde", () => {
+    for (const t of ["prot", "deut", "trit"] as const) {
+      const p = parMasParecido(paleta, (c) => comoLoVe(c, t));
+      expect(
+        p.d,
+        `${nombre} · ${t} · ${NATURALEZAS[p.a - 1]} vs ${NATURALEZAS[p.b - 1]} → ΔE ${p.d.toFixed(1)}`,
+      ).toBeGreaterThanOrEqual(8);
+    }
+  });
+
+  it("la lista del test es la de constants.ts, resuelta", () => {
+    // Si alguien cambia `NATURE_COLOR` sin tocar esto, el test dejaría de medir la paleta
+    // real. Se comprueba al menos que sigan siendo nueve y en el mismo orden.
+    const src = readFileSync(
+      join(process.cwd(), "src/modules/financial-base/constants.ts"),
+      "utf8",
+    );
+    const bloque = /export const NATURE_COLOR[\s\S]*?\{([\s\S]*?)\};/.exec(src)?.[1] ?? "";
+    const claves = [...bloque.matchAll(/^\s*(\w+):/gm)].map((m) => m[1]);
+    expect(claves).toEqual([...NATURALEZAS]);
+  });
+});

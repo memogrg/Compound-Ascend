@@ -23,6 +23,15 @@ export const DonutChart = dynamic(() => import("./donut-chart").then((m) => m.Do
   loading: () => <ChartSkeleton height={240} />,
 });
 
+/**
+ * La dona CON su leyenda. Es lo que usan las cinco tarjetas; `DonutChart` a secas queda para
+ * quien solo quiera el anillo.
+ */
+export const DonutConLeyenda = dynamic(
+  () => import("./donut-legend").then((m) => m.DonutConLeyenda),
+  { ssr: false, loading: () => <ChartSkeleton height={240} /> },
+);
+
 export const PerformanceChart = dynamic(
   () => import("./area-chart").then((m) => m.PerformanceChart),
   { ssr: false, loading: () => <ChartSkeleton /> },

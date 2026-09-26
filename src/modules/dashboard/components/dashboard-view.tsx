@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
+import { DonutConLeyenda, type DonutDatum } from "@/components/charts/lazy";
 import { Icon } from "@/components/ui/icon";
 import { AgentMark } from "@/components/ui/agent-mark";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
@@ -298,39 +298,19 @@ function CompositionCard({
           Detalle <Icon name="chev" width={2.2} />
         </Link>
       </div>
-      <div
-        style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14, flexWrap: "wrap" }}
-      >
-        <DonutChart
-          data={donutData}
-          centerLabel={formatCompact(expenseMonthly, currency)}
-          centerSub="al mes"
-        />
-        <div style={{ flex: 1, minWidth: 140, display: "flex", flexDirection: "column", gap: 8 }}>
-          {donutData.length === 0 ? (
-            <span className="muted" style={{ fontSize: 12.5 }}>
-              Agrega gastos en tu Base Financiera.
-            </span>
-          ) : (
-            donutData.slice(0, 5).map((d) => (
-              <div
-                key={d.name}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "10px 1fr auto",
-                  gap: 9,
-                  alignItems: "center",
-                  fontSize: 12.5,
-                }}
-              >
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
-                <span style={{ color: "var(--ink-2)" }}>{d.name}</span>
-                <span className="muted tnum">{formatMoney(d.value, currency)}</span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      <DonutConLeyenda
+        data={donutData}
+        currency={currency}
+        centerLabel={formatCompact(expenseMonthly, currency)}
+        centerSub="al mes"
+        // Taxonomía FIJA: los bloques de gasto son nueve y cada uno significa algo. Se
+        // muestran todos, en el orden canónico de `EXPENSE_NATURES`. Plegarlos en «Otras N»
+        // —como se hacía— tapaba justo lo que esta tarjeta viene a responder: en qué se va el
+        // dinero por bloque. Y que un bloque desaparezca porque este mes gastó poco hace
+        // imposible comparar dos meses.
+        modo="taxonomia"
+        vacio="Agrega gastos en tu Base Financiera."
+      />
     </div>
   );
 }

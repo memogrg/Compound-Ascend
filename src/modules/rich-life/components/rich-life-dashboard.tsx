@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
+import { DonutConLeyenda, type DonutDatum } from "@/components/charts/lazy";
 import { textoPasivos } from "@/modules/rich-life/engine/pasivos-texto";
 import { DeleteButton } from "./delete-button";
 import { EditRichButton, AddRichButton } from "./rich-actions";
@@ -516,49 +516,12 @@ function DonutCard({
   return (
     <div className="card card-pad">
       <div className="card-title">{title}</div>
-      <div
-        style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14, flexWrap: "wrap" }}
-      >
-        <DonutChart data={data} centerLabel={formatCompact(total, currency)} />
-        <div style={{ flex: 1, minWidth: 140, display: "flex", flexDirection: "column", gap: 8 }}>
-          {data.length === 0 ? (
-            <span className="muted" style={{ fontSize: 12.5 }}>
-              {empty}
-            </span>
-          ) : (
-            data.map((d) => (
-              <div
-                key={d.name}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "10px 1fr auto",
-                  gap: 9,
-                  alignItems: "center",
-                  fontSize: 12.5,
-                }}
-              >
-                <span style={{ width: 9, height: 9, borderRadius: 3, background: d.color }} />
-                <span
-                  style={{
-                    color: "var(--muted)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {d.name}
-                </span>
-                <span
-                  className="tnum"
-                  style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--muted)" }}
-                >
-                  {formatMoney(d.value, currency)}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      <DonutConLeyenda
+        data={data}
+        currency={currency}
+        centerLabel={formatCompact(total, currency)}
+        vacio={empty}
+      />
     </div>
   );
 }
