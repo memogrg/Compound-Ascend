@@ -112,14 +112,28 @@ export const CATEGORY_DEFAULT_NATURE: Record<string, string> = {
 };
 
 /** Color por naturaleza (tokens del design system) para gráficos. */
+/**
+ * Un color por BLOQUE de la taxonomía de gasto. Es una paleta categórica: su trabajo es que
+ * nueve bloques se distingan entre sí, y eso se mide (`tests/unit/contraste-paleta.test.ts`).
+ *
+ * La versión anterior apuntaba a tokens SEMÁNTICOS (`--c-expense`, `--warn`, `--c-invest`…)
+ * y tenía tres colisiones exactas que nadie veía porque son alias encadenados: `--c-expense`
+ * y `--warn` desembocan los dos en `--s2`, `--c-invest` en `--info` igual que `crecimiento`,
+ * y `--teal` en `--s6` igual que `ahorro`. Leyendo esta lista los nueve valores parecen
+ * distintos; resueltos, eran seis — y la dona del panel pintaba dos bloques del mismo ocre.
+ *
+ * Ahora apunta a la paleta de GRÁFICOS, que ya está validada para daltonismo, más dos tonos
+ * nuevos (`--s7` oliva y `--s8` vino) buscados para completar los nueve sin bajar de ΔE 8 en
+ * ninguna de las cuatro visiones. El orden es el canónico de `EXPENSE_NATURES`.
+ */
 export const NATURE_COLOR: Record<string, string> = {
-  esencial: "var(--c-expense)",
-  estilo_vida: "var(--warn)",
-  financiero: "var(--c-debt)",
-  proteccion: "var(--c-protect)",
-  crecimiento: "var(--info)",
-  ahorro: "var(--c-savings)",
-  inversion: "var(--c-invest)",
-  donacion: "var(--teal)",
+  esencial: "var(--chart-3)",
+  estilo_vida: "var(--s7)",
+  financiero: "var(--chart-5)",
+  proteccion: "var(--chart-1)",
+  crecimiento: "var(--chart-2)",
+  ahorro: "var(--chart-6)",
+  inversion: "var(--chart-4)",
+  donacion: "var(--s8)",
   miscelaneo: "var(--muted-2)",
 };

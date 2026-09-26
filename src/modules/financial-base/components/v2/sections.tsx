@@ -86,15 +86,20 @@ import type {
 } from "@/modules/financial-base/types";
 import { monthParam, type RangeKey } from "@/modules/financial-base/engine/period";
 
+/**
+ * La paleta de las donas de CATEGORÍA. Son los seis tonos de gráfico, que es la única paleta
+ * del repo validada para daltonismo (`tests/unit/contraste-paleta.test.ts`), y son seis
+ * porque seis es lo que la leyenda muestra antes de agrupar el resto en «Otras N»: con la
+ * lista anterior —ocho tokens semánticos, varios de ellos alias del mismo color— y
+ * veinticinco categorías, el índice daba la vuelta tres veces y la dona repetía colores.
+ */
 const PALETTE = [
-  "var(--pos)",
-  "var(--info)",
-  "var(--gold)",
-  "var(--teal)",
-  "var(--c-networth)",
-  "var(--warn)",
-  "var(--c-protect)",
-  "var(--muted-2)",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
 ];
 
 const PRESSURE: Record<FinancialPressure, { label: string; tone: MetricTone }> = {
@@ -385,12 +390,14 @@ export function MiBaseSection({ view }: { view: V2View }) {
           data={donutData(real.incomeByKey)}
           total={real.realIncome}
           currency={currency}
+          modo="lista"
         />
         <DonutCard
           title="E · Composición de gastos"
           data={donutData(real.expenseByKey)}
           total={real.realExpense}
           currency={currency}
+          modo="lista"
         />
       </section>
 
@@ -419,11 +426,13 @@ function DonutCard({
   data,
   total,
   currency,
+  modo,
 }: {
   title: string;
   data: DonutDatum[];
   total: number;
   currency: string;
+  modo?: "taxonomia" | "lista";
 }) {
   return (
     <div className="card card-pad">
@@ -433,6 +442,7 @@ function DonutCard({
         currency={currency}
         centerLabel={formatCompact(total, currency)}
         centerSub="al mes"
+        modo={modo}
         vacio="Sin datos este mes."
       />
     </div>
@@ -524,6 +534,7 @@ export function IncomeExpenseSection({
           data={donutData(real.expenseByKey)}
           total={realTotal}
           currency={currency}
+          modo="lista"
         />
       </section>
 
@@ -664,6 +675,7 @@ function IncomeSection({ view }: { view: V2View }) {
           data={donutData(incomeByManualSource)}
           total={realIncome}
           currency={currency}
+          modo="lista"
         />
       </section>
 

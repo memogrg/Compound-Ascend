@@ -303,11 +303,12 @@ function CompositionCard({
         currency={currency}
         centerLabel={formatCompact(expenseMonthly, currency)}
         centerSub="al mes"
-        // El panel es un resumen: cinco filas y el resto agrupado en «Otras N», que lleva su
-        // monto y su porcentaje. Antes se cortaba en cinco SIN decirlo, así que los
-        // porcentajes —que no había— no habrían sumado el total y las categorías sobrantes
-        // desaparecían sin dejar rastro.
-        maxFilas={5}
+        // Taxonomía FIJA: los bloques de gasto son nueve y cada uno significa algo. Se
+        // muestran todos, en el orden canónico de `EXPENSE_NATURES`. Plegarlos en «Otras N»
+        // —como se hacía— tapaba justo lo que esta tarjeta viene a responder: en qué se va el
+        // dinero por bloque. Y que un bloque desaparezca porque este mes gastó poco hace
+        // imposible comparar dos meses.
+        modo="taxonomia"
         vacio="Agrega gastos en tu Base Financiera."
       />
     </div>
