@@ -34,8 +34,8 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Cache de build Next
         uses: actions/cache@v5
@@ -274,8 +274,8 @@ jobs:
       # requiere WebSocket nativo (ausente en Node 20). Ver issue #94.
       - uses: actions/setup-node@v6
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
 
       - run: npm ci
 
@@ -294,7 +294,6 @@ jobs:
         run: |
           echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
           echo "::notice::registro sin fijar: el CLI probará public.ecr.aws, luego ghcr.io y luego docker.io"
-
 
       # ── Autenticación de registros, ANTES de cualquier `supabase start` ──────────────
       #
@@ -436,5 +435,253 @@ jobs:
         with:
           name: e2e-playwright-results
           path: /tmp/compound-e2e-results
+          retention-days: 7
+          if-no-files-found: ignore
+
+  e2e_nav_v2:
+    name: E2E nav-v2
+    runs-on: ubuntu-24.04
+    needs: ci
+    if: github.event_name == 'pull_request'
+    env:
+      # Solo para poder preguntar por su existencia en el `if` de los pasos de login.
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      # ─────────────────────────────────────────────────────────────────────────────────
+      # LA CAUSA RAÍZ de que estos dos jobs llevaran días en rojo, y no es el rate limit.
+      #
+      # `supabase/setup-cli@v2` exporta `SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io`. En el
+      # CLI 2.109.1 —comprobado en el binario de esa versión exacta— esa variable no elige
+      # un registro PREFERIDO: **apaga el fallback**.
+      #
+      #   registros(imagen) = env puesta ? [solo ese] : [public.ecr.aws, ghcr.io, docker.io]
+      #
+      # Por eso el error decía «failed to pull docker image from all registries: ghcr.io/…»
+      # con un solo registro en la lista: era la lista entera. Y por eso el limitador de
+      # ghcr.io sobre la IP del runner bastaba para tumbar el job.
+      #
+      # Vacía ⇒ el CLI la trata como ausente (`trim()`, `length === 0`) y recupera su
+      # comportamiento por defecto: **public.ecr.aws primero**, con ghcr.io y docker.io
+      # detrás. Comprobado que las ocho imágenes existen en `public.ecr.aws/supabase/*` con
+      # exactamente los mismos tags.
+      #
+      # OJO: ponerla acá NO basta, y la primera corrida verde lo demostró bajando igual de
+      # ghcr.io. `setup-cli` la exporta por `$GITHUB_ENV`, y eso GANA al `env` del job en
+      # todos los pasos siguientes. Hay que volver a vaciarla DESPUÉS de ese paso; se deja
+      # aquí igualmente para que el valor sea explícito allá donde se lea.
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
+      # El smoke abre un navegador, inicia sesión y navega: necesita Postgres, kong, gotrue,
+      # postgrest, realtime y storage. Fuera quedan los cinco que nada de eso toca — Studio,
+      # imgproxy, mailpit (el usuario se siembra ya confirmado) y el par logflare + vector.
+      EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
+    steps:
+      - uses: actions/checkout@v7
+
+      # Node 22: supabase-js >=2.1xx inicializa Realtime en `createClient` y
+      # requiere WebSocket nativo (ausente en Node 20). Ver issue #94.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          # Misma versión que el job de migraciones, y del mismo sitio: el `env` del workflow.
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+        env:
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Deshace lo que `setup-cli` acaba de exportar. Sin esto el CLI se queda con un único
+      # registro y perdemos el fallback — que es exactamente lo que tenía a `main` en rojo.
+      - name: Recuperar el fallback de registros del CLI
+        run: |
+          echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
+          echo "::notice::registro sin fijar: el CLI probará public.ecr.aws, luego ghcr.io y luego docker.io"
+
+      # ── Autenticación de registros, ANTES de cualquier `supabase start` ──────────────
+      #
+      # `supabase start` baja TRECE imágenes y **todas** salen de ghcr.io/supabase/*:
+      # postgres, gotrue, postgrest, realtime, storage-api, imgproxy, edge-runtime,
+      # postgres-meta, studio, logflare, vector, mailpit y kong. Ninguna de Docker Hub.
+      #
+      # Anónimamente, ghcr.io limita por IP, y la IP es la del runner compartido de
+      # GitHub: el error es `toomanyrequests: allowed: 44000/minute`, que no es culpa de
+      # este repo y no se arregla esperando —tres reintentos repartidos en 2,5 h dieron lo
+      # mismo—. Autenticado, la cuota pasa a contarse por usuario.
+      - name: Login en ghcr.io (cuota por usuario en vez de por IP del runner)
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Hoy NINGUNA imagen del stack viene de Docker Hub; este paso es preventivo, para el
+      # día en que el CLI de Supabase mueva alguna o añadamos un servicio propio.
+      #
+      # Sin `continue-on-error`, a propósito: `tests/unit/ci-guards.test.ts` prohíbe esa
+      # directiva en TODO el archivo —un job que se salta su propio veredicto ya nos costó
+      # un incidente— y no hace falta, porque el `if` ya se encarga de lo único que se
+      # quería cubrir: que el PR no dependa de unos secrets que todavía no existen. Si el
+      # secret existe pero es inválido, que falle es lo correcto: una credencial rota tiene
+      # que verse.
+      - name: Login en Docker Hub (preventivo — hoy no se descarga nada de ahí)
+        # `env` y no `secrets`: el contexto `secrets` no existe en el `if` de un paso.
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Aviso si Docker Hub no está autenticado
+        if: env.DOCKERHUB_USERNAME == ''
+        run: |
+          echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las imágenes del stack salen de public.ecr.aws, con ghcr.io de respaldo."
+
+      # Este job NO cachea las imágenes, y es deliberado. Medido: descargarlas de
+      # public.ecr.aws tarda MENOS que restaurar el tarball y hacerle `docker load` (3m40s
+      # contra 4m36s), y las ocho ocupaban 1,07 GiB de un cupo de 10 GiB que el repo ya tenía
+      # lleno — desalojando las cachés de npm y de Next, que sí ahorran tiempo. La de
+      # `migrations` se queda porque ahí sí gana. Ver `scripts/ci/imagenes-supabase.sh`.
+      - name: Levantar el stack
+        run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
+
+      - name: Migraciones y variables del stack efímero
+        run: |
+          supabase migration up --local
+          # Exporta URL + claves del stack efímero al entorno del job.
+          # `supabase status -o env` entrecomilla los valores ("..."); hay que
+          # quitar las comillas o GITHUB_ENV las conserva literales y rompen la
+          # validación de URL en supabase-js (issue #94).
+          # El seeder usa SUPABASE_URL/SERVICE_ROLE_KEY; el dev server (npm run
+          # dev) lee NEXT_PUBLIC_SUPABASE_URL/ANON_KEY en runtime para el login.
+          supabase status -o env | while IFS='=' read -r key val; do
+            val="${val%\"}"; val="${val#\"}"
+            case "$key" in
+              API_URL)
+                echo "SUPABASE_URL=$val"
+                echo "NEXT_PUBLIC_SUPABASE_URL=$val"
+                ;;
+              ANON_KEY) echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$val" ;;
+              SERVICE_ROLE_KEY) echo "SUPABASE_SERVICE_ROLE_KEY=$val" ;;
+              DB_URL) echo "DB_URL=$val" ;;
+            esac
+          done >> "$GITHUB_ENV"
+
+      # Los grants a los roles de Supabase ahora viven en la migración
+      # 20260620000001_grants_public_roles.sql (issue #98), así que `supabase
+      # migration up` los aplica; ya no hace falta el paso de psql aquí.
+
+      - name: Seed usuario E2E
+        run: node scripts/seed-e2e-user.mjs
+        env:
+          E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+      # Datos mínimos para el smoke: presupuesto del MES EN CURSO (para que
+      # health.hasData sea true y /dashboard pinte el HERO en vez del
+      # EmptyState) y un holding (para que /patrimonio liste una posición).
+      #
+      # Va a budget_items y NO a income_sources: los indicadores se calculan
+      # desde el presupuesto vivo, no desde las tablas del Módulo 2 original
+      # —que ninguna pantalla escribe ya—. Sembrar income_sources dejaba al
+      # usuario E2E sin datos visibles y el smoke caía en el EmptyState.
+      #
+      # El gasto MANUAL es tan necesario como el ingreso: sin él el mes se
+      # considera "sin presupuesto" y los indicadores caen al mes cerrado
+      # anterior (que en una cuenta recién sembrada no existe), ver
+      # engine/periodo-indicadores.
+      #
+      # Sin created_by/last_edited_by: son columnas de auditoría nullables que
+      # agrega una migración dinámica (household_backfillable_tables) y el smoke
+      # no las necesita — nombrarlas ataría este seed a esa lista.
+      #
+      # Vía psql como superusuario: ni service_role ni authenticated tienen
+      # grant de INSERT en el stack local. Idempotente.
+      - name: Seed datos E2E (presupuesto + holding vía SQL superuser)
+        env:
+          E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
+        run: >
+          psql "$DB_URL" -v ON_ERROR_STOP=1
+          -c "insert into public.budget_items (user_id, type, name, amount, currency, frequency, period_year, period_month, income_type, source_kind)
+          select u.id, 'income', 'Salario E2E', 1000000, 'CRC', 'mensual',
+          extract(year from now())::int, extract(month from now())::int, 'activo', 'manual'
+          from auth.users u
+          where u.email = '$E2E_EMAIL'
+          and not exists (select 1 from public.budget_items b where b.user_id = u.id and b.type = 'income');
+          insert into public.budget_items (user_id, type, name, amount, currency, frequency, period_year, period_month, source_kind)
+          select u.id, 'expense', 'Vivienda E2E', 400000, 'CRC', 'mensual',
+          extract(year from now())::int, extract(month from now())::int, 'manual'
+          from auth.users u
+          where u.email = '$E2E_EMAIL'
+          and not exists (select 1 from public.budget_items b where b.user_id = u.id and b.type = 'expense');
+          insert into public.investment_holdings (user_id, symbol, asset_type, quantity, average_cost, cost_basis, currency, label)
+          select u.id, 'VOO', 'etf', 10, 400, 4000, 'USD', 'VOO'
+          from auth.users u
+          where u.email = '$E2E_EMAIL'
+          and not exists (select 1 from public.investment_holdings h where h.user_id = u.id);"
+
+      - name: Navegador Playwright
+        run: npx playwright install --with-deps chromium
+
+      # ── Lo propio de este job ───────────────────────────────────────────────────────
+      #
+      # `NEXT_PUBLIC_NAV_V2` se INLINEA en el bundle al compilar, así que no basta con
+      # ponerla al arrancar: hay que compilar con ella. Por eso este job hace su propio
+      # build en vez de reutilizar el del job `ci`.
+      - name: Compilar con la bandera encendida
+        run: npm run build
+        env:
+          NEXT_PUBLIC_NAV_V2: "1"
+
+      # Se comprueba el ARTEFACTO, no el código de salida: un build que no arranca deja el
+      # `.next` anterior y todo lo que viene después mide la versión equivocada.
+      - name: Verificar que la bandera llegó al bundle
+        run: |
+          if ! grep -rq "tb2-search" .next/static/chunks/*.js; then
+            echo "::error::NEXT_PUBLIC_NAV_V2 no llegó al bundle"
+            exit 1
+          fi
+          echo "bandera presente en el bundle"
+
+      # El servidor CONGELADO, que es contra el que corre la suite de accesibilidad: reloj
+      # fijo y red externa cortada, para que dos corridas midan lo mismo.
+      - name: Servidor congelado
+        run: |
+          npm run qa:start -- --port 3001 &
+          # Espera activa con curl en vez de `npx wait-on`: esa descarga un paquete que no
+          # está en el lockfile, y un job de CI no debería traerse dependencias de la red
+          # que nadie fijó.
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:3001/login; then
+              echo "servidor arriba tras ${i}s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::el servidor congelado no respondió en 120s"
+          exit 1
+        env:
+          NEXT_PUBLIC_NAV_V2: "1"
+
+      - name: Specs de la bandera (15 pruebas)
+        run: npx playwright test -c playwright.a11y.config.ts bottom-nav-v2 command-palette mobile-nav-v2
+        env:
+          E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          A11Y_BASE_URL: http://localhost:3001
+
+      # Evidencia del fallo: Playwright ya guarda screenshot + trace en
+      # /tmp/compound-e2e-results (only-on-failure / retain-on-failure); sin
+      # subirlos no se pueden inspeccionar. Útil para diagnosticar el smoke.
+
+      - name: Subir evidencia nav-v2 (si falla)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nav-v2-playwright-results
+          path: /tmp/compound-a11y-results
           retention-days: 7
           if-no-files-found: ignore

@@ -13,6 +13,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Browser } from "@playwright/test";
 
+import { apareceA, irA } from "./navegar";
 import { ESTADO_SESION } from "./sesion";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -38,13 +39,15 @@ let banderaEncendida = false;
 test.beforeAll(async ({ browser }) => {
   const ctx = await browser.newContext({ storageState: ESTADO_SESION });
   const page = await ctx.newPage();
-  await page.goto("/m/gastos", { waitUntil: "networkidle", timeout: 60_000 });
+  await irA(page, "/m/gastos", ".m-shell");
   // `button.tb2-search` es del topbar de la WEB y no existe en el shell móvil: con esa
   // sonda estos cuatro casos se saltaban incluso con la bandera encendida — verde sin
   // haber probado nada, que es justo lo que la sonda venía a evitar. El detector móvil son
   // las pestañas de núcleo (`.mn2-tabs`), que `mobile-header` solo pinta bajo bandera. Se
   // mira en `/m/gastos` y no en `/m`: el Inicio no lleva pestañas de núcleo.
-  banderaEncendida = (await page.locator(".mn2-tabs").count()) > 0;
+  // Se ESPERA un rato corto: las pestañas son cliente, y contar al instante las daba por
+  // ausentes en CI aunque la bandera estuviera encendida.
+  banderaEncendida = await apareceA(page, ".mn2-tabs");
   await ctx.close();
 });
 
@@ -60,8 +63,8 @@ async function abrirMovil(browser: Browser, ruta: string) {
     reducedMotion: "reduce",
   });
   const page = await ctx.newPage();
-  await page.goto(ruta, { waitUntil: "networkidle", timeout: 60_000 });
-  await page.waitForTimeout(600);
+  // `/m` (Inicio) no lleva pestañas de núcleo, así que el ancla común es el shell móvil.
+  await irA(page, ruta, ".m-shell");
   return { ctx, page };
 }
 
@@ -103,7 +106,10 @@ test("las pestañas del núcleo navegan y marcan la activa", async ({ browser })
   await expect(tabs.getByRole("link", { name: "Deudas" })).toHaveAttribute("aria-current", "page");
 
   // Son RUTAS, no paneles: no hay tablist que un lector anuncie con flechas.
-  expect(await page.locator('[role="tablist"]').count(), "no debería haber tablist").toBe(0);
+  // `toHaveCount` y no `expect(await …count())`: la aserción web REINTENTA. Lo de arriba
+  // era una foto instantánea, y este spec mide un header que se termina de decidir en el
+  // cliente — con la foto se leía el estado servido, no el final.
+  await expect(page.locator('[role="tablist"]'), "no debería haber tablist").toHaveCount(0);
 
   await tabs.getByRole("link", { name: "Metas" }).click();
   await page.waitForURL(/\/m\/metas/, { timeout: 20_000 });
@@ -127,12 +133,16 @@ test("el eyebrow sale del modelo, y Asesor no tiene barra", async ({ browser }) 
   // Y donde dirían lo mismo, no se pinta: «PATRIMONIO» sobre «Patrimonio» solo repite.
   const { ctx, page } = await abrirMovil(browser, "/m/patrimonio");
   await expect(page.locator(".m-topbar .m-hd-title")).toHaveText("Patrimonio");
-  expect(await page.locator(".m-topbar .ov").count(), "eyebrow repetido").toBe(0);
+  // El servidor pinta el eyebrow con el nombre del NÚCLEO y el cliente lo quita cuando
+  // coincide con el título —medido: `.ov` vale 1 a los 0 ms y 0 a los 200—, así que la foto
+  // instantánea leía «Patrimonio» dos veces. Es un parpadeo real de la app, anotado aparte;
+  // acá se afirma el estado final, que es lo que el caso dice comprobar.
+  await expect(page.locator(".m-topbar .ov"), "eyebrow repetido").toHaveCount(0);
   await ctx.close();
 
   // Asesor tiene una sola pantalla: una pestaña sola no es una barra.
   const b = await abrirMovil(browser, "/m/asistente");
-  expect(await b.page.locator("nav.mn2-tabs").count()).toBe(0);
+  await expect(b.page.locator("nav.mn2-tabs")).toHaveCount(0);
   await b.ctx.close();
 });
 
