@@ -26,6 +26,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Browser, type Locator, type Page } from "@playwright/test";
 
+import { apareceA, irA } from "./navegar";
 import { ESTADO_SESION } from "./sesion";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -61,9 +62,12 @@ let banderaEncendida = false;
 test.beforeAll(async ({ browser }) => {
   const ctx = await browser.newContext({ storageState: ESTADO_SESION });
   const page = await ctx.newPage();
-  await page.goto(RUTA, { waitUntil: "networkidle", timeout: 60_000 });
+  await irA(page, RUTA);
   // El botón buscador del topbar v2 solo existe bajo bandera: es el detector más barato.
-  banderaEncendida = (await page.locator("button.tb2-search").count()) > 0;
+  // Se ESPERA un rato corto en vez de contar al instante: bajo bandera el botón es cliente
+  // y en CI la hidratación llega bastante después del HTML — contar sin esperar saltaba los
+  // seis casos en silencio. «No aparece» sigue significando bandera apagada.
+  banderaEncendida = await apareceA(page, "button.tb2-search");
   await ctx.close();
 });
 
@@ -79,9 +83,34 @@ async function abrirPanel(browser: Browser, ruta: string = RUTA) {
     reducedMotion: "reduce",
   });
   const page = await ctx.newPage();
-  await page.goto(ruta, { waitUntil: "networkidle", timeout: 60_000 });
-  await page.waitForTimeout(600);
+  await irA(page, ruta, "button.tb2-search");
   return { ctx, page };
+}
+
+/**
+ * Abre la paleta y no vuelve hasta que la lista está poblada.
+ *
+ * Pulsar `Control+k` y leer las opciones en la misma línea es una carrera: el diálogo y su
+ * lista se montan en el cliente, y en CI eso llega bastante después del HTML. Se veía como
+ * «element(s) not found» sobre el primer `option`, que parece un selector roto y no lo es.
+ */
+async function abrirPaleta(page: Page) {
+  // El atajo es un `keydown` que monta React: antes de hidratar, la pulsación se pierde sin
+  // dejar rastro y el fallo sale como «element(s) not found» sobre el combobox, que parece
+  // un selector roto. Se reintenta en vez de esperar más: no hay ninguna señal en el DOM
+  // que diga «ya hidraté», y tres pulsaciones de más no cambian nada si la primera prendió.
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press("Control+k");
+    // Se ESPERA a que aparezca antes de decidir reintentar. Un `isVisible()` justo después
+    // de la tecla siempre da `false` —abrir es un cambio de estado de React, no es
+    // síncrono— y el reintento volvía a pulsar el atajo, que ALTERNA: la segunda pulsación
+    // cerraba la paleta que la primera acababa de abrir. El reintento fabricaba el fallo
+    // que venía a evitar.
+    if (await apareceA(page, '[role="combobox"][aria-label="Buscar o ir a…"]', 2_000)) break;
+  }
+  await expect(combobox(page)).toBeVisible();
+  await expect(page.getByRole("listbox", { name: "Resultados" })).toBeVisible();
+  await expect(opciones(page).first()).toBeVisible();
 }
 
 /** Nodos por impacto, aplanados: una regla puede afectar decenas de elementos. */
@@ -181,7 +210,7 @@ test("el foco entra al input, Enter navega conservando el periodo y Escape lo de
   await expect(boton).toBeVisible();
 
   // Abrir con el atajo: el foco tiene que quedar EN el input, no en el diálogo.
-  await page.keyboard.press("Control+k");
+  await abrirPaleta(page);
   await expect(combobox(page)).toBeFocused();
 
   // Escape cierra y devuelve el foco a quien lo tenía: el botón del topbar. Sin esto,
@@ -210,7 +239,7 @@ test("el foco entra al input, Enter navega conservando el periodo y Escape lo de
 test("las flechas envuelven y la opción activa se anuncia", async ({ browser }) => {
   const { ctx, page } = await abrirPanel(browser);
 
-  await page.keyboard.press("Control+k");
+  await abrirPaleta(page);
   const input = combobox(page);
   const primera = opciones(page).first();
   const ultima = opciones(page).last();
@@ -257,15 +286,22 @@ test("si la persona estaba en un campo, Escape la devuelve A SU CAMPO", async ({
 test("la opción activa se mantiene a la vista al bajar con el teclado", async ({ browser }) => {
   const { ctx, page } = await abrirPanel(browser);
 
-  await page.keyboard.press("Control+k");
+  await abrirPaleta(page);
   const lista = page.getByRole("listbox", { name: "Resultados" });
-  const total = await opciones(page).count();
   // Sin consulta la paleta ofrece el menú completo, que no cabe en la altura de la lista:
   // si no se hiciera scroll, el activo terminaría fuera del contenedor.
-  expect(total, "hacen falta más opciones de las que caben").toBeGreaterThan(10);
+  await expect.poll(() => opciones(page).count(), { timeout: 10_000 }).toBeGreaterThan(10);
 
-  for (let i = 1; i < total; i++) await page.keyboard.press("ArrowDown");
-  const ultima = opciones(page).nth(total - 1);
+  // Se BAJA hasta la última en vez de contar primero y pulsar N−1 veces. Contar es una foto
+  // instantánea: si se saca mientras la lista todavía se está llenando, el total sale corto
+  // y las flechas se quedan a mitad de camino — fallo intermitente, y solo en CI, que es
+  // donde la lista tarda en llenarse. El tope del bucle es una guarda contra colgarse, no
+  // una cuenta de opciones.
+  const ultima = opciones(page).last();
+  for (let i = 0; i < 80; i++) {
+    if ((await ultima.getAttribute("aria-selected")) === "true") break;
+    await page.keyboard.press("ArrowDown");
+  }
   await expect(ultima).toHaveAttribute("aria-selected", "true");
   await dentroDeLaLista(lista, ultima, "última");
 
