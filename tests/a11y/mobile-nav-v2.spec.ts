@@ -133,11 +133,14 @@ test("el eyebrow sale del modelo, y Asesor no tiene barra", async ({ browser }) 
   // Y donde dirían lo mismo, no se pinta: «PATRIMONIO» sobre «Patrimonio» solo repite.
   const { ctx, page } = await abrirMovil(browser, "/m/patrimonio");
   await expect(page.locator(".m-topbar .m-hd-title")).toHaveText("Patrimonio");
-  // El servidor pinta el eyebrow con el nombre del NÚCLEO y el cliente lo quita cuando
-  // coincide con el título —medido: `.ov` vale 1 a los 0 ms y 0 a los 200—, así que la foto
-  // instantánea leía «Patrimonio» dos veces. Es un parpadeo real de la app, anotado aparte;
-  // acá se afirma el estado final, que es lo que el caso dice comprobar.
-  await expect(page.locator(".m-topbar .ov"), "eyebrow repetido").toHaveCount(0);
+  // Conteo DIRECTO otra vez: el parpadeo se arregló en el origen —el esqueleto ya no adivina
+  // el texto— y no hay ningún estado intermedio que esperar. Si vuelve, este caso lo caza en
+  // la primera foto.
+  //
+  // `:not(.ov-reserva)` porque lo que se prohíbe es un eyebrow con TEXTO que repita el
+  // título. El hueco vacío que reserva el esqueleto lleva la misma clase `.ov` —tiene que
+  // llevarla, o no mediría lo mismo— y contarlo haría fallar el caso por el arreglo.
+  expect(await page.locator(".m-topbar .ov:not(.ov-reserva)").count(), "eyebrow repetido").toBe(0);
   await ctx.close();
 
   // Asesor tiene una sola pantalla: una pestaña sola no es una barra.

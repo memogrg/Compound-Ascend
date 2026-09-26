@@ -10,6 +10,10 @@ import { MobileHeader } from "../components/mobile-header";
  *
  * Header sin título a propósito: el título real llega con la página y escribir uno
  * aquí obligaría a adivinarlo, con el costo de mostrar el equivocado por un instante.
+ * Sin título tampoco hay eyebrow —`EyebrowNucleo` no pinta sin uno—, y es la misma
+ * razón: el eyebrow del modelo se compara con el título para no repetirlo, así que
+ * pintarlo acá era adivinar. En `/m/patrimonio` la adivinanza salía mal y el eyebrow
+ * aparecía y desaparecía al llegar la página.
  * Los tres bloques son los altos que más se repiten (resumen, cuerpo, secundario) —
  * no calcan ninguna pantalla, solo evitan que el contenido salte al llegar.
  */
