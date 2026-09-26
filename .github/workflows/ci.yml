@@ -667,7 +667,7 @@ jobs:
           NEXT_PUBLIC_NAV_V2: "1"
 
       - name: Specs de la bandera (15 pruebas)
-        run: npx playwright test -c playwright.a11y.config.ts bottom-nav-v2 command-palette mobile-nav-v2
+        run: npx playwright test -c playwright.a11y.config.ts _diag-networkidle bottom-nav-v2 command-palette mobile-nav-v2
         env:
           E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
