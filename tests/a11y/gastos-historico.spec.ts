@@ -71,9 +71,24 @@ test("el presupuesto es una serie mensual en escalón, no un total del rango", a
     .filter((x): x is string => Boolean(x))
     .map(aNumero);
   expect(presupuestos.length, `no se leyeron presupuestos de: ${filas.join(" // ")}`).toBe(3);
-  // Si fuera una línea horizontal, los tres serían idénticos. Basta con que el último
-  // difiera para demostrar que cada mes lleva el suyo.
-  expect(new Set(presupuestos).size, `presupuestos: ${presupuestos.join(", ")}`).toBeGreaterThan(1);
+
+  // La versión anterior exigía que los meses DIFIRIERAN entre sí, y eso no es la
+  // propiedad: un presupuesto estable tres meses seguidos es perfectamente normal —de
+  // hecho es lo que tiene la demo desde que se resembraron sus partidas derivadas—. Lo que
+  // se quiere demostrar es otra cosa: que cada punto lleva el presupuesto de SU MES y no el
+  // total del rango. Se compara contra el titular, que sí es el total.
+  const planificado = page.getByText(/Gasto planificado/i).first();
+  await expect(planificado).toHaveCount(1);
+  const total = aNumero(
+    /₡[\d.]+/.exec(await planificado.locator("xpath=..").innerText())?.[0] ?? "0",
+  );
+  expect(total, "no se leyó el titular").toBeGreaterThan(0);
+  for (const p of presupuestos) {
+    expect(p, `mes ${p} contra total ${total}`).toBeLessThan(total);
+  }
+  // Y el total tiene que ser la SUMA de los meses, no otra cosa.
+  const suma = presupuestos.reduce((a, b) => a + b, 0);
+  expect(Math.abs(suma - total), `suma ${suma} vs total ${total}`).toBeLessThanOrEqual(3);
   await ctx.close();
 });
 
