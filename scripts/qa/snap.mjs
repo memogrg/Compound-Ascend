@@ -188,6 +188,34 @@ async function recorrerPagina(page) {
 }
 
 /**
+ * Lo que se OCULTA en toda captura porque no es determinista y no depende del diseño.
+ *
+ * Solo el badge de la campana, por ahora. Muestra el número de insights activos, y ese
+ * número cambia entre corridas: los detectores crean y resuelven filas según el estado de la
+ * cuenta, y con el reloj CONGELADO la guarda de frescura de `refreshInsights()` no rota
+ * nunca, así que la primera lectura de una corrida puede refrescar y la siguiente no. El
+ * resultado era un cuadrito rojo de 16 px que aparecía, desaparecía o cambiaba de cifra en
+ * media docena de pantallas, y cada diff visual había que mirarlo para descartarlo.
+ *
+ * `visibility: hidden` y no `display: none`: el badge está en posición absoluta, así que
+ * ninguna de las dos mueve nada — pero con `visibility` la caja sigue ahí y un cambio de
+ * TAMAÑO del badge seguiría saliendo en el diff como corrimiento de lo que tenga al lado.
+ * Lo que se renuncia a vigilar es su color y su cifra, a cambio de que el resto del diff
+ * signifique algo.
+ */
+const OCULTAR_EN_CAPTURA = [".bell-badge"];
+
+async function enmascararNoDeterminista(page) {
+  try {
+    await page.addStyleTag({
+      content: `${OCULTAR_EN_CAPTURA.join(",")}{visibility:hidden !important}`,
+    });
+  } catch {
+    /* la página se fue: la captura fallará por su cuenta y con mejor mensaje */
+  }
+}
+
+/**
  * Lleva toda animación y TRANSICIÓN a su estado final.
  *
  * `animations: "disabled"` del screenshot congela animaciones, no transiciones: el revelado del
@@ -289,6 +317,32 @@ async function main() {
     process.exit(2);
   }
 
+  /**
+   * `--rutas /gastos,/dashboard` captura SOLO esas, por coincidencia exacta de `path`.
+   *
+   * Para comprobar un cambio acotado, las 200 pantallas son 40 minutos para mirar dos. El
+   * inventario completo sigue siendo el defecto: esto se pide a propósito, y la corrida
+   * imprime cuáles quedaron para que nadie confunda un diff parcial con uno completo.
+   */
+  const soloRutas = args.rutas
+    ? new Set(
+        String(args.rutas)
+          .split(",")
+          .map((r) => r.trim())
+          .filter(Boolean),
+      )
+    : null;
+  const rutas = soloRutas ? ROUTES.filter((r) => soloRutas.has(r.path)) : ROUTES;
+  if (soloRutas) {
+    const encontradas = rutas.map((r) => r.path);
+    const faltan = [...soloRutas].filter((r) => !encontradas.includes(r));
+    if (faltan.length > 0) {
+      console.error(`Rutas que no están en routes.json: ${faltan.join(", ")}`);
+      process.exit(2);
+    }
+    console.log(`SOLO ${encontradas.length} ruta(s): ${encontradas.join(", ")}`);
+  }
+
   const freeze = instanteCongelado(args.freeze);
   // Render determinista: sin esto, dos corridas idénticas difieren en ±1-2 niveles de color en los
   // bordes (antialiasing de texto y degradados). Son 200 px invisibles, pero rompen la comparación
@@ -313,7 +367,7 @@ async function main() {
 
     for (const tema of temas) {
       for (const width of widths) {
-        for (const ruta of ROUTES) {
+        for (const ruta of rutas) {
           // Una superficie con anchos propios se salta el resto: no es un fallo, es que esa
           // pantalla no existe a ese ancho.
           const permitidos = anchosDe(ruta);
@@ -360,6 +414,7 @@ async function main() {
           await recorrerPagina(page);
           await esperarFuentes(page);
           await finalizarAnimaciones(page);
+          await enmascararNoDeterminista(page);
           const loadingResidual = await esperarSinCargando(page);
           const termsModal = await hayModalTerminos(page);
           if (termsModal) conTerminos++;

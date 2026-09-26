@@ -101,6 +101,12 @@ export function BellNotifications() {
         <Icon name="bell" />
         {count > 0 ? (
           <span
+            // Clase, además del estilo en línea: es el ancla con la que la captura de QA lo
+            // oculta. El número de insights activos cambia entre corridas —los detectores
+            // crean y resuelven filas— y con el reloj congelado la guarda de frescura no
+            // rota, así que el badge era el único píxel no determinista de media docena de
+            // pantallas. Ver `OCULTAR_EN_CAPTURA` en `scripts/qa/snap.mjs`.
+            className="bell-badge"
             style={{
               position: "absolute",
               top: 2,
