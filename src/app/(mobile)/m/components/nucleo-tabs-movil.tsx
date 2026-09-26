@@ -58,10 +58,32 @@ export function NucleoTabsMovil() {
  * donde el núcleo y la pantalla se llaman igual: «PATRIMONIO» sobre «Patrimonio» no añade
  * jerarquía, solo repite. La comprobación se aplica al texto que se iba a mostrar —venga
  * del modelo o del `fallback`—, porque el problema es el mismo en los dos casos.
+ *
+ * SIN TÍTULO no se escribe TEXTO, y esa es la regla que evita el parpadeo. Un eyebrow
+ * CUALIFICA a un título; sin título no cualifica nada, solo adivina. Quien monta este header
+ * sin título es el esqueleto de `loading.tsx` —el título real llega con la página—, y en
+ * `/m/patrimonio` el esqueleto pintaba «Patrimonio» (el núcleo) que la página borraba al
+ * llegar ~200 ms después, porque ahí el núcleo y la pantalla se llaman igual: quien abría la
+ * pantalla veía «Patrimonio / Patrimonio» un instante. Adivinar el eyebrow tiene el mismo
+ * costo que adivinar el título, que es justo lo que `loading.tsx` no hace.
+ *
+ * Pero el RENGLÓN sí se reserva. Medido sobre las quince rutas de `/m` a 390 px, quitar el
+ * eyebrow del esqueleto sin más dejaba el encabezado creciendo al llegar la página en seis de
+ * ellas:
+ *
+ *   /m/mi-base-financiera  +13,16 px      /m/deudas       +15 px
+ *   /m/inversiones         +13,16 px      /m/proteccion   +15 px
+ *   /m/indicadores         +15 px         /m/mi-perfil-financiero  +30 px
+ *
+ * Un salto de 15 px en el encabezado empuja la pantalla entera justo cuando el dedo ya está
+ * viajando hacia ella. El hueco va con un espacio de ancho cero: así lo alto de la caja lo
+ * decide la MISMA tipografía que el eyebrow real, sin un `min-height` que haya que mantener
+ * en sincronía con la fuente. `aria-hidden` porque no dice nada.
  */
 export function EyebrowNucleo({ fallback, title }: { fallback?: string; title?: string }) {
   const pathname = usePathname() ?? "/m";
   const searchParams = useSearchParams();
+  if (!title) return <div className="ov ov-reserva" aria-hidden="true" />;
   const texto = eyebrowDeRuta(pathname, searchParams?.toString() ?? null) ?? fallback;
   if (!texto || eyebrowRepiteTitulo(texto, title)) return null;
   return <div className="ov">{texto}</div>;
