@@ -361,10 +361,12 @@ test("«Composición por categoría» confiesa el rango que suma, igual que los 
 }) => {
   // El centro sumaba el RANGO y el subtítulo decía «al mes»: a tres meses, la Hipoteca son
   // tres cuotas y el total un trimestre, pero la tarjeta lo presentaba como un mes.
+  // Y con la NATURALEZA delante: el período dice cuándo, no qué. En una pantalla donde
+  // conviven presupuesto y gasto real, «de 3 meses» a secas se puede leer de las dos formas.
   for (const [rango, esperado] of [
-    ["1m", "del mes"],
-    ["3m", "de 3 meses"],
-    ["6m", "de 6 meses"],
+    ["1m", "gasto real del mes"],
+    ["3m", "gasto real de 3 meses"],
+    ["6m", "gasto real de 6 meses"],
   ] as const) {
     const { ctx, page } = await abrir(browser, `/gastos?range=${rango}`);
     const titulo = page.getByText("Composición por categoría").first();

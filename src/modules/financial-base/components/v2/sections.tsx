@@ -385,12 +385,16 @@ export function MiBaseSection({ view }: { view: V2View }) {
       </ChartCard>
 
       <section className="cols-2">
+        {/* Estas dos suman lo REAL (transacciones del periodo), no el presupuesto. El
+            subtítulo lo dice: decía «al mes», que da el período pero no la naturaleza, y con
+            una tarjeta hermana que suma presupuesto la diferencia no es cosmética. */}
         <DonutCard
           title="D · Composición de ingresos"
           data={donutData(real.incomeByKey)}
           total={real.realIncome}
           currency={currency}
           modo="lista"
+          sub="ingreso real del mes"
         />
         <DonutCard
           title="E · Composición de gastos"
@@ -398,6 +402,7 @@ export function MiBaseSection({ view }: { view: V2View }) {
           total={real.realExpense}
           currency={currency}
           modo="lista"
+          sub="gasto real del mes"
         />
       </section>
 
@@ -548,7 +553,7 @@ export function IncomeExpenseSection({
           total={realTotal}
           currency={currency}
           modo="lista"
-          sub={delRango}
+          sub={`gasto real ${delRango}`}
         />
       </section>
 
@@ -690,6 +695,7 @@ function IncomeSection({ view }: { view: V2View }) {
           total={realIncome}
           currency={currency}
           modo="lista"
+          sub="ingreso real del mes"
         />
       </section>
 
