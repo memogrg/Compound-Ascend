@@ -16,6 +16,7 @@ import "server-only";
  * (engine/derived-budget) y el índice único 0023 hace el sync idempotente.
  */
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
+import { logger } from "@/lib/logger";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import {
   diffDerived,
@@ -157,6 +158,15 @@ export async function ingresoPasivoDerivadoPromedio(
   return [...porHolding.values()];
 }
 
+/** Qué hizo (o qué haría, en simulacro) una corrida del sync para UN usuario y UN periodo. */
+export type ResumenSync = {
+  toInsert: number;
+  toUpdate: number;
+  toDelete: number;
+  /** Cuántas de las que insertaría, por `source_kind`. */
+  porOrigen: Record<string, number>;
+};
+
 export async function syncDerivedBudget(
   period: Period,
   /**
@@ -176,8 +186,17 @@ export async function syncDerivedBudget(
    * recorta con los importes de hoy — la cuota de una deuda que cambió en octubre no puede
    * reescribir septiembre.
    */
-  opciones?: { congelado?: boolean },
-): Promise<void> {
+  opciones?: {
+    congelado?: boolean;
+    /**
+     * Calcula y NO escribe. Es el modo que usa `x-dry-run: 1` contra producción: antes de
+     * soltar un barrido sobre la base de todos los usuarios, saber cuántas líneas tocaría y de
+     * qué origen. Un simulacro que escribe no es un simulacro, así que el caso que lo cubre
+     * mira TODAS las escrituras, no solo las de `budget_items`.
+     */
+    simulacro?: boolean;
+  },
+): Promise<ResumenSync> {
   const { db: supabase, userId } = await resolveAuth(ctx);
   const user = { id: userId };
 
@@ -522,6 +541,19 @@ export async function syncDerivedBudget(
     congelado: opciones?.congelado,
   });
 
+  const porOrigen: Record<string, number> = {};
+  for (const l of toInsert) porOrigen[l.sourceKind] = (porOrigen[l.sourceKind] ?? 0) + 1;
+  const resumen: ResumenSync = {
+    toInsert: toInsert.length,
+    toUpdate: toUpdate.length,
+    toDelete: toDeleteIds.length,
+    porOrigen,
+  };
+
+  // El corte del simulacro va ANTES de la primera escritura y después de TODO el cálculo: lo
+  // que reporta es exactamente lo que haría la corrida de verdad.
+  if (opciones?.simulacro) return resumen;
+
   if (toInsert.length > 0) {
     // household: las líneas derivadas comparten hogar igual que las manuales.
     const household_id = await getActiveHouseholdId(supabase, user.id);
@@ -571,6 +603,18 @@ export async function syncDerivedBudget(
     await supabase.from("budget_items").delete().in("id", toDeleteIds).eq("user_id", user.id);
   }
 
+  return finalizarSync(supabase, user.id, period, opciones, resumen);
+}
+
+/** Lo que queda después de escribir el diff: conciliación de renta y barrido de huérfanas. */
+async function finalizarSync(
+  supabase: AuthContext["db"],
+  userId: string,
+  period: Period,
+  opciones: { congelado?: boolean; simulacro?: boolean } | undefined,
+  resumen: ResumenSync,
+): Promise<ResumenSync> {
+  const user = { id: userId };
   // ── Nada de lo que sigue corre en modo congelado ──────────────────────────
   //
   // Las dos son escrituras correctas para el mes EN CURSO y prohibidas para uno cerrado, y las
@@ -578,7 +622,7 @@ export async function syncDerivedBudget(
   // hace UPDATE de `transactions`, y el barrido de huérfanas es CROSS-PERIOD, así que borraría
   // líneas derivadas de meses ya cerrados. `congelado` significa «solo insertar», y eso incluye
   // lo que viene después del diff.
-  if (opciones?.congelado) return;
+  if (opciones?.congelado) return resumen;
 
   // Conciliación de renta (C-2b): atribuye las transacciones de renta del
   // periodo (linked_kind='rental') a su línea derivada, llenando la barra
@@ -598,6 +642,112 @@ export async function syncDerivedBudget(
   } catch {
     // noop — se reintenta en la próxima carga.
   }
+  return resumen;
+}
+
+/**
+ * Materializa y CONGELA las líneas derivadas de un periodo ya cerrado, para todos los usuarios.
+ *
+ * ── EL ESCALÓN QUE CIERRA ───────────────────────────────────────────────────
+ * Hoy las líneas derivadas de un mes existen solo si su dueño abrió la app durante ese mes:
+ * `base-view` llama a `syncDerivedBudget` al cargar, y solo si el periodo no es anterior al
+ * actual. Quien no la abrió en septiembre ve, para siempre, un septiembre sin la parte derivada
+ * de su presupuesto —las cuotas de sus deudas, los aportes a sus metas, las primas— y el
+ * histórico de columnas le dibuja un escalón que no ocurrió. Y el snapshot mensual, que suma
+ * `budget_items` de ese periodo, lo hereda.
+ *
+ * ── SOLO INSERTA ────────────────────────────────────────────────────────────
+ * `congelado: true`: si el periodo ya tiene líneas derivadas, no se toca NINGUNA —ni se
+ * actualiza ni se borra—. Un mes cerrado no se reescribe con los importes de hoy: la cuota que
+ * subió en octubre no puede reescribir septiembre. Para quien sí abrió la app, esto es una
+ * no-operación exacta.
+ *
+ * Un usuario que falla no detiene el barrido y se registra con su id.
+ */
+export async function congelarDerivadasDelPeriodo(
+  period: Period,
+  opciones?: {
+    /**
+     * Simulacro: recorre a todos los usuarios, calcula lo que insertaría y NO escribe. Es lo
+     * que responde `x-dry-run: 1`, para poder mirar el alcance del barrido antes de soltarlo
+     * sobre la base de producción.
+     */
+    simulacro?: boolean;
+  },
+): Promise<{
+  users: number;
+  conLineas: number;
+  failed: number;
+  simulacro: boolean;
+  /** Solo en simulacro: qué insertaría por usuario. Id ACORTADO — no hace falta el completo. */
+  detalle?: { user: string; lineas: number; porOrigen: Record<string, number> }[];
+}> {
+  const simulacro = opciones?.simulacro === true;
+  const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
+  const admin = createServiceRoleClient();
+  const { data: users } = await admin.from("profiles").select("id");
+  let conLineas = 0;
+  let failed = 0;
+  const detalle: { user: string; lineas: number; porOrigen: Record<string, number> }[] = [];
+  for (const u of users ?? []) {
+    try {
+      if (simulacro) {
+        const r = await syncDerivedBudget(
+          period,
+          { db: admin, userId: u.id },
+          { congelado: true, simulacro: true },
+        );
+        if (r.toInsert > 0) {
+          conLineas += 1;
+          detalle.push({ user: u.id.slice(0, 8), lineas: r.toInsert, porOrigen: r.porOrigen });
+        }
+        continue;
+      }
+      const antes = await contarDerivadas(admin, u.id, period);
+      await syncDerivedBudget(period, { db: admin, userId: u.id }, { congelado: true });
+      const despues = await contarDerivadas(admin, u.id, period);
+      if (despues > antes) conLineas += 1;
+      // Invariante del modo congelado, comprobada en caliente: nunca puede haber MENOS líneas
+      // que antes. Si algún día pasa, es que una escritura se escapó del `congelado` y hay que
+      // enterarse por el log del cron, no por un histórico que cambió solo.
+      if (despues < antes) {
+        logger.warn("congelarDerivadasDelPeriodo: el periodo PERDIÓ líneas derivadas", {
+          userId: u.id,
+          period: period.label,
+          antes,
+          despues,
+        });
+      }
+    } catch (err) {
+      failed += 1;
+      logger.warn("congelarDerivadasDelPeriodo: un usuario falló", { userId: u.id, err });
+    }
+  }
+  return {
+    users: users?.length ?? 0,
+    conLineas,
+    failed,
+    simulacro,
+    // El detalle solo viaja en simulacro: en la corrida de verdad sería una lista de miles de
+    // ids en la respuesta de un cron que nadie lee.
+    ...(simulacro ? { detalle: detalle.sort((a, b) => b.lineas - a.lineas) } : {}),
+  };
+}
+
+/** Cuántas líneas derivadas tiene ese usuario en ese periodo. Solo para el log del cron. */
+async function contarDerivadas(
+  admin: AuthContext["db"],
+  userId: string,
+  period: Period,
+): Promise<number> {
+  const { count } = await admin
+    .from("budget_items")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("period_month", period.month)
+    .eq("period_year", period.year)
+    .neq("source_kind", "manual");
+  return count ?? 0;
 }
 
 /**
