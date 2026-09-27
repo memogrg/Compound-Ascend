@@ -88,7 +88,7 @@ export { buildWeeklyDigest, type WeeklyDigest } from "./engine/weekly-digest";
 export {
   getSnapshotHistory,
   generateAndSaveSnapshot,
-  ensureTodaySnapshot,
+  generatePortfolioSnapshotsForAllUsers,
 } from "./services/snapshot-service";
 export { getInvestmentInsights } from "./services/investment-insights";
 export { getMacroInsights, type MacroInsight } from "./services/macro-insights";
