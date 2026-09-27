@@ -48,7 +48,10 @@ test("login → dashboard → crear gasto → patrimonio → chat multilínea", 
   await modal.getByPlaceholder("Automercado, Uber, Netflix…").fill("Gasto e2e smoke");
   await modal.getByPlaceholder("0").fill("1234");
   // La categoría es obligatoria en registro manual: elegí el sobre "(general)" del primer frasco.
-  await modal.getByRole("button", { name: /\(general\)/ }).first().click();
+  await modal
+    .getByRole("button", { name: /\(general\)/ })
+    .first()
+    .click();
   await modal.getByRole("button", { name: /Guardar/ }).click();
   await expect(page.getByText("Gasto registrado")).toBeVisible({ timeout: 15_000 });
 
@@ -106,4 +109,38 @@ test("login → dashboard → crear gasto → patrimonio → chat multilínea", 
   // Y al enviar, el campo vuelve a una línea.
   await expect(campo).toHaveValue("");
   expect((await campo.boundingBox())?.height ?? 0).toBeLessThan(altoCrecido);
+
+  // 5) Con la bandera APAGADA, la barra inferior tampoco puede quedar tapada.
+  //
+  // Va aquí y no en un test aparte por el mismo motivo que el chat: el login tiene un
+  // reintento por 3 porque en dev el primer submit se pierde, y repetirlo duplicaría la parte
+  // más frágil del recorrido.
+  //
+  // Lo que se comprueba es la invariante, no un componente: en el centro de cada enlace de la
+  // barra, el elemento de más arriba tiene que pertenecer a la barra. Da igual quién se
+  // interponga. El que se interponía era la barra de re-aceptación legal, anclada a
+  // `bottom: 0` con z-index 60 contra los 45 de la navegación — y este job es el único que la
+  // ve, porque corre con los términos pendientes a propósito.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/dashboard");
+  await page.waitForLoadState("networkidle");
+  await expect(page.locator(".bottom-nav")).toBeVisible({ timeout: 30_000 });
+  const intrusos = await page.locator(".bottom-nav a").evaluateAll((enlaces) =>
+    enlaces
+      .map((a) => {
+        const r = a.getBoundingClientRect();
+        const encima = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        if (encima?.closest(".bottom-nav")) return null;
+        const cadena: string[] = [];
+        for (let n: Element | null = encima; n && cadena.length < 5; n = n.parentElement) {
+          cadena.push(
+            n.tagName.toLowerCase() +
+              (n.className ? `.${String(n.className).trim().split(/\s+/).join(".")}` : ""),
+          );
+        }
+        return `${a.getAttribute("href")} ← ${cadena.join(" > ") || "nada"}`;
+      })
+      .filter(Boolean),
+  );
+  expect(intrusos, "algo se pinta encima de la barra inferior v1").toEqual([]);
 });

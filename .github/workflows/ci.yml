@@ -417,6 +417,25 @@ jobs:
           where u.email = '$E2E_EMAIL'
           and not exists (select 1 from public.investment_holdings h where h.user_id = u.id);"
 
+      # Los términos, PENDIENTES también acá.
+      #
+      # `seed-e2e-user.mjs` los marca aceptados para que la barra de re-aceptación no tape el
+      # contenido que busca el smoke. El precio era que NINGÚN job de CI veía nunca esa barra,
+      # y por eso los dos daban verde mientras en local los cinco enlaces de la navegación
+      # inferior eran intocables: anclada a `bottom: 0` con z-index 60, la barra legal tapaba
+      # entera a la de navegación (z-index 45).
+      #
+      # Con el ancla arreglada, la barra ya no tapa nada y el smoke puede correr con ella
+      # montada — que es el estado de cualquier cuenta anterior al registro de términos. Su
+      # último paso comprueba exactamente eso con la bandera APAGADA.
+      - name: Dejar los términos PENDIENTES (para que la barra legal se monte)
+        env:
+          E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
+        run: >
+          psql "$DB_URL" -v ON_ERROR_STOP=1
+          -c "update public.profiles p set terms_version = null, terms_accepted_at = null
+          from auth.users u where u.id = p.id and u.email = '$E2E_EMAIL';"
+
       - name: Navegador Playwright
         run: npx playwright install --with-deps chromium
 
@@ -623,6 +642,27 @@ jobs:
           where u.email = '$E2E_EMAIL'
           and not exists (select 1 from public.investment_holdings h where h.user_id = u.id);"
 
+      # Y acá se DESHACE el `terms_version` que sembró seed-e2e-user.mjs, a propósito y
+      # solo en este job.
+      #
+      # El seed lo marca para que la barra de re-aceptación no tape el contenido que busca
+      # el smoke. El precio fue que este job —el único que mide la navegación inferior— no
+      # veía nunca esa barra, y por eso daba verde mientras en local los cinco enlaces eran
+      # intocables: anclada a `bottom: 0` con z-index 60, la barra legal tapaba entera a la
+      # de navegación (z-index 45). No era cuestión de tener más datos —la cuenta de CI casi
+      # no tiene— sino de una pieza de interfaz global que el seed apagaba.
+      #
+      # Con los términos pendientes, los specs de la bandera corren con el mismo cascarón
+      # que ve quien tiene una cuenta anterior al registro. El smoke, que sí necesita la
+      # pantalla despejada, corre en otro job con su propio seed y no se toca.
+      - name: Dejar los términos PENDIENTES (para que la barra legal se monte)
+        env:
+          E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
+        run: >
+          psql "$DB_URL" -v ON_ERROR_STOP=1
+          -c "update public.profiles p set terms_version = null, terms_accepted_at = null
+          from auth.users u where u.id = p.id and u.email = '$E2E_EMAIL';"
+
       - name: Navegador Playwright
         run: npx playwright install --with-deps chromium
 
@@ -667,7 +707,9 @@ jobs:
           NEXT_PUBLIC_NAV_V2: "1"
 
       - name: Specs de la bandera (15 pruebas)
-        run: npx playwright test -c playwright.a11y.config.ts bottom-nav-v2 command-palette mobile-nav-v2
+        run: >
+          npx playwright test -c playwright.a11y.config.ts
+          bottom-nav-v2 command-palette mobile-nav-v2 barra-legal
         env:
           E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}

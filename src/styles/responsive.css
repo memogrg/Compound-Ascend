@@ -11,6 +11,17 @@
   }
   :root {
     --sidebar-w: 0px;
+    /* 63px es el alto real de `.bottom-nav` con su contenido (6 de padding + ítem de 51 +
+       6), MEDIDO en el navegador y estable de 320 a 820px de ancho. El área segura va
+       aparte porque la barra ya la reserva en su propio `padding-bottom`.
+       Los 90 y 78 que había antes salían de suponer 62: erraban por uno. Si la barra
+       cambia de alto, este número cambia con ella. */
+    --bottom-nav-h: calc(63px + env(safe-area-inset-bottom, 0px));
+    /* Alto de la barra legal compacta: 8 de relleno + 44 del botón + 8 + 1 del borde = 61,
+       MEDIDO en `/dashboard` y en `/m/gastos` a 390. Lo leen los elementos que tienen que
+       esquivarla cuando está montada. Sin área segura: en la web la barra se apoya sobre la
+       de navegación, que ya la reserva. */
+    --legal-bar-h: 61px;
   }
   .sidebar {
     position: fixed;
@@ -50,15 +61,25 @@
     display: grid;
   }
   .content {
-    padding: 16px 15px 90px;
+    padding: 16px 15px calc(var(--bottom-nav-h) + 28px);
   }
   .coach-fab {
-    bottom: 78px;
+    bottom: calc(var(--bottom-nav-h) + 16px);
   }
-  /* El área de contenido pierde alto por el tabbar inferior: .content pasa a
-     16px arriba + 90px abajo (contra 22+22), así que el tab respira 60px menos. */
+  /* Y si la barra legal está montada, el FAB se sube por encima de ELLA. Con la barra
+     subida a `--bottom-nav-h`, el botón del asesor caía justo sobre su botón «Aceptar» y lo
+     dejaba a medias: el arreglo de un solape no puede crear otro. `:has()` porque la barra
+     aparece y desaparece según la cuenta; un valor fijo dejaría el FAB flotando alto para
+     todo el mundo. */
+  body:has(.legal-accept-bar) .coach-fab {
+    bottom: calc(var(--bottom-nav-h) + var(--legal-bar-h) + 16px);
+  }
+  /* El área de contenido pierde alto por el tabbar inferior: .content pasa a 16px arriba
+     + (barra + 28) abajo (contra 22+22), así que el tab respira 60px menos.
+     95 = esos 16 de arriba + 28 de colchón + 51 de la barra superior; el alto de la barra
+     inferior lo pone el token. Antes era un 157 fijo, que es lo mismo valorándola en 62. */
   .ac-page {
-    height: calc(100dvh - 157px);
+    height: calc(100dvh - var(--bottom-nav-h) - 95px);
   }
   .ac-page-top,
   .ac-page .ac-toolbar,
@@ -120,6 +141,35 @@
   .bn-item svg {
     width: 20px;
     height: 20px;
+  }
+
+  /* La barra de re-aceptación legal se sienta ENCIMA de la navegación, no sobre ella.
+     Anclada a `bottom: 0` y con z-index 60 tapaba la barra entera —los cinco enlaces
+     dejaban de recibir el toque— y eso contradice su propio motivo de existir: es una
+     barra y no un modal justamente para que nadie quede encerrado por un aviso legal.
+     En `/m` el ancla es otra y vive en `m/legal-movil.css`: allí no hay tabbar, lo que
+     hay que despejar es el FAB. */
+  .legal-accept-bar {
+    /* La safe-area ya la reserva `--bottom-nav-h`; sumarla otra vez dejaría un hueco. */
+    bottom: var(--bottom-nav-h);
+    padding-bottom: 8px;
+    padding-top: 8px;
+  }
+  /* UNA fila: el botón no baja debajo del texto. Con `wrap` la barra pasaba de 61 a 105 px
+     en cuanto el texto no cabía, y esos 44 px extra se los come el contenido. */
+  .legal-accept-caja {
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+  .legal-accept-texto {
+    flex: 1 1 auto;
+    font-size: 12.5px;
+    line-height: 1.35;
+  }
+  .legal-accept-btn {
+    flex: none;
+    padding: 0 16px;
+    font-size: 14px;
   }
 }
 
