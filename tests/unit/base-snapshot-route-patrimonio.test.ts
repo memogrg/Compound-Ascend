@@ -49,6 +49,18 @@ vi.mock("@/modules/rich-life/services/net-worth-snapshot-service", () => ({
   generateNetWorthSnapshot: (p: Periodo) => nwUser(p),
 }));
 
+/**
+ * El reloj del CRON, fijo.
+ *
+ * El camino de cron ancla el mes cerrado en UTC con `simNow()`, así que sin fijarlo los casos de
+ * abajo afirmarían «agosto» solo porque hoy es septiembre: el 1 de octubre se pondrían rojos sin
+ * que nadie tocara nada. Con el reloj fijo, «el mes recién cerrado» es una afirmación sobre el
+ * código y no sobre el calendario de quien corre la suite.
+ */
+vi.mock("@/lib/time/clock", () => ({
+  now: () => new Date("2026-09-15T12:00:00Z"),
+}));
+
 vi.mock("@/lib/time/user-time", () => ({
   userCurrentPeriod: async () => ({
     year: 2026,
@@ -108,7 +120,11 @@ describe("GET /api/base/snapshot (cron)", () => {
     };
     expect(congelar).toHaveBeenCalledTimes(1);
     // El MISMO periodo cerrado que la base, no el mes en curso.
+    // El mes RECIÉN cerrado y solo ese: con el reloj en el 15-sep-2026, agosto.
     expect(congelar.mock.calls[0]?.[0]).toMatchObject({ year: 2026, month: 8 });
+    // Y el mismo periodo que recibe el snapshot: si se separaran, el snapshot sumaría un mes
+    // cuyas derivadas acaban de materializarse en otro.
+    expect(baseAllUsers.mock.calls[0]?.[0]).toMatchObject({ year: 2026, month: 8 });
     expect(json.derivadas).toMatchObject({ users: 3, conLineas: 1 });
     // Y el orden, que es el punto: primero congelar, después sumar.
     expect(orden).toEqual(["congelar", "snapshot-base"]);
