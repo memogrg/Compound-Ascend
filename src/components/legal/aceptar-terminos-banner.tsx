@@ -24,8 +24,14 @@ import { aceptarTerminosAction } from "@/lib/legal/actions";
  *
  * El copy tampoco promete un bloqueo que no existe. Decía «confirmá que estás de acuerdo para
  * seguir usando tu cuenta», y eso es falso: la cuenta sigue funcionando sin aceptar. Ahora
- * enuncia el hecho y ofrece las dos salidas —revisar o aceptar—, con los documentos en
+ * enuncia el hecho y ofrece las dos salidas —leer o aceptar—, con los documentos en
  * pestaña nueva para que leerlos no interrumpa lo que la persona estaba haciendo.
+ *
+ * **Dos enlaces y no tres.** Había un tercero, «Revisar», y llevaba a `/terminos`: anunciaba
+ * los dos documentos y abría uno. Son dos páginas separadas y no existe ninguna que las
+ * contenga, así que la única versión honesta de «revisar» son los dos enlaces que ya están en
+ * la frase —uno por documento—, y el tercero se fue. Cualquier enlace nuevo que prometa ambos
+ * necesita antes una página que de verdad los contenga.
  */
 export function AceptarTerminosBanner() {
   const [oculto, setOculto] = useState(false);
@@ -57,10 +63,6 @@ export function AceptarTerminosBanner() {
           y la{" "}
           <a href="/privacidad" target="_blank" rel="noopener noreferrer">
             Política de privacidad
-          </a>{" "}
-          ·{" "}
-          <a href="/terminos" target="_blank" rel="noopener noreferrer">
-            Revisar
           </a>
           {error ? (
             <span role="alert" className="legal-accept-error">
