@@ -287,13 +287,19 @@ function CompositionCard({
   currency,
 }: {
   donutData: DonutDatum[];
+  /** El PRESUPUESTO mensual (`budget_items`), no el gasto real. El nombre viene del engine. */
   expenseMonthly: number;
   currency: string;
 }) {
   return (
     <div className="card card-pad">
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <div className="card-title">Composición de gastos</div>
+        {/* «Presupuesto», no «gastos». Esta tarjeta suma `budget_items` —lo PLANIFICADO del
+            mes— y lo presentaba bajo un título de gasto: en la cuenta de demo eso son
+            ₡1.726.097 presentados como si fueran los ₡1.167.030 que se llevan gastados. Hay
+            un caso que fija el hecho (`tests/a11y/panel-composicion.spec.ts`) antes de que
+            nadie vuelva a cambiar el rótulo por suposición. */}
+        <div className="card-title">Presupuesto del mes por bloque</div>
         <Link className="ghost-link" href="/mi-base-financiera">
           Detalle <Icon name="chev" width={2.2} />
         </Link>
@@ -302,14 +308,16 @@ function CompositionCard({
         data={donutData}
         currency={currency}
         centerLabel={formatCompact(expenseMonthly, currency)}
-        centerSub="al mes"
+        // Naturaleza además del período: «al mes» decía cuándo pero no qué. El período lo
+        // pone el título, que está justo encima.
+        centerSub="presupuesto"
         // Taxonomía FIJA: los bloques de gasto son nueve y cada uno significa algo. Se
         // muestran todos, en el orden canónico de `EXPENSE_NATURES`. Plegarlos en «Otras N»
         // —como se hacía— tapaba justo lo que esta tarjeta viene a responder: en qué se va el
         // dinero por bloque. Y que un bloque desaparezca porque este mes gastó poco hace
         // imposible comparar dos meses.
         modo="taxonomia"
-        vacio="Agrega gastos en tu Base Financiera."
+        vacio="Agregá tu presupuesto en Mi Base Financiera."
       />
     </div>
   );
