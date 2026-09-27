@@ -16,6 +16,7 @@
  *   node scripts/qa/snap.mjs --out qa-snapshots/x --freeze 2026-09-17T12:00:00-06:00
  */
 import { chromium } from "playwright";
+import { CABECERA_BANDERAS } from "./banderas.mjs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -34,6 +35,22 @@ import { pathToFileURL } from "node:url";
  * `superficie: "m"` marca las pantallas de la app móvil (`/m/*`). Una ruta SIN ese campo es
  * de la web, y nada cambia para ella: las 23 de siempre se siguen capturando igual.
  */
+/**
+ * La cabecera de banderas del servidor que se va a capturar.
+ *
+ * Devuelve `null` ante cualquier problema —servidor sin la cabecera, red, 500—: la captura no
+ * se aborta por no poder etiquetarla, pero tampoco se inventa un «(ninguna)» que el diff
+ * tomaría por un dato bueno.
+ */
+export async function leerBanderas(baseUrl) {
+  try {
+    const r = await fetch(new URL("/login", baseUrl), { redirect: "manual" });
+    return r.headers.get(CABECERA_BANDERAS);
+  } catch {
+    return null;
+  }
+}
+
 export const ROUTES = JSON.parse(readFileSync(new URL("./routes.json", import.meta.url), "utf8"));
 
 /**
@@ -453,6 +470,15 @@ async function main() {
   const manifest = {
     generatedAt: new Date().toISOString(),
     baseUrl,
+    /**
+     * Con qué banderas de interfaz se compiló el servidor que se acaba de capturar, leídas de
+     * la cabecera que pone el propio build (`src/lib/qa/banderas.ts`). `null` si el servidor no
+     * la manda —un build anterior a esta guarda—, y eso NO es lo mismo que «ninguna».
+     *
+     * Se lee del SERVIDOR y no del entorno de este proceso a propósito: lo que importa es con
+     * qué se compiló lo que se está mirando, no qué variables tenía quien captura.
+     */
+    banderas: await leerBanderas(baseUrl),
     fixedTime: freeze.toISOString(),
     fixedTimeSource:
       args.freeze && args.freeze !== true
