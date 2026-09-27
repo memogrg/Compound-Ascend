@@ -73,9 +73,36 @@ en el borde. Para eso está B.
 
 ### La regla
 
-Si un mes cerrado no tiene partidas derivadas, se **estima** con los compromisos actuales y se
-**rotula «estimado»**. Si las tiene, mandan ellas y no hay estimado: la línea persistida gana
-siempre.
+Si un mes cerrado no tiene partidas derivadas, se **estima** y se **rotula «estimado»**. Si las
+tiene, mandan ellas y no hay estimado: la línea persistida gana siempre.
+
+**El estimado usa los compromisos VIGENTES EN ESE MES, no los de hoy.** Es la corrección que
+hace de B algo defendible y no una copia del bug de #819. Para cada mes cerrado sin partidas,
+una entidad entra en el estimado si:
+
+- **empezó antes o durante ese mes** (`start_date` ≤ último día del mes; una deuda firmada en
+  marzo no estaba en enero), y
+- **no estaba saldada ni cerrada antes de ese mes** (una deuda cancelada en febrero no pesa en
+  marzo; una meta completada o abandonada, tampoco).
+
+Con los compromisos de HOY, saldar una deuda esta tarde borraba ₡312.180 de junio, julio y
+agosto a la vez. Con los del mes, saldarla hoy no toca ninguno: la deuda existía entonces y el
+estimado lo sigue diciendo. Sigue siendo aproximado —no sabe si la cuota de entonces era la de
+ahora— pero es un aproximado **estable**, y eso es lo que separa una estimación de una invención.
+
+El coste es que hacen falta las fechas: `start_date` y la de saldado o cierre de cada entidad.
+Las deudas y las metas las tienen; donde falte, esa entidad queda **fuera** del estimado en vez
+de entrar con la fecha de hoy. Un estimado corto y honesto vale más que uno completo e inventado.
+
+**Y solo se aplica a períodos NO congelados.** En cuanto el cron de A materialice un mes, ese mes
+deja de estimarse para siempre: hay línea persistida y la línea persistida gana. El estimado
+existe para el borde histórico anterior al despliegue, y va desapareciendo mes a mes.
+
+### Lo que sigue siendo aproximado
+
+Que el pasado deje de moverse no lo convierte en un registro: una deuda cuya cuota subió en mayo
+se reconstruye hacia atrás con la cuota nueva. Por eso B es el suelo del borde histórico y no el
+plan, y por eso el rótulo no es opcional.
 
 ### Dónde
 
@@ -86,9 +113,9 @@ para todo el rango y por mes solo consulta lo que depende del mes. Extenderlo a 
 
 ### El rótulo NO es opcional
 
-Un estimado sin rotular es el bug de #819 servido en la capa de lectura: el número se mueve solo
-—pagá una deuda hoy y junio pierde ₡312.180 retroactivamente— y el usuario no tiene forma de
-saberlo. Va rotulado en los **tres** sitios donde aparece:
+Aunque el estimado ya no se mueva al cambiar un compromiso, sigue siendo una reconstrucción: la
+cuota de entonces puede no ser la de ahora, y quien lo lee no tiene forma de saber cuál de los
+dos números está viendo. Va rotulado en los **tres** sitios donde aparece:
 
 - **Gráfico**: la marca de presupuesto de un mes estimado va punteada, y la leyenda suma
   «Presupuesto estimado». Mismo criterio que el mes parcial: el color no puede ser el único
@@ -103,7 +130,7 @@ saberlo. Va rotulado en los **tres** sitios donde aparece:
 
 Cuatro, en este orden. Cada uno entra solo y deja el árbol verde.
 
-### PR 1 · `diffDerived` aprende a congelar *(solo motor, sin efecto visible)*
+### PR 1 · `diffDerived` aprende a congelar _(solo motor, sin efecto visible)_
 
 - `diffDerived(existing, desired, { congelado })` → con `congelado`, solo `toInsert`, y vacío si
   ya hay alguna derivada en el periodo.
@@ -112,7 +139,7 @@ Cuatro, en este orden. Cada uno entra solo y deja el árbol verde.
   sin `congelado` el comportamiento actual no cambia (el caso que protege lo que ya funciona).
 - **Riesgo:** ninguno. Nadie pasa `congelado` todavía.
 
-### PR 2 · `syncDerivedBudget` sin sesión *(refactor, sin cambio de comportamiento)*
+### PR 2 · `syncDerivedBudget` sin sesión _(refactor, sin cambio de comportamiento)_
 
 - `syncDerivedBudget(period, ctx?)` con el patrón `AuthContext` que ya usan
   `holdings-service` y `snapshot-service` (`resolveAuth(ctx)`), en vez de inventar otro.
@@ -121,7 +148,7 @@ Cuatro, en este orden. Cada uno entra solo y deja el árbol verde.
 - **Riesgo:** medio. Es el PR que toca más líneas. Mitigación: no cambia ni una decisión, solo
   de dónde salen el cliente y el id.
 
-### PR 3 · El cron materializa *(el cambio de verdad)*
+### PR 3 · El cron materializa _(el cambio de verdad)_
 
 - `/api/base/snapshot` compone la materialización del mes cerrado, después del snapshot de la
   base y del de patrimonio, y **best-effort**: un fallo aquí no puede tumbar los snapshots, que
@@ -142,8 +169,10 @@ Cuatro, en este orden. Cada uno entra solo y deja el árbol verde.
 - Extender `getEntityFallbackBudgetPorPeriodo` a las cuatro fuentes que faltan.
 - `MesPresupuestado` gana `estimado: boolean`, que viaja hasta el gráfico, la tabla y el KPI.
 - **Tests (rojo primero):** un mes CON partidas no se estima (la persistida gana); un mes sin
-  ellas se estima y llega marcado; en el navegador, que la marca punteada y el «· estimado»
-  aparezcan donde toca y **no** donde no toca.
+  ellas se estima y llega marcado; **una entidad que empezó DESPUÉS del mes no entra**; **una
+  saldada ANTES del mes tampoco**; una sin fecha de inicio queda fuera en vez de entrar con la
+  de hoy; en el navegador, que la marca punteada y el «· estimado» aparezcan donde toca y **no**
+  donde no toca.
 - **Riesgo:** bajo y reversible quitando el fallback.
 
 ---
