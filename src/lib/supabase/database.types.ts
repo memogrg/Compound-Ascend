@@ -883,6 +883,12 @@ export type DividendRow = Audited & {
 export type PortfolioSnapshotRow = {
   id: string;
   user_id: string;
+  // household_id / created_by: la tabla los tiene desde 20260601000011 (que crea hasta el
+  // índice `idx_portfolio_snapshots_household`), pero este tipo no los declaraba y por eso el
+  // insert del cron los omitía sin que el compilador dijera nada. Cuatro filas de producción
+  // quedaron sin ellos, invisibles para el resto del hogar.
+  household_id: string | null;
+  created_by: string | null;
   date: string;
   portfolio_value: number;
   investment_value: number;
