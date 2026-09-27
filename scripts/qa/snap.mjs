@@ -140,6 +140,39 @@ async function esperarSinCargando(page) {
   }
 }
 
+/**
+ * ¿Quedó algún ESQUELETO de gráfico sin reemplazar?
+ *
+ * Los charts se cargan con `dynamic({ ssr: false, loading: () => <ChartSkeleton /> })`
+ * (`src/components/charts/lazy.tsx`), y el marcador de posición es `<div class="skel">`. No dice
+ * «Cargando…», así que `esperarSinCargando` no lo ve: es una caja gris del alto reservado.
+ *
+ * Costó la medida de determinismo de esta ronda. Dos capturas de la MISMA compilación contra el
+ * MISMO servidor dieron `light/1280/mi-rich-life` distinto —2196 px contra 2102— y parecía un
+ * cambio de datos. No lo era: en una corrida las dos donas («Composición de activos» y «de
+ * pasivos») habían montado y en la otra seguían siendo su esqueleto, que es MÁS ALTO que la dona
+ * con su leyenda. El alto de la página era estable en las dos, así que esperar a que el alto se
+ * asiente tampoco lo habría atrapado: hace falta la señal positiva de que el gráfico llegó.
+ */
+async function esperarSinEsqueletos(page) {
+  try {
+    await page.waitForFunction(
+      () =>
+        !Array.from(document.querySelectorAll(".skel")).some((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return false;
+          const cs = getComputedStyle(el);
+          return cs.visibility !== "hidden" && cs.display !== "none" && cs.opacity !== "0";
+        }),
+      undefined,
+      { timeout: TIMEOUT_CARGANDO_MS },
+    );
+    return false;
+  } catch {
+    return true; // venció el timeout: la captura sale con el esqueleto, y se dice
+  }
+}
+
 /** El modal de Términos se REGISTRA, nunca se acepta: aceptar es una decisión de la persona. */
 async function hayModalTerminos(page) {
   try {
@@ -416,6 +449,8 @@ async function main() {
           await finalizarAnimaciones(page);
           await enmascararNoDeterminista(page);
           const loadingResidual = await esperarSinCargando(page);
+          // Y los esqueletos de gráfico, que NO dicen «Cargando…»: ver `esperarSinEsqueletos`.
+          const esqueletoResidual = await esperarSinEsqueletos(page);
           const termsModal = await hayModalTerminos(page);
           if (termsModal) conTerminos++;
 
@@ -433,13 +468,15 @@ async function main() {
             consoleErrors,
             termsModal,
             loadingResidual,
+            esqueletoResidual,
           });
           console.log(
             `${tema}/${width} ${ruta.path} · ${networkidleMs}ms` +
               `${navError ? " · ERROR NAV" : ""}` +
               `${consoleErrors.length ? ` · ${consoleErrors.length} err` : ""}` +
               `${termsModal ? " · términos" : ""}` +
-              `${loadingResidual ? " · Cargando… residual" : ""}`,
+              `${loadingResidual ? " · Cargando… residual" : ""}` +
+              `${esqueletoResidual ? " · ESQUELETO residual" : ""}`,
           );
 
           await context.close();

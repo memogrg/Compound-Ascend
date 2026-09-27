@@ -8,7 +8,6 @@ import { getActiveHouseholdId, householdMemberIds } from "@/lib/household/active
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
-import { requireUser } from "@/lib/auth/session";
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { now as simNow } from "@/lib/time/clock";
 import { logger } from "@/lib/logger";
@@ -308,36 +307,45 @@ function periodCutoff(period: SnapshotPeriod): string | null {
 }
 
 /**
- * Asegura el snapshot de HOY para el usuario en sesión. Best-effort e idempotente:
- * se llama al cargar Patrimonio, igual que ensureMonthlyContributions() en Inversiones.
+ * Barrido diario de `portfolio_snapshots` para TODOS los usuarios (service role, sin sesión).
  *
- * Existe porque el gráfico del hero necesita ≥2 puntos y `portfolio_snapshots` estaba
- * vacía: sin nadie que escribiera, la serie no arrancaba nunca. Con esto el historial
- * empieza el día que abres la pantalla, no cuando alguien programe un cron.
+ * Sustituye a `ensureTodaySnapshot()`, que escribía el punto de hoy al cargar
+ * `/m/patrimonio`. Esa lectura-que-escribe tenía dos precios:
  *
- * Recibe `netWorth` y `currency` en vez de recalcularlos: quien llama ya tiene el
- * getRichLifeSummary() de la página y ninguno de los dos servicios usa React cache(),
- * así que pedirlo otra vez duplicaría el trabajo más caro de la carga. Del portafolio
- * sí se hace fetch, porque la página no lo tiene y escribir portfolio_value = 0 dejaría
- * basura en la fila que luego lee Portafolio.
+ *  · **El gráfico cambiaba de forma entre dos visitas seguidas.** Capturando las 200 pantallas
+ *    dos veces contra el MISMO build y el MISMO servidor, nueve comparaciones difieren:
+ *    `/patrimonio` y `/m/patrimonio` en todos sus anchos y temas. Recortando la zona que
+ *    cambia, el escalón de la curva está en otra x — la serie tiene un punto más. Lo creó la
+ *    primera visita.
+ *  · **El snapshot es del CIERRE del día, no del momento en que alguien abrió una pantalla.**
+ *    Quien abría la app dos veces con el mercado moviéndose escribía el primer precio del día
+ *    y ya; quien no la abría no tenía punto. La serie dependía del hábito de mirarla.
  *
- * NUNCA lanza: si algo falla la pantalla se pinta igual, solo se queda sin el punto de
- * hoy. Por eso tampoco vive en refreshInsights() —el trabajo con efectos secundarios va
- * en la carga de página, regla del repo—.
+ * Mismo patrón que `generateSnapshotsForAllUsers` (financial-base) y
+ * `generateNetWorthSnapshotsForAllUsers` (rich-life): recorre `profiles` con el cliente de
+ * servicio y delega en el camino sin sesión, que ya existía
+ * (`generateSnapshotForUserCron`) y que resuelve precios desde `market_price_cache`.
+ *
+ * Un usuario que falla NO detiene el barrido, y se registra con su id: en un cron, un fallo
+ * silencioso es un agujero que nadie ve.
  */
-export async function ensureTodaySnapshot(netWorth: number, currency: string): Promise<void> {
-  try {
-    const user = await requireUser();
-    const { getPortfolioReport } = await import("@/modules/wealth/services/portfolio-service");
-    const report = await getPortfolioReport();
-    await generateAndSaveSnapshot(
-      user.id,
-      report.analytics.totalPortfolioValue,
-      report.analytics.totalCostBasis,
-      netWorth,
-      currency,
-    );
-  } catch (err) {
-    logger.warn("ensureTodaySnapshot: no se pudo guardar el snapshot de hoy", { err });
+export async function generatePortfolioSnapshotsForAllUsers(): Promise<{
+  users: number;
+  written: number;
+  failed: number;
+}> {
+  const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
+  const admin = createServiceRoleClient();
+  const { data: users } = await admin.from("profiles").select("id");
+  let written = 0;
+  let failed = 0;
+  for (const u of users ?? []) {
+    try {
+      if (await generateSnapshotForUserCron(u.id)) written += 1;
+    } catch (err) {
+      failed += 1;
+      logger.warn("barrido de snapshots: un usuario falló", { userId: u.id, err });
+    }
   }
+  return { users: users?.length ?? 0, written, failed };
 }

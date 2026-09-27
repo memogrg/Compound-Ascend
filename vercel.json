@@ -5,6 +5,10 @@
       "schedule": "0 8 * * *"
     },
     {
+      "path": "/api/investments/snapshot",
+      "schedule": "30 8 * * *"
+    },
+    {
       "path": "/api/base/snapshot",
       "schedule": "0 6 1 * *"
     },
