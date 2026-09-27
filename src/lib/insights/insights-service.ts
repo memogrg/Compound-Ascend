@@ -533,8 +533,10 @@ export async function refreshDailyPatrimonioInsight(ctx?: AuthContext): Promise<
     if (!isStale(last?.updated_at ? new Date(last.updated_at) : null, 20)) return;
 
     const { getPatrimonioReport, buildDailyPatrimonioInsight } = await import("@/modules/wealth");
-    const { report, level, diagnosis } = await getPatrimonioReport(ctx);
-    const detected = buildDailyPatrimonioInsight(report, level, diagnosis);
+    const { report, level, diagnosis, protectionGaps } = await getPatrimonioReport(ctx);
+    // Con las brechas: la microacción de la bandera de protección depende de QUÉ falta, y
+    // mandar a revisar el fondo de emergencia a quien lo tiene cubierto es peor que callar.
+    const detected = buildDailyPatrimonioInsight(report, level, diagnosis, protectionGaps);
     const household_id = await getActiveHouseholdId(supabase, userId);
 
     // Uno activo a la vez: como related_id es null, el upsert no dedupea; cerramos
@@ -607,8 +609,8 @@ export async function writeDailyInsightForUserCron(
 export async function generateDailyRitualForUser(userId: string): Promise<void> {
   const { getPatrimonioReportForUser, buildDailyPatrimonioInsight } =
     await import("@/modules/wealth");
-  const { report, level, diagnosis } = await getPatrimonioReportForUser(userId);
-  const detected = buildDailyPatrimonioInsight(report, level, diagnosis);
+  const { report, level, diagnosis, protectionGaps } = await getPatrimonioReportForUser(userId);
+  const detected = buildDailyPatrimonioInsight(report, level, diagnosis, protectionGaps);
   await writeDailyInsightForUserCron(userId, detected);
 }
 

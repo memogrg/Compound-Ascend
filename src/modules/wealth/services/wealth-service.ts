@@ -18,6 +18,7 @@ import { monedaDelMovimientoEsCoherente } from "@/modules/wealth/engine/portfoli
 import {
   computeReadiness,
   computeProtection,
+  tieneFondoDeDefensa,
   computeBalance,
   computePortfolio,
 } from "@/modules/wealth";
@@ -336,12 +337,8 @@ export async function getWealthSummary(ctx?: AuthContext): Promise<WealthSummary
 
   // Canónico: solo el fondo FORMAL (goal_type), consistente con deriveFundAmounts y
   // getDefenseFundsReport. Un goal genérico llamado "emergencia" ya no cuenta.
-  const hasEmergencyFund = (goals ?? []).some(
-    (g) => g.goal_type === "defensa:fondo_emergencia" && Number(g.current_amount) > 0,
-  );
-  const hasPeaceFund = (goals ?? []).some(
-    (g) => g.goal_type === "defensa:fondo_paz" && Number(g.current_amount) > 0,
-  );
+  const hasEmergencyFund = tieneFondoDeDefensa(goals ?? [], "defensa:fondo_emergencia");
+  const hasPeaceFund = tieneFondoDeDefensa(goals ?? [], "defensa:fondo_paz");
   const hasCriticalDebt = (debts ?? []).some(
     (d) =>
       Number(d.balance) > 0 &&

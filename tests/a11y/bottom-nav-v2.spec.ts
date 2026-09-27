@@ -25,9 +25,22 @@ async function abrir(browser: Browser, url = "/dashboard") {
   return { ctx, page };
 }
 
-/** Con la bandera apagada la barra tiene seis ítems; con ella, cinco. */
+/**
+ * Con la bandera apagada la barra tiene seis ítems; con ella, cinco.
+ *
+ * La cuenta se lee cuando la barra terminó de montar. Leerla antes devuelve 0, el caso se salta
+ * diciendo «NAV_V2 apagada» —que es mentira— y encima el guardián de CI convierte esa mentira en
+ * «la bandera no llegó al build» y tumba el job entero. Pasó: cinco casos de ESTE archivo
+ * pasaron con la bandera encendida y el sexto —el único que abre `/dashboard?period=2026-08`, la
+ * carga más pesada— se saltó por haber contado demasiado pronto.
+ *
+ * `expect.poll` y no un `waitForSelector` del primer ítem: lo que hay que esperar es que la
+ * CUENTA se estabilice, no que exista uno.
+ */
 async function v2Encendida(page: import("@playwright/test").Page): Promise<boolean> {
-  return (await page.locator(".bottom-nav .bn-item").count()) === 5;
+  const items = page.locator(".bottom-nav .bn-item");
+  await expect.poll(() => items.count(), { timeout: 15_000 }).toBeGreaterThan(0);
+  return (await items.count()) === 5;
 }
 
 test("cinco núcleos, y el de la ruta marcado", async ({ browser }) => {

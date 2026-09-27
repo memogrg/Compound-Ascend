@@ -49,6 +49,7 @@ export {
   sizeFund,
   emergencyTargetIn,
   isDefenseFundGoalType,
+  tieneFondoDeDefensa,
   monthsCovered,
   detectLongTermObligation,
   EMERGENCY_FUND_USD,

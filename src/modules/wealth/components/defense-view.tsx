@@ -1,4 +1,5 @@
 import { Icon } from "@/components/ui/icon";
+import { HelpTip } from "@/components/shared/help-tip";
 import { DeleteButton } from "./delete-button";
 import { EditWealthButton, PayPremiumButton, WealthActions } from "./wealth-actions";
 import { formatMoney } from "@/lib/format";
@@ -44,7 +45,15 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
           }}
         >
           <div className="label" style={{ alignSelf: "flex-start" }}>
-            Puntuación de protección
+            Puntuación de protección{" "}
+            <HelpTip
+              text={
+                "Cómo se calcula: protecciones cubiertas ÷ 5, en porcentaje. Las cinco son " +
+                "gastos mayores, vida, invalidez, fondo de emergencia y fondo de paz. " +
+                "«Gastos médicos menores» es opcional y no cuenta. Un fondo cuenta solo si " +
+                "existe como fondo formal Y tiene saldo."
+              }
+            />
           </div>
           <div className="ring-wrap" style={{ margin: "14px 0 6px" }}>
             <svg width="150" height="150" viewBox="0 0 42 42">
