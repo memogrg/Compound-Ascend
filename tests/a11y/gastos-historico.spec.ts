@@ -31,7 +31,14 @@ async function tarjetaHistorico(page: import("@playwright/test").Page) {
   await expect(titulo).toHaveCount(1);
   const tarjeta = titulo.locator("xpath=ancestor::*[contains(@class,'card')][1]");
   await tarjeta.scrollIntoViewIfNeeded();
-  await page.waitForTimeout(400);
+  // El gráfico es `dynamic({ssr:false})`: el título está desde el primer render y las columnas
+  // llegan después. Esperar un tiempo fijo alcanzaba casi siempre, y «casi» en un arnés visual
+  // significa un rojo cada tantas corridas que no dice nada. Se espera la PRIMERA columna.
+  await tarjeta
+    .locator(".cf-col-dentro, .cf-marca")
+    .first()
+    .waitFor({ state: "visible", timeout: 30_000 });
+  await page.waitForTimeout(300);
   return tarjeta;
 }
 
