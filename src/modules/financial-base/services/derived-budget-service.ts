@@ -16,6 +16,7 @@ import "server-only";
  * (engine/derived-budget) y el índice único 0023 hace el sync idempotente.
  */
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
+import { logger } from "@/lib/logger";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import {
   diffDerived,
@@ -598,6 +599,74 @@ export async function syncDerivedBudget(
   } catch {
     // noop — se reintenta en la próxima carga.
   }
+}
+
+/**
+ * Materializa y CONGELA las líneas derivadas de un periodo ya cerrado, para todos los usuarios.
+ *
+ * ── EL ESCALÓN QUE CIERRA ───────────────────────────────────────────────────
+ * Hoy las líneas derivadas de un mes existen solo si su dueño abrió la app durante ese mes:
+ * `base-view` llama a `syncDerivedBudget` al cargar, y solo si el periodo no es anterior al
+ * actual. Quien no la abrió en septiembre ve, para siempre, un septiembre sin la parte derivada
+ * de su presupuesto —las cuotas de sus deudas, los aportes a sus metas, las primas— y el
+ * histórico de columnas le dibuja un escalón que no ocurrió. Y el snapshot mensual, que suma
+ * `budget_items` de ese periodo, lo hereda.
+ *
+ * ── SOLO INSERTA ────────────────────────────────────────────────────────────
+ * `congelado: true`: si el periodo ya tiene líneas derivadas, no se toca NINGUNA —ni se
+ * actualiza ni se borra—. Un mes cerrado no se reescribe con los importes de hoy: la cuota que
+ * subió en octubre no puede reescribir septiembre. Para quien sí abrió la app, esto es una
+ * no-operación exacta.
+ *
+ * Un usuario que falla no detiene el barrido y se registra con su id.
+ */
+export async function congelarDerivadasDelPeriodo(
+  period: Period,
+): Promise<{ users: number; conLineas: number; failed: number }> {
+  const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
+  const admin = createServiceRoleClient();
+  const { data: users } = await admin.from("profiles").select("id");
+  let conLineas = 0;
+  let failed = 0;
+  for (const u of users ?? []) {
+    try {
+      const antes = await contarDerivadas(admin, u.id, period);
+      await syncDerivedBudget(period, { db: admin, userId: u.id }, { congelado: true });
+      const despues = await contarDerivadas(admin, u.id, period);
+      if (despues > antes) conLineas += 1;
+      // Invariante del modo congelado, comprobada en caliente: nunca puede haber MENOS líneas
+      // que antes. Si algún día pasa, es que una escritura se escapó del `congelado` y hay que
+      // enterarse por el log del cron, no por un histórico que cambió solo.
+      if (despues < antes) {
+        logger.warn("congelarDerivadasDelPeriodo: el periodo PERDIÓ líneas derivadas", {
+          userId: u.id,
+          period: period.label,
+          antes,
+          despues,
+        });
+      }
+    } catch (err) {
+      failed += 1;
+      logger.warn("congelarDerivadasDelPeriodo: un usuario falló", { userId: u.id, err });
+    }
+  }
+  return { users: users?.length ?? 0, conLineas, failed };
+}
+
+/** Cuántas líneas derivadas tiene ese usuario en ese periodo. Solo para el log del cron. */
+async function contarDerivadas(
+  admin: AuthContext["db"],
+  userId: string,
+  period: Period,
+): Promise<number> {
+  const { count } = await admin
+    .from("budget_items")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("period_month", period.month)
+    .eq("period_year", period.year)
+    .neq("source_kind", "manual");
+  return count ?? 0;
 }
 
 /**

@@ -208,3 +208,47 @@ derivarla al leer, esa sí sería una migración, e iría en un PR posterior al 
 - `/gastos` y Mi Base Financiera siguen diciendo lo mismo para el mes en curso (ya hay un caso
   que lo compara en vivo, en `tests/a11y/gastos-historico.spec.ts`).
 - El escalón del borde se mueve un mes por mes, en vez de quedarse quieto.
+
+---
+
+## Simulacro del cron (base local, tres cuentas)
+
+`tests/rls/congelar-derivadas.rls.test.ts`, contra Postgres real. Las tres cuentas se crean en
+el propio caso y se borran al final; A y B tienen **la misma deuda** (cuota de hoy ₡50.000) y la
+única diferencia es si el mes cerrado ya tenía su línea derivada.
+
+Periodo cerrado del simulacro: **ago 2026**.
+
+| cuenta                         | antes                                                   | después                                                 | 2.ª corrida |
+| ------------------------------ | ------------------------------------------------------- | ------------------------------------------------------- | ----------- |
+| **A** · abrió la app en agosto | 1 línea · `Pago — Préstamo del simulacro` = **₡41.000** | 1 línea · **₡41.000**                                   | idéntica    |
+| **B** · NO la abrió            | 0 líneas                                                | 1 línea · `Pago — Préstamo del simulacro` = **₡50.000** | idéntica    |
+| **C** · sin compromisos        | 0 líneas                                                | 0 líneas                                                | idéntica    |
+
+Los **₡41.000 de A** son el punto: la cuota de hoy es ₡50.000 y el mes cerrado se queda con lo
+que decía entonces. La aserción compara la fila COMPLETA, `id` y `updated_at` incluidos.
+
+Y se vio fallar: con `congelado: false`, la misma corrida deja a A en **₡50.000** — un UPDATE
+sobre un mes cerrado, que es la condición de parada del plan.
+
+Además, el `congelado` del motor (#863) no alcanzaba solo: después del diff quedaban
+`relinkRentalReceipts` (UPDATE de `transactions`) y `sweepOrphanedDerived` (DELETE
+**cross-period**, o sea también en meses cerrados). Las dos se saltan en modo congelado.
+
+## Qué hará el cron del 1-oct 12:00 UTC
+
+|                                     | sin este PR                                          | con este PR                                                                                             |
+| ----------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| hora                                | **06:00** UTC                                        | **12:00** UTC (a las 06:00 del día 1 todavía es el último día del mes anterior en UTC−7 y más al oeste) |
+| `budget_items`                      | no los toca                                          | **inserta** las derivadas que falten en septiembre, por usuario; nunca actualiza ni borra               |
+| `monthly_snapshots`                 | septiembre, sumando el presupuesto **tal como esté** | septiembre, con las derivadas ya materializadas (de ahí que congelar vaya ANTES)                        |
+| `net_worth_snapshots`               | septiembre                                           | igual                                                                                                   |
+| quien no abrió la app en septiembre | conserva el escalón, y el snapshot lo hereda         | recupera su parte derivada                                                                              |
+
+Si el PR no está mergeado y verificado antes del **30-sep 23:00 UTC**, no se despliega hasta
+después del cron: un despliegue a mitad de la corrida dejaría una parte de los usuarios con las
+derivadas materializadas y otra no, y no habría forma de saber cuáles sin volver a mirar fila
+por fila. En ese caso el cron del 1-oct corre como hoy (06:00, sin tocar `budget_items`), el
+escalón de septiembre queda para quien no abrió la app, y se cierra con la corrida del 1-nov o
+con una llamada manual al endpoint una vez desplegado — el modo congelado es idempotente, así
+que llamarlo tarde no duplica nada.
