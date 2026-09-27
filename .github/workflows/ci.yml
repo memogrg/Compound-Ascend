@@ -678,16 +678,6 @@ jobs:
 
       # Se comprueba el ARTEFACTO, no el código de salida: un build que no arranca deja el
       # `.next` anterior y todo lo que viene después mide la versión equivocada.
-      - name: Verificar que la bandera llegó al bundle
-        run: |
-          if ! grep -rq "tb2-search" .next/static/chunks/*.js; then
-            echo "::error::NEXT_PUBLIC_NAV_V2 no llegó al bundle"
-            exit 1
-          fi
-          echo "bandera presente en el bundle"
-
-      # El servidor CONGELADO, que es contra el que corre la suite de accesibilidad: reloj
-      # fijo y red externa cortada, para que dos corridas midan lo mismo.
       - name: Servidor congelado
         run: |
           npm run qa:start -- --port 3001 &
@@ -707,13 +697,20 @@ jobs:
           NEXT_PUBLIC_NAV_V2: "1"
 
       - name: Specs de la bandera (15 pruebas)
-        run: >
-          npx playwright test -c playwright.a11y.config.ts
-          bottom-nav-v2 command-palette mobile-nav-v2 barra-legal
         env:
           E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           A11Y_BASE_URL: http://localhost:3001
+          PLAYWRIGHT_JSON_OUTPUT_NAME: /tmp/nav-v2.json
+        run: >
+          npx playwright test -c playwright.a11y.config.ts --reporter=list,json
+          bottom-nav-v2 command-palette mobile-nav-v2 barra-legal
+
+      # Y la bandera se verifica por el RESULTADO, no por un grep al bundle: si llegó, ningún
+      # caso se saltó por su causa. Ver el porqué en el propio script.
+      - name: Verificar que la bandera llegó (ningún caso saltado por ella)
+        if: always()
+        run: node scripts/ci/verificar-bandera-nav.mjs /tmp/nav-v2.json
 
       # Evidencia del fallo: Playwright ya guarda screenshot + trace en
       # /tmp/compound-e2e-results (only-on-failure / retain-on-failure); sin
