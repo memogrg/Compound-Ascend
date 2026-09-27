@@ -15,8 +15,6 @@ import "server-only";
  * linkable-entities-service para no acoplar módulos). El diff es puro
  * (engine/derived-budget) y el índice único 0023 hace el sync idempotente.
  */
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth/session";
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import {
@@ -159,9 +157,29 @@ export async function ingresoPasivoDerivadoPromedio(
   return [...porHolding.values()];
 }
 
-export async function syncDerivedBudget(period: Period): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function syncDerivedBudget(
+  period: Period,
+  /**
+   * ctx inyectable (cron con service-role), igual que en `ingresoPasivoDerivadoPromedio` más
+   * arriba y por la misma razón: sin esto la función pide `requireUser()` a secas y ninguna
+   * ruta sin sesión puede materializar las derivadas de nadie.
+   *
+   * Lo necesita el cron del cierre de mes: hoy las líneas derivadas de un mes cerrado solo
+   * existen si su dueño abrió la app durante ese mes (`base-view` las sincroniza al cargar,
+   * y solo si el periodo no es anterior al actual). Para quien no la abrió, el histórico
+   * muestra un escalón: el presupuesto de ese mes le falta la parte derivada.
+   */
+  ctx?: AuthContext,
+  /**
+   * `congelado: true` ⇒ el diff solo INSERTA, y solo si el periodo está vacío
+   * (`diffDerived`). Es el modo del cierre de mes: un mes cerrado no se reescribe ni se
+   * recorta con los importes de hoy — la cuota de una deuda que cambió en octubre no puede
+   * reescribir septiembre.
+   */
+  opciones?: { congelado?: boolean },
+): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const user = { id: userId };
 
   const twelveMonthsAgo = new Date(period.year, period.month - 13, 1).toISOString().slice(0, 10);
 
@@ -188,8 +206,10 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
       .select("holding_id,amount,currency,payment_date")
       .eq("user_id", user.id)
       .gte("payment_date", twelveMonthsAgo),
-    getSystemCategoryId("deudas"),
-    getSystemCategoryId("seguros"),
+    // Con ctx: sin él estas dos vuelven a pedir `requireUser()` y el camino de cron muere
+    // justo aquí, después de haber leído todo lo demás con el cliente de servicio.
+    getSystemCategoryId("deudas", ctx),
+    getSystemCategoryId("seguros", ctx),
   ]);
 
   const desired: DesiredLine[] = [];
@@ -498,7 +518,9 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
     sourceId: r.source_id,
   }));
 
-  const { toInsert, toUpdate, toDeleteIds } = diffDerived(existing, desired);
+  const { toInsert, toUpdate, toDeleteIds } = diffDerived(existing, desired, {
+    congelado: opciones?.congelado,
+  });
 
   if (toInsert.length > 0) {
     // household: las líneas derivadas comparten hogar igual que las manuales.
@@ -549,6 +571,15 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
     await supabase.from("budget_items").delete().in("id", toDeleteIds).eq("user_id", user.id);
   }
 
+  // ── Nada de lo que sigue corre en modo congelado ──────────────────────────
+  //
+  // Las dos son escrituras correctas para el mes EN CURSO y prohibidas para uno cerrado, y las
+  // encontró el caso «congelado: no sale ningún UPDATE ni DELETE»: la conciliación de renta
+  // hace UPDATE de `transactions`, y el barrido de huérfanas es CROSS-PERIOD, así que borraría
+  // líneas derivadas de meses ya cerrados. `congelado` significa «solo insertar», y eso incluye
+  // lo que viene después del diff.
+  if (opciones?.congelado) return;
+
   // Conciliación de renta (C-2b): atribuye las transacciones de renta del
   // periodo (linked_kind='rental') a su línea derivada, llenando la barra
   // "Recibido". Solo toca las que aún no tienen income_source_id (idempotente),
@@ -576,7 +607,7 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
  * (income_source_id is null). No pisa atribuciones existentes: es idempotente.
  */
 async function relinkRentalReceipts(
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  supabase: AuthContext["db"],
   userId: string,
   period: Period,
 ): Promise<void> {
@@ -616,10 +647,7 @@ type OriginTable = (typeof ORIGIN_TABLE)[keyof typeof ORIGIN_TABLE];
  * existe en su tabla origen, en todos los periodos del usuario. Si la consulta
  * a la tabla origen falla, NO borra ese kind (evita borrados por error de RLS).
  */
-async function sweepOrphanedDerived(
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  userId: string,
-): Promise<void> {
+async function sweepOrphanedDerived(supabase: AuthContext["db"], userId: string): Promise<void> {
   const { data: derived } = await supabase
     .from("budget_items")
     .select("id,source_kind,source_id")
