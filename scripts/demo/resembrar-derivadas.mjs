@@ -70,6 +70,40 @@ if (!user) {
 }
 console.log(`cuenta: ${EMAIL}  ${user.id}`);
 
+/**
+ * Tabla por mes: manual / debt / goal / total, SOLO de esta cuenta.
+ *
+ * Es la evidencia de la resiembra, y por eso se saca del mismo sitio que escribe: un conteo
+ * hecho con otra consulta, o sin el filtro por cuenta, no dice nada de lo que pasó acá.
+ */
+async function tabla(titulo) {
+  const filas = await rest(
+    `budget_items?select=period_year,period_month,source_kind,amount&user_id=eq.${user.id}` +
+      `&type=eq.expense&limit=20000`,
+  );
+  const porMes = new Map();
+  for (const f of filas) {
+    const k = `${f.period_year}-${String(f.period_month).padStart(2, "0")}`;
+    const m = porMes.get(k) ?? { manual: 0, debt: 0, goal: 0, otros: 0 };
+    if (m[f.source_kind] === undefined) m.otros += Number(f.amount);
+    else m[f.source_kind] += Number(f.amount);
+    porMes.set(k, m);
+  }
+  const fmt = (n) => Math.round(n).toLocaleString("es-CR");
+  console.log(`\n${titulo}  (cuenta ${user.id})`);
+  console.log("  periodo   |      manual |        debt |        goal |       total");
+  for (const k of [...porMes.keys()].sort()) {
+    const m = porMes.get(k);
+    const t = m.manual + m.debt + m.goal + m.otros;
+    console.log(
+      `  ${k}   | ${fmt(m.manual).padStart(11)} | ${fmt(m.debt).padStart(11)} | ` +
+        `${fmt(m.goal).padStart(11)} | ${fmt(t).padStart(11)}`,
+    );
+  }
+}
+
+await tabla("ANTES");
+
 // ── el molde: las derivadas del mes MÁS RECIENTE que las tenga ───────────────
 const todas = await rest(
   `budget_items?select=*&user_id=eq.${user.id}&source_kind=in.(debt,goal)` +
@@ -130,3 +164,4 @@ for (let i = 0; i < filas.length; i += 400) {
   });
 }
 console.log(`listo: ${filas.length} líneas derivadas en ${objetivo.length} meses.`);
+await tabla("DESPUÉS");

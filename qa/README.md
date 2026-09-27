@@ -72,3 +72,51 @@ node /ruta/a/la/carpeta-principal/scripts/dev/con-env.mjs --raiz /ruta/a/la/carp
 
 `tests/e2e/smoke.spec.ts` **sí** inicia sesión: el login es lo que prueba. Un login por
 corrida, y corre contra `npm run dev` en :3000, no contra el congelado.
+
+## Dos guardas que no se pueden saltar por descuido
+
+### 1 · La base local tiene que estar al día
+
+`qa:start` no arranca si `supabase/migrations/` tiene algo que la base local no. Las nombra y da
+el comando para aplicarlas:
+
+```
+  ✖ La base local va 1 migración(es) por detrás del repo.
+
+    Faltan por aplicar:
+      20260828000001
+
+    Aplicalas con:
+      supabase db push --local   # o, si ya están aplicadas a mano: supabase migration repair --status applied 20260828000001
+```
+
+**Por qué existe.** `/patrimonio` mostraba ₡0 con dos posiciones en la tabla. No era el código:
+la base local iba 24 migraciones por detrás, `investment_holdings` no tenía las columnas
+`payout_*`, el `select` de `listHoldings` devolvía 400 y `(data ?? [])` lo convertía en «este
+usuario no tiene inversiones». Una pantalla vacía, correcta según la app, y una captura que no
+significaba nada. El job «Migraciones aplican en BD fresca» no lo caza: prueba que las
+migraciones corren sobre una base vacía, no que la tuya esté al día.
+
+El estado se lee con `supabase migration list --local`, así que hace falta el CLI y el stack
+levantado. `QA_SKIP_MIGRACIONES=1` la salta y lo dice en voz alta; lo que se capture así **no
+vale como evidencia**, por el mismo motivo por el que la guarda existe.
+
+**En CI no corre.** Allí el job crea la base desde cero aplicando `supabase/migrations/` en ese
+mismo job, así que la paridad está garantizada por construcción; y el CLI de Supabase no está en
+el PATH del runner, con lo cual la guarda solo podría fallar por no poder leer.
+
+### 2 · Un diff parcial se anuncia, y falla
+
+`qa:snap --rutas /gastos,/dashboard` captura solo esas: sirve para **iterar** sin pagar los
+cuarenta minutos del inventario completo. Pero un diff parcial y uno completo se ven igual —una
+lista de imágenes y un «sin diferencias»—, así que `qa:diff` lo dice y sale con código distinto
+de 0:
+
+```
+PARCIAL: 6 de 200 capturas del inventario (39 rutas de routes.json, en sus anchos y los dos temas).
+  Un diff parcial NO es evidencia de un PR: solo dice que lo que se miró no cambió.
+  Para la evidencia, capturá sin `--rutas`.
+```
+
+**La evidencia de un PR es el diff completo de `routes.json`.** `--rutas` es para el rato en que
+se está iterando, no para el PR.

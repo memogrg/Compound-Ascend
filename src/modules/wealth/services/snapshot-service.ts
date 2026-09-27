@@ -1,5 +1,5 @@
 import "server-only";
-import { householdMemberIds } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds } from "@/lib/household/active";
 
 /**
  * Servicio de snapshots de portafolio.
@@ -74,6 +74,31 @@ export async function getSnapshotHistory(
  * @param netWorth         Patrimonio neto total (moneda principal).
  * @param currency         Moneda principal.
  */
+/**
+ * El hogar del usuario, para etiquetar la fila.
+ *
+ * Sin `household_id` la fila es INVISIBLE para el resto del hogar: la RLS filtra por él, así
+ * que Marta no vería los puntos de patrimonio que sí ve José. Se le escapó al guardián que ya
+ * existe (`tests/unit/household-propagation.test.ts`) porque esta escritura no pasa por el
+ * orquestador: la hace el cron con el cliente de servicio. Medido en producción antes del
+ * arreglo: 16 filas, 4 sin `household_id` ni `created_by`.
+ *
+ * `null` es una respuesta legítima —modo «solo», sin hogar—: la fila se escribe igual, porque
+ * es SU patrimonio, y `created_by` sigue diciendo quién la puso. Inventar un hogar sería peor.
+ *
+ * Nunca revienta: un snapshot es best-effort y no puede tumbar ni el cron ni la pantalla.
+ */
+async function hogarDe(
+  supabase: Parameters<typeof getActiveHouseholdId>[0],
+  userId: string,
+): Promise<string | null> {
+  try {
+    return await getActiveHouseholdId(supabase, userId);
+  } catch {
+    return null;
+  }
+}
+
 export async function generateAndSaveSnapshot(
   userId: string,
   portfolioValue: number,
@@ -85,12 +110,15 @@ export async function generateAndSaveSnapshot(
     const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
     const supabase = createServiceRoleClient();
     const today = simNow().toISOString().slice(0, 10);
+    const householdId = await hogarDe(supabase, userId);
 
     const { data, error } = await supabase
       .from("portfolio_snapshots")
       .upsert(
         {
           user_id: userId,
+          household_id: householdId,
+          created_by: userId,
           date: today,
           portfolio_value: portfolioValue,
           investment_value: investmentValue,
@@ -137,6 +165,8 @@ export async function maybeGenerateSnapshot(
 
     await supabase.from("portfolio_snapshots").insert({
       user_id: userId,
+      household_id: await hogarDe(supabase, userId),
+      created_by: userId,
       date: today,
       portfolio_value: portfolioValue,
       investment_value: investmentValue,

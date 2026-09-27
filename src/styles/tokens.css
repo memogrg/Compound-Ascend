@@ -90,6 +90,19 @@
 
   --sidebar-w: 248px;
 
+  /* Espacio que ocupa la barra inferior móvil (`.bottom-nav`), área segura incluida.
+     0 en escritorio, donde la barra no existe; `responsive.css` le da su valor real
+     bajo 820px. Lo leen TODOS los elementos anclados al borde inferior —el contenido,
+     el FAB del asesor, el pop-up del ritmo, la barra legal— para no quedar debajo de
+     ella. Era un 90 y un 78 sueltos en `responsive.css`, y el día que apareció otra
+     barra fija abajo (la de re-aceptación de términos) nadie tenía de dónde leer el
+     número: se ancló a `bottom: 0` y tapó la navegación entera. */
+  --bottom-nav-h: 0px;
+
+  /* Alto de la barra de re-aceptación legal cuando está montada. 0 en escritorio, donde no
+     estorba a nada; `responsive.css` le da su valor real bajo 820px. */
+  --legal-bar-h: 0px;
+
   /* ---- Aliases legacy → v2 (consumidos por las clases existentes) ---- */
   --bg: var(--canvas);
   --bg-elev: var(--surface);

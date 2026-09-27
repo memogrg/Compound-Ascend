@@ -3,6 +3,9 @@ import "./mobile.css";
 // Después de mobile.css: AÑADE lo que `.m-seg` no tiene (desbordamiento horizontal) sin
 // cambiar ninguna de sus reglas. Solo aplica a `.mn2-tabs`, que únicamente existe bajo bandera.
 import "./nav-v2-movil.css";
+// El override del anclaje de la barra legal en `/m`. Aparte de `mobile.css` a propósito:
+// es el ajuste de UN componente compartido, no piel móvil.
+import "./legal-movil.css";
 import { MobileIntro } from "./components/mobile-intro";
 
 /**
