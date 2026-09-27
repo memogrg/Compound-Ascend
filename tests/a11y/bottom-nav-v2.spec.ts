@@ -89,6 +89,61 @@ test("la barra no tapa el contenido ni el botón del asesor", async ({ browser }
   await ctx.close();
 });
 
+test("nadie se pinta encima de la barra", async ({ browser }) => {
+  // El caso de arriba mide GEOMETRÍA —que la barra no invada el contenido— y por eso daba
+  // verde mientras los cinco enlaces eran intocables: lo que fallaba era el APILAMIENTO.
+  // La barra de re-aceptación de términos se anclaba a `bottom: 0` con z-index 60 contra
+  // los 45 de la barra, así que la tapaba entera. En CI no se veía porque el seed le marca
+  // los términos al bot; con cualquier cuenta que los tenga pendientes, la navegación
+  // completa dejaba de responder y Playwright solo decía «intercepts pointer events».
+  //
+  // Se comprueba la invariante, no un componente: en el centro de cada enlace, el elemento
+  // de más arriba tiene que pertenecer a la barra. Da igual quién se interponga.
+  const { ctx, page } = await abrir(browser);
+  test.skip(!(await v2Encendida(page)), "NAV_V2 apagada");
+
+  const intrusos = await page.locator(".bottom-nav a").evaluateAll((enlaces) =>
+    enlaces
+      .map((a) => {
+        const r = a.getBoundingClientRect();
+        const encima = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        if (encima?.closest(".bottom-nav")) return null;
+        // Quién tapa, con su cadena de ancestros: sin esto el fallo no dice dónde mirar.
+        const cadena: string[] = [];
+        for (let n = encima; n && n.tagName && cadena.length < 5; n = n.parentElement) {
+          cadena.push(
+            n.tagName.toLowerCase() +
+              (n.className ? `.${String(n.className).trim().split(/\s+/).join(".")}` : ""),
+          );
+        }
+        return `${a.getAttribute("href")} ← ${cadena.join(" > ") || "nada"}`;
+      })
+      .filter(Boolean),
+  );
+  expect(intrusos, "algo se pinta encima de la barra inferior").toEqual([]);
+  await ctx.close();
+});
+
+test("la barra legal, si aparece, se sienta encima de la navegación", async ({ browser }) => {
+  // La regla concreta detrás de la invariante de arriba, dicha por su nombre para que un
+  // cambio en el aviso legal falle señalando al aviso legal. Se salta cuando la cuenta ya
+  // aceptó la versión vigente: ahí no hay barra que medir y no hay nada que probar.
+  const { ctx, page } = await abrir(browser);
+  test.skip(!(await v2Encendida(page)), "NAV_V2 apagada");
+
+  const legal = page.locator('[aria-label="Aceptación de términos"]');
+  test.skip((await legal.count()) === 0, "la cuenta ya aceptó los términos vigentes");
+
+  const caja = await legal.boundingBox();
+  const barra = await page.locator(".bottom-nav").boundingBox();
+  expect(caja && barra).toBeTruthy();
+  // Termina donde empieza la barra: ni un píxel encima de ella. Sin tolerancia a propósito
+  // —`--bottom-nav-h` se midió contra el alto real de la barra (63px), así que las dos
+  // cifras tienen que coincidir; un margen de holgura acá solo escondería que se separaron.
+  expect(caja!.y + caja!.height).toBeLessThanOrEqual(barra!.y);
+  await ctx.close();
+});
+
 test("a 390 los íconos del topbar van en la fila del título y el periodo debajo", async ({
   browser,
 }) => {
