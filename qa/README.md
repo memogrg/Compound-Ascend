@@ -101,6 +101,10 @@ El estado se lee con `supabase migration list --local`, así que hace falta el C
 levantado. `QA_SKIP_MIGRACIONES=1` la salta y lo dice en voz alta; lo que se capture así **no
 vale como evidencia**, por el mismo motivo por el que la guarda existe.
 
+**En CI no corre.** Allí el job crea la base desde cero aplicando `supabase/migrations/` en ese
+mismo job, así que la paridad está garantizada por construcción; y el CLI de Supabase no está en
+el PATH del runner, con lo cual la guarda solo podría fallar por no poder leer.
+
 ### 2 · Un diff parcial se anuncia, y falla
 
 `qa:snap --rutas /gastos,/dashboard` captura solo esas: sirve para **iterar** sin pagar los

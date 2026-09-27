@@ -68,3 +68,22 @@ describe("comandoParaAplicar", () => {
     expect(c).toContain("20260907000001 20260907000002");
   });
 });
+
+describe("exigirBaseAlDia", () => {
+  it("en CI no comprueba nada: la base la crea el propio job desde las migraciones", async () => {
+    // @ts-expect-error — `.mjs` sin tipos.
+    const { exigirBaseAlDia } = await import("../../scripts/qa/migraciones.mjs");
+    const antes = process.env.CI;
+    process.env.CI = "true";
+    try {
+      // Si comprobara, reventaría: en el runner no hay CLI de Supabase que consultar.
+      expect(await exigirBaseAlDia({ cwd: "/no/existe" })).toEqual({
+        saltada: true,
+        faltantes: [],
+      });
+    } finally {
+      if (antes === undefined) delete process.env.CI;
+      else process.env.CI = antes;
+    }
+  });
+});

@@ -87,6 +87,12 @@ export async function leerEstado({ cwd = process.cwd() } = {}) {
  * @returns {Promise<{ saltada: boolean, faltantes: string[] }>}
  */
 export async function exigirBaseAlDia({ cwd = process.cwd(), log = console } = {}) {
+  // En CI no hay nada que comparar: el job crea la base desde cero aplicando
+  // `supabase/migrations/` en ese mismo job, así que la paridad está garantizada por
+  // construcción. Y el CLI de Supabase no está en el PATH del runner, así que la guarda solo
+  // podría fallar por no poder leer — que es exactamente lo que pasó la primera vez.
+  if (process.env.CI) return { saltada: true, faltantes: [] };
+
   if (process.env.QA_SKIP_MIGRACIONES === "1") {
     log.warn("\n  ⚠ QA_SKIP_MIGRACIONES=1: no se comprobó la paridad de la base.");
     log.warn("    Lo que se capture así NO vale como evidencia.\n");
