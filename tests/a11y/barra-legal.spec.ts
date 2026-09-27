@@ -162,8 +162,18 @@ for (const [ruta, nombre] of [
     if ((await barra(page).count()) === 0) {
       test.skip(true, "la cuenta ya aceptó los términos vigentes: no hay barra que medir");
     }
+    // DOS enlaces, no tres: cada documento exactamente una vez. El tercero se llamaba
+    // «Revisar» y llevaba solo a `/terminos`, así que prometía los dos documentos y abría
+    // uno. Con dos páginas separadas y sin una que las contenga, la única versión honesta
+    // de «revisar» son los dos enlaces.
     const enlaces = barra(page).getByRole("link");
-    expect(await enlaces.count(), "faltan los enlaces a los documentos").toBeGreaterThanOrEqual(3);
+    expect(await enlaces.count(), "no hay exactamente un enlace por documento").toBe(2);
+    expect(
+      await barra(page)
+        .getByRole("link", { name: /^Revisar$/ })
+        .count(),
+      "sigue habiendo un enlace «Revisar», que solo puede llevar a uno de los dos",
+    ).toBe(0);
     const hrefs = await enlaces.evaluateAll((ns) =>
       ns.map(
         (n) => `${n.getAttribute("href")}|${n.getAttribute("target")}|${n.getAttribute("rel")}`,
@@ -184,7 +194,6 @@ for (const [ruta, nombre] of [
     // Y el texto no promete un bloqueo que no existe: la cuenta sigue funcionando sin aceptar.
     const texto = (await barra(page).innerText()).replace(/\s+/g, " ");
     expect(texto, texto).toContain("Actualizamos los Términos y la Política de privacidad");
-    expect(texto, texto).toContain("Revisar");
     expect(texto, texto).toContain("Aceptar");
     expect(texto, texto).not.toMatch(/para seguir usando|dejar[aá] de|bloque/i);
     await ctx.close();
