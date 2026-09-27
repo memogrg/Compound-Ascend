@@ -18,6 +18,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { instanteCongelado } from "./snap.mjs";
+import { exigirBaseAlDia } from "./migraciones.mjs";
 
 const aquí = path.dirname(fileURLToPath(import.meta.url));
 const preload = path.join(aquí, "server-freeze.js");
@@ -28,6 +29,11 @@ function argumento(nombre) {
   const v = process.argv[i + 1];
   return v && !v.startsWith("--") ? v : undefined;
 }
+
+// ANTES de levantar nada: si la base local va por detrás del repo, lo que se capture no vale.
+// Una columna que el código pide y la base no tiene sale como 400, el servicio la convierte en
+// «sin datos», y la pantalla queda vacía pareciendo correcta. Ver `migraciones.mjs`.
+await exigirBaseAlDia({ cwd: process.cwd() });
 
 const puerto = argumento("port") ?? "3001";
 // instanteCongelado ya resuelve la precedencia --freeze > QA_FREEZE > hoy 12:00 CR.
