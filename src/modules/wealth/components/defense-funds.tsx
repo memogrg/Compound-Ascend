@@ -31,7 +31,13 @@ type Report = DefenseFundsPlan & {
 const EMERGENCY_HELP =
   "Colchón de arranque para un imprevisto puntual (una emergencia médica, un electrodoméstico roto). Recomendado $1.000. No se dimensiona por meses.";
 const PEACE_HELP =
-  "Reserva para cubrir varios meses de tus gastos esenciales si tu ingreso se detiene. Se dimensiona como N meses de gasto esencial (vos elegís N, 3-6).";
+  "Reserva para cubrir varios meses de tus gastos esenciales si tu ingreso se detiene. Se dimensiona como N meses de gasto esencial (vos elegís N, 3-6). " +
+  // La división, dicha: es OTRA que la de «meses de colchón» en Mi Rich Life, y las dos se leen
+  // como «cuánto aguanto». Acá el numerador es solo el fondo FORMAL y el divisor el gasto
+  // ESENCIAL (sin los aportes a los propios fondos); allá, toda tu liquidez —metas incluidas—
+  // entre tu presupuesto mensual completo. Por eso pueden dar números distintos sin que ninguno
+  // esté mal.
+  "Cómo se calcula: fondo de paz formal ÷ gasto esencial mensual.";
 
 function Bar({ pct, color }: { pct: number; color: string }) {
   return (

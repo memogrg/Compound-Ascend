@@ -440,7 +440,7 @@ function PatrimonioSections({
           label="Meses de colchón"
           value={formatDecimal(r.mesesDeColchon)}
           note="liquidez vs. gasto mensual"
-          tip={`Qué es: cuántos meses cubrirías con tu dinero líquido si se cortaran tus ingresos. ${queCuenta}${contraQue}Por qué importa: es tu colchón de seguridad. Qué hago: apunta primero a 3-6 meses de gastos.`}
+          tip={`Cómo se calcula: liquidez total —tus metas incluidas— ÷ presupuesto mensual. Qué es: cuántos meses cubrirías con tu dinero líquido si se cortaran tus ingresos. ${queCuenta}${contraQue}Ojo: tu «fondo de paz» mide otra cosa —solo el fondo formal, entre el gasto esencial—, así que los dos números no tienen por qué coincidir. Qué hago: apuntá primero a 3-6 meses de gastos.`}
         />
         <MetricCard
           label="Cobertura de ingreso pasivo"
