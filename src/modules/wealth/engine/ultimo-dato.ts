@@ -48,7 +48,6 @@ export function etiquetaUltimoDato(puntos: { date: string }[], hoyIso: string): 
   // Hoy —o, por si acaso, una fecha futura— no se anuncia: decir «último dato: mañana» sería
   // peor que no decir nada.
   if (dias <= 0) return null;
-  if (dias === 1) return "Último dato: ayer";
 
   const [anio, mes, dia] = ultimo.split("-");
   const nombreMes = MESES[Number(mes) - 1] ?? mes;
@@ -56,5 +55,7 @@ export function etiquetaUltimoDato(puntos: { date: string }[], hoyIso: string): 
   const fecha = mismoAnio
     ? `${Number(dia)} de ${nombreMes}`
     : `${Number(dia)} de ${nombreMes} de ${anio}`;
-  return `Último dato: ${fecha}`;
+  // «al <fecha>» y no «ayer»: una fecha se lee igual mañana, cuando la captura de hoy quede
+  // guardada en un informe o en un ticket, y no obliga a saber cuándo se miró la pantalla.
+  return `Datos al ${fecha}`;
 }

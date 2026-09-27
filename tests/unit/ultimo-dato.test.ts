@@ -24,19 +24,22 @@ describe("etiquetaUltimoDato", () => {
     );
   });
 
-  it("si el último punto es de ayer, lo dice", () => {
-    expect(etiquetaUltimoDato([{ date: "2026-09-17" }], "2026-09-18")).toBe("Último dato: ayer");
+  it("si el último punto es de ayer, lo FECHA — no dice «ayer»", () => {
+    // Una fecha se lee igual mañana, cuando la captura quede guardada en un informe.
+    expect(etiquetaUltimoDato([{ date: "2026-09-17" }], "2026-09-18")).toBe(
+      "Datos al 17 de septiembre",
+    );
   });
 
   it("de hace unos días, con la fecha", () => {
     expect(etiquetaUltimoDato([{ date: "2026-09-10" }], "2026-09-18")).toBe(
-      "Último dato: 10 de septiembre",
+      "Datos al 10 de septiembre",
     );
   });
 
   it("de otro año, con el año", () => {
     expect(etiquetaUltimoDato([{ date: "2025-12-31" }], "2026-09-18")).toBe(
-      "Último dato: 31 de diciembre de 2025",
+      "Datos al 31 de diciembre de 2025",
     );
   });
 
