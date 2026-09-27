@@ -11,6 +11,7 @@ import type {
   DiagnosisFlag,
 } from "@/modules/wealth/engine/patrimonio-engine";
 import type { DetectedInsight } from "@/lib/insights/types";
+import type { ProtectionGap } from "@/modules/wealth/types";
 
 /** Tipo (kind) fijo del insight del ritual diario. */
 export const RITUAL_KIND = "ritual_patrimonio";
@@ -41,7 +42,9 @@ const ACTION_BY_FLAG: Record<string, { title: string; action: string }> = {
   },
   alta_tasa_baja_proteccion: {
     title: "Protege lo que estás construyendo",
-    action: "Hoy en 30s: revisa si tu fondo de emergencia cubre al menos 3 meses.",
+    // La acción real la elige `accionDeProteccion` con las brechas de verdad; esta es el
+    // respaldo de cuando no llegan (llamadores viejos).
+    action: "Hoy en 30s: mirá qué te falta en tu tablero de protección.",
   },
   patrimonio_alto_baja_liquidez: {
     title: "Suma un poco de colchón",
@@ -61,6 +64,36 @@ const ACTION_BY_FLAG: Record<string, { title: string; action: string }> = {
   },
 };
 
+/**
+ * Qué decirle a alguien cuya PROTECCIÓN está baja, según lo que de verdad le falta.
+ *
+ * `alta_tasa_baja_proteccion` son cinco casillas —tres seguros y los dos fondos de defensa— y la
+ * microacción decía siempre «revisá tu fondo de emergencia». En la cuenta de demo eso apunta a lo
+ * único que esa persona SÍ tiene: el fondo está cubierto y lo que falta son las tres pólizas.
+ *
+ * Los seguros van primero cuando faltan las dos cosas: un fondo de emergencia no cubre una
+ * hospitalización, y el orden de `essentials` en `computeProtection` ya dice lo mismo.
+ *
+ * «Gastos médicos menores» queda fuera: está en `gaps` con severidad baja justamente porque NO
+ * puntúa, así que mandar a comprarlo sería actuar sobre una casilla que no disparó nada.
+ */
+export function accionDeProteccion(gaps: ProtectionGap[]): string {
+  const cuentan = gaps.filter((g) => g.severity !== "bajo");
+  const seguros = cuentan.filter((g) => /^Seguro/i.test(g.type));
+  if (seguros.length > 0) {
+    const nombre = (seguros[0]?.type ?? "").replace(/^Seguro de\s*/i, "").toLowerCase();
+    const resto = seguros.length - 1;
+    const cola = resto > 0 ? ` (y ${resto} más)` : "";
+    return `Hoy en 30s: mirá qué cubre tu seguro de ${nombre}${cola}, o anotá que no lo tenés.`;
+  }
+  const fondos = cuentan.filter((g) => /^Fondo/i.test(g.type));
+  if (fondos.length > 0) {
+    const cual = (fondos[0]?.type ?? "").toLowerCase();
+    return `Hoy en 30s: definí cuánto querés en tu ${cual} y apartá el primer aporte.`;
+  }
+  return "Hoy en 30s: mirá tu tablero de protección y elegí la brecha que más te pesa.";
+}
+
 /** Elige la bandera activa de mayor prioridad (o null si no hay). */
 function topFlag(diagnosis: DiagnosisFlag[]): DiagnosisFlag | null {
   if (diagnosis.length === 0) return null;
@@ -79,18 +112,28 @@ export function buildDailyPatrimonioInsight(
   report: PatrimonioReport,
   level: PatrimonioLevel,
   diagnosis: DiagnosisFlag[],
+  /**
+   * Las brechas reales de `computeProtection`. Opcional: un llamador que no las pase se queda
+   * con el copy genérico, que ya no promete mirar un fondo que puede estar bien.
+   */
+  protectionGaps?: ProtectionGap[],
 ): DetectedInsight {
   const flag = topFlag(diagnosis);
   if (flag) {
     const copy = ACTION_BY_FLAG[flag.code] ?? {
       title: "Tu siguiente paso patrimonial",
-      action: "Hoy en 30s: revisa este punto en tu panel de patrimonio.",
+      action: "Hoy en 30s: revisá este punto en tu panel de patrimonio.",
     };
+    // La bandera de protección es la única cuya acción depende de QUÉ falta.
+    const action =
+      flag.code === "alta_tasa_baja_proteccion" && protectionGaps
+        ? accionDeProteccion(protectionGaps)
+        : copy.action;
     return {
       kind: RITUAL_KIND,
       severity: "accionar",
       title: copy.title,
-      body: copy.action,
+      body: action,
       metric: report.indice,
     };
   }

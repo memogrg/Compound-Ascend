@@ -18,7 +18,12 @@ import {
   getLiquidityBalance,
   ingresoPasivoDerivadoPromedio,
 } from "@/modules/financial-base";
-import { computeProtection, computePortfolio, investmentsInCurrency } from "@/modules/wealth";
+import {
+  computeProtection,
+  computePortfolio,
+  investmentsInCurrency,
+  tieneFondoDeDefensa,
+} from "@/modules/wealth";
 import { getCurrentDebtBalances } from "@/modules/control";
 import { buildRichLifeSnapshot } from "@/modules/rich-life/engine/rich-life-engine";
 import { mapInvestmentLiquidity, savingsLiquidity } from "@/modules/rich-life/engine/asset-mapping";
@@ -311,7 +316,9 @@ async function aggregarPatrimonio(
     getLiquidityBalance(ctx),
     db
       .from("savings_goals")
-      .select("id,name,current_amount,stored_in,status,currency")
+      // `goal_type` no es decorativo: de él sale si hay fondo de emergencia y fondo de paz
+      // FORMALES, que es lo que puntúa la protección. Ver más abajo.
+      .select("id,name,current_amount,stored_in,status,currency,goal_type")
       .eq("user_id", userId),
     // Renta/intereses DERIVADOS de las inversiones (alquiler, bonos, CDP, préstamos)
     // MÁS los pagos periódicos configurados (dividendos y cupones). Es ingreso pasivo
@@ -487,14 +494,21 @@ async function aggregarPatrimonio(
     // Delta 3b: la moneda NATIVA de la inversión (antes se tageaba con la de display, mezclando).
     currency: r.currency ?? currency,
   }));
+  // Los fondos de defensa se detectan por `goal_type`, igual que en la pantalla autoritativa
+  // de protección (`wealth-service.ts`), y NO por «¿tiene algún activo líquido?».
+  //
+  // El proxy de liquidez decía que sí en cuanto existiera CUALQUIER meta con saldo, y los
+  // activos «líquidos» de Rich Life son sintéticos: el saco más toda meta con saldo. En la
+  // cuenta de demo eso hacía que «Universidad de Sofía» —un fondo para la universidad de una
+  // hija— contara como fondo de PAZ. Y este `protection.score` no se queda en Rich Life:
+  // `patrimonio-service` reusa este mismo agregado, así que el proxy llegaba hasta la tarjeta
+  // del panel. Registrado ≠ acumulado: se exige saldo > 0, como hace wealth-service.
+  const metas = goalRows.data ?? [];
   const protection = computeProtection(
     {
       freeCashflow: base.indicators.freeCashflow,
-      hasEmergencyFund: assets.some((a) => a.assetClass === "liquido"),
-      // Vista secundaria (Rich Life): no consulta metas, así que reutiliza el
-      // mismo proxy de liquidez para el fondo de paz. La pantalla autoritativa
-      // de protección (Patrimonio) sí detecta ambos fondos por goal_type.
-      hasPeaceFund: assets.some((a) => a.assetClass === "liquido"),
+      hasEmergencyFund: tieneFondoDeDefensa(metas, "defensa:fondo_emergencia"),
+      hasPeaceFund: tieneFondoDeDefensa(metas, "defensa:fondo_paz"),
       hasCriticalDebt,
       dependents: profileRow.data?.dependents_count ?? 0,
       riskClassKnown: true,

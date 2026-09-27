@@ -129,11 +129,17 @@ export function PortfolioView({
   displayCurrency,
   rates,
   openContributions,
+  ultimoDato = null,
 }: {
   report: PortfolioReport;
   snapshots: PortfolioSnapshot[];
   dividends: Dividend[];
   summary: WealthSummary;
+  /**
+   * «Datos al <fecha>» cuando el último snapshot NO es de hoy, ya resuelto con el hoy del
+   * USUARIO por el servidor: este componente es cliente y no puede leer la zona del perfil.
+   */
+  ultimoDato?: string | null;
   /** Tasa de inversión (0-1) de BaseIndicators (financial-base). */
   investmentRate: number;
   /** Moneda del dropdown (display): solo afecta agregados/gráficas, no las filas. */
@@ -193,6 +199,7 @@ export function PortfolioView({
       {subtab === "portafolio" ? (
         <PortfolioPanel
           report={report}
+          ultimoDato={ultimoDato}
           snapshots={snapshots}
           dividends={dividends}
           summary={summary}
@@ -222,6 +229,7 @@ function PortfolioPanel({
   displayCurrency,
   rates,
   openContributions,
+  ultimoDato,
 }: {
   report: PortfolioReport;
   snapshots: PortfolioSnapshot[];
@@ -231,6 +239,8 @@ function PortfolioPanel({
   displayCurrency: string;
   rates: Record<string, number>;
   openContributions: OpenContribution[];
+  /** «Datos al <fecha>», ya resuelto con el hoy del USUARIO por el servidor. */
+  ultimoDato: string | null;
 }) {
   const { analytics, currency } = report;
   // Los agregados/gráficas siguen la moneda del dropdown (display): se calculan
@@ -389,6 +399,14 @@ function PortfolioPanel({
           {investedSeries.length >= 2 ? (
             <div className="invline">
               <PerformanceChart data={investedSeries} currency={displayCurrency} height={88} />
+              {/* Hasta cuándo llega la serie, cuando no llega hasta hoy. La pantalla ya no
+                  escribe su propio punto —lo hace el barrido diario—, así que sin esto una
+                  curva que termina el martes se lee como si terminara hoy. */}
+              {ultimoDato ? (
+                <div className="muted fs12" style={{ marginTop: 4 }}>
+                  {ultimoDato}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>

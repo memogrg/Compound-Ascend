@@ -702,6 +702,15 @@ export type BudgetTotals = {
   incomeByKey: KeyedTotals;
   expenseByKey: KeyedTotals;
   nativeByKey: NativeKeyedTotals;
+  /**
+   * Las claves de gasto que incluyen alguna línea DERIVADA (`source_kind` ≠ `'manual'`).
+   *
+   * La clave pierde el origen al agrupar, y hay consumidores para los que ese origen manda: un
+   * sobre derivado no se gasta desde el sobre, se genera desde su entidad, así que la pregunta
+   * «¿lo usás?» no aplica (ver `lib/rhythm/idle-envelopes.ts`). Una clave que MEZCLA manual y
+   * derivada cuenta como derivada: es justo la que no se puede comparar contra el gasto real.
+   */
+  derivedKeys: string[];
   items: BudgetItem[];
   currency: string;
 };
@@ -720,6 +729,7 @@ export async function getBudgetTotals(period: Period, ctx?: AuthContext): Promis
   const incomeByKey: KeyedTotals = {};
   const expenseByKey: KeyedTotals = {};
   const nativeByKey: NativeKeyedTotals = {};
+  const derivedKeys = new Set<string>();
 
   for (const it of items) {
     // INGRESO: el monto de la fuente es lo que llega POR PAGO, así que el aporte
@@ -746,6 +756,7 @@ export async function getBudgetTotals(period: Period, ctx?: AuthContext): Promis
       const key = it.categoryId ?? `name:${it.name.trim().toLowerCase()}`;
       const label = it.categoryId ? (catMap[it.categoryId] ?? it.name) : it.name;
       expenseByKey[key] = { label, value: (expenseByKey[key]?.value ?? 0) + value };
+      if ((it.sourceKind ?? "manual") !== "manual") derivedKeys.add(key);
       // La acumulación nativa (y la detección de "este sobre mezcla monedas") vive en el motor
       // puro: es una regla, no un detalle de esta query, y así se prueba sin tocar Supabase.
       nativeByKey[key] = acumularNativo(nativeByKey[key], {
@@ -756,7 +767,16 @@ export async function getBudgetTotals(period: Period, ctx?: AuthContext): Promis
     }
   }
 
-  return { budgetIncome, budgetExpense, incomeByKey, expenseByKey, nativeByKey, items, currency };
+  return {
+    budgetIncome,
+    budgetExpense,
+    incomeByKey,
+    expenseByKey,
+    nativeByKey,
+    derivedKeys: [...derivedKeys],
+    items,
+    currency,
+  };
 }
 
 /**
