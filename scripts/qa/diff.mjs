@@ -13,6 +13,8 @@
  *   node scripts/qa/diff.mjs --a … --b … --exclude home --max-diff-pixels 60 --max-delta 2
  */
 import { chromium } from "playwright";
+// El inventario, para saber si lo que se comparó es todo o un trozo.
+import { ROUTES, anchosDe } from "./snap.mjs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,6 +27,32 @@ import { fileURLToPath } from "node:url";
 const FUENTE_CONTEO = (
   await readFile(fileURLToPath(new URL("./comparar-pixeles.mjs", import.meta.url)), "utf8")
 ).replace(/^export /gm, "");
+
+/**
+ * Cuántas capturas debería tener una corrida completa, según `routes.json`.
+ *
+ * Se calcula igual que las hace `snap.mjs`: cada ruta se captura en los anchos de SU superficie
+ * (`anchosDe`) y en los dos temas. No se puede simplificar a «rutas × 6»: `/m` va a 390 y 768, y
+ * `/dev/ui` solo a 1280.
+ */
+function capturasEsperadas(anchos = [390, 768, 1280], temas = 2) {
+  let n = 0;
+  for (const r of ROUTES) {
+    // `anchosDe` recibe la RUTA entera (lee `superficie`) y devuelve `null` cuando no hay
+    // restricción: ahí valen todos los anchos de la corrida.
+    const propios = anchosDe(r);
+    n += (propios ?? anchos).length * temas;
+  }
+  return { capturas: n, rutas: ROUTES.length };
+}
+
+/** `null` si el inventario está completo; si no, con qué se quedó corto. */
+function faltanRutas(comparadas) {
+  const { capturas, rutas } = capturasEsperadas();
+  if (comparadas >= capturas) return null;
+  return { comparadas, esperadas: capturas, rutas };
+
+}
 
 function parseArgs(argv) {
   const args = {};
@@ -289,7 +317,26 @@ async function main() {
       `reprobadas (px > ${maxDiffPixels} o delta > ${maxDelta}): ${reprobadas.map((f) => f.imagen).join(", ")}`,
     );
   }
-  const falla = reprobadas.length > 0 || soloA.length > 0 || soloB.length > 0;
+
+  // ¿Se comparó TODO el inventario, o solo un trozo?
+  //
+  // `qa:snap --rutas` sirve para iterar: comprobar un cambio acotado sin pagar cuarenta minutos.
+  // El riesgo es que un diff parcial se presente como evidencia de un PR, y a simple vista los
+  // dos se ven igual — una lista de imágenes y un «sin diferencias». Así que se dice, y se sale
+  // con un código distinto de 0: la evidencia de un PR es el inventario completo.
+  const parcial = faltanRutas(comunes.length);
+  if (parcial) {
+    console.log(
+      `\nPARCIAL: ${parcial.comparadas} de ${parcial.esperadas} capturas del inventario ` +
+        `(${parcial.rutas} rutas de routes.json, en sus anchos y los dos temas).`,
+    );
+    console.log(
+      "  Un diff parcial NO es evidencia de un PR: solo dice que lo que se miró no cambió.\n" +
+        "  Para la evidencia, capturá sin `--rutas`.",
+    );
+  }
+
+  const falla = reprobadas.length > 0 || soloA.length > 0 || soloB.length > 0 || Boolean(parcial);
   process.exit(falla ? 1 : 0);
 }
 
