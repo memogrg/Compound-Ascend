@@ -48,10 +48,17 @@ recorrer(informe.suites);
 
 const porLaBandera = saltados.filter((s) => /NAV_V2/i.test(s.motivo));
 if (porLaBandera.length > 0) {
+  // El mensaje NO afirma la causa. Decía «NEXT_PUBLIC_NAV_V2 no llegó al build», y una vez
+  // fue falso: cinco casos del mismo archivo pasaron CON la bandera encendida y el sexto se
+  // saltó porque contó los ítems de la barra antes de que terminara de montar. El guardián
+  // sabe que un caso se saltó por la bandera; por qué, no puede saberlo desde aquí, y un
+  // mensaje que se inventa la causa manda a buscar donde no está.
+  console.error(`::error::${porLaBandera.length} caso(s) se saltaron por NEXT_PUBLIC_NAV_V2`);
+  for (const s of porLaBandera) console.error(`  · ${s.titulo} — «${s.motivo}»`);
   console.error(
-    "::error::los casos de la bandera se saltaron: NEXT_PUBLIC_NAV_V2 no llegó al build",
+    "    Si se saltaron TODOS, la bandera no llegó al build. Si se saltó solo alguno, la\n" +
+      "    sonda del propio spec midió antes de tiempo — mirá `v2Encendida` en su archivo.",
   );
-  for (const s of porLaBandera) console.error(`  · ${s.titulo}`);
   process.exit(1);
 }
 
