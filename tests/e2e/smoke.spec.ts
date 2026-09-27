@@ -131,6 +131,11 @@ test("login → dashboard → crear gasto → patrimonio → chat multilínea", 
         const r = a.getBoundingClientRect();
         const encima = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
         if (encima?.closest(".bottom-nav")) return null;
+        // `nextjs-portal` es el indicador de las devtools de Next, y el smoke corre contra
+        // `npm run dev`: a 390 px se sienta en la esquina inferior izquierda, justo sobre el
+        // primer enlace. Es un artefacto del modo desarrollo, no existe en producción, y
+        // excluirlo es lo único honesto — taparlo con un z-index sería mover el problema.
+        if (encima?.closest("nextjs-portal")) return null;
         const cadena: string[] = [];
         for (let n: Element | null = encima; n && cadena.length < 5; n = n.parentElement) {
           cadena.push(

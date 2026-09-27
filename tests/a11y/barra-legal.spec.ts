@@ -17,6 +17,23 @@ import { ESTADO_SESION } from "./sesion";
 /** Alto máximo de la barra en móvil, SIN el área segura, que depende del aparato. */
 const ALTO_MAXIMO = 64;
 
+/**
+ * Las dos rutas que mide este spec, CALENTADAS una vez.
+ *
+ * En CI el primer render de una ruta tarda decenas de segundos —render de servidor completo
+ * contra Postgres, en un runner de 4 vCPU compartido con el stack de Supabase—, y con siete
+ * casos abriendo su propio contexto esa espera se pagaba siete veces y algunas cruzaban el
+ * minuto. Se paga una sola vez, antes de medir nada.
+ */
+test.beforeAll(async ({ browser }) => {
+  const ctx = await browser.newContext({ storageState: ESTADO_SESION });
+  const page = await ctx.newPage();
+  for (const ruta of ["/dashboard", "/m/gastos"]) {
+    await page.goto(ruta, { waitUntil: "domcontentloaded", timeout: 120_000 }).catch(() => {});
+  }
+  await ctx.close();
+});
+
 async function abrir(browser: Browser, ruta: string, ancho = 390) {
   const ctx = await browser.newContext({
     storageState: ESTADO_SESION,
