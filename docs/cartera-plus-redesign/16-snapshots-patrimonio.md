@@ -1,6 +1,8 @@
 # 16 · Snapshots de patrimonio: sacar la escritura de la carga, y graficar el patrimonio neto
 
-**Plan. No implementado todavía.**
+**Estado:** el punto 2 está hecho (PR A, #862) y el punto 1 está hecho (PR C, este PR: la
+escritura de `portfolio_snapshots` salió de la carga y pasó a un barrido diario). Quedan el
+backfill (PR B) y el gráfico de patrimonio neto (PR D). El inventario de la sección 5 es nuevo.
 
 Cuatro cosas, y las cuatro salieron de medir, no de leer código:
 
@@ -161,13 +163,54 @@ código.
 
 ---
 
+## 5 · Inventario: todas las LECTURAS que escriben
+
+Una carga de pantalla que escribe es la misma familia de problema tres veces: hace que la
+pantalla dependa de quién la abrió y cuándo, mete latencia en el camino de lectura, y convierte
+el diff visual en ruido que hay que descartar a mano. Esto es el censo completo, medido con
+`grep` sobre `src/app/**` y sobre los `ensure*`/`maybe*` del repo.
+
+| # | Función | Se llama desde | Qué escribe | Propuesta |
+|---|---|---|---|---|
+| 1 | `ensureTodaySnapshot` | `/m/patrimonio` | una fila/día en `portfolio_snapshots` | **HECHO en este PR**: barrido diario (`/api/investments/snapshot`, 08:30 UTC) y la pantalla solo lee |
+| 2 | `ensureCurrentNetWorthSnapshot` | `/mi-rich-life` (web) y `/m/patrimonio` | la fila del MES en curso en `net_worth_snapshots` (upsert) | **se queda, con motivo**: su periodo es el mes, así que reescribe la MISMA fila todo el mes en vez de alargar la serie. No mueve el gráfico entre dos visitas. Candidata a irse al barrido diario junto con PR D |
+| 3 | `ensureMonthlyContributions` | `/patrimonio`, `/m/inversiones`, `/dashboard` | `holding_contributions` + `transactions` (gasto) + `investment_transactions` | **cron**: es la brecha de aporte (DCA). Escribe DINERO —un gasto— al abrir una pantalla, que es lo más caro de esta lista. Idempotente por índice único `(holding_id, period_year, period_month)`, así que moverla a cron mensual no cambia el resultado; lo que cambia es que deje de depender de que alguien abra la app |
+| 4 | `ensureMonthlyPremiums` | `/patrimonio` | igual, para las primas de seguros | **cron**, con `ensureMonthlyContributions`: mismo patrón, misma razón |
+| 5 | `ensureRecurringIncome` | `/dashboard`, `base-view` (`/mi-base-financiera`), y ya también el cron de ritmo | copia los ingresos recurrentes al periodo (`budget_items`) | **cron** (ya tiene uno: `lib/rhythm/cron-service.ts:215`). La llamada de pantalla es el respaldo de cuando no había cron; con el cron corriendo, sobra |
+| 6 | `syncDerivedBudget` | `base-view` (solo si el periodo NO es anterior al actual), `dividend-service`, `rental-service` | INSERT/UPDATE/DELETE de `budget_items` derivados | **acción explícita + cron**: desde una entidad (alta de deuda/meta/póliza) es correcto que sincronice; desde una carga de pantalla es una escritura por visita. El plan 15 le añade la variante sin sesión y el congelado del mes cerrado |
+| 7 | `refreshInsights` (vía `getActiveInsights`) | la campana, y **el context-engine del asesor en cada mensaje** | `user_insights` (alta, `status`, `updated_at`) | **se queda**: no es un dato del usuario sino la conclusión sobre sus datos, y la reconciliación por `(kind, related_id)` es lo que hace que un insight se auto-resuelva. Ya tiene guarda de frescura. Lo que NO puede entrar ahí es trabajo con efectos secundarios (dinero, fusiones): eso va en la carga de página o en cron, y está escrito en su cabecera |
+
+### Lo que este PR cambia, exactamente
+
+- `ensureTodaySnapshot` **desaparece** (no queda ningún llamador).
+- `generatePortfolioSnapshotsForAllUsers()` recorre `profiles` con el cliente de servicio y
+  delega en `generateSnapshotForUserCron`, que ya existía. Un usuario que falla no detiene el
+  barrido y se registra con su id.
+- `/api/investments/snapshot` acepta el barrido: con secreto de cron y **sin** `userId`. Antes
+  eso era un 422 —y por eso la escritura vivía en la pantalla: el endpoint solo sabía hacer un
+  usuario a la vez—. `GET` atiende **solo** el barrido (el cron de Vercel llega por GET); el
+  camino con sesión sigue siendo POST, porque un GET que escribe se dispara con un prefetch.
+- `vercel.json`: `30 8 * * *`, media hora después del refresco de indicadores, para que los
+  precios del día ya estén en `market_price_cache`.
+- La pantalla dice **hasta cuándo llega la curva** (`etiquetaUltimoDato`, puro y probado):
+  «Último dato: ayer» / «Último dato: 10 de septiembre». Con el punto de hoy no dice nada.
+
+### El efecto secundario, dicho en voz alta
+
+Un usuario al que el barrido no haya llegado **no tiene punto de hoy**. Es lo correcto —el
+snapshot es del cierre del día, no del momento en que alguien abrió una pantalla— pero cambia
+la curva del día en curso, que ahora termina en el último punto cerrado. De ahí el rótulo.
+
+---
+
 ## Orden
 
 ```
-PR A · household_id + created_by en el insert, y el catch deja de ser mudo
+PR A · household_id + created_by en el insert, y el catch deja de ser mudo   HECHO (#862)
 PR B · migración de backfill de las 4 filas            (después de A, nunca antes)
-PR C · barrido diario en cron; la pantalla deja de escribir
-PR D · las dos pantallas grafican getNetWorthHistory()
+        · NO hace falta migración: las 4 filas se rellenaron por API, y quedaron 0
+PR C · barrido diario en cron; la pantalla deja de escribir                  HECHO (este PR)
+PR D · las dos pantallas grafican getNetWorthHistory()                       pendiente
 ```
 
 A y B son independientes de C y D y se pueden mandar ya. C es el que quita el ruido de las
