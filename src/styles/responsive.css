@@ -74,6 +74,18 @@
   body:has(.legal-accept-bar) .coach-fab {
     bottom: calc(var(--bottom-nav-h) + var(--legal-bar-h) + 16px);
   }
+  /* El pop-up del ritmo del mes también se sienta ARRIBA de la barra de navegación. Su
+     z-index (45) EMPATA con el de `.bottom-nav`, y con el empate gana la que va después en el
+     DOM —la barra—, así que sus dos botones quedaban tapados por debajo. Subir el z-index
+     sería la respuesta fácil y la equivocada: lo pondría por encima de la navegación, que es
+     el problema que este PR viene a cerrar. Se sube por geometría, como todo lo demás.
+     El móvil ya lo resolvía así: ver `.m-rhythm-nudge`, anclado sobre el FAB. */
+  .rhythm-nudge {
+    bottom: calc(var(--bottom-nav-h) + 16px);
+  }
+  body:has(.legal-accept-bar) .rhythm-nudge {
+    bottom: calc(var(--bottom-nav-h) + var(--legal-bar-h) + 16px);
+  }
   /* El área de contenido pierde alto por el tabbar inferior: .content pasa a 16px arriba
      + (barra + 28) abajo (contra 22+22), así que el tab respira 60px menos.
      95 = esos 16 de arriba + 28 de colchón + 51 de la barra superior; el alto de la barra

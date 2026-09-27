@@ -173,3 +173,31 @@ for (const [ruta, nombre] of [
     await ctx.close();
   });
 }
+
+test("web · el pop-up del ritmo no queda debajo de la navegación", async ({ browser }) => {
+  // Su z-index (45) EMPATA con el de `.bottom-nav`, y con el empate gana la que va después en
+  // el DOM: la barra. Sus dos botones quedaban tapados. Se comprueba por geometría y no por
+  // apilamiento porque la respuesta correcta es subirlo, no darle más z-index —eso lo pondría
+  // por encima de la navegación, que es justo lo que este PR viene a cerrar.
+  const { ctx, page } = await abrir(browser, "/dashboard");
+  const nudge = page.locator(".rhythm-nudge");
+  if ((await nudge.count()) === 0) {
+    test.skip(true, "esta cuenta no tiene aviso de ritmo del mes hoy");
+  }
+  const n = (await nudge.boundingBox())!;
+  const nav = page.locator(".bottom-nav");
+  if ((await nav.count()) > 0) {
+    const b = (await nav.boundingBox())!;
+    expect(n.y + n.height, `nudge hasta ${n.y + n.height} · nav desde ${b.y}`).toBeLessThanOrEqual(
+      b.y,
+    );
+  }
+  if ((await barra(page).count()) > 0) {
+    const l = (await barra(page).boundingBox())!;
+    expect(
+      n.y + n.height,
+      `nudge hasta ${n.y + n.height} · legal desde ${l.y}`,
+    ).toBeLessThanOrEqual(l.y);
+  }
+  await ctx.close();
+});
