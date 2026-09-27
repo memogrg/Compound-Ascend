@@ -349,8 +349,9 @@ jobs:
           # `supabase status -o env` entrecomilla los valores ("..."); hay que
           # quitar las comillas o GITHUB_ENV las conserva literales y rompen la
           # validación de URL en supabase-js (issue #94).
-          # El seeder usa SUPABASE_URL/SERVICE_ROLE_KEY; el dev server (npm run
-          # dev) lee NEXT_PUBLIC_SUPABASE_URL/ANON_KEY en runtime para el login.
+          # El seeder usa SUPABASE_URL/SERVICE_ROLE_KEY; el build del smoke INLINEA
+          # NEXT_PUBLIC_SUPABASE_URL/ANON_KEY, así que tienen que estar en el entorno
+          # ANTES de compilar — y por eso este paso va antes del de Playwright.
           supabase status -o env | while IFS='=' read -r key val; do
             val="${val%\"}"; val="${val#\"}"
             case "$key" in
@@ -574,8 +575,9 @@ jobs:
           # `supabase status -o env` entrecomilla los valores ("..."); hay que
           # quitar las comillas o GITHUB_ENV las conserva literales y rompen la
           # validación de URL en supabase-js (issue #94).
-          # El seeder usa SUPABASE_URL/SERVICE_ROLE_KEY; el dev server (npm run
-          # dev) lee NEXT_PUBLIC_SUPABASE_URL/ANON_KEY en runtime para el login.
+          # El seeder usa SUPABASE_URL/SERVICE_ROLE_KEY; el build del smoke INLINEA
+          # NEXT_PUBLIC_SUPABASE_URL/ANON_KEY, así que tienen que estar en el entorno
+          # ANTES de compilar — y por eso este paso va antes del de Playwright.
           supabase status -o env | while IFS='=' read -r key val; do
             val="${val%\"}"; val="${val#\"}"
             case "$key" in

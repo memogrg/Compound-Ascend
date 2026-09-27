@@ -15,6 +15,7 @@
 import { chromium } from "playwright";
 // El inventario, para saber si lo que se comparó es todo o un trozo.
 import { ROUTES, anchosDe } from "./snap.mjs";
+import { diferenciasDeBanderas } from "./banderas.mjs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -51,7 +52,6 @@ function faltanRutas(comparadas) {
   const { capturas, rutas } = capturasEsperadas();
   if (comparadas >= capturas) return null;
   return { comparadas, esperadas: capturas, rutas };
-
 }
 
 function parseArgs(argv) {
@@ -189,6 +189,46 @@ async function compararEnPagina(page, aUri, bUri, threshold, ignorarDeltaBajo) {
   );
 }
 
+/** El manifiesto de una corrida, o `null` si no se puede leer (una corrida vieja o a medias). */
+async function leerManifest(dir) {
+  try {
+    return JSON.parse(await readFile(path.join(dir, "manifest.json"), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Se niega a comparar dos corridas compiladas con banderas de interfaz distintas, nombrándolas.
+ *
+ * Un manifiesto SIN el dato (`null`) no bloquea: es una corrida anterior a esta guarda, y
+ * confundir «no lo sé» con «son distintas» haría imposible comparar contra cualquier base
+ * antigua. Se avisa, en voz alta, y quien mira decide.
+ */
+async function exigirMismasBanderas(dirA, dirB) {
+  const [ma, mb] = await Promise.all([leerManifest(dirA), leerManifest(dirB)]);
+  const ba = ma?.banderas ?? null;
+  const bb = mb?.banderas ?? null;
+  if (ba == null || bb == null) {
+    console.log(
+      `\n  ⚠ Banderas de compilación desconocidas en ${ba == null ? dirA : dirB}: ` +
+        `no se puede comprobar que las dos corridas midan lo mismo.`,
+    );
+    return;
+  }
+  const difs = diferenciasDeBanderas(ba, bb);
+  if (difs.length === 0) return;
+  console.error(`\n  ✖ Las dos corridas se compilaron con banderas de interfaz distintas.\n`);
+  for (const d of difs) {
+    console.error(`      ${d.bandera}:  ${dirA} = ${d.base}   ·   ${dirB} = ${d.nueva}`);
+  }
+  console.error(
+    `\n    No se compara: un cambio de bandera mueve pantallas enteras y el diff diría que\n` +
+      `    los movió el PR. Volvé a compilar la base con las MISMAS banderas y capturá otra vez.\n`,
+  );
+  process.exit(2);
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const dirA = args.a;
@@ -227,6 +267,14 @@ async function main() {
   );
   /** `light/390/home.png` → `home`. */
   const slugDe = (rel) => path.basename(rel, ".png");
+
+  // ── ANTES de comparar un solo píxel: ¿son comparables? ────────────────────────────────
+  //
+  // Una línea base compilada con `NEXT_PUBLIC_NAV_V2=1` y una rama sin ella dieron 169 de 200
+  // capturas distintas para un PR que solo cambiaba dos textos. Ese diff era correcto y no
+  // medía nada: la navegación entera era otra. Comparar así no es un margen que haya que
+  // ajustar, es una comparación inválida, y por eso esto no avisa: se niega.
+  await exigirMismasBanderas(dirA, dirB);
 
   const [pngsA, pngsB] = await Promise.all([listarPngs(dirA), listarPngs(dirB)]);
   const setB = new Set(pngsB);

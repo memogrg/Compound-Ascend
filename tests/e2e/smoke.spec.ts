@@ -131,10 +131,11 @@ test("login → dashboard → crear gasto → patrimonio → chat multilínea", 
         const r = a.getBoundingClientRect();
         const encima = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
         if (encima?.closest(".bottom-nav")) return null;
-        // `nextjs-portal` es el indicador de las devtools de Next, y el smoke corre contra
-        // `npm run dev`: a 390 px se sienta en la esquina inferior izquierda, justo sobre el
-        // primer enlace. Es un artefacto del modo desarrollo, no existe en producción, y
-        // excluirlo es lo único honesto — taparlo con un z-index sería mover el problema.
+        // `nextjs-portal` es el indicador de las devtools de Next: a 390 px se sienta en la
+        // esquina inferior izquierda, justo sobre el primer enlace. Desde que el smoke corre
+        // contra un BUILD (ver `playwright.config.ts`) no debería aparecer nunca; la exclusión
+        // se queda para quien corra el spec a mano contra su `next dev`, donde sí sale. Si
+        // volviera a aparecer en CI, es señal de que el servidor no es el compilado.
         if (encima?.closest("nextjs-portal")) return null;
         const cadena: string[] = [];
         for (let n: Element | null = encima; n && cadena.length < 5; n = n.parentElement) {
