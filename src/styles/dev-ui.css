@@ -1,0 +1,198 @@
+/**
+ * La galería interna (`/dev/ui`). **Nada de esto se usa en producción**: la página devuelve
+ * 404 cuando `VERCEL_ENV === "production"`, así que estas reglas existen solo para mirar las
+ * primitivas, nunca para vestirlas.
+ *
+ * Por eso todo va prefijado `du-`, y por eso ningún nombre es una palabra suelta: `overline`
+ * ya nos costó un subrayado en toda la landing por chocar con una utilidad de Tailwind, y esta
+ * hoja se carga en el mismo documento que las demás.
+ */
+
+/* ── Controles ─────────────────────────────────────────────────────────────── */
+
+.du-controles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.du-controles fieldset {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.du-controles legend {
+  float: left;
+  margin-right: 8px;
+  padding: 0;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.du-controles label,
+.du-check {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  cursor: pointer;
+}
+
+/* ── El lienzo ─────────────────────────────────────────────────────────────── */
+
+.du-lienzo {
+  /* `max-width` y no un iframe: lo que se quiere ver es cómo se reacomoda la rejilla. Las
+     media queries de verdad las prueba la captura, que abre el navegador a 390 y a 1280. */
+  margin-inline: auto;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--fg);
+  transition: max-width 200ms ease;
+}
+
+/* Reproduce el efecto de `prefers-reduced-motion` DENTRO del lienzo, para poder mirarlo sin
+   cambiar el ajuste del sistema. No lo simula «a medias»: apaga transiciones y animaciones. */
+.du-lienzo[data-quieto="1"],
+.du-lienzo[data-quieto="1"] * {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* ── Entradas ──────────────────────────────────────────────────────────────── */
+
+.du-entrada {
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+
+.du-entrada:first-child {
+  border-top: 0;
+}
+
+.du-entrada-cab {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.du-entrada-tit {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* El ancla se ve siempre, no solo al pasar el mouse: en una pantalla táctil no hay hover, y
+   el punto de una galería es poder mandar el enlace a una entrada concreta. */
+.du-ancla {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.du-ancla:hover,
+.du-ancla:focus-visible {
+  color: var(--accent);
+}
+
+.du-entrada-nota {
+  margin: 4px 0 10px;
+  max-width: 62ch;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* La especificación: `<details>` y no un tooltip de hover — se abre con teclado, no se escapa
+   al mover la mano, y se puede capturar en una prueba visual sin simular el puntero. */
+.du-spec > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.du-spec > summary::-webkit-details-marker {
+  display: none;
+}
+
+.du-spec > p {
+  max-width: 60ch;
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* ── La matriz de estados ──────────────────────────────────────────────────── */
+
+.du-matriz {
+  display: grid;
+  gap: 12px;
+  /* 260 px es el ancho al que una KpiCard todavía respira. Con `auto-fill` la matriz pasa de
+     cuatro columnas a una sin una sola media query, que es justo lo que el control de ancho
+     tiene que dejar ver. */
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.du-estado {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.du-estado-rotulo {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+/* La caja de cada estado tiene un alto MÍNIMO común, para que «cargando» y «con datos» se
+   miren lado a lado y cualquier salto del marco se vea de inmediato. Mínimo y no fijo: un
+   rótulo largo tiene que poder crecer, que es lo que ese estado viene a mostrar. */
+.du-estado-caja {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 92px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.du-vacio {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}

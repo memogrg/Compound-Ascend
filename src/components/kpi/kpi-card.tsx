@@ -1,6 +1,7 @@
 "use client";
 
 import { formatMoney } from "@/lib/format";
+import { EstadoCifra } from "./estado-kpi";
 
 import { DeltaChip, type SentidoBueno } from "./delta-chip";
 import { digitosNumero, partesNumero } from "./numero-animado";
@@ -25,6 +26,8 @@ export function KpiCard({
   nota,
   delta,
   puntos,
+  cargando,
+  error,
 }: {
   etiqueta: string;
   valor: number;
@@ -33,21 +36,32 @@ export function KpiCard({
   nota?: string;
   delta?: { valor: number; vsEtiqueta?: string; sentidoBueno: SentidoBueno };
   puntos?: readonly number[];
+  /** Todavía no llegó el dato. El marco NO cambia de alto: ver `estado-kpi.tsx`. */
+  cargando?: boolean;
+  /** No se pudo calcular. Se dice en el lugar de la cifra, sin mover nada. */
+  error?: string;
 }) {
   const partes = partesNumero(valor, moneda, decimales);
+  const sinDato = Boolean(cargando || error);
 
   return (
     <div className="kpi-card">
       <p className="kpi-card-etiqueta">{etiqueta}</p>
       <p className="kpi-card-cifra tnum">
-        <span className="sr-only">{formatMoney(valor, moneda, decimales)}</span>
-        <span aria-hidden="true">
-          <span className="kpi-cifra-signo">{partes.signo}</span>
-          <span className="kpi-cifra-simbolo">{partes.simbolo}</span>
-          {digitosNumero(partes)}
-        </span>
+        <EstadoCifra cargando={cargando} error={error}>
+          <>
+            <span className="sr-only">{formatMoney(valor, moneda, decimales)}</span>
+            <span aria-hidden="true">
+              <span className="kpi-cifra-signo">{partes.signo}</span>
+              <span className="kpi-cifra-simbolo">{partes.simbolo}</span>
+              {digitosNumero(partes)}
+            </span>
+          </>
+        </EstadoCifra>
       </p>
-      {delta ? (
+      {/* Sin dato no se pinta un delta ni una sparkline: serían una comparación y una
+          tendencia inventadas sobre un número que no existe. */}
+      {delta && !sinDato ? (
         <DeltaChip
           valor={delta.valor}
           moneda={moneda}
@@ -55,7 +69,7 @@ export function KpiCard({
           sentidoBueno={delta.sentidoBueno}
         />
       ) : null}
-      {puntos ? <Sparkline puntos={puntos} ancho={64} alto={20} /> : null}
+      {puntos && !sinDato ? <Sparkline puntos={puntos} ancho={64} alto={20} /> : null}
       {nota ? <p className="kpi-card-nota">{nota}</p> : null}
     </div>
   );
