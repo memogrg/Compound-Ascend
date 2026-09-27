@@ -136,6 +136,42 @@ describe("syncDerivedBudget con ctx (cron)", () => {
     expect(requireUserMock).not.toHaveBeenCalled();
   });
 
+  it("simulacro: CERO escrituras, y dice cuántas líneas insertaría y de qué origen", async () => {
+    // El modo que usa `x-dry-run: 1` contra producción. Un simulacro que escribe no es un
+    // simulacro, así que el caso mira TODAS las escrituras, no solo las de `budget_items`.
+    const escrituras: Escritura[] = [];
+    const { syncDerivedBudget } =
+      await import("@/modules/financial-base/services/derived-budget-service");
+    const resumen = await syncDerivedBudget(
+      PERIODO_CERRADO,
+      {
+        db: stubDb(
+          {
+            // Un mes cerrado VACÍO de derivadas y una deuda viva: es el caso que el cron
+            // viene a arreglar, así que el simulacro tiene que contar una línea.
+            debts: [
+              {
+                id: "d-1",
+                name: "Préstamo",
+                currency: "CRC",
+                min_payment: 50_000,
+                current_payment: 0,
+                is_current: true,
+                balance: 1_000_000,
+              },
+            ],
+          },
+          escrituras,
+        ),
+        userId: "11111111-1111-1111-1111-111111111111",
+      },
+      { congelado: true, simulacro: true },
+    );
+    expect(escrituras).toEqual([]);
+    expect(resumen.toInsert).toBe(1);
+    expect(resumen.porOrigen).toEqual({ debt: 1 });
+  });
+
   it("SIN congelado, ese mismo mes poblado sí se recorta (el contraste)", async () => {
     // El caso espejo: es lo que hace hoy la carga de pantalla, y es correcto para el mes en
     // curso. Si este dejara de borrar, el de arriba no probaría nada.

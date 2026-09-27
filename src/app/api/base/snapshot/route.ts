@@ -74,20 +74,30 @@ async function snapshotPatrimonioUser(periodo: {
  * Best-effort y con el detalle en la respuesta: si esto falla, los snapshots se escriben igual
  * (es lo que ya hacía el cron) y el fallo queda a la vista en el JSON del cron.
  */
-async function congelarDerivadasAllUsers(periodo: {
-  year: number;
-  month: number;
-  label: string;
-  from: string;
-  to: string;
-}): Promise<{ users: number; conLineas: number; failed: number } | { error: true }> {
+async function congelarDerivadasAllUsers(
+  periodo: { year: number; month: number; label: string; from: string; to: string },
+  simulacro = false,
+): Promise<unknown> {
   try {
     const { congelarDerivadasDelPeriodo } =
       await import("@/modules/financial-base/services/derived-budget-service");
-    return await congelarDerivadasDelPeriodo(periodo);
+    return await congelarDerivadasDelPeriodo(periodo, { simulacro });
   } catch {
     return { error: true };
   }
+}
+
+/**
+ * `x-dry-run: 1` (con el MISMO `CRON_SECRET`): simulacro. Recorre a todos los usuarios, calcula
+ * qué insertaría para el mes recién cerrado y responde SOLO conteos por usuario —id acortado y
+ * líneas por `source_kind`—, sin escribir absolutamente nada: ni las derivadas, ni los snapshots.
+ *
+ * Existe para poder mirar el alcance de un barrido antes de soltarlo sobre la base de
+ * producción. Que no escriba no es una promesa del comentario: el caso que lo cubre mira TODAS
+ * las escrituras del camino, no solo las de `budget_items`.
+ */
+function esSimulacro(req: Request): boolean {
+  return req.headers.get("x-dry-run") === "1";
 }
 
 async function handle(req: Request) {
@@ -107,6 +117,18 @@ async function handle(req: Request) {
       // PRIMERO las derivadas del mes cerrado, y solo INSERTANDO: para quien no abrió la app
       // en ese mes, su presupuesto no tenía cuotas, aportes ni primas — y el snapshot que se
       // escribe dos líneas más abajo lo heredaba. Para quien sí la abrió esto no hace nada.
+      // Simulacro: se calcula y se responde, sin tocar NADA —tampoco los snapshots, que son
+      // escrituras igual de reales que las derivadas.
+      if (esSimulacro(req)) {
+        const derivadas = await congelarDerivadasAllUsers(closed, true);
+        return NextResponse.json({
+          ok: true,
+          mode: "cron-simulacro",
+          period: closed.label,
+          derivadas,
+        });
+      }
+
       const derivadas = await congelarDerivadasAllUsers(closed);
       const { generateSnapshotsForAllUsers } =
         await import("@/modules/financial-base/services/snapshot-service");
