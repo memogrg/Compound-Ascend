@@ -135,7 +135,7 @@
 }
 .nav-badge.alert {
   background: var(--danger-soft);
-  color: var(--danger);
+  color: var(--neg-texto);
 }
 .nav-dot {
   margin-left: auto;
