@@ -434,6 +434,22 @@ jobs:
       # 20260620000001_grants_public_roles.sql (issue #98), así que `supabase
       # migration up` los aplica; ya no hace falta el paso de psql aquí.
 
+      # ── UN instante, para la siembra y para la app ───────────────────────────────────
+      #
+      # Lo calcula el propio arnés (`instanteCongelado`), que desde el arreglo del 28-sep no
+      # devuelve nunca uno futuro: con el reloj adelantado, el token que emite gotrue con la
+      # hora REAL parece vencido en cada render, todos los componentes de servidor piden
+      # refrescarlo a la vez y gotrue responde 409. La página no falla — se queda cargando.
+      #
+      # Y va al `$GITHUB_ENV` para que lo lean los DOS: la siembra (que si no anclara aquí
+      # escribiría el mes real mientras la app mira otro, y el panel saldría vacío en cada
+      # cruce de mes) y `qa:start`, que lo toma de `QA_FREEZE`.
+      - name: Instante congelado, uno solo
+        run: |
+          INSTANTE=$(node -e "import('./scripts/qa/snap.mjs').then(m => console.log(m.instanteCongelado().toISOString()))")
+          echo "QA_FREEZE=$INSTANTE" >> "$GITHUB_ENV"
+          echo "::notice::instante congelado (siembra y app): $INSTANTE"
+
       - name: Seed usuario E2E
         run: node scripts/seed-e2e-user.mjs
         env:
@@ -467,13 +483,13 @@ jobs:
           psql "$DB_URL" -v ON_ERROR_STOP=1
           -c "insert into public.budget_items (user_id, type, name, amount, currency, frequency, period_year, period_month, income_type, source_kind)
           select u.id, 'income', 'Salario E2E', 1000000, 'CRC', 'mensual',
-          extract(year from now())::int, extract(month from now())::int, 'activo', 'manual'
+          extract(year from '$QA_FREEZE'::timestamptz)::int, extract(month from '$QA_FREEZE'::timestamptz)::int, 'activo', 'manual'
           from auth.users u
           where u.email = '$E2E_EMAIL'
           and not exists (select 1 from public.budget_items b where b.user_id = u.id and b.type = 'income');
           insert into public.budget_items (user_id, type, name, amount, currency, frequency, period_year, period_month, source_kind)
           select u.id, 'expense', 'Vivienda E2E', 400000, 'CRC', 'mensual',
-          extract(year from now())::int, extract(month from now())::int, 'manual'
+          extract(year from '$QA_FREEZE'::timestamptz)::int, extract(month from '$QA_FREEZE'::timestamptz)::int, 'manual'
           from auth.users u
           where u.email = '$E2E_EMAIL'
           and not exists (select 1 from public.budget_items b where b.user_id = u.id and b.type = 'expense');
@@ -711,6 +727,22 @@ jobs:
       # 20260620000001_grants_public_roles.sql (issue #98), así que `supabase
       # migration up` los aplica; ya no hace falta el paso de psql aquí.
 
+      # ── UN instante, para la siembra y para la app ───────────────────────────────────
+      #
+      # Lo calcula el propio arnés (`instanteCongelado`), que desde el arreglo del 28-sep no
+      # devuelve nunca uno futuro: con el reloj adelantado, el token que emite gotrue con la
+      # hora REAL parece vencido en cada render, todos los componentes de servidor piden
+      # refrescarlo a la vez y gotrue responde 409. La página no falla — se queda cargando.
+      #
+      # Y va al `$GITHUB_ENV` para que lo lean los DOS: la siembra (que si no anclara aquí
+      # escribiría el mes real mientras la app mira otro, y el panel saldría vacío en cada
+      # cruce de mes) y `qa:start`, que lo toma de `QA_FREEZE`.
+      - name: Instante congelado, uno solo
+        run: |
+          INSTANTE=$(node -e "import('./scripts/qa/snap.mjs').then(m => console.log(m.instanteCongelado().toISOString()))")
+          echo "QA_FREEZE=$INSTANTE" >> "$GITHUB_ENV"
+          echo "::notice::instante congelado (siembra y app): $INSTANTE"
+
       - name: Seed usuario E2E
         run: node scripts/seed-e2e-user.mjs
         env:
@@ -744,13 +776,13 @@ jobs:
           psql "$DB_URL" -v ON_ERROR_STOP=1
           -c "insert into public.budget_items (user_id, type, name, amount, currency, frequency, period_year, period_month, income_type, source_kind)
           select u.id, 'income', 'Salario E2E', 1000000, 'CRC', 'mensual',
-          extract(year from now())::int, extract(month from now())::int, 'activo', 'manual'
+          extract(year from '$QA_FREEZE'::timestamptz)::int, extract(month from '$QA_FREEZE'::timestamptz)::int, 'activo', 'manual'
           from auth.users u
           where u.email = '$E2E_EMAIL'
           and not exists (select 1 from public.budget_items b where b.user_id = u.id and b.type = 'income');
           insert into public.budget_items (user_id, type, name, amount, currency, frequency, period_year, period_month, source_kind)
           select u.id, 'expense', 'Vivienda E2E', 400000, 'CRC', 'mensual',
-          extract(year from now())::int, extract(month from now())::int, 'manual'
+          extract(year from '$QA_FREEZE'::timestamptz)::int, extract(month from '$QA_FREEZE'::timestamptz)::int, 'manual'
           from auth.users u
           where u.email = '$E2E_EMAIL'
           and not exists (select 1 from public.budget_items b where b.user_id = u.id and b.type = 'expense');

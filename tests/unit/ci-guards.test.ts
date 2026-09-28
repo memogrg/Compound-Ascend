@@ -129,6 +129,16 @@ describe("la caché de imágenes del stack", () => {
     expect(bloque).toContain("> .env.local");
   });
 
+  it("la siembra y la app comparten instante: ni un `now()` en el período sembrado", () => {
+    // Si la siembra ancla en el reloj real y la app va congelada, un cruce de mes deja los
+    // datos en octubre y la pantalla mirando septiembre: el panel sale vacío y el fallo
+    // parece de la pantalla. El instante lo calcula el arnés una vez y lo leen los dos.
+    expect(DIRECTIVAS).not.toContain("extract(year from now())");
+    expect(DIRECTIVAS).not.toContain("extract(month from now())");
+    expect(DIRECTIVAS).toContain("instanteCongelado()");
+    expect(DIRECTIVAS).toContain('echo "QA_FREEZE=$INSTANTE" >> "$GITHUB_ENV"');
+  });
+
   it("la caché de Next no lleva un hash de `src/**`", () => {
     // Con él, la clave cambiaba en cada commit: no acertaba nunca y cada corrida escribía
     // ~450 MB que no se reusarían jamás. 21 entradas, 9,2 GB de un cupo de 10, y al pasarse

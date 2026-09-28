@@ -100,7 +100,20 @@ const pick = (arr) => arr[Math.floor(rnd() * arr.length) % arr.length];
 // pasado, más el mes EN CURSO cortado en el día de hoy. Así la demo no envejece sola.
 //   `key`  → gobierna el guion (fases, aguinaldo, venta de la moto, plan de la tarjeta)
 //   `rkey` / `y` / `m` → gobiernan las fechas reales que se escriben en la base
-const AHORA = new Date();
+/**
+ * El «ahora» de la siembra. Por defecto el reloj real, y con `QA_FREEZE` el MISMO instante
+ * en el que se congela la app.
+ *
+ * Que sean el mismo importa: si la siembra ancla en el reloj real y la app va congelada, un
+ * cruce de mes deja los datos en octubre y la pantalla mirando septiembre — el panel sale
+ * vacío y el fallo parece de la pantalla. En CI el instante lo calcula el propio arnés
+ * (`instanteCongelado`), que nunca devuelve uno futuro.
+ */
+const AHORA = process.env.QA_FREEZE ? new Date(process.env.QA_FREEZE) : new Date();
+if (Number.isNaN(AHORA.getTime())) {
+  console.error(`QA_FREEZE inválido: ${process.env.QA_FREEZE}`);
+  process.exit(2);
+}
 const pad2 = (n) => String(n).padStart(2, "0");
 const HOY = `${AHORA.getFullYear()}-${pad2(AHORA.getMonth() + 1)}-${pad2(AHORA.getDate())}`;
 const NARRATIVA = [];
