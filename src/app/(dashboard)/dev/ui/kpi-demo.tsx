@@ -31,7 +31,9 @@ export function KpiDemo() {
   const [alterno, setAlterno] = useState(false);
 
   return (
-    <div style={{ display: "grid", gap: 24 }}>
+    /* El `id` es el ancla de `tests/a11y/kpi.spec.ts`. El catálogo de estados monta ocho
+       `KpiHero` más en la misma página, así que un `.kpi-hero` a secas resuelve a nueve. */
+    <div id="demo-kpi" style={{ display: "grid", gap: 24 }}>
       <div
         style={{
           display: "flex",

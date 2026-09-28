@@ -267,3 +267,19 @@
 .du-lienzo[data-forzados="1"] * {
   border-color: CanvasText;
 }
+
+/**
+ * Los rellenos DECORATIVOS se descartan, que es lo que hace el sistema de verdad: en
+ * `forced-colors` el navegador sustituye los fondos por `Canvas`, así que una rampa de calor
+ * —el calendario— desaparece entera. Eso es justamente la lección, no un efecto secundario:
+ * lo que codifica con color y nada más deja de decir algo.
+ *
+ * Sin esta regla la simulación mentía en la dirección contraria. Al forzar `--chart-1` a
+ * `CanvasText` la rampa se volvía una escala de GRISES oscuros con el número del día todavía
+ * en tinta encima: 1,56:1 en el paso 3. Diez avisos de contraste de axe sobre una situación
+ * que el sistema real no produce, mientras la de verdad —quedarse sin rampa— no se veía.
+ */
+.du-lienzo[data-forzados="1"] .cal-dia {
+  background: Canvas;
+  color: CanvasText;
+}

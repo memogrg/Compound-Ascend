@@ -37,27 +37,39 @@ async function abrir(browser: Browser, tema: "light" | "dark" = "light", ancho =
   const page = await ctx.newPage();
   await page.goto(RUTA, { waitUntil: "networkidle", timeout: 60_000 });
   await page.waitForTimeout(700);
-  await page.locator(".lec-desglose").first().scrollIntoViewIfNeeded();
+  await dentro(page).locator(".lec-desglose").first().scrollIntoViewIfNeeded();
   return { ctx, page };
+}
+
+/**
+ * TODO lo de este archivo se busca DENTRO de la demo de lectura, nunca en la página.
+ *
+ * El catálogo de estados (delta 2.6a) monta las mismas primitivas en sus ocho estados, así
+ * que `.lec-fila` pasó de 7 a 24 y `.kpi-card` recogía tarjetas de otra sección. Diez casos
+ * en rojo que no hablaban de la lectura, sino de dónde estaban mirando. El ancla la pone
+ * `lectura-demo.tsx`.
+ */
+function dentro(page: Page) {
+  return page.locator("#demo-lectura");
 }
 
 /** La fila del desglose cuya etiqueta es exactamente ésta. */
 function fila(page: Page, etiqueta: string) {
-  return page.locator(".lec-fila").filter({ hasText: etiqueta }).first();
+  return dentro(page).locator(".lec-fila").filter({ hasText: etiqueta }).first();
 }
 
 test("el desglose pliega los que sobran en «Otros»", async ({ browser }) => {
   // Ocho sobres con max 6: seis filas más «Otros».
   const { ctx, page } = await abrir(browser);
-  await expect(page.locator(".lec-fila")).toHaveCount(7);
-  await expect(page.locator(".lec-fila").last()).toContainText("Otros");
+  await expect(dentro(page).locator(".lec-fila")).toHaveCount(7);
+  await expect(dentro(page).locator(".lec-fila").last()).toContainText("Otros");
   await ctx.close();
 });
 
 test("los porcentajes pintados suman 100", async ({ browser }) => {
   // Es lo primero que alguien nota y lo último que perdona.
   const { ctx, page } = await abrir(browser);
-  const textos = await page.locator(".lec-desglose .lec-pct").allInnerTexts();
+  const textos = await dentro(page).locator(".lec-desglose .lec-pct").allInnerTexts();
   const suma = textos.reduce((s, t) => s + Number(t.replace(/[^\d-]/g, "")), 0);
   expect(suma, textos.join(" + ")).toBe(100);
   await ctx.close();
@@ -103,19 +115,21 @@ test("«Ver detalle» baja de nivel, con breadcrumb, y Escape sube", async ({ br
   await fila(page, "Supermercado").click();
 
   // El control de detalle es HERMANO de la fila, no hijo: por eso hay que buscarlo aparte.
-  await page.locator(".lec-detalle").click();
+  await dentro(page).locator(".lec-detalle").click();
 
-  const ruta = page.locator("nav[aria-label='Nivel del desglose']");
+  const ruta = dentro(page).locator("nav[aria-label='Nivel del desglose']");
   await expect(ruta).toBeVisible();
   await expect(ruta).toContainText("Supermercado");
-  await expect(page.locator(".lec-fila")).toHaveCount(3);
+  await expect(dentro(page).locator(".lec-fila")).toHaveCount(3);
   await expect(fila(page, "Automercado")).toBeVisible();
 
   // Sin selección viva, Escape sube un nivel.
-  await page.locator(".lec-desglose").click({ position: { x: 4, y: 4 } });
+  await dentro(page)
+    .locator(".lec-desglose")
+    .click({ position: { x: 4, y: 4 } });
   await page.keyboard.press("Escape");
   await expect(ruta).toBeHidden();
-  await expect(page.locator(".lec-fila")).toHaveCount(7);
+  await expect(dentro(page).locator(".lec-fila")).toHaveCount(7);
   await ctx.close();
 });
 
@@ -128,19 +142,19 @@ test("entrar a un nivel limpia la selección heredada, también la controlada", 
   // que solo miraba `aria-pressed`. Por eso se comprueban las dos cosas.
   const { ctx, page } = await abrir(browser);
   await fila(page, "Supermercado").click();
-  await page.locator(".lec-detalle").click();
-  await expect(page.locator(".lec-fila[aria-pressed='true']")).toHaveCount(0);
-  await expect(page.locator(".lec-fila[data-atenuada]")).toHaveCount(0);
+  await dentro(page).locator(".lec-detalle").click();
+  await expect(dentro(page).locator(".lec-fila[aria-pressed='true']")).toHaveCount(0);
+  await expect(dentro(page).locator(".lec-fila[data-atenuada]")).toHaveCount(0);
   await ctx.close();
 });
 
 test("volver al nivel de arriba tampoco deja nada atenuado", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
   await fila(page, "Supermercado").click();
-  await page.locator(".lec-detalle").click();
-  await page.getByRole("button", { name: "Volver" }).click();
-  await expect(page.locator(".lec-fila")).toHaveCount(7);
-  await expect(page.locator(".lec-fila[data-atenuada]")).toHaveCount(0);
+  await dentro(page).locator(".lec-detalle").click();
+  await dentro(page).getByRole("button", { name: "Volver" }).click();
+  await expect(dentro(page).locator(".lec-fila")).toHaveCount(7);
+  await expect(dentro(page).locator(".lec-fila[data-atenuada]")).toHaveCount(0);
   await ctx.close();
 });
 
@@ -151,38 +165,44 @@ test("el NIVEL también es contexto: entrar a un sobre mueve el KPI y filtra", a
   // puede seguir hablando del total.
   const { ctx, page } = await abrir(browser);
   await fila(page, "Supermercado").click();
-  await page.locator(".lec-detalle").click();
+  await dentro(page).locator(".lec-detalle").click();
 
-  const kpi = page.locator(".kpi-card").filter({ hasText: "Supermercado" });
+  const kpi = dentro(page).locator(".kpi-card").filter({ hasText: "Supermercado" });
   await expect(kpi).toBeVisible();
   await expect(kpi.locator(".sr-only").first()).toHaveText("₡412.500");
-  await expect(page.locator(".lec-senal")).toHaveCount(1);
-  await expect(page.locator(".lec-senal")).toContainText("Supermercado se pasó del sobre");
+  await expect(dentro(page).locator(".lec-senal")).toHaveCount(1);
+  await expect(dentro(page).locator(".lec-senal")).toContainText("Supermercado se pasó del sobre");
 
   // Volver restablece el total y la lista completa.
-  await page.getByRole("button", { name: "Volver" }).click();
-  await expect(page.locator(".kpi-card").filter({ hasText: "Total del mes" })).toBeVisible();
-  await expect(page.locator(".lec-senal")).toHaveCount(3);
+  await dentro(page).getByRole("button", { name: "Volver" }).click();
+  await expect(
+    dentro(page).locator(".kpi-card").filter({ hasText: "Total del mes" }),
+  ).toBeVisible();
+  await expect(dentro(page).locator(".lec-senal")).toHaveCount(3);
   await ctx.close();
 });
 
 test("Escape sube de nivel y también restablece el contexto", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
   await fila(page, "Supermercado").click();
-  await page.locator(".lec-detalle").click();
-  await expect(page.locator(".lec-senal")).toHaveCount(1);
+  await dentro(page).locator(".lec-detalle").click();
+  await expect(dentro(page).locator(".lec-senal")).toHaveCount(1);
 
-  await page.locator(".lec-desglose").click({ position: { x: 4, y: 4 } });
+  await dentro(page)
+    .locator(".lec-desglose")
+    .click({ position: { x: 4, y: 4 } });
   await page.keyboard.press("Escape");
-  await expect(page.locator(".kpi-card").filter({ hasText: "Total del mes" })).toBeVisible();
-  await expect(page.locator(".lec-senal")).toHaveCount(3);
+  await expect(
+    dentro(page).locator(".kpi-card").filter({ hasText: "Total del mes" }),
+  ).toBeVisible();
+  await expect(dentro(page).locator(".lec-senal")).toHaveCount(3);
   await ctx.close();
 });
 
 test("dentro de un sobre, todas las filas van del color del sobre", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
   await fila(page, "Supermercado").click();
-  await page.locator(".lec-detalle").click();
+  await dentro(page).locator(".lec-detalle").click();
   const colores = await page
     .locator(".lec-desglose .lec-swatch")
     .evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor));
@@ -203,7 +223,7 @@ test("en la raíz, ningún par de sobres comparte color", async ({ browser }) =>
 
 test("el enlace de evidencia se ve sin depender del color", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
-  const ev = page.locator(".lec-senal-ev").first();
+  const ev = dentro(page).locator(".lec-senal-ev").first();
   await expect(ev).toBeVisible();
   const deco = await ev.evaluate((e) => getComputedStyle(e).textDecorationLine);
   expect(deco).toContain("underline");
@@ -216,17 +236,17 @@ test("el enlace de evidencia se ve sin depender del color", async ({ browser }) 
 
 test("seleccionar un sobre mueve el KPI y filtra las señales", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
-  const kpi = page.locator(".kpi-card").filter({ hasText: "Total del mes" });
+  const kpi = dentro(page).locator(".kpi-card").filter({ hasText: "Total del mes" });
   await expect(kpi).toBeVisible();
-  await expect(page.locator(".lec-senal")).toHaveCount(3);
+  await expect(dentro(page).locator(".lec-senal")).toHaveCount(3);
 
   await fila(page, "Supermercado").click();
 
   // El KPI pasa a ser el del sobre…
-  await expect(page.locator(".kpi-card").filter({ hasText: "Supermercado" })).toBeVisible();
+  await expect(dentro(page).locator(".kpi-card").filter({ hasText: "Supermercado" })).toBeVisible();
   // …y la lista se queda con la señal de esa categoría.
-  await expect(page.locator(".lec-senal")).toHaveCount(1);
-  await expect(page.locator(".lec-senal")).toContainText("Supermercado se pasó del sobre");
+  await expect(dentro(page).locator(".lec-senal")).toHaveCount(1);
+  await expect(dentro(page).locator(".lec-senal")).toContainText("Supermercado se pasó del sobre");
   await ctx.close();
 });
 
@@ -234,7 +254,7 @@ test("«Descartar» es HERMANO del enlace, nunca está dentro", async ({ browser
   // Es la diferencia entre este componente y la fila de transacciones, que arrastra 44
   // nodos de `nested-interactive` justamente por anidarlos.
   const { ctx, page } = await abrir(browser);
-  const senal = page.locator(".lec-senal").first();
+  const senal = dentro(page).locator(".lec-senal").first();
   await expect(senal.locator("button[aria-label^='Descartar']")).toHaveCount(1);
   await expect(senal.locator("a button, button a")).toHaveCount(0);
   await ctx.close();
@@ -242,9 +262,9 @@ test("«Descartar» es HERMANO del enlace, nunca está dentro", async ({ browser
 
 test("la severidad se dice en palabras, no solo en color", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
-  const n = await page.locator(".lec-senal").count();
+  const n = await dentro(page).locator(".lec-senal").count();
   for (let i = 0; i < n; i++) {
-    await expect(page.locator(".lec-senal").nth(i).locator(".sr-only")).toContainText(
+    await expect(dentro(page).locator(".lec-senal").nth(i).locator(".sr-only")).toContainText(
       /Buena señal|Requiere acción|Para observar|Informativo/,
     );
   }
@@ -253,7 +273,7 @@ test("la severidad se dice en palabras, no solo en color", async ({ browser }) =
 
 test("la ayuda del encabezado abre con el teclado y se describe", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
-  const boton = page.locator(".lec-ayuda button").first();
+  const boton = dentro(page).locator(".lec-ayuda button").first();
   await boton.focus();
   const tip = page.locator("[role='tooltip']");
   await expect(tip).toBeVisible();
@@ -267,7 +287,7 @@ test("la ayuda del encabezado abre con el teclado y se describe", async ({ brows
 
 test("la franja de acción no ofrece controles que no hagan nada", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
-  const franja = page.locator(".lec-acciones");
+  const franja = dentro(page).locator(".lec-acciones");
   await expect(
     franja.getByRole("link", { name: "Ajustar el sobre de Supermercado" }),
   ).toBeVisible();
