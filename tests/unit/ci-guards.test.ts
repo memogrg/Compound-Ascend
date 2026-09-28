@@ -94,9 +94,12 @@ describe("la caché de imágenes del stack", () => {
     // Una clave compartida serviría el tarball de `migrations` —que excluye trece
     // servicios— a los E2E, que necesitan ocho. El arranque fallaría bajando lo que falta,
     // que es exactamente lo que la caché venía a evitar.
-    const claves = [...DIRECTIVAS.matchAll(/valor=imagenes-v2-[^\n]*?-([a-z0-9]+)-\$CFG/g)].map(
-      (m) => m[1],
-    );
+    // El token puede llevar dentro la expresión del shard (`a11y${{ matrix.shard }}`), que
+    // en la corrida se expande a `a11y1` y `a11y2`: dos entradas distintas, que es lo que se
+    // quiere.
+    const claves = [
+      ...DIRECTIVAS.matchAll(/valor=imagenes-v2-[^\n]*?-([a-z0-9$${} .a-z]+?)-\$CFG/g),
+    ].map((m) => m[1]);
     expect(claves).toHaveLength(JOBS_CON_SUPABASE);
     expect(new Set(claves).size, `claves: ${claves.join(", ")}`).toBe(JOBS_CON_SUPABASE);
   });
@@ -113,11 +116,24 @@ describe("la caché de imágenes del stack", () => {
     expect(DIRECTIVAS).toContain("sha256sum supabase/config.toml");
   });
 
-  it("el job de a11y corre la suite ENTERA, sin acotar a unos ficheros", () => {
+  it("el job de a11y corre la suite ENTERA: se parte por shards, nunca por ficheros", () => {
     // Acotarla a unos specs es lo que la volvería inútil: los 21 casos que se rompieron
-    // estaban repartidos entre tres ficheros que nadie habría elegido a mano.
+    // estaban repartidos entre tres ficheros que nadie habría elegido a mano. Partirla por
+    // SHARD no elige nada — Playwright reparte todo lo que hay — y por eso es la única forma
+    // de partirla que no deja un hueco.
     const bloque = DIRECTIVAS.slice(DIRECTIVAS.indexOf("  e2e_a11y:"));
-    expect(bloque).toContain("npx playwright test -c playwright.a11y.config.ts\n");
+    expect(bloque).toContain("npx playwright test -c playwright.a11y.config.ts --shard=");
+    // Ni un nombre de fichero detrás del config: eso sí sería acotar.
+    expect(bloque).not.toMatch(/playwright\.a11y\.config\.ts[^\n]*\.spec\.ts/);
+    // Y los shards cubren el total: si alguien pone 1/3 y 2/3, falta un tercio.
+    const shards = [...bloque.matchAll(/--shard=\$\{\{ matrix\.shard \}\}\/(\d+)/g)].map((m) =>
+      Number(m[1]),
+    );
+    expect(shards.length, "el shard sale de la matriz").toBeGreaterThan(0);
+    const matriz = bloque.match(/shard: \[([^\]]+)\]/)?.[1] ?? "";
+    const cuantos = matriz.split(",").filter((x) => x.trim()).length;
+    for (const total of shards)
+      expect(total, `matriz de ${cuantos} contra /${total}`).toBe(cuantos);
   });
 
   it("el job de a11y siembra con DEMO_ENV_FILE, nunca contra producción", () => {
