@@ -385,6 +385,48 @@ async function main() {
   }
 
   const falla = reprobadas.length > 0 || soloA.length > 0 || soloB.length > 0 || Boolean(parcial);
+
+  /**
+   * El reporte en JSON, junto a los PNG. Lo leen dos cosas: la página de comparación —que sin
+   * él no puede distinguir una captura REPROBADA de una que solo movió antialiasing— y el
+   * resumen del job de CI, que lista las rutas que cambian sin tener que parsear el log.
+   */
+  const reprobadasSet = new Set(reprobadas.map((f) => f.imagen));
+  await writeFile(
+    path.join(outDiff, "reporte.json"),
+    JSON.stringify(
+      {
+        generadoEn: new Date().toISOString(),
+        a: dirA,
+        b: dirB,
+        comparadas: comunes.length,
+        criterio: {
+          threshold,
+          maxDiffPixels,
+          maxDelta,
+          ignorarDeltaBajo,
+          excluidos: [...excluidos],
+        },
+        parcial: parcial ?? null,
+        soloA,
+        soloB,
+        capturas: conDiff.map((f) => ({
+          imagen: f.imagen,
+          px: f.diffPixels,
+          pct: Number(f.pct?.toFixed?.(4) ?? 0),
+          maxDelta: f.maxDelta,
+          ignorados: f.ignorados,
+          excluida: Boolean(f.excluida),
+          reprobada: reprobadasSet.has(f.imagen),
+          tamañoDistinto: Boolean(f.sizeMismatch),
+        })),
+        falla,
+      },
+      null,
+      2,
+    ),
+  );
+
   process.exit(falla ? 1 : 0);
 }
 
