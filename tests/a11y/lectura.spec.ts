@@ -203,7 +203,7 @@ test("dentro de un sobre, todas las filas van del color del sobre", async ({ bro
   const { ctx, page } = await abrir(browser);
   await fila(page, "Supermercado").click();
   await dentro(page).locator(".lec-detalle").click();
-  const colores = await page
+  const colores = await dentro(page)
     .locator(".lec-desglose .lec-swatch")
     .evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor));
   expect(colores.length).toBe(3);
@@ -213,7 +213,7 @@ test("dentro de un sobre, todas las filas van del color del sobre", async ({ bro
 
 test("en la raíz, ningún par de sobres comparte color", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
-  const colores = await page
+  const colores = await dentro(page)
     .locator(".lec-desglose .lec-swatch")
     .evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor));
   // Seis sobres con su color + «Otros» con el neutro.

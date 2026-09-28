@@ -280,6 +280,9 @@
  * que el sistema real no produce, mientras la de verdad —quedarse sin rampa— no se veía.
  */
 .du-lienzo[data-forzados="1"] .cal-dia {
-  background: Canvas;
-  color: CanvasText;
+  /* `!important` porque el relleno de la rampa va INLINE —`color-mix()` calculado por celda—
+     y una regla de hoja no le gana a un atributo `style`. Es la única forma de reproducir
+     acá lo que el sistema hace por encima de todo. */
+  background: Canvas !important;
+  color: CanvasText !important;
 }
