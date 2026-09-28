@@ -47,9 +47,20 @@ test("las cuatro muestras se montan, con su tabla", async ({ browser }) => {
   // Los cuatro del catálogo dibujan con Recharts. El calendario NO —es SVG propio— así que
   // se comprueba un mínimo, no una igualdad: si alguna superficie no midió, no hay SVG.
   expect(await page.locator(".cf .recharts-surface").count()).toBeGreaterThanOrEqual(4);
-  // La tabla está SIEMPRE en el DOM, aunque no se vea: es el canal accesible. Esta sí es una
-  // igualdad, y la que importa: CADA marco tiene la suya, sin excepción.
-  await expect(page.locator(".cf table.cf-tabla")).toHaveCount(await marcos.count());
+  // La tabla está SIEMPRE en el DOM cuando HAY datos, aunque no se vea: es el canal
+  // accesible. La igualdad va contra los marcos con datos, no contra todos: un marco vacío,
+  // cargando o en error no tiene nada que tabular, y el catálogo de estados trajo 12 de esos
+  // a la misma página (36 marcos, 24 tablas). Sin `[data-estado]` la única forma de que
+  // pasara era aflojarla a un «mayor o igual», que es lo mismo que borrarla.
+  const conDatos = page.locator('.cf[data-estado="datos"]');
+  const cuantosConDatos = await conDatos.count();
+  expect(cuantosConDatos, "ningún marco con datos").toBeGreaterThanOrEqual(4);
+  await expect(page.locator('.cf[data-estado="datos"] table.cf-tabla')).toHaveCount(
+    cuantosConDatos,
+  );
+  // Y la otra mitad de la invariante, que es la que se habría perdido al aflojarla: un marco
+  // SIN datos no monta una tabla vacía, que sería ruido para el lector de pantalla.
+  await expect(page.locator('.cf:not([data-estado="datos"]) table.cf-tabla')).toHaveCount(0);
   await ctx.close();
 });
 
@@ -179,13 +190,22 @@ test("las barras: tope de 24 px y exactamente 2 px dentro del mes", async ({ bro
    * después de colocarla y dejaba el sobrante como hueco (9 px a 1280).
    */
   const { ctx, page } = await abrir(browser);
-  const barras = page.locator(".recharts-bar-rectangle path");
+  // Acotado a UN gráfico: el primero de la entrada de barras agrupadas (su estado «con
+  // datos»). Dos acotaciones más flojas ya fallaron, y las dos por la misma razón —el caso
+  // mide huecos ENTRE barras vecinas ordenadas por x, y eso solo tiene sentido dentro de un
+  // trazado—. Midiendo toda la página entraban las barras apiladas, que por definición se
+  // solapan (-24 px); midiendo la entrada entera entraban los ocho estados en rejilla, y la
+  // segunda fila arranca a la izquierda de la primera (-21 px).
+  const AGRUPADAS = "#gr-barras-agrupadas figure.cf";
+  const barras = page.locator(AGRUPADAS).first().locator(".recharts-bar-rectangle path");
+  await page.locator(AGRUPADAS).first().scrollIntoViewIfNeeded();
   const n = await barras.count();
-  expect(n, "no se encontró ninguna barra en /dev/ui").toBeGreaterThan(3);
+  expect(n, "no se encontró ninguna barra agrupada en /dev/ui").toBeGreaterThan(3);
 
-  const m = await page.evaluate(() => {
+  const m = await page.evaluate((sel) => {
+    const marco = document.querySelector(sel);
     const rects = Array.from(
-      document.querySelectorAll<SVGPathElement>(".recharts-bar-rectangle path"),
+      marco?.querySelectorAll<SVGPathElement>(".recharts-bar-rectangle path") ?? [],
     )
       .map((p) => p.getBoundingClientRect())
       .sort((a, b) => a.x - b.x);
@@ -198,7 +218,7 @@ test("las barras: tope de 24 px y exactamente 2 px dentro del mes", async ({ bro
       dentroDelMes: huecos[0]!,
       entreMeses: huecos[huecos.length - 1]!,
     };
-  });
+  }, AGRUPADAS);
 
   // El tope es la regla deliberada: una barra de 40 px no dice más que una de 24.
   expect(m.anchoMaximo, `barra de ${m.anchoMaximo.toFixed(1)} px`).toBeLessThanOrEqual(24.5);

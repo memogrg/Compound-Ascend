@@ -134,7 +134,12 @@ export function ChartFrame({
   }, [onSoltar]);
 
   return (
-    <figure className="cf" ref={figuraRef}>
+    /* `data-estado` no pinta nada: existe para poder AFIRMAR sobre el estado desde fuera.
+       La tabla solo se monta con datos —un marco vacío o en error no tiene nada que tabular—,
+       así que la invariante «todo marco tiene su tabla» solo se puede comprobar si se puede
+       distinguir un marco con datos de uno sin ellos. Antes se comprobaba sobre la página
+       entera, y el catálogo de estados la rompió con 36 marcos y 24 tablas. */
+    <figure className="cf" data-estado={estado} ref={figuraRef}>
       <figcaption className="cf-cab">
         <div className="cf-titulos">
           <h3 className="cf-titulo">
