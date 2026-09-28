@@ -98,10 +98,16 @@
 }
 
 /* El ancla se ve siempre, no solo al pasar el mouse: en una pantalla táctil no hay hover, y
-   el punto de una galería es poder mandar el enlace a una entrada concreta. */
+   el punto de una galería es poder mandar el enlace a una entrada concreta.
+ *
+ * SUBRAYADA, y no por gusto: axe la marcó nueve veces con `link-in-text-block`. Un enlace
+ * dentro de un bloque de texto que solo se distingue por el color necesita 3:1 contra el texto
+ * que lo rodea, y `--muted` sobre el título daba 2,64:1. El subrayado quita la dependencia del
+ * color por completo, que es mejor que perseguir el ratio. */
 .du-ancla {
   color: var(--muted);
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .du-ancla:hover,

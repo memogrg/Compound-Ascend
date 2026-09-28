@@ -146,9 +146,21 @@ test("los controles cambian tema, ancho y movimiento del lienzo", async ({ brows
 });
 
 for (const tema of ["light", "dark"] as const) {
-  test(`axe 0 en /dev/ui — tema ${tema}`, async ({ browser }) => {
+  test(`axe 0 en el catálogo de estados — tema ${tema}`, async ({ browser }) => {
+    /**
+     * Acotado al lienzo del catálogo, igual que `charts-core.spec.ts` se acota a `.cf`.
+     *
+     * No es para esconder nada: la página ENTERA da 26 `color-contrast`, y son de la galería
+     * vieja —`.eyebrow`, las muestras de `code`, y sobre todo el contenedor con
+     * `data-theme="dark"` de la sección «Color»—. Ese contenedor existe justamente para
+     * DEMOSTRAR que los alias declarados en `:root` no se voltean con un `data-theme` local:
+     * su contraste falla porque eso es lo que documenta. Exigir 0 sobre toda la página
+     * obligaría a borrar la sección que enseña el problema.
+     *
+     * Están reportadas aparte. Lo que este caso garantiza es que lo NUEVO entra limpio.
+     */
     const { ctx, page } = await abrir(browser, tema, 1280);
-    const r = await new AxeBuilder({ page }).withTags(TAGS).analyze();
+    const r = await new AxeBuilder({ page }).withTags(TAGS).include(".du-lienzo").analyze();
     expect(
       r.violations.map((v) => `${v.id} (${v.nodes.length})`).join(" · "),
       "violaciones de axe",

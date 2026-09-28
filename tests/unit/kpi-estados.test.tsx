@@ -34,25 +34,32 @@ describe("KpiCard · estados sin dato", () => {
     expect(html).toContain("<svg");
   });
 
-  it("cargando: esqueleto DENTRO del párrafo de la cifra, no una caja aparte", () => {
+  it("cargando: el velo va DENTRO del párrafo de la cifra, no en una caja aparte", () => {
     const html = render({ ...BASE, cargando: true });
-    // El esqueleto es hijo del mismo `<p class="kpi-card-cifra">`: de ahí hereda el renglón.
-    expect(html).toMatch(/<p class="kpi-card-cifra[^"]*"[^>]*>(?:(?!<\/p>).)*kpi-esqueleto/s);
+    expect(html).toMatch(/<p class="kpi-card-cifra[^"]*"[^>]*>(?:(?!<\/p>).)*kpi-contexto-velo/s);
     expect(html).toContain("Cargando…");
   });
 
-  it("cargando: ni delta ni tendencia — serían una comparación y una curva inventadas", () => {
+  it("cargando: el contenido real SIGUE en el DOM, para que el alto no cambie", () => {
+    // Contraintuitivo y a propósito. Quitarlo dejaba la tarjeta más baja y la página daba el
+    // salto que este estado venía a evitar: 45 px en el hero. Tres intentos de imitar esas
+    // medidas a mano se quedaron en 22 y en 13 px. Se pinta lo de siempre y se tapa.
     const html = render({ ...BASE, cargando: true });
-    expect(html).not.toContain("kpi-delta");
-    expect(html).not.toContain("<svg");
+    expect(html).toContain("kpi-delta");
+    expect(html).toContain("<svg");
   });
 
-  it("error: el mensaje ocupa el lugar de la cifra, y tampoco hay delta ni tendencia", () => {
+  it("…pero oculto a los lectores: nadie puede oír un delta que todavía no existe", () => {
+    // La otra mitad de la decisión. Si el contenido reservado no fuera `aria-hidden`, quien
+    // escucha la pantalla oiría la cifra vieja como si fuera el dato que está cargando.
+    const html = render({ ...BASE, cargando: true });
+    expect(html).toMatch(/<span class="kpi-velado" aria-hidden="true">/);
+  });
+
+  it("error: el mensaje ocupa el lugar de la cifra", () => {
     const html = render({ ...BASE, error: "No se pudo calcular" });
     expect(html).toContain("No se pudo calcular");
     expect(html).toMatch(/<p class="kpi-card-cifra[^"]*"[^>]*>(?:(?!<\/p>).)*kpi-error/s);
-    expect(html).not.toContain("kpi-delta");
-    expect(html).not.toContain("<svg");
   });
 
   it("error usa role=status, no alert", () => {
@@ -65,7 +72,7 @@ describe("KpiCard · estados sin dato", () => {
 
   it("si llegan los dos, manda «cargando»: el reintento ya está en curso", () => {
     const html = render({ ...BASE, cargando: true, error: "viejo" });
-    expect(html).toContain("kpi-esqueleto");
+    expect(html).toContain("kpi-contexto-velo");
     expect(html).not.toContain("viejo");
   });
 

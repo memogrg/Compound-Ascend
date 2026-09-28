@@ -60,7 +60,28 @@ export function KpiCard({
         </EstadoCifra>
       </p>
       {/* Sin dato no se pinta un delta ni una sparkline: serían una comparación y una
-          tendencia inventadas sobre un número que no existe. */}
+          tendencia inventadas sobre un número que no existe. Pero el SITIO se reserva: quitar
+          la fila encogía la tarjeta y la rejilla daba el salto que este estado venía a evitar. */}
+      {/* El sitio se reserva con los elementos REALES, invisibles y en su posición de siempre.
+          Envolverlos juntos en una fila los ponía lado a lado cuando la tarjeta los apila, y la
+          caja salía 24 px más baja: un envoltorio que se añade para no mover nada tiene que no
+          ser nada. La barra gris va solo sobre la cifra, que es lo que se está esperando. */}
+      {sinDato && delta ? (
+        <span className="kpi-velado" aria-hidden="true">
+          <DeltaChip
+            valor={delta.valor}
+            moneda={moneda}
+            vsEtiqueta={delta.vsEtiqueta}
+            sentidoBueno={delta.sentidoBueno}
+          />
+        </span>
+      ) : null}
+      {sinDato && puntos ? (
+        <span className="kpi-velado" aria-hidden="true">
+          <Sparkline puntos={puntos} ancho={64} alto={20} />
+        </span>
+      ) : null}
+
       {delta && !sinDato ? (
         <DeltaChip
           valor={delta.valor}
