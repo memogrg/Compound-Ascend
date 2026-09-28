@@ -14,6 +14,7 @@ import {
 import { ChartsDemo } from "./charts-demo";
 import { KpiDemo } from "./kpi-demo";
 import { CalendarioDemo } from "./calendario-demo";
+import { ProveedorControles } from "./controles-catalogo";
 import { EstadosDemo } from "./estados-demo";
 import { GraficosEstadosDemo } from "./graficos-estados-demo";
 import { LecturaDemo } from "./lectura-demo";
@@ -400,39 +401,47 @@ export default function DevUiPage() {
 
       <Seccion
         n={6}
-        titulo="Gráficos"
-        sub="Núcleo de la fase 2 sobre Recharts 3 — datos fijos, sin fetch. Cada uno con su tabla."
+        titulo="Interacción de los gráficos"
+        sub="Lo que una captura no muestra: dos gráficos sincronizados por período, clic que fija, teclado que recorre"
       >
         <ChartsDemo />
       </Seccion>
 
-      <Seccion n={7} titulo="KPI" sub="Una cifra por pantalla, animada; el resto en seco">
+      <Seccion
+        n={7}
+        titulo="Animación de la cifra"
+        sub="Una cifra por pantalla: pulsá «Simular cambio» para ver la transición"
+      >
         <KpiDemo />
       </Seccion>
 
       <Seccion
         n={8}
-        titulo="Lectura"
-        sub="Dónde exactamente, qué investigar y qué hacer — encadenados"
+        titulo="Lectura enlazada"
+        sub="Dónde exactamente, qué investigar y qué hacer — encadenados: el sobre elegido mueve el KPI y filtra las señales"
       >
         <LecturaDemo />
       </Seccion>
 
-      <Seccion
-        n={9}
-        titulo="Estados"
-        sub="Las nueve primitivas de KPI y lectura en sus ocho estados — con controles de tema, ancho y movimiento"
-      >
-        <EstadosDemo />
-      </Seccion>
+      {/* Las dos secciones del catálogo comparten UN panel de controles: mirar una primitiva en
+          oscuro y el gráfico de al lado en claro no compara nada. Ver `controles-catalogo.tsx`. */}
+      <ProveedorControles>
+        <Seccion
+          n={9}
+          titulo="Estados"
+          sub="Las nueve primitivas de KPI y lectura en sus ocho estados"
+        >
+          <EstadosDemo />
+        </Seccion>
 
-      <Seccion
-        n={10}
-        titulo="Estados de los gráficos"
-        sub="Los siete gráficos en los mismos ocho estados — sobre el marco real, con su tabla y su foco de teclado"
-      >
-        <GraficosEstadosDemo />
-      </Seccion>
+        <Seccion
+          n={10}
+          titulo="Estados de los gráficos"
+          sub="Los siete gráficos en los mismos ocho estados — sobre el marco real, con su tabla y su foco de teclado"
+        >
+          <GraficosEstadosDemo />
+        </Seccion>
+      </ProveedorControles>
 
       <Seccion
         n={11}

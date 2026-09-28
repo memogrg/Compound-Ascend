@@ -33,6 +33,8 @@ import { fileURLToPath } from "node:url";
 // bajo ESM. Se importa el módulo entero y se desestructura.
 import nextEnv from "@next/env";
 
+import { candadoVivo } from "../qa/servidor-vivo.mjs";
+
 const { loadEnvConfig } = nextEnv;
 
 const argv = process.argv.slice(2);
@@ -67,6 +69,28 @@ const { loadedEnvFiles } = loadEnvConfig(raiz, false, { info: () => {}, error: (
 // Solo los NOMBRES de los ficheros, jamás una clave ni un valor.
 const nombres = loadedEnvFiles.map((f) => path.basename(f.path)).join(", ") || "(ninguno)";
 console.error(`con-env: entorno desde ${raiz} · ${nombres}`);
+
+/**
+ * Compilar debajo de un servidor congelado vivo deja a ESE servidor sirviendo una carpeta que
+ * ya no existe: sigue en pie con su manifiesto en memoria y devuelve 500 en cada chunk. La
+ * página llega, el JavaScript no, y la suite entera mide una aplicación sin interactividad —
+ * 88 casos en rojo y 1,1 h de corrida que no dicen nada. El servidor no se cae, que es lo que
+ * lo vuelve peligroso.
+ */
+const construye = /\bbuild\b/.test(argv.join(" "));
+if (construye) {
+  const candado = candadoVivo(raiz);
+  if (candado) {
+    console.error(
+      `con-env: hay un servidor congelado sirviendo ${raiz}\n` +
+        `         pid ${candado.pid}, puerto ${candado.puerto}, desde ${candado.desde ?? "?"}.\n` +
+        "         Compilar ahora le borra la carpeta bajo los pies: seguiría respondiendo,\n" +
+        "         devolviendo 500 en cada chunk, y lo que midas después no vale.\n" +
+        "         Pará el servidor primero:  npm run qa:stop",
+    );
+    process.exit(2);
+  }
+}
 
 // Ver el comentario de cabecera: propagarlo rompe `next build`.
 delete process.env.NODE_ENV;

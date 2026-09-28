@@ -57,3 +57,4 @@ qa-snapshots/
 
 # Sesión guardada por el globalSetup de Playwright: son cookies de un usuario real.
 .auth/
+.qa-servidor.json
