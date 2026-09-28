@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 
 import { instanteCongelado } from "./snap.mjs";
 import { exigirBaseAlDia } from "./migraciones.mjs";
+import { marcar, puertoOcupado, soltar } from "./servidor-vivo.mjs";
 
 const aquí = path.dirname(fileURLToPath(import.meta.url));
 const preload = path.join(aquí, "server-freeze.js");
@@ -36,6 +37,25 @@ function argumento(nombre) {
 await exigirBaseAlDia({ cwd: process.cwd() });
 
 const puerto = argumento("port") ?? "3001";
+
+/**
+ * El puerto se comprueba ANTES de arrancar, y si está ocupado no se arranca: se falla.
+ *
+ * `next start` ya moría con `EADDRINUSE`, pero eso no bastaba — el servidor VIEJO seguía
+ * respondiendo en ese puerto, la espera activa con `curl` lo encontraba vivo y la corrida
+ * seguía adelante midiendo OTRO commit. Pasó dos veces. Un arnés que sigue tras un fallo de
+ * arranque no da un error: da una medida falsa, que es peor.
+ */
+if (await puertoOcupado(puerto)) {
+  console.error(
+    `\n  qa:start: el puerto ${puerto} ya está ocupado.\n\n` +
+      "  No se arranca: lo que responda ahí es otro servidor —otro commit, u otra carpeta—\n" +
+      "  y la corrida que venga detrás lo mediría a él sin enterarse.\n\n" +
+      "    npm run qa:stop          (mata los servidores de QA de la máquina)\n" +
+      `    npm run qa:start -- --port <otro>\n`,
+  );
+  process.exit(2);
+}
 // instanteCongelado ya resuelve la precedencia --freeze > QA_FREEZE > hoy 12:00 CR.
 const congelado = instanteCongelado(argumento("freeze")).toISOString();
 
@@ -57,12 +77,19 @@ console.log(`\n  Capturá con el MISMO instante, en otra terminal:\n`);
 console.log(`    QA_FREEZE=${congelado} \\`);
 console.log(`      E2E_EMAIL=… E2E_PASSWORD=… npm run qa:snap -- --out qa-snapshots/<nombre>\n`);
 
+// El candado dice quién sirve esta carpeta. Lo mira `con-env.mjs` antes de compilar.
+marcar(process.cwd(), puerto);
+
 const hijo = spawn("npx", ["next", "start", "-p", puerto], { stdio: "inherit", env });
 
 for (const señal of ["SIGINT", "SIGTERM"]) {
   process.on(señal, () => hijo.kill(señal));
 }
+// El candado se suelta pase lo que pase: uno huérfano convierte la guarda en un estorbo, y a
+// la siguiente alguien la quita entera.
+process.on("exit", () => soltar(process.cwd()));
 hijo.on("exit", (code, señal) => {
+  soltar(process.cwd());
   if (señal) process.kill(process.pid, señal);
   else process.exit(code ?? 0);
 });
