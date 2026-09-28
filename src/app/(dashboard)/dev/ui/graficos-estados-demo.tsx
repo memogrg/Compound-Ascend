@@ -161,7 +161,7 @@ function Linea({
       tabla={tablaDeDatos(datos, series, (v) => formatMoney(v, MONEDA), "Mes")}
     >
       <ResponsiveContainer width="100%" height={140}>
-        <LineChart data={datos}>
+        <LineChart data={datos} accessibilityLayer>
           <XAxis dataKey="x" {...EJE} />
           {series.map((s) => (
             <Line key={s.clave} dataKey={s.clave} stroke={s.color} {...TRAZO} />
@@ -186,7 +186,7 @@ function Area_({ estado, datos = SERIE }: { estado: EstadoGrafico; datos?: typeo
       tabla={tablaDeDatos(datos, SERIES, (v) => formatMoney(v, MONEDA), "Mes")}
     >
       <ResponsiveContainer width="100%" height={140}>
-        <AreaChart data={datos}>
+        <AreaChart data={datos} accessibilityLayer>
           <XAxis dataKey="x" {...EJE} />
           <Area dataKey="v" stroke="var(--chart-2)" fill="var(--chart-2)" fillOpacity={0.18} />
         </AreaChart>
@@ -223,7 +223,7 @@ function Barras({
       tabla={tablaDeDatos(conDos, series, (v) => formatMoney(v, MONEDA), "Mes")}
     >
       <ResponsiveContainer width="100%" height={140}>
-        <BarChart data={conDos}>
+        <BarChart data={conDos} accessibilityLayer>
           <XAxis dataKey="x" {...EJE} />
           {series.map((s) => (
             <Bar

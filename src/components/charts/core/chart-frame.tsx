@@ -143,17 +143,29 @@ export function ChartFrame({
           </h3>
           {subtitulo ? <p className="cf-sub">{subtitulo}</p> : null}
         </div>
-        {estado === "datos" ? (
-          <button
-            type="button"
-            className="cf-btn-tabla"
-            aria-expanded={verTabla}
-            aria-controls={idTabla}
-            onClick={() => setVerTabla((v) => !v)}
-          >
-            {verTabla ? "Ver gráfico" : "Ver tabla"}
-          </button>
-        ) : null}
+        {/*
+         * El botón se PINTA SIEMPRE y solo se esconde cuando no hay datos.
+         *
+         * Quitarlo cambiaba el alto del encabezado, y con él el de todo el marco: 220 px con
+         * datos contra 213 px vacío. O sea que este componente incumplía, por 7 px, la
+         * invariante que su propia cabecera promete —«los cuatro estados ocupan LA MISMA
+         * altura»— y nadie lo veía porque en producción ningún llamador pasa `estado`.
+         *
+         * `visibility: hidden` y no `display: none`: conserva la caja Y saca el botón del orden
+         * de tabulación, que es justo lo que hace falta — un «Ver tabla» alcanzable con el
+         * teclado cuando no hay tabla sería una promesa vacía.
+         */}
+        <button
+          type="button"
+          className="cf-btn-tabla"
+          data-reservado={estado === "datos" ? undefined : ""}
+          aria-hidden={estado === "datos" ? undefined : true}
+          aria-expanded={verTabla}
+          aria-controls={idTabla}
+          onClick={() => setVerTabla((v) => !v)}
+        >
+          {verTabla ? "Ver gráfico" : "Ver tabla"}
+        </button>
       </figcaption>
 
       {/* `radiogroup` y no una lista de botones: los presets son una elección entre

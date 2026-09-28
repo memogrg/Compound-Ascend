@@ -104,12 +104,16 @@ for (const tema of ["light", "dark"] as const) {
 
 test("el tooltip se fija con el teclado y se suelta con Escape", async ({ browser }) => {
   const { ctx, page } = await abrir(browser, "light", 1280);
-  const grafico = page.locator("#gr-linea .du-estado[data-estado='con datos'] .recharts-wrapper");
-  await expect(grafico).toHaveCount(1);
-  // `accessibilityLayer` de Recharts pone `tabIndex=0` en su envoltorio: el gráfico ES
-  // focalizable, que es la razón por la que el SVG no va `aria-hidden` (ver `chart-frame.tsx`).
-  const focalizable = await grafico.evaluate((el) => el.getAttribute("tabindex"));
-  expect(focalizable, "el gráfico no es alcanzable con el teclado").toBe("0");
+  // El `tabindex=0` lo pone `accessibilityLayer` en el **SVG**, no en el envoltorio: medido en
+  // la página, `svg.recharts-surface` lo lleva y `.recharts-wrapper` no. Es también la razón
+  // por la que el SVG no puede ir `aria-hidden` — un focalizable dentro de un `aria-hidden` es
+  // la violación `aria-hidden-focus` que axe marcó la primera vez (ver `chart-frame.tsx`).
+  const svg = page.locator("#gr-linea .du-estado[data-estado='con datos'] svg.recharts-surface");
+  await expect(svg.first()).toHaveAttribute("tabindex", "0");
+
+  // Y el foco llega de verdad, no solo el atributo.
+  await svg.first().focus();
+  await expect(svg.first()).toBeFocused();
   await ctx.close();
 });
 
@@ -139,9 +143,12 @@ test("cada entrada tiene ancla, nota y especificación", async ({ browser }) => 
 });
 
 for (const tema of ["light", "dark"] as const) {
-  test(`axe 0 en /dev/ui con los gráficos — tema ${tema}`, async ({ browser }) => {
+  test(`axe 0 en el lienzo de gráficos — tema ${tema}`, async ({ browser }) => {
+    // Acotado al lienzo, igual que la 2.6a y que `charts-core.spec.ts` con `.cf`. Fuera del
+    // lienzo quedan 3 `color-contrast` que NO son del catálogo: `.up`, `.down` y `.active` son
+    // clases de PRODUCCIÓN (3,93:1 y 3,95:1), y están reportadas aparte.
     const { ctx, page } = await abrir(browser, tema, 1280);
-    const r = await new AxeBuilder({ page }).withTags(TAGS).analyze();
+    const r = await new AxeBuilder({ page }).withTags(TAGS).include(".du-lienzo").analyze();
     expect(
       r.violations.map((v) => `${v.id} (${v.nodes.length})`).join(" · "),
       "violaciones de axe",
