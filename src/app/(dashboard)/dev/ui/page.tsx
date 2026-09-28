@@ -15,6 +15,7 @@ import { ChartsDemo } from "./charts-demo";
 import { KpiDemo } from "./kpi-demo";
 import { CalendarioDemo } from "./calendario-demo";
 import { EstadosDemo } from "./estados-demo";
+import { GraficosEstadosDemo } from "./graficos-estados-demo";
 import { LecturaDemo } from "./lectura-demo";
 import { MotionDemo } from "./motion-demo";
 
@@ -408,6 +409,14 @@ export default function DevUiPage() {
 
       <Seccion
         n={10}
+        titulo="Estados de los gráficos"
+        sub="Los siete gráficos en los mismos ocho estados — sobre el marco real, con su tabla y su foco de teclado"
+      >
+        <GraficosEstadosDemo />
+      </Seccion>
+
+      <Seccion
+        n={11}
         titulo="Calendario y zoom"
         sub="Sin ECharts: SVG propio y presets de rango accesibles por teclado"
       >
@@ -415,7 +424,7 @@ export default function DevUiPage() {
       </Seccion>
 
       <Seccion
-        n={11}
+        n={12}
         titulo="Formateadores"
         sub="src/lib/format.ts — miles con punto, siempre, en servidor y cliente"
       >

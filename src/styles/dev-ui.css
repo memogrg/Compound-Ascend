@@ -196,3 +196,17 @@
   line-height: 1.5;
   color: var(--muted);
 }
+
+/* Los gráficos necesitan más ancho que una KpiCard para que su eje se lea: 380 px es el punto
+   donde un eje de seis meses deja de solaparse. Debajo de eso la matriz cae a una columna, que
+   es exactamente lo que hay que poder mirar con el control de ancho en 390. */
+.du-matriz-ancha {
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+}
+
+/* El gráfico ocupa el ancho de su celda; la caja del estado deja de centrarlo verticalmente
+   para que el marco empiece siempre arriba y los ocho se puedan comparar de un vistazo. */
+.du-matriz-ancha .du-estado-caja {
+  justify-content: flex-start;
+  min-height: 200px;
+}
