@@ -229,3 +229,66 @@
 .kpi-meter[data-severidad="peligro"] .kpi-meter-relleno {
   background: var(--danger);
 }
+
+/* ── Estados sin dato: cargando y error ───────────────────────────────────────
+ *
+ * La regla es que el MARCO no se mueva. Un esqueleto de otro alto que el contenido no es un
+ * detalle estético: empuja la página cuando llega el dato, y hace que dos capturas de la misma
+ * compilación no se puedan comparar (nos costó una medición de determinismo entera, con
+ * `/mi-rich-life` en 2196 px contra 2102 px por unas donas que en una corrida habían montado y
+ * en la otra no).
+ *
+ * Por eso el esqueleto es `inline-block` con `1em` de alto dentro del mismo párrafo de la
+ * cifra: hereda su `font-size` y su `line-height`, así que ocupa exactamente el mismo renglón
+ * en el hero (42 px) y en la tarjeta (23 px) sin repetir una sola medida.
+ */
+.kpi-esqueleto {
+  display: inline-block;
+  height: 1em;
+  vertical-align: middle;
+  border-radius: 6px;
+}
+
+.kpi-error {
+  display: inline-block;
+  /* El mismo renglón que la cifra, en el tamaño del texto corrido: el error se lee, no grita. */
+  height: 1em;
+  line-height: 1em;
+  vertical-align: middle;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted-fg, var(--muted));
+}
+
+/* ── Reservar el sitio mientras carga ─────────────────────────────────────────
+ *
+ * El contenido REAL se pinta pero no se ve, y el esqueleto va encima. Es la única forma de que
+ * el alto de la fila no pueda separarse del de «con datos»: dos medidas escritas a mano se
+ * separan el día que una cambie. Primero se intentó con barras de `1em` y el hueco pasó de
+ * 45 px a 22 — un chip y una sparkline no miden lo que una línea de texto.
+ */
+.kpi-contexto-velo {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+}
+
+/* El contenido reservado: ocupa su sitio y no se ve.
+ *
+ * `display: contents` a propósito: el envoltorio DESAPARECE de la caja y sus hijos se
+ * disponen como si fueran hijos directos, así que el alto es idéntico al de «con datos». Con un
+ * `span` normal la tarjeta salía 3-4,5 px más ALTA — el propio envoltorio era un elemento flex
+ * más. `visibility` se hereda, así que esconde igual. Es la cuarta iteración de la misma
+ * lección: cualquier caja que se añada para no mover nada, mueve algo. */
+.kpi-velado {
+  display: contents;
+  visibility: hidden;
+}
+
+/* Contexto de posicionamiento del velo de la cifra. No cambia nada más: un `<p>` estático y
+   uno relativo ocupan exactamente lo mismo. */
+.kpi-hero-cifra,
+.kpi-card-cifra {
+  position: relative;
+}
