@@ -3,7 +3,7 @@ import { decodeMail, stripHtml } from "@/lib/ingestion/email/mime";
 
 const INNER_1 = [
   "From: notificacionbac@baccredomatic.cr",
-  "To: memogrg@gmail.com",
+  "To: usuario@ejemplo.test",
   "Subject: Notificacion de transaccion SUBWAY LAGUNILLA 04-09-2026 - 12:10",
   "Date: Fri, 04 Sep 2026 12:10:00 -0600",
   "Message-ID: <inner1@bac>",
@@ -16,7 +16,7 @@ const INNER_1 = [
 
 const INNER_2 = [
   "From: notificacionbac@baccredomatic.cr",
-  "To: memogrg@gmail.com",
+  "To: usuario@ejemplo.test",
   "Subject: Notificacion de transaccion AM PM LAGUNILLA 04-09-2026 - 18:40",
   "Date: Fri, 04 Sep 2026 18:40:00 -0600",
   "Message-ID: <inner2@bac>",
@@ -28,7 +28,7 @@ const INNER_2 = [
 
 /** Lo que manda Gmail con «Reenviar como archivo adjunto»: cuerpo vacío + N adjuntos message/rfc822. */
 const OUTER = [
-  "From: memogrg@gmail.com",
+  "From: usuario@ejemplo.test",
   "To: u2g5zmfs5w2@in.aitechumbrella.com",
   "Subject: Fwd: avisos de setiembre",
   "Date: Sat, 05 Sep 2026 10:00:00 -0600",
@@ -66,7 +66,7 @@ describe("mime · decodeMail", () => {
 
   it("«reenviar como archivo adjunto»: abre cada .eml con su remitente, fecha y cuerpo", async () => {
     const d = await decodeMail(Buffer.from(OUTER));
-    expect(d.from).toBe("memogrg@gmail.com");
+    expect(d.from).toBe("usuario@ejemplo.test");
     expect(d.attached).toHaveLength(2);
     const [a, b] = d.attached;
     expect(a!.from).toBe("notificacionbac@baccredomatic.cr");
