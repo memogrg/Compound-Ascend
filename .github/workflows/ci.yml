@@ -1276,9 +1276,16 @@ jobs:
         run: |
           # Veinte rutas fijas, UN tema y UN ancho: 20 capturas por tanda. Con los seis
           # combinados serían 120 y la sonda costaría más que lo que vigila.
+          #
+          # Fuera `home` y `dev_ui`, las mismas que excluye el criterio estricto. No es aflojar
+          # el umbral: la landing anima su gráfica de doce meses EN BUCLE a propósito, así que
+          # dos capturas suyas nunca son idénticas —medido: 230 px con delta 2— y una sonda que
+          # falla siempre por una animación intencionada se desactiva a la semana. Las otras 19
+          # dieron 0 px de diferencia, que es lo que esta sonda viene a comprobar.
           RUTAS=$(node -e "
             const r = require('./scripts/qa/routes.json');
-            console.log(r.slice(0, 20).map(x => x.path).join(','));
+            const fuera = new Set(['/', '/dev/ui']);
+            console.log(r.filter(x => !fuera.has(x.path)).slice(0, 20).map(x => x.path).join(','));
           ")
           for TANDA in det-a det-b; do
             node scripts/qa/snap.mjs --base-url http://localhost:3001 \
@@ -1449,9 +1456,16 @@ jobs:
         run: |
           # Veinte rutas fijas, UN tema y UN ancho: 20 capturas por tanda. Con los seis
           # combinados serían 120 y la sonda costaría más que lo que vigila.
+          #
+          # Fuera `home` y `dev_ui`, las mismas que excluye el criterio estricto. No es aflojar
+          # el umbral: la landing anima su gráfica de doce meses EN BUCLE a propósito, así que
+          # dos capturas suyas nunca son idénticas —medido: 230 px con delta 2— y una sonda que
+          # falla siempre por una animación intencionada se desactiva a la semana. Las otras 19
+          # dieron 0 px de diferencia, que es lo que esta sonda viene a comprobar.
           RUTAS=$(node -e "
             const r = require('./scripts/qa/routes.json');
-            console.log(r.slice(0, 20).map(x => x.path).join(','));
+            const fuera = new Set(['/', '/dev/ui']);
+            console.log(r.filter(x => !fuera.has(x.path)).slice(0, 20).map(x => x.path).join(','));
           ")
           for TANDA in det-a det-b; do
             node scripts/qa/snap.mjs --base-url http://localhost:3001 \
