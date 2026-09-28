@@ -125,6 +125,27 @@
   --warn: var(--warning);
   --warn-soft: var(--warning-soft);
 
+  /* ---- El color de estado cuando va como TEXTO sobre su propio tinte ----
+   *
+   * Un color sobre un tinte de sí mismo tiene un techo: medido, el verde sobre su 12 % da
+   * 3,94:1 y el ámbar 3,25:1, contra el 4,5:1 que WCAG 1.4.3 pide para texto pequeño. Y
+   * bajar el alfa del fondo NO alcanza: probado a 12, 10, 8, 6 y 5 %, aun con el fondo en
+   * blanco puro el verde se queda en ~4,35. El que tiene que moverse es el texto.
+   *
+   * Existen aparte para no tocar `--accent`, que es el verde de marca (#378451, el mismo del
+   * «+» del wordmark). Oscurecerlo app-wide lo apartaría de la marca para arreglar un chip.
+   *
+   * Solo se usan donde el color va como TEXTO sobre su tinte. Como relleno, como ícono o
+   * sobre la superficie, el color de estado se queda como está: ahí ya cumple —el ícono de
+   * aviso da 3,70:1 y a un gráfico WCAG 1.4.11 le pide 3:1—.
+   *
+   * Los valores apuntan a 4,6 y no a 4,5 pelado: al ras, cualquier retoque vuelve a tumbarlo.
+   */
+  --pos-texto: #32784a; /* 4,60:1 sobre --pos-soft */
+  --neg-texto: #b14844; /* 4,62:1 sobre --neg-soft */
+  --warn-texto: #8f6325; /* 4,63:1 sobre --warn-soft */
+  --info-texto: var(--info); /* 4,54:1 sin tocar: ya cumple */
+
   /* ---- Layer / domain accents (re-derivados de la paleta v2) ---- */
   --c-income: var(--success);
   --c-expense: var(--s2);
@@ -191,6 +212,14 @@
 }
 
 [data-theme="dark"] {
+  /* En oscuro el texto tiene que ACLARARSE, no oscurecerse: el tinte es oscuro y la
+     separación va hacia arriba. Solo el rojo lo necesita (3,98:1); el verde da 5,00 y el
+     ámbar 5,81 sobre sus tintes, así que se quedan en su valor. */
+  --neg-texto: #e5746a; /* 4,61:1 sobre --neg-soft */
+  --pos-texto: var(--success); /* 5,00:1 sin tocar */
+  --warn-texto: var(--warning); /* 5,81:1 sin tocar */
+  --info-texto: var(--info); /* 4,80:1 sin tocar */
+
   --canvas: #15140f;
   --surface: #1e1c16;
   --surface-2: #26241c;
