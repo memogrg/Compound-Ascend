@@ -3,7 +3,7 @@
  * Reciben los datos ya calculados desde la página. Sincronización: lo real sale
  * de transactions; el presupuesto de budget_items.
  */
-import { formatMoney, formatPercent, formatCompact } from "@/lib/format";
+import { formatMoney, formatPercent, formatCompact, formatMonthShort } from "@/lib/format";
 import { convertCurrency } from "@/lib/fx";
 import { MetricCard, type MetricTone } from "@/components/shared/metric-card";
 import {
@@ -12,7 +12,13 @@ import {
 } from "@/components/shared/financial-insight-card";
 import { DonutConLeyenda, type DonutDatum } from "@/components/charts/lazy";
 import { PremiumLineChart, PerformanceChart } from "@/components/charts/lazy";
-import { HistoricoGasto, type PeriodoEnCurso } from "@/components/charts/core";
+import {
+  ChartFrame,
+  HistoricoGasto,
+  describirGrafico,
+  tablaDeDatos,
+  type PeriodoEnCurso,
+} from "@/components/charts/core";
 import {
   rotuloDelRango,
   type MesPresupuestado,
@@ -532,18 +538,57 @@ export function IncomeExpenseSection({
       <SummaryStrip cards={summary} />
 
       <section className="cols-2">
-        <ChartCard title="Histórico de gastos" hint="real vs presupuesto mensual">
-          <HistoricoGasto
-            datos={history.map((h, i) => ({
-              label: h.label,
-              real: h.realExpense,
-              presupuesto: view.budgetByMonth?.[i]?.total ?? 0,
-            }))}
-            moneda={currency}
-            enCurso={view.enCurso ?? null}
-            alto={180}
-          />
-        </ChartCard>
+        {(() => {
+          // El estado va EXPLÍCITO, que es lo que trae el núcleo: sin meses no hay nada que
+          // dibujar, y antes eso pintaba un marco vacío del alto de un gráfico sin decir por
+          // qué. `ChartFrame` reserva el mismo alto en los cuatro estados, así que la tarjeta
+          // no salta al pasar de «cargando» a «con datos».
+          const filas = history.map((h, i) => ({
+            label: h.label,
+            real: h.realExpense,
+            presupuesto: view.budgetByMonth?.[i]?.total ?? 0,
+          }));
+          return (
+            <ChartFrame
+              titulo="Histórico de gastos"
+              subtitulo="real vs presupuesto mensual"
+              estado={filas.length === 0 ? "vacio" : "datos"}
+              mensajeVacio="Todavía no hay meses cerrados que comparar."
+              alto={180}
+              descripcion={describirGrafico({
+                titulo: "Histórico de gastos",
+                serie: filas.map((f) => ({ x: f.label, y: f.real })),
+                formato: (v) => formatMoney(v, currency),
+              })}
+              tabla={tablaDeDatos(
+                filas.map((f) => ({ x: f.label, real: f.real, presupuesto: f.presupuesto })),
+                [
+                  {
+                    clave: "real",
+                    etiqueta: "Gasto real",
+                    color: "var(--chart-3)",
+                    marca: "barra",
+                  },
+                  {
+                    clave: "presupuesto",
+                    etiqueta: "Presupuesto",
+                    color: "var(--chart-axis)",
+                    marca: "linea",
+                  },
+                ],
+                (v) => formatMoney(v, currency),
+                "Mes",
+              )}
+            >
+              <HistoricoGasto
+                datos={filas}
+                moneda={currency}
+                enCurso={view.enCurso ?? null}
+                alto={180}
+              />
+            </ChartFrame>
+          );
+        })()}
         {/* El centro suma el RANGO, igual que los KPI de arriba — la Hipoteca a tres meses
             son tres cuotas, no una. El cálculo no cambia; cambia lo que el rótulo confiesa.
             Decía «al mes» mientras mostraba un trimestre. */}
@@ -679,7 +724,24 @@ function IncomeSection({ view }: { view: V2View }) {
       <SummaryStrip cards={summary} />
 
       <section className="cols-2">
-        <ChartCard title="Histórico de ingresos" hint="recibido por mes">
+        <ChartFrame
+          titulo="Histórico de ingresos"
+          subtitulo="recibido por mes"
+          estado={incomeArea.length === 0 ? "vacio" : "datos"}
+          mensajeVacio="Todavía no hay ingresos registrados en este rango."
+          alto={160}
+          descripcion={describirGrafico({
+            titulo: "Histórico de ingresos",
+            serie: incomeArea.map((d) => ({ x: formatMonthShort(d.date), y: d.value })),
+            formato: (v) => formatMoney(v, currency),
+          })}
+          tabla={tablaDeDatos(
+            incomeArea.map((d) => ({ x: formatMonthShort(d.date), value: d.value })),
+            [{ clave: "value", etiqueta: "Ingreso", color: "var(--chart-1)", marca: "area" }],
+            (v) => formatMoney(v, currency),
+            "Mes",
+          )}
+        >
           <PerformanceChart
             data={incomeArea}
             currency={currency}
@@ -688,7 +750,7 @@ function IncomeSection({ view }: { view: V2View }) {
             height={160}
             axes="full"
           />
-        </ChartCard>
+        </ChartFrame>
         <DonutCard
           title="Composición por fuente"
           data={donutData(incomeByManualSource)}
