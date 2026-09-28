@@ -16,9 +16,29 @@ import type { ReactNode } from "react";
  * ocupa la cifra: lo que cambia es lo que hay dentro, nunca la caja.
  */
 
-/** Barra gris del ancho de una cifra. `aria-hidden`: quien usa lector ya oyó «cargando». */
-export function EsqueletoCifra({ ancho = "62%" }: { ancho?: string }) {
-  return <span className="skel kpi-esqueleto" aria-hidden="true" style={{ width: ancho }} />;
+/**
+ * El velo: el contenido REAL, invisible, con una barra gris encima.
+ *
+ * Tres intentos costó llegar acá, y los tres fallaron por lo mismo. Una barra de `1em` dentro
+ * del párrafo de la cifra dejaba la tarjeta 45 px más baja; reservando además el sitio del delta
+ * y la sparkline bajó a 22; afinando esos dos, a 13 — porque la cifra tiene una caja de línea
+ * que `1em` no reproduce. **Toda medida escrita a mano para imitar a otra se separa de ella.**
+ * La única versión estable es no imitar nada: se pinta lo de siempre, se esconde, y el esqueleto
+ * va encima. El alto es el mismo por construcción, no por coincidencia.
+ */
+function Velo({ children }: { children: ReactNode }) {
+  // Sin caja propia: el velo va ABSOLUTO —el `<p>` de la cifra es su contexto— y el contenido
+  // queda envuelto en un `span` inline que no altera la caja de línea. El primer intento usó un
+  // `inline-flex` y la tarjeta salió 4 px MÁS ALTA que con datos: el envoltorio mismo era el
+  // que movía el marco. Un contenedor que se añade para no mover nada tiene que no ser nada.
+  return (
+    <>
+      <span className="skel kpi-contexto-velo" aria-hidden="true" />
+      <span className="kpi-velado" aria-hidden="true">
+        {children}
+      </span>
+    </>
+  );
 }
 
 /**
@@ -30,19 +50,17 @@ export function EsqueletoCifra({ ancho = "62%" }: { ancho?: string }) {
 export function EstadoCifra({
   cargando,
   error,
-  anchoEsqueleto,
   children,
 }: {
   cargando?: boolean;
   error?: string;
-  anchoEsqueleto?: string;
   children: ReactNode;
 }): ReactNode {
   if (cargando) {
     return (
       <>
         <span className="sr-only">Cargando…</span>
-        <EsqueletoCifra ancho={anchoEsqueleto} />
+        <Velo>{children}</Velo>
       </>
     );
   }

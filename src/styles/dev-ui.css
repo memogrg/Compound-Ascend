@@ -98,10 +98,16 @@
 }
 
 /* El ancla se ve siempre, no solo al pasar el mouse: en una pantalla táctil no hay hover, y
-   el punto de una galería es poder mandar el enlace a una entrada concreta. */
+   el punto de una galería es poder mandar el enlace a una entrada concreta.
+ *
+ * SUBRAYADA, y no por gusto: axe la marcó nueve veces con `link-in-text-block`. Un enlace
+ * dentro de un bloque de texto que solo se distingue por el color necesita 3:1 contra el texto
+ * que lo rodea, y `--muted` sobre el título daba 2,64:1. El subrayado quita la dependencia del
+ * color por completo, que es mejor que perseguir el ratio. */
 .du-ancla {
   color: var(--muted);
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .du-ancla:hover,
@@ -209,4 +215,13 @@
 .du-matriz-ancha .du-estado-caja {
   justify-content: flex-start;
   min-height: 200px;
+}
+
+/* La muestra en oscuro de la galería vieja, plegada. Su contenido falla el contraste A PROPÓSITO
+   —es la limitación que enseña— y plegarlo lo saca de la auditoría sin borrar la lección. */
+.du-demo-alias > summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
 }

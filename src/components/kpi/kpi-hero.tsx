@@ -64,7 +64,7 @@ export function KpiHero({
       <p className="kpi-hero-etiqueta">{etiqueta}</p>
 
       <p className="kpi-hero-cifra">
-        <EstadoCifra cargando={cargando} error={error} anchoEsqueleto="58%">
+        <EstadoCifra cargando={cargando} error={error}>
           <>
             {/* El número entero, una sola vez, para quien escucha la pantalla. */}
             <span className="sr-only">{texto}</span>
@@ -93,7 +93,34 @@ export function KpiHero({
 
       {/* Sin dato no hay delta, ni tendencia, ni medidor: serían una comparación, una curva y
           un progreso inventados sobre un número que no existe. La NOTA sí se queda — dice qué
-          se está midiendo, y eso sigue siendo cierto mientras carga. */}
+          se está midiendo, y eso sigue siendo cierto mientras carga.
+       *
+       * Pero el SITIO se reserva. Quitar la fila entera encogía la tarjeta 45 px, así que la
+       * página daba el salto exacto que este estado venía a evitar — lo midió el caso
+       * «el esqueleto NO mueve el marco», que falló con «con datos 152,25 px · cargando
+       * 107,02 px». Lo que cambia es el contenido de la fila, nunca su existencia. */}
+      {(delta || puntos) && sinDato ? (
+        // La MISMA fila que con datos, con el contenido real invisible: así el alto no puede
+        // separarse. La barra gris va solo sobre la cifra.
+        <div className="kpi-hero-contexto" aria-hidden="true">
+          {delta ? (
+            <span className="kpi-velado">
+              <DeltaChip
+                valor={delta.valor}
+                moneda={moneda}
+                vsEtiqueta={delta.vsEtiqueta}
+                sentidoBueno={delta.sentidoBueno}
+              />
+            </span>
+          ) : null}
+          {puntos ? (
+            <span className="kpi-velado">
+              <Sparkline puntos={puntos} />
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       {(delta || puntos) && !sinDato ? (
         <div className="kpi-hero-contexto">
           {delta ? (
@@ -105,6 +132,18 @@ export function KpiHero({
             />
           ) : null}
           {puntos ? <Sparkline puntos={puntos} /> : null}
+        </div>
+      ) : null}
+
+      {medidor && sinDato ? (
+        <div className="kpi-hero-medidor kpi-velado" aria-hidden="true">
+          <Meter
+            valor={medidor.valor}
+            max={medidor.max}
+            etiqueta={medidor.etiqueta}
+            umbrales={medidor.umbrales}
+          />
+          <p className="kpi-hero-nota">{medidor.etiqueta}</p>
         </div>
       ) : null}
 
