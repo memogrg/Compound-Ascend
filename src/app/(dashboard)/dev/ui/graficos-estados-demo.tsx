@@ -22,6 +22,8 @@ import {
   TRAZO,
   describirGrafico,
   tablaDeDatos,
+  useAncho,
+  anchoDeBarra,
   type EstadoGrafico,
   type SerieDef,
 } from "@/components/charts/core";
@@ -196,6 +198,9 @@ function Area_({ estado, datos = SERIE }: { estado: EstadoGrafico; datos?: typeo
   );
 }
 
+/** Lo que ocupa el eje Y: se descuenta del contenedor para medir el trazado real. */
+const ANCHO_EJE_Y = 56;
+
 function Barras({
   estado,
   apiladas,
@@ -206,6 +211,13 @@ function Barras({
   datos?: typeof SERIE;
 }) {
   const conDos = datos.map((d) => ({ ...d, w: Math.round(d.v * 0.45) }));
+  // El ancho de barra se CALCULA midiendo el contenedor, igual que en producción. Sin esto
+  // Recharts reparte todo el ancho disponible entre las categorías y con tres meses salían
+  // barras de 111 px — seis veces el tope de 24 que el design system declara, y justo lo
+  // contrario de lo que promete la ficha de esta entrada. El catálogo existe para enseñar
+  // lo que hace el núcleo, no una versión suya que se porta distinto.
+  const [refAncho, anchoCaja] = useAncho<HTMLDivElement>();
+  const anchoBarra = anchoDeBarra(Math.max(0, anchoCaja - ANCHO_EJE_Y), conDos.length, 2);
   const titulo = apiladas ? "Ingresos y gastos (apiladas)" : "Ingresos y gastos (agrupadas)";
   const series: SerieDef[] = [
     { clave: "v", etiqueta: "Gasto", color: "var(--chart-3)", marca: "linea" },
@@ -223,20 +235,28 @@ function Barras({
       })}
       tabla={tablaDeDatos(conDos, series, (v) => formatMoney(v, MONEDA), "Mes")}
     >
-      <ResponsiveContainer width="100%" height={140}>
-        <BarChart data={conDos} accessibilityLayer>
-          <XAxis dataKey="x" {...EJE} />
-          {series.map((s) => (
-            <Bar
-              key={s.clave}
-              dataKey={s.clave}
-              fill={s.color}
-              stackId={apiladas ? "a" : undefined}
-              {...BARRA}
-            />
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
+      <div ref={refAncho} style={{ height: 140 }}>
+        <ResponsiveContainer width="100%" height={140}>
+          <BarChart
+            data={conDos}
+            accessibilityLayer
+            barGap={BARRA.separacion}
+            barCategoryGap={BARRA.separacionCategoria}
+            {...(anchoBarra > 0 ? { barSize: anchoBarra } : {})}
+          >
+            <XAxis dataKey="x" {...EJE} />
+            {series.map((s) => (
+              <Bar
+                key={s.clave}
+                dataKey={s.clave}
+                fill={s.color}
+                stackId={apiladas ? "a" : undefined}
+                {...BARRA}
+              />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </ChartFrame>
   );
 }

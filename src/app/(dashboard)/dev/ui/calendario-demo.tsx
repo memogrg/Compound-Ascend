@@ -115,7 +115,11 @@ export function CalendarioDemo() {
   const conBaseCero = incluyeCero(escala.dominio);
 
   return (
-    <div style={{ display: "grid", gap: 26 }}>
+    /* El `id` es el ancla de `tests/a11y/charts-calendario.spec.ts`. Existe porque el
+       catálogo de estados monta el calendario SEIS veces más en la misma página, y un
+       `.cal-grid` a secas pasó a resolver a siete elementos: veinte casos en rojo que no
+       hablaban del calendario, sino de dónde estaban mirando. */
+    <div id="demo-calendario" style={{ display: "grid", gap: 26 }}>
       <ChartFrame
         titulo={`Gasto diario · ${MES_LARGO}`}
         subtitulo="Cada celda es un día; el color, cuánto se gastó"
