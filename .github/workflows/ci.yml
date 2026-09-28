@@ -37,13 +37,22 @@ jobs:
           node-version: "20"
           cache: "npm"
 
+      # La clave NO lleva un hash de `src/**`, y es el arreglo de un problema medido: con él,
+      # la clave cambiaba en CADA commit, así que no acertaba nunca —el `restore-keys` hacía
+      # todo el trabajo— pero cada corrida ESCRIBÍA una entrada nueva de ~450 MB que ya no
+      # volvería a acertar jamás. El repo llegó a 21 entradas `next-*` sumando 9,2 GB de un
+      # cupo de 10, y al pasarse, GitHub desaloja por antigüedad de uso: lo primero que se
+      # llevaba era la caché de imágenes del stack, que es justo la que evita que el job
+      # muera en el registro.
+      #
+      # Con la clave atada solo al lockfile hay UNA entrada por cambio de dependencias:
+      # cuando acierta, `actions/cache` no reescribe, así que deja de crecer sola. La caché
+      # de Next es incremental por dentro, así que una un poco vieja sigue sirviendo.
       - name: Cache de build Next
         uses: actions/cache@v5
         with:
           path: .next/cache
-          key: next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**') }}
-          restore-keys: |
-            next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+          key: next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - run: npm ci
       # Va PRIMERO porque es el paso más barato (~5s) y el que más fácil se olvida.
@@ -189,7 +198,12 @@ jobs:
       - name: Clave de la caché de imágenes
         id: clave_imagenes
         run: |
-          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-migrations-$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+          # CLI + config.toml + exclusiones: los tres deciden QUÉ imágenes y con qué tags se
+          # bajan, así que cualquiera de los tres invalida la caché solo. `config.toml` entra
+          # porque ahí se activan o apagan servicios enteros.
+          CFG=$(sha256sum supabase/config.toml | cut -c1-12)
+          EXC=$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)
+          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-migrations-$CFG-$EXC" >> "$GITHUB_OUTPUT"
 
       - name: Caché de imágenes del stack
         id: cache_imagenes
@@ -334,13 +348,52 @@ jobs:
         run: |
           echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las imágenes del stack salen de public.ecr.aws, con ghcr.io de respaldo."
 
-      # Este job NO cachea las imágenes, y es deliberado. Medido: descargarlas de
-      # public.ecr.aws tarda MENOS que restaurar el tarball y hacerle `docker load` (3m40s
-      # contra 4m36s), y las ocho ocupaban 1,07 GiB de un cupo de 10 GiB que el repo ya tenía
-      # lleno — desalojando las cachés de npm y de Next, que sí ahorran tiempo. La de
-      # `migrations` se queda porque ahí sí gana. Ver `scripts/ci/imagenes-supabase.sh`.
+      # ── Caché de las imágenes del stack ──────────────────────────────────────────────
+      #
+      # Este job NO la tenía, y era una decisión medida: descargarlas de public.ecr.aws
+      # tardaba MENOS que restaurar el tarball y hacerle `docker load` (3m40s contra 4m36s),
+      # y ocupaban 1,07 GiB de un cupo de 10 GiB que el repo tenía lleno.
+      #
+      # Se revierte porque las dos premisas cambiaron:
+      #
+      #  · **El cupo ya no está lleno.** Estaba ocupado por 21 entradas `next-*` de ~450 MB
+      #    que no acertaban nunca (su clave llevaba un hash de `src/**`, que cambia en cada
+      #    commit). Arreglada esa clave y borradas las de los PR ya mergeados, el repo pasó
+      #    de 10,39 GB a 4,43 GB.
+      #  · **El minuto de más no era el problema.** En una sola noche, tres corridas de los
+      #    dos jobs E2E murieron con `toomanyrequests: Data limit exceeded` bajando esas
+      #    mismas imágenes, y cada relanzamiento gastaba el cupo que necesitaba el siguiente.
+      #
+      # Y conviene no vender esto como lo que no es. RE-MEDIDO con la caché ya poblada, el
+      # tiempo NO mejora en estos dos jobs: `docker load` de un tar de 3,6 GB cuesta 96s y
+      # 69s, y el smoke pasó de 4m51s a 5m21s (nav-v2, de 5m25s a 5m12s; migraciones, de
+      # 2m20s a 2m0s, que ahí sí gana). Lo que se compra es que `Pulling` sea CERO: el job
+      # deja de poder morir porque un registro público esté de malas. Medio minuto por
+      # corrida a cambio de quitar un modo de fallo entero.
+      - name: Clave de la caché de imágenes
+        id: clave_imagenes
+        run: |
+          CFG=$(sha256sum supabase/config.toml | cut -c1-12)
+          EXC=$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)
+          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-smoke-$CFG-$EXC" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de imágenes del stack
+        id: cache_imagenes
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/supabase-imagenes/stack.tar
+          key: ${{ steps.clave_imagenes.outputs.valor }}
+
+      - name: Cargar imágenes de la caché
+        run: scripts/ci/imagenes-supabase.sh cargar ~/.cache/supabase-imagenes/stack.tar
+
       - name: Levantar el stack
         run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
+
+      # Solo cuando la caché no acertó: si acertó, el tarball ya es el que está en disco.
+      - name: Guardar imágenes para la próxima corrida
+        if: steps.cache_imagenes.outputs.cache-hit != 'true'
+        run: scripts/ci/imagenes-supabase.sh guardar ~/.cache/supabase-imagenes/stack.tar
 
       - name: Migraciones y variables del stack efímero
         run: |
@@ -560,13 +613,52 @@ jobs:
         run: |
           echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las imágenes del stack salen de public.ecr.aws, con ghcr.io de respaldo."
 
-      # Este job NO cachea las imágenes, y es deliberado. Medido: descargarlas de
-      # public.ecr.aws tarda MENOS que restaurar el tarball y hacerle `docker load` (3m40s
-      # contra 4m36s), y las ocho ocupaban 1,07 GiB de un cupo de 10 GiB que el repo ya tenía
-      # lleno — desalojando las cachés de npm y de Next, que sí ahorran tiempo. La de
-      # `migrations` se queda porque ahí sí gana. Ver `scripts/ci/imagenes-supabase.sh`.
+      # ── Caché de las imágenes del stack ──────────────────────────────────────────────
+      #
+      # Este job NO la tenía, y era una decisión medida: descargarlas de public.ecr.aws
+      # tardaba MENOS que restaurar el tarball y hacerle `docker load` (3m40s contra 4m36s),
+      # y ocupaban 1,07 GiB de un cupo de 10 GiB que el repo tenía lleno.
+      #
+      # Se revierte porque las dos premisas cambiaron:
+      #
+      #  · **El cupo ya no está lleno.** Estaba ocupado por 21 entradas `next-*` de ~450 MB
+      #    que no acertaban nunca (su clave llevaba un hash de `src/**`, que cambia en cada
+      #    commit). Arreglada esa clave y borradas las de los PR ya mergeados, el repo pasó
+      #    de 10,39 GB a 4,43 GB.
+      #  · **El minuto de más no era el problema.** En una sola noche, tres corridas de los
+      #    dos jobs E2E murieron con `toomanyrequests: Data limit exceeded` bajando esas
+      #    mismas imágenes, y cada relanzamiento gastaba el cupo que necesitaba el siguiente.
+      #
+      # Y conviene no vender esto como lo que no es. RE-MEDIDO con la caché ya poblada, el
+      # tiempo NO mejora en estos dos jobs: `docker load` de un tar de 3,6 GB cuesta 96s y
+      # 69s, y el smoke pasó de 4m51s a 5m21s (nav-v2, de 5m25s a 5m12s; migraciones, de
+      # 2m20s a 2m0s, que ahí sí gana). Lo que se compra es que `Pulling` sea CERO: el job
+      # deja de poder morir porque un registro público esté de malas. Medio minuto por
+      # corrida a cambio de quitar un modo de fallo entero.
+      - name: Clave de la caché de imágenes
+        id: clave_imagenes
+        run: |
+          CFG=$(sha256sum supabase/config.toml | cut -c1-12)
+          EXC=$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)
+          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-navv2-$CFG-$EXC" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de imágenes del stack
+        id: cache_imagenes
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/supabase-imagenes/stack.tar
+          key: ${{ steps.clave_imagenes.outputs.valor }}
+
+      - name: Cargar imágenes de la caché
+        run: scripts/ci/imagenes-supabase.sh cargar ~/.cache/supabase-imagenes/stack.tar
+
       - name: Levantar el stack
         run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
+
+      # Solo cuando la caché no acertó: si acertó, el tarball ya es el que está en disco.
+      - name: Guardar imágenes para la próxima corrida
+        if: steps.cache_imagenes.outputs.cache-hit != 'true'
+        run: scripts/ci/imagenes-supabase.sh guardar ~/.cache/supabase-imagenes/stack.tar
 
       - name: Migraciones y variables del stack efímero
         run: |
