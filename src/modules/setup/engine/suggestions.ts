@@ -12,6 +12,7 @@
  */
 import type { SetupSnapshot, SetupSobre } from "@/modules/setup/types";
 
+import { formateadorNumero } from "@/lib/format";
 /**
  * Reparto de referencia por frasco, como fracción del ingreso NETO mensual.
  * Es un punto de partida conversable, no una regla: los seis frascos normales
@@ -40,7 +41,7 @@ export type Suggestion = {
 };
 
 function money(v: number, currency: string): string {
-  return new Intl.NumberFormat("es-CR", {
+  return formateadorNumero({
     style: "currency",
     currency,
     maximumFractionDigits: 0,

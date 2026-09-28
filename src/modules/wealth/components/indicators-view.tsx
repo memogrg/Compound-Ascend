@@ -11,6 +11,7 @@ import type {
 import type { MacroInsight, InsightTone } from "@/modules/wealth/services/macro-insights";
 import type { IndicatorUnit } from "@/lib/economic-indicators";
 
+import { formateadorNumero } from "@/lib/format";
 const TONE_COLOR: Record<InsightTone, string> = {
   pos: "var(--pos)",
   neg: "var(--neg)",
@@ -20,7 +21,7 @@ const TONE_COLOR: Record<InsightTone, string> = {
 
 /** Número con 2 decimales en formato es-CR. */
 function num2(value: number): string {
-  return new Intl.NumberFormat("es-CR", {
+  return formateadorNumero({
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);

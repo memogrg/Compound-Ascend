@@ -1,7 +1,7 @@
 import { getControlSummary } from "@/modules/control";
 import { getDisplayCurrency, listCategoryTree } from "@/modules/financial-base";
 import { convertCurrency } from "@/lib/fx";
-import { formatMoney, formatPercent } from "@/lib/format";
+import { formatMoney, formatMonthTinyYear, formatPercent } from "@/lib/format";
 import { MobileHeader } from "../../components/mobile-header";
 import {
   MSummaryCard,
@@ -153,8 +153,5 @@ export default async function MobileMetas() {
 
 /** Fecha corta para la celda de métrica, que es estrecha y no parte línea: "dic 2026". */
 function fmtShort(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", {
-    month: "short",
-    year: "numeric",
-  });
+  return formatMonthTinyYear(iso);
 }

@@ -17,6 +17,7 @@ import {
 } from "@/modules/account/services/subscription-service";
 import { PAID_PLANS, isDowngrade, type PaidPlan, type Plan } from "@/lib/plan";
 
+import { formatDateLong } from "@/lib/format";
 export type UrlResult = { ok: boolean; url?: string; message?: string };
 
 function esPlanDePago(v: string): v is PaidPlan {
@@ -63,9 +64,5 @@ export async function cancelarBajadaAction(): Promise<{ ok: boolean }> {
 }
 
 function formatoCorto(iso: string): string {
-  return new Date(iso).toLocaleDateString("es-CR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  return formatDateLong(iso);
 }

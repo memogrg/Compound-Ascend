@@ -33,6 +33,7 @@ import { isEmailConfigured } from "@/lib/email/send";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { PLAN_LABEL, isPaidPlan } from "@/lib/plan";
 
+import { formatNumber } from "@/lib/format";
 /** Fila de la hoja de configuración: encabezado (título + descripción) | cuerpo. */
 function SetRow({
   title,
@@ -159,8 +160,7 @@ export default async function Page() {
         <div className="usage-lb">
           <span>Uso de IA este mes</span>
           <span className="tk">
-            {acc.tokensUsed.toLocaleString("es-CR")} / {acc.tokenLimit.toLocaleString("es-CR")}{" "}
-            tokens
+            {formatNumber(acc.tokensUsed)} / {formatNumber(acc.tokenLimit)} tokens
           </span>
         </div>
         <div className="bar-track" style={{ height: 9 }}>

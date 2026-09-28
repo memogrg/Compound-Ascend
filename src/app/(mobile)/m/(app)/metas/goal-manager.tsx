@@ -29,7 +29,7 @@ import type {
   GoalDetailVM,
   GoalMovementType,
 } from "@/modules/control/services/goal-detail-service";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatMonthTiny, formatMonthTinyYear } from "@/lib/format";
 import { useCaptureToday } from "@/components/tz/timezone-context";
 import { useBarraAnticipada } from "@/lib/ui/use-barra-anticipada";
 
@@ -85,10 +85,7 @@ const STATUS_TONE: Record<string, MTone> = {
  */
 function fmtMonth(iso: string | null | undefined): string {
   if (!iso) return "sin fecha";
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", {
-    month: "short",
-    year: "numeric",
-  });
+  return formatMonthTinyYear(iso);
 }
 
 /**
@@ -638,10 +635,7 @@ const MOVE_LABEL: Record<GoalMovementType, string> = {
 
 function fmtMoveDate(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-CR", {
-    day: "2-digit",
-    month: "short",
-  });
+  return formatMonthTiny(iso);
 }
 
 /**

@@ -11,7 +11,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatMonthTiny } from "@/lib/format";
 import { getGoalDetailAction, revertGoalMovementAction } from "@/modules/control/api/actions";
 import type {
   GoalDetailVM,
@@ -38,11 +38,7 @@ const TYPE_TIP: Record<GoalMovementType, string> = {
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-CR", {
-    day: "2-digit",
-    month: "short",
-    year: "2-digit",
-  });
+  return formatMonthTiny(iso);
 }
 
 export function GoalDetailButton({ goal }: { goal: SavingsGoal }) {

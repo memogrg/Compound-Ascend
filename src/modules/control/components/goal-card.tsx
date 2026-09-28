@@ -22,7 +22,7 @@ import { GoalWithdrawButton } from "./goal-withdraw-button";
 import { GoalSpendButton } from "./goal-spend-button";
 import { GoalDetailButton } from "./goal-detail-button";
 import { EditControlButton } from "./control-actions";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatMonthTinyYear } from "@/lib/format";
 // Del ENGINE directo, no del barrel: `@/modules/control` reexporta servicios con
 // `server-only` y este es un client component.
 import { aporteOptimista } from "@/modules/control/engine/aporte-optimista";
@@ -38,11 +38,7 @@ const RECURRENCE_LABEL: Record<string, string> = {
 };
 
 function fmtResetDate(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-CR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return formatMonthTinyYear(iso);
 }
 
 const ACTION: Record<GoalAction, { label: string; color: string; bg: string }> = {

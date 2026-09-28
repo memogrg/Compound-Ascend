@@ -13,7 +13,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
-import { formatMoney } from "@/lib/format";
+import { formatDateLong, formatMoney } from "@/lib/format";
 import { QuickAddModal } from "@/modules/financial-base/components/v2/quick-add-modal";
 import {
   removeTransactionAction,
@@ -65,11 +65,7 @@ function effectColor(effect: MoneyFlowEffect): string {
 }
 
 function fullDate(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  return formatDateLong(iso);
 }
 
 /** Línea de viaje "origen → destino": colorea "Tu liquidez" según el efecto. */

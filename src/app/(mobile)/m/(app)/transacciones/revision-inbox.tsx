@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { formatMoney } from "@/lib/format";
+import { formatDayMonthTiny, formatMoney } from "@/lib/format";
 import {
   confirmIngestProposalAction,
   discardIngestProposalAction,
@@ -119,7 +119,7 @@ function txnLabel(t: Transaction): string {
 /** dd mmm (es-MX) a partir de yyyy-mm-dd. */
 function shortDate(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
+  return formatDayMonthTiny(d);
 }
 
 export function RevisionInbox({

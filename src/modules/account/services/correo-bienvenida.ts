@@ -20,13 +20,10 @@ import { alreadyProcessed } from "@/lib/security/idempotency";
 import { escapeHtml } from "@/lib/security/escape-html";
 import { planDeSuscripcion } from "@/lib/billing/stripe";
 
+import { formatDateLong, formateadorNumero } from "@/lib/format";
 function fecha(epoch: number | null | undefined): string | null {
   if (!epoch) return null;
-  return new Date(epoch * 1000).toLocaleDateString("es-CR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  return formatDateLong(epoch * 1000);
 }
 
 function monto(sub: Stripe.Subscription): string | null {
@@ -37,7 +34,7 @@ function monto(sub: Stripe.Subscription): string | null {
   // Dólares con punto decimal («$34.00»), como los muestra Stripe y la landing;
   // colones sin decimales y con separador de miles local.
   if (moneda === "USD") return `$${valor.toFixed(2)}`;
-  const n = new Intl.NumberFormat("es-CR", { maximumFractionDigits: 0 }).format(valor);
+  const n = formateadorNumero({ maximumFractionDigits: 0 }).format(valor);
   return `${moneda} ${n}`;
 }
 

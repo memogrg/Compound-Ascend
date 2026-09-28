@@ -22,7 +22,7 @@ import {
   type RangoPreset,
 } from "@/components/charts/core";
 import { REJILLA, EJE, TRAZO, type SerieDef } from "@/components/charts/core/theme";
-import { formatAxisCompact, formatMoney } from "@/lib/format";
+import { formatAxisCompact, formatMoney, formateadorFecha } from "@/lib/format";
 import { currentPeriodInTz, todayISOInTz } from "@/lib/time/user-time-core";
 
 /**
@@ -35,7 +35,7 @@ const MONEDA = "CRC";
 const AHORA = currentPeriodInTz("America/Costa_Rica");
 /** «septiembre 2026»: mes completo y año. «sep 26» obliga a descifrar una abreviatura para
  *  saber de qué mes habla la rejilla, que es lo primero que hay que saber. */
-const MES_LARGO = new Intl.DateTimeFormat("es-CR", { month: "long", year: "numeric" }).format(
+const MES_LARGO = formateadorFecha({ month: "long", year: "numeric" }).format(
   new Date(AHORA.year, AHORA.month - 1, 1),
 );
 const PERIODO_ACTUAL = `${AHORA.year}-${String(AHORA.month).padStart(2, "0")}`;

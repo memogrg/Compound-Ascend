@@ -4,7 +4,7 @@ import {
   type IndicatorCard,
 } from "@/modules/wealth/services/indicators-service";
 import { getMacroInsights } from "@/modules/wealth";
-import { formatDecimal } from "@/lib/format";
+import { formatDayMonthTiny, formatDecimal, formatNumber } from "@/lib/format";
 import {
   MSummaryCard,
   MSectionHeader,
@@ -33,8 +33,8 @@ function fmtValue(card: IndicatorCard): string {
   if (card.value == null) return "—";
   if (card.unit === "percent") return `${formatDecimal(card.value, 2)}%`;
   if (card.unit === "currency")
-    return `₡${card.value.toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  return card.value.toLocaleString("es-CR", { maximumFractionDigits: 0 });
+    return `₡${formatNumber(card.value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatNumber(card.value, { maximumFractionDigits: 0 });
 }
 
 /** Cambio vs ~6 meses: puntos porcentuales para tasas, % relativo para el resto. */
@@ -103,10 +103,7 @@ function trendClass(card: IndicatorCard, dir: -1 | 0 | 1): string {
 /** Fecha de observación en corto ("12 jul"); vacío si no hay. */
 function fmtObserved(iso: string | null): string {
   if (!iso) return "";
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", {
-    day: "numeric",
-    month: "short",
-  });
+  return formatDayMonthTiny(iso);
 }
 
 /** Alturas (30–88%) de la mini-tendencia a partir de los últimos puntos reales. Lógica

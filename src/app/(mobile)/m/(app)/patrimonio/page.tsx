@@ -4,7 +4,7 @@ import { etiquetaUltimoDato } from "@/modules/wealth/engine/ultimo-dato";
 import { userToday } from "@/lib/time/user-time";
 import { MobileHeader } from "../../components/mobile-header";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
-import { formatMoney, formatCompact, currencySymbol } from "@/lib/format";
+import { currencySymbol, formatCompact, formatDayMonthTiny, formatMoney } from "@/lib/format";
 import { MDonut, type MSlice } from "../../components/m-donut";
 import { MScrubChart, type MPoint } from "../../components/m-scrub-chart";
 import {
@@ -46,10 +46,7 @@ export default async function MobilePatrimonio() {
   const snapshots = await getSnapshotHistory("all");
   const ultimoDato = etiquetaUltimoDato(snapshots, await userToday());
   const nwPoints: MPoint[] = snapshots.map((s) => ({
-    label: new Date(`${s.date}T00:00:00`).toLocaleDateString("es-CR", {
-      day: "numeric",
-      month: "short",
-    }),
+    label: formatDayMonthTiny(s.date),
     value: s.netWorth,
   }));
 
