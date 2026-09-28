@@ -42,6 +42,21 @@
   letter-spacing: 0.06em;
 }
 
+/**
+ * El panel único del catálogo (delta 2.6c) queda pegado arriba: el catálogo mide varias
+ * pantallas de alto, y con el panel al principio de la sección había que subir hasta el
+ * título para cambiar de tema y volver a bajar al estado que se estaba mirando.
+ *
+ * `--surface` opaco a propósito: debajo pasan gráficos y tarjetas, y un panel translúcido
+ * deja leer dos cifras encimadas.
+ */
+.du-controles-sticky {
+  position: sticky;
+  top: 8px;
+  z-index: 3;
+  background: var(--surface);
+}
+
 .du-controles label,
 .du-check {
   display: inline-flex;
@@ -224,4 +239,31 @@
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--muted);
+}
+
+/* ── Colores forzados ─────────────────────────────────────────────────────────
+ *
+ * `forced-colors` no se puede activar desde la página: lo decide el sistema operativo. Lo que
+ * este control hace es REPRODUCIR su efecto sobre el lienzo —el sistema sustituye todo color por
+ * su paleta y descarta los fondos decorativos— para poder mirar qué se cae cuando el color deja
+ * de estar disponible como canal.
+ *
+ * `forced-color-adjust: none` NO se usa acá: sería pedirle al sistema que respete nuestros
+ * colores, o sea justo lo contrario de lo que hay que comprobar. */
+.du-lienzo[data-forzados="1"] {
+  --chart-1: CanvasText;
+  --chart-2: CanvasText;
+  --chart-3: CanvasText;
+  --chart-4: CanvasText;
+  --chart-5: CanvasText;
+  --chart-6: CanvasText;
+  --pos: CanvasText;
+  --neg: CanvasText;
+  --accent: LinkText;
+  background: Canvas;
+  color: CanvasText;
+}
+
+.du-lienzo[data-forzados="1"] * {
+  border-color: CanvasText;
 }

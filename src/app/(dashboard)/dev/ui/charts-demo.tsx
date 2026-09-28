@@ -1,11 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
   Line,
   LineChart,
@@ -18,7 +16,6 @@ import {
 import {
   ALTO_TOOLTIP_ANCLADO,
   ANIMACION_ACTIVA,
-  BARRA,
   ChartFrame,
   ChartTooltip,
   CROSSHAIR,
@@ -33,9 +30,6 @@ import {
   TRAZO,
   describirGrafico,
   curvaDe,
-  anchoDeBarra,
-  escalaBarras,
-  useAncho,
   formatoEjeX,
   niceDomain,
   opacidadDe,
@@ -50,7 +44,17 @@ import {
 import { formatAxisCompact, formatMoney } from "@/lib/format";
 
 /**
- * Las muestras del núcleo de gráficos, sobre Recharts 3.
+ * La INTERACCIÓN del núcleo de gráficos, sobre Recharts 3.
+ *
+ * Quedan dos gráficos, no cuatro (delta 2.6c). Las barras y los sobres que había acá los
+ * dibuja el catálogo de estados —los mismos gráficos, en los ocho estados, sobre el marco de
+ * verdad—, así que mantenerlos era dibujar dos veces lo mismo. La cuenta del tooltip de seis
+ * series («las 4 de mayor peso y el resto») la fija `tests/unit/charts-tooltip.test.ts`, que
+ * es donde vive esa regla; no hacía falta una demo para verla.
+ *
+ * Lo que el catálogo no puede mostrar es lo que queda: el par sincronizado por PERÍODO —el
+ * crosshair de uno mueve el del otro—, el clic que fija el tooltip, Escape que lo suelta y
+ * las flechas que recorren los puntos anunciando en vivo. Eso no cabe en una captura.
  *
  * Datos FIJOS y deterministas escritos acá: `/dev/ui` no lee de Supabase ni de ningún
  * servicio, así que el catálogo se ve igual en cualquier máquina y las capturas de QA no
@@ -62,7 +66,6 @@ import { formatAxisCompact, formatMoney } from "@/lib/format";
 const MONEDA = "CRC";
 
 /** Lo que ocupa el eje Y (`<YAxis width={56}>`): no es área de dibujo para las barras. */
-const ANCHO_EJE_Y = 56;
 const GRUPO = "dev-ui-periodo";
 
 const PATRIMONIO = [
@@ -133,70 +136,6 @@ const SERIES_FLUJO: SerieDef[] = [
     marca: "linea",
     guion: true,
   },
-];
-
-const MESES = [
-  { x: "2026-04", ingresos: 2_300_000, gastos: 1_820_000 },
-  { x: "2026-05", ingresos: 2_300_000, gastos: 1_940_000 },
-  { x: "2026-06", ingresos: 2_450_000, gastos: 1_760_000 },
-  { x: "2026-07", ingresos: 2_300_000, gastos: 2_010_000 },
-  { x: "2026-08", ingresos: 2_520_000, gastos: 1_880_000 },
-  { x: "2026-09", ingresos: 2_300_000, gastos: 1_690_000 },
-];
-const SERIES_MESES: SerieDef[] = [
-  {
-    clave: "ingresos",
-    etiqueta: "Ingresos",
-    color: "var(--chart-1)",
-    marca: "barra",
-    sentidoBueno: "arriba",
-  },
-  {
-    clave: "gastos",
-    etiqueta: "Gastos",
-    color: "var(--chart-5)",
-    marca: "barra",
-    sentidoBueno: "abajo",
-  },
-];
-
-/** Seis sobres: la muestra del tope de 4 filas del tooltip. */
-const SOBRES = [
-  {
-    x: "2026-07",
-    super: 420_000,
-    casa: 310_000,
-    transporte: 145_000,
-    salud: 90_000,
-    ocio: 78_000,
-    otros: 41_000,
-  },
-  {
-    x: "2026-08",
-    super: 455_000,
-    casa: 310_000,
-    transporte: 132_000,
-    salud: 120_000,
-    ocio: 96_000,
-    otros: 38_000,
-  },
-  {
-    x: "2026-09",
-    super: 398_000,
-    casa: 310_000,
-    transporte: 151_000,
-    salud: 64_000,
-    ocio: 82_000,
-    otros: 45_000,
-  },
-];
-const SERIES_SOBRES: SerieDef[] = [
-  { clave: "super", etiqueta: "Supermercado", color: "var(--chart-1)", marca: "linea" },
-  { clave: "casa", etiqueta: "Casa", color: "var(--chart-2)", marca: "linea" },
-  { clave: "transporte", etiqueta: "Transporte", color: "var(--chart-3)", marca: "linea" },
-  { clave: "salud", etiqueta: "Salud", color: "var(--chart-4)", marca: "linea" },
-  { clave: "ocio", etiqueta: "Ocio", color: "var(--chart-5)", marca: "linea" },
-  { clave: "otros", etiqueta: "Otros", color: "var(--chart-6)", marca: "linea" },
 ];
 
 const EJE_PROPS = {
@@ -324,8 +263,6 @@ export function ChartsDemo() {
       </p>
       <AreaDemo />
       <LineaDemo />
-      <BarrasDemo />
-      <SobresDemo />
     </div>
   );
 }
@@ -497,172 +434,6 @@ function LineaDemo() {
                 strokeDasharray={s.guion ? "5 4" : undefined}
                 dot={false}
                 connectNulls={false}
-                opacity={opacidadDe(it.estado, s.clave)}
-                isAnimationActive={ANIMACION_ACTIVA}
-                activeDot={{
-                  r: PUNTO_ACTIVO.radio,
-                  fill: s.color,
-                  stroke: PUNTO_ACTIVO.anilloColor,
-                  strokeWidth: PUNTO_ACTIVO.anilloAncho,
-                }}
-              />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </ChartFrame>
-  );
-}
-
-/** Barras desde cero, con separación dentro del mes y aire entre meses. */
-function BarrasDemo() {
-  const it = useInteraccion();
-  const visibles = seriesVisibles(SERIES_MESES, it.estado);
-  const escala = useMemo(() => escalaBarras(MESES.flatMap((d) => [d.ingresos, d.gastos])), []);
-  // El ancho de barra se CALCULA, no se recorta. `maxBarSize` encoge cada barra DESPUÉS de
-  // colocarla y el sobrante se queda como hueco: a 1280 los 2 px prometidos se volvían 9.
-  // Midiendo el contenedor se pide el `barSize` exacto que deja 2 px, con el mismo tope.
-  const [refAncho, anchoCaja] = useAncho<HTMLDivElement>();
-  const anchoBarra = anchoDeBarra(Math.max(0, anchoCaja - ANCHO_EJE_Y), MESES.length, 2);
-
-  return (
-    <ChartFrame
-      titulo="Ingresos y gastos por mes"
-      subtitulo="Desde cero · barras ≤ 24 px · 2 px dentro del mes y aire entre meses"
-      descripcion={describirGrafico({
-        titulo: "Ingresos por mes",
-        serie: MESES.map((d) => ({ x: formatoEjeX(d.x), y: d.ingresos })),
-        formato: (v) => formatMoney(v, MONEDA),
-      })}
-      alto={230}
-      reservaSuperior={it.reservaSuperior}
-      anuncio={it.anuncio}
-      onSoltar={it.soltar}
-      tabla={tablaDeDatos(
-        MESES.map((d) => ({ ...d, x: formatoEjeX(d.x) })),
-        SERIES_MESES,
-        (v) => formatMoney(v, MONEDA),
-        "Mes",
-      )}
-      leyenda={
-        <Legend
-          series={SERIES_MESES}
-          estado={it.estado}
-          onActivar={it.activar}
-          onDesactivar={it.desactivar}
-          onAlternar={it.alternar}
-        />
-      }
-    >
-      <div {...it.propsContenedor} ref={refAncho} style={{ height: "100%" }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={MESES}
-            margin={it.margen}
-            barGap={BARRA.separacion}
-            barCategoryGap={BARRA.separacionCategoria}
-            // 0 = todavía no se midió el contenedor; ahí decide Recharts en vez de pintar
-            // barras de cero en el primer render.
-            {...(anchoBarra > 0 ? { barSize: anchoBarra } : {})}
-            accessibilityLayer
-            {...it.propsChart}
-          >
-            <CartesianGrid stroke={REJILLA.color} strokeWidth={REJILLA.ancho} vertical={false} />
-            <XAxis dataKey="x" {...EJE_PROPS} tickFormatter={formatoEjeX} />
-            <YAxis
-              {...EJE_PROPS}
-              width={56}
-              domain={escala.dominio}
-              ticks={escala.ticks}
-              tickFormatter={(v: number) => formatAxisCompact(v, MONEDA)}
-            />
-            <Tooltip
-              cursor={{ fill: "var(--chip)" }}
-              position={it.position}
-              active={it.estado.fijado !== null ? true : undefined}
-              defaultIndex={it.estado.fijado ?? undefined}
-              content={<ChartTooltip series={SERIES_MESES} moneda={MONEDA} onPunto={it.alPunto} />}
-            />
-            {visibles.map((s) => (
-              <Bar
-                key={s.clave}
-                dataKey={s.clave}
-                fill={s.color}
-                radius={[BARRA.radio, BARRA.radio, 0, 0]}
-                opacity={opacidadDe(it.estado, s.clave)}
-                isAnimationActive={ANIMACION_ACTIVA}
-              />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </ChartFrame>
-  );
-}
-
-/** Seis series: el tooltip muestra las 4 de mayor peso y cuenta el resto. */
-function SobresDemo() {
-  const it = useInteraccion();
-  const visibles = seriesVisibles(SERIES_SOBRES, it.estado);
-
-  return (
-    <ChartFrame
-      titulo="Gasto por sobre"
-      subtitulo="Seis series: el tooltip muestra las 4 de mayor peso y cuenta el resto"
-      descripcion={describirGrafico({
-        titulo: "Gasto por sobre",
-        serie: SOBRES.map((d) => ({ x: formatoEjeX(d.x), y: d.super })),
-        formato: (v) => formatMoney(v, MONEDA),
-      })}
-      alto={230}
-      reservaSuperior={it.reservaSuperior}
-      anuncio={it.anuncio}
-      onSoltar={it.soltar}
-      tabla={tablaDeDatos(
-        SOBRES.map((d) => ({ ...d, x: formatoEjeX(d.x) })),
-        SERIES_SOBRES,
-        (v) => formatMoney(v, MONEDA),
-        "Mes",
-      )}
-      leyenda={
-        <Legend
-          series={SERIES_SOBRES}
-          estado={it.estado}
-          onActivar={it.activar}
-          onDesactivar={it.desactivar}
-          onAlternar={it.alternar}
-        />
-      }
-    >
-      <div {...it.propsContenedor} style={{ height: "100%" }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={SOBRES} margin={it.margen} accessibilityLayer {...it.propsChart}>
-            <CartesianGrid stroke={REJILLA.color} strokeWidth={REJILLA.ancho} vertical={false} />
-            <XAxis dataKey="x" {...EJE_PROPS} tickFormatter={formatoEjeX} />
-            <YAxis
-              {...EJE_PROPS}
-              width={56}
-              domain={dominioDe(
-                SOBRES,
-                SERIES_SOBRES.map((s) => s.clave),
-              )}
-              tickFormatter={(v: number) => formatAxisCompact(v, MONEDA)}
-            />
-            <Tooltip
-              cursor={cursorDe(it.estado.fijado)}
-              position={it.position}
-              active={it.estado.fijado !== null ? true : undefined}
-              defaultIndex={it.estado.fijado ?? undefined}
-              content={<ChartTooltip series={SERIES_SOBRES} moneda={MONEDA} onPunto={it.alPunto} />}
-            />
-            {visibles.map((s) => (
-              <Line
-                key={s.clave}
-                type={curvaDe(s)}
-                dataKey={s.clave}
-                stroke={s.color}
-                strokeWidth={TRAZO.ancho}
-                dot={false}
                 opacity={opacidadDe(it.estado, s.clave)}
                 isAnimationActive={ANIMACION_ACTIVA}
                 activeDot={{
