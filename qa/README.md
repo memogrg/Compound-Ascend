@@ -120,3 +120,7 @@ PARCIAL: 6 de 200 capturas del inventario (39 rutas de routes.json, en sus ancho
 
 **La evidencia de un PR es el diff completo de `routes.json`.** `--rutas` es para el rato en que
 se está iterando, no para el PR.
+
+<!-- Una línea, a propósito: este cambio existe para comprobar que una rama NUEVA acierta la
+     caché de imágenes poblada en `main`. Si acierta, los tres jobs dicen «Cache restored from
+     key» y ninguno descarga nada. -->
