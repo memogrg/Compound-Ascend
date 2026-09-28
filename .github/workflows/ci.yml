@@ -250,7 +250,19 @@ jobs:
     name: E2E smoke
     runs-on: ubuntu-24.04
     needs: ci
-    if: github.event_name == 'pull_request'
+    # PR (donde bloquea) **y** push a main.
+    #
+    # Lo segundo es lo que hace que la caché de imágenes sirva de algo. `actions/cache` restaura
+    # desde la rama actual y desde la rama por defecto; como estos dos jobs solo corrían en PR,
+    # su tarball nunca llegaba a `refs/heads/main` y NINGUNA rama podía restaurarlo. Medido en
+    # un PR de una línea abierto justo para esto: `Pulling` = 89, 96 y 63, y ni una línea de
+    # «Cache restored from key: imagenes-v2-…». La única que acertaba era la de `migrations`,
+    # que es el único job que sí corre en push.
+    #
+    # El precio es una corrida de E2E por merge. Es menos de lo que costaban los relanzamientos
+    # que provocaba el problema, y de paso da verificación post-merge sobre el código ya
+    # fusionado, que hasta ahora nadie hacía.
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     env:
       # Solo para poder preguntar por su existencia en el `if` de los pasos de login.
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -515,7 +527,19 @@ jobs:
     name: E2E nav-v2
     runs-on: ubuntu-24.04
     needs: ci
-    if: github.event_name == 'pull_request'
+    # PR (donde bloquea) **y** push a main.
+    #
+    # Lo segundo es lo que hace que la caché de imágenes sirva de algo. `actions/cache` restaura
+    # desde la rama actual y desde la rama por defecto; como estos dos jobs solo corrían en PR,
+    # su tarball nunca llegaba a `refs/heads/main` y NINGUNA rama podía restaurarlo. Medido en
+    # un PR de una línea abierto justo para esto: `Pulling` = 89, 96 y 63, y ni una línea de
+    # «Cache restored from key: imagenes-v2-…». La única que acertaba era la de `migrations`,
+    # que es el único job que sí corre en push.
+    #
+    # El precio es una corrida de E2E por merge. Es menos de lo que costaban los relanzamientos
+    # que provocaba el problema, y de paso da verificación post-merge sobre el código ya
+    # fusionado, que hasta ahora nadie hacía.
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     env:
       # Solo para poder preguntar por su existencia en el `if` de los pasos de login.
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
