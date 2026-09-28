@@ -59,11 +59,12 @@
   font-variant-numeric: tabular-nums;
 }
 .delta.up {
-  color: var(--pos);
+  /* Texto sobre su propio tinte: el token de TEXTO, que es el que llega a 4,5:1. */
+  color: var(--pos-texto);
   background: var(--pos-soft);
 }
 .delta.down {
-  color: var(--neg);
+  color: var(--neg-texto);
   background: var(--neg-soft);
 }
 .delta.flat {

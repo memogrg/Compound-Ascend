@@ -297,7 +297,7 @@ select.ac-rc-field {
   border-radius: 8px;
   border-left: 2px solid var(--warning);
   background: var(--warning-soft);
-  color: var(--warning);
+  color: var(--warn-texto);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -308,8 +308,9 @@ select.ac-rc-field {
   padding: 2px 9px;
   border: 1px solid var(--warning);
   border-radius: var(--r-pill);
+  /* Transparente, pero vive DENTRO del aviso: el fondo real es `--warning-soft`. */
   background: transparent;
-  color: var(--warning);
+  color: var(--warn-texto);
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
