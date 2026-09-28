@@ -362,10 +362,14 @@ jobs:
       #    de 10,39 GB a 4,43 GB.
       #  · **El minuto de más no era el problema.** En una sola noche, tres corridas de los
       #    dos jobs E2E murieron con `toomanyrequests: Data limit exceeded` bajando esas
-      #    mismas imágenes, y cada relanzamiento gastaba el cupo que necesitaba el
-      #    siguiente. Un job que tarda un minuto más pero no depende de que un registro
-      #    público esté de buenas sale ganando; comparar solo los tiempos del camino feliz
-      #    es comparar la mitad.
+      #    mismas imágenes, y cada relanzamiento gastaba el cupo que necesitaba el siguiente.
+      #
+      # Y conviene no vender esto como lo que no es. RE-MEDIDO con la caché ya poblada, el
+      # tiempo NO mejora en estos dos jobs: `docker load` de un tar de 3,6 GB cuesta 96s y
+      # 69s, y el smoke pasó de 4m51s a 5m21s (nav-v2, de 5m25s a 5m12s; migraciones, de
+      # 2m20s a 2m0s, que ahí sí gana). Lo que se compra es que `Pulling` sea CERO: el job
+      # deja de poder morir porque un registro público esté de malas. Medio minuto por
+      # corrida a cambio de quitar un modo de fallo entero.
       - name: Clave de la caché de imágenes
         id: clave_imagenes
         run: |
@@ -623,10 +627,14 @@ jobs:
       #    de 10,39 GB a 4,43 GB.
       #  · **El minuto de más no era el problema.** En una sola noche, tres corridas de los
       #    dos jobs E2E murieron con `toomanyrequests: Data limit exceeded` bajando esas
-      #    mismas imágenes, y cada relanzamiento gastaba el cupo que necesitaba el
-      #    siguiente. Un job que tarda un minuto más pero no depende de que un registro
-      #    público esté de buenas sale ganando; comparar solo los tiempos del camino feliz
-      #    es comparar la mitad.
+      #    mismas imágenes, y cada relanzamiento gastaba el cupo que necesitaba el siguiente.
+      #
+      # Y conviene no vender esto como lo que no es. RE-MEDIDO con la caché ya poblada, el
+      # tiempo NO mejora en estos dos jobs: `docker load` de un tar de 3,6 GB cuesta 96s y
+      # 69s, y el smoke pasó de 4m51s a 5m21s (nav-v2, de 5m25s a 5m12s; migraciones, de
+      # 2m20s a 2m0s, que ahí sí gana). Lo que se compra es que `Pulling` sea CERO: el job
+      # deja de poder morir porque un registro público esté de malas. Medio minuto por
+      # corrida a cambio de quitar un modo de fallo entero.
       - name: Clave de la caché de imágenes
         id: clave_imagenes
         run: |
