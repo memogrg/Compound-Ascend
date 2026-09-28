@@ -202,3 +202,12 @@
   line-height: 1.5;
   color: var(--muted);
 }
+
+/* La muestra en oscuro de la galería vieja, plegada. Su contenido falla el contraste A PROPÓSITO
+   —es la limitación que enseña— y plegarlo lo saca de la auditoría sin borrar la lección. */
+.du-demo-alias > summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+}
