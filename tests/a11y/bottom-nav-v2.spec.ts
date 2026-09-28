@@ -39,7 +39,11 @@ async function abrir(browser: Browser, url = "/dashboard") {
  */
 async function v2Encendida(page: import("@playwright/test").Page): Promise<boolean> {
   const items = page.locator(".bottom-nav .bn-item");
-  await expect.poll(() => items.count(), { timeout: 15_000 }).toBeGreaterThan(0);
+  // Se espera a una barra COMPLETA, y las únicas completas son 5 (bandera encendida) o 6
+  // (apagada). Esperar a `> 0` no bastaba —fue el primer arreglo— porque atrapa un montaje a
+  // medias: con tres ítems ya pintados la sonda concluía «apagada», el caso se saltaba y el
+  // guardián de CI tumbaba el job. Volvió a pasar en «nadie se pinta encima de la barra».
+  await expect.poll(() => items.count(), { timeout: 15_000 }).toBeGreaterThanOrEqual(5);
   return (await items.count()) === 5;
 }
 
