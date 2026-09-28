@@ -63,8 +63,8 @@ async function coloresPintados(page: Page): Promise<[number, number, number][]> 
       s.style.cssText = `flex:1;background:var(--chart-${i})`;
       cont.appendChild(s);
     }
-    // El PRIMER lienzo: el catálogo tiene dos (estados y gráficos) y cada uno lleva sus
-    // propios controles de visión.
+    // El PRIMER lienzo: el catálogo tiene dos (estados y gráficos) y los dos cuelgan del
+    // MISMO panel de controles, así que el filtro que se active cae sobre los dos por igual.
     document.querySelector(".du-lienzo")?.prepend(cont);
   });
   // `locator.screenshot()` y no `page.screenshot({clip})`: el lienzo puede quedar por debajo
