@@ -330,7 +330,16 @@ async function finalizarAnimaciones(page) {
 }
 
 async function iniciarSesion(browser, baseUrl, email, password) {
-  const context = await browser.newContext();
+  /**
+   * `reducedMotion: "reduce"`, igual que los contextos de captura de más abajo.
+   *
+   * No estaba, y era una inconsistencia del propio arnés: con la animación de entrada viva,
+   * Playwright exige que el botón esté «visible, enabled AND STABLE» y en un runner cargado
+   * el elemento sigue moviéndose entre fotogramas. En una máquina rápida la animación termina
+   * antes de que nadie mire, así que el fallo solo aparecía en CI — y el mensaje, «esperando
+   * el botón», mandaba a buscar el problema en la pantalla de login.
+   */
+  const context = await browser.newContext({ reducedMotion: "reduce" });
   const page = await context.newPage();
   await page.goto(new URL("/login", baseUrl).toString(), { waitUntil: "networkidle" });
   await page.getByLabel("Correo").fill(email);
