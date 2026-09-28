@@ -515,15 +515,32 @@ async function main() {
   // Render determinista: sin esto, dos corridas idénticas difieren en ±1-2 niveles de color en los
   // bordes (antialiasing de texto y degradados). Son 200 px invisibles, pero rompen la comparación
   // estricta a umbral 0 — y bajar el umbral taparía cambios de color reales de 1-2 niveles.
-  const browser = await chromium.launch({
-    args: [
-      "--force-color-profile=srgb", // mismo perfil siempre, no el del monitor
-      "--disable-lcd-text", // antialiasing en gris, no subpíxel (el subpíxel varía)
-      "--font-render-hinting=none",
-      "--disable-gpu", // rasterizado por software: reproducible entre corridas
-      "--deterministic-mode",
-    ],
-  });
+  /**
+   * `--deterministic-mode` se cae en CI, y solo en CI.
+   *
+   * Esa bandera fija el reloj y el planificador del navegador, y en el runner deja de producir
+   * fotogramas: la comprobación «estable» de Playwright se apoya en `requestAnimationFrame`,
+   * `page.screenshot()` espera un fotograma que no llega y `page.content()` sí responde porque
+   * no necesita compositor. En la Mac la misma bandera SÍ avanza — medido, «rAF avanza: sí ·
+   * 34 ms» — y por eso el fallo era invisible en local.
+   *
+   * Las otras cuatro se quedan en los dos sitios: son las que de verdad fijan el RENDER (perfil
+   * de color, antialiasing en gris, sin hinting, rasterizado por software), y sin ellas dos
+   * corridas idénticas difieren en ±1-2 niveles en los bordes.
+   *
+   * Y el determinismo no se da por supuesto: con `QA_CI=1` el propio job vuelve a capturar 20
+   * rutas al final y compara las dos tandas. Si no da cero, falla.
+   */
+  const enCI = process.env.QA_CI === "1";
+  const banderas = [
+    "--force-color-profile=srgb", // mismo perfil siempre, no el del monitor
+    "--disable-lcd-text", // antialiasing en gris, no subpíxel (el subpíxel varía)
+    "--font-render-hinting=none",
+    "--disable-gpu", // rasterizado por software: reproducible entre corridas
+    ...(enCI ? [] : ["--deterministic-mode"]),
+  ];
+  if (enCI) console.log("QA_CI=1 · sin --deterministic-mode (no produce fotogramas en el runner)");
+  const browser = await chromium.launch({ args: banderas });
   /**
    * ¿Avanza `requestAnimationFrame` en ESTE navegador?
    *

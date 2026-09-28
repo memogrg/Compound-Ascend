@@ -1257,9 +1257,35 @@ jobs:
         env:
           E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          # En CI se retira `--deterministic-mode` (no produce fotogramas en el runner). Ver
+          # `snap.mjs`; lo que esa bandera prometía se demuestra en el paso siguiente.
+          QA_CI: "1"
         run: |
           node scripts/qa/snap.mjs --base-url http://localhost:3001 \
             --shard ${{ matrix.shard }}/2 --out capturas
+
+      # Quitar la bandera del determinismo y confiar sería cambiar una garantía por una
+      # suposición. Se vuelve a capturar un puñado de rutas contra el MISMO servidor y la misma
+      # compilación, con umbral CERO y sin filtro de antialiasing: cualquier píxel distinto es
+      # inestabilidad, y entonces las capturas no sirven como evidencia.
+      - name: Sonda de determinismo (20 rutas, dos veces)
+        env:
+          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          QA_CI: "1"
+        run: |
+          # Veinte rutas fijas, UN tema y UN ancho: 20 capturas por tanda. Con los seis
+          # combinados serían 120 y la sonda costaría más que lo que vigila.
+          RUTAS=$(node -e "
+            const r = require('./scripts/qa/routes.json');
+            console.log(r.slice(0, 20).map(x => x.path).join(','));
+          ")
+          for TANDA in det-a det-b; do
+            node scripts/qa/snap.mjs --base-url http://localhost:3001 \
+              --rutas "$RUTAS" --theme light --widths 1280 --out "$TANDA"
+          done
+          node scripts/qa/sonda-determinismo.mjs --a det-a --b det-b \
+            --out-diff diff-determinismo
 
       - name: Subir las capturas como base
         uses: actions/upload-artifact@v4
@@ -1404,9 +1430,35 @@ jobs:
         env:
           E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          # En CI se retira `--deterministic-mode` (no produce fotogramas en el runner). Ver
+          # `snap.mjs`; lo que esa bandera prometía se demuestra en el paso siguiente.
+          QA_CI: "1"
         run: |
           node scripts/qa/snap.mjs --base-url http://localhost:3001 \
             --shard ${{ matrix.shard }}/2 --out capturas
+
+      # Quitar la bandera del determinismo y confiar sería cambiar una garantía por una
+      # suposición. Se vuelve a capturar un puñado de rutas contra el MISMO servidor y la misma
+      # compilación, con umbral CERO y sin filtro de antialiasing: cualquier píxel distinto es
+      # inestabilidad, y entonces las capturas no sirven como evidencia.
+      - name: Sonda de determinismo (20 rutas, dos veces)
+        env:
+          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          QA_CI: "1"
+        run: |
+          # Veinte rutas fijas, UN tema y UN ancho: 20 capturas por tanda. Con los seis
+          # combinados serían 120 y la sonda costaría más que lo que vigila.
+          RUTAS=$(node -e "
+            const r = require('./scripts/qa/routes.json');
+            console.log(r.slice(0, 20).map(x => x.path).join(','));
+          ")
+          for TANDA in det-a det-b; do
+            node scripts/qa/snap.mjs --base-url http://localhost:3001 \
+              --rutas "$RUTAS" --theme light --widths 1280 --out "$TANDA"
+          done
+          node scripts/qa/sonda-determinismo.mjs --a det-a --b det-b \
+            --out-diff diff-determinismo
 
       # Evidencia del fallo de login: el mensaje de Playwright no dice cuál de las tres
       # condiciones —visible, habilitado, estable— es la que falta, y adivinarlo ya costó dos
