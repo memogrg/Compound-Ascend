@@ -1572,7 +1572,16 @@ jobs:
             exit 1
           fi
           mkdir -p base
-          gh run download "$RID" --pattern "capturas-$BASE-*" --dir /tmp/base-art
+          # Una corrida verde NO implica que tenga capturas: las de `main` anteriores a este
+          # job terminaron bien y no subieron ninguna. Se comprueba y se dice, en vez de dejar
+          # que `gh` escupa «no valid artifacts found» y que quien mire adivine qué significa.
+          if ! gh run download "$RID" --pattern "capturas-$BASE-*" --dir /tmp/base-art; then
+            echo "::error::la corrida $RID del merge-base $BASE terminó en verde pero no tiene capturas."
+            echo "Pasa mientras \`main\` no haya corrido todavía con el job de capturas: su primer"
+            echo "push posterior a este PR deja la base lista."
+            echo "Qué hacer: relanzar este job cuando la corrida de main de $BASE tenga el artefacto."
+            exit 1
+          fi
           find /tmp/base-art -mindepth 1 -maxdepth 1 -type d -exec cp -a {}/. base/ \;
           echo "hay=si" >> "$GITHUB_OUTPUT"
 
