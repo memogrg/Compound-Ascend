@@ -127,21 +127,37 @@ test("cada entrada tiene ancla, nota de uso y su especificación", async ({ brow
   await ctx.close();
 });
 
-test("los controles cambian tema, ancho y movimiento del lienzo", async ({ browser }) => {
+test("UN panel mueve los DOS lienzos: tema, ancho y movimiento", async ({ browser }) => {
+  // Desde 2.6c el panel es uno solo y las dos secciones —estados y gráficos— cuelgan de él.
+  // Por eso se comprueban los dos lienzos y no `.first()`: con un panel por sección esto
+  // pasaba igual mirando uno, y era justamente lo que había que dejar de tener (mirar una
+  // primitiva en oscuro y el gráfico de al lado en claro no compara nada).
   const { ctx, page } = await abrir(browser, "light", 1280);
-  const lienzo = page.locator(".du-lienzo");
+  const lienzos = page.locator(".du-lienzo");
+  const n = await lienzos.count();
+  expect(n, "el catálogo tiene dos lienzos: estados y gráficos").toBe(2);
+
+  const anchosAntes: number[] = [];
+  for (let i = 0; i < n; i++) anchosAntes.push((await lienzos.nth(i).boundingBox())!.width);
 
   await page.getByRole("radio", { name: "oscuro" }).check();
-  await expect(lienzo).toHaveAttribute("data-theme", "dark");
+  for (let i = 0; i < n; i++) {
+    await expect(lienzos.nth(i), `lienzo ${i}`).toHaveAttribute("data-theme", "dark");
+  }
 
-  const ancho1280 = (await lienzo.boundingBox())!.width;
   await page.getByRole("radio", { name: "390" }).check();
   await page.waitForTimeout(350);
-  const ancho390 = (await lienzo.boundingBox())!.width;
-  expect(ancho390, `1280 → ${ancho1280}px · 390 → ${ancho390}px`).toBeLessThan(ancho1280);
+  for (let i = 0; i < n; i++) {
+    const ahora = (await lienzos.nth(i).boundingBox())!.width;
+    expect(ahora, `lienzo ${i}: 1280 → ${anchosAntes[i]}px · 390 → ${ahora}px`).toBeLessThan(
+      anchosAntes[i]!,
+    );
+  }
 
   await page.getByRole("checkbox", { name: /movimiento/i }).check();
-  await expect(lienzo).toHaveAttribute("data-quieto", "1");
+  for (let i = 0; i < n; i++) {
+    await expect(lienzos.nth(i), `lienzo ${i}`).toHaveAttribute("data-quieto", "1");
+  }
   await ctx.close();
 });
 

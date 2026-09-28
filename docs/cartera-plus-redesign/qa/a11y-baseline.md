@@ -35,74 +35,74 @@ Anchos 1280 y 390.
 
 ### Totales
 
-| Impacto | Nodos |
-| --- | --- |
-| critical | 0 |
-| serious | 308 |
-| moderate | 0 |
-| minor | 0 |
+| Impacto   | Nodos   |
+| --------- | ------- |
+| critical  | 0       |
+| serious   | 308     |
+| moderate  | 0       |
+| minor     | 0       |
 | **total** | **308** |
 
 ### Las 5 reglas más frecuentes
 
-| Regla | Impacto | Nodos | Rutas | Ejemplo de selector |
-| --- | --- | --- | --- | --- |
-| `color-contrast` | serious | 294 | 22 | `a[data-nav="assistant"] > span:nth-child(2)` |
-| `aria-hidden-focus` | serious | 14 | 5 | `div[role="img"] > div[aria-hidden="true"]` |
+| Regla               | Impacto | Nodos | Rutas | Ejemplo de selector                           |
+| ------------------- | ------- | ----- | ----- | --------------------------------------------- |
+| `color-contrast`    | serious | 294   | 22    | `a[data-nav="assistant"] > span:nth-child(2)` |
+| `aria-hidden-focus` | serious | 14    | 5     | `div[role="img"] > div[aria-hidden="true"]`   |
 
 - **`color-contrast`** — Elements must meet minimum color contrast ratio thresholds
 - **`aria-hidden-focus`** — ARIA hidden element must not be focusable or contain focusable elements
 
 ### Por ruta y ancho
 
-| Ruta | Ancho | critical | serious | moderate | minor | total |
-| --- | --- | --- | --- | --- | --- | --- |
-| `/asistente` | 1280 | 0 | 1 | 0 | 0 | **1** |
-| `/asistente` | 390 | 0 | 1 | 0 | 0 | **1** |
-| `/configuracion` | 1280 | 0 | 7 | 0 | 0 | **7** |
-| `/configuracion` | 390 | 0 | 6 | 0 | 0 | **6** |
-| `/configurar` | 1280 | 0 | 7 | 0 | 0 | **7** |
-| `/configurar` | 390 | 0 | 6 | 0 | 0 | **6** |
-| `/control-financiero` | 1280 | 0 | 5 | 0 | 0 | **5** |
-| `/control-financiero` | 390 | 0 | 5 | 0 | 0 | **5** |
-| `/dashboard` | 1280 | 0 | 8 | 0 | 0 | **8** |
-| `/dashboard` | 390 | 0 | 8 | 0 | 0 | **8** |
-| `/deudas` | 1280 | 0 | 6 | 0 | 0 | **6** |
-| `/deudas` | 390 | 0 | 5 | 0 | 0 | **5** |
-| `/empezar` | 1280 | 0 | 6 | 0 | 0 | **6** |
-| `/empezar` | 390 | 0 | 6 | 0 | 0 | **6** |
-| `/faqs` | 1280 | 0 | 2 | 0 | 0 | **2** |
-| `/faqs` | 390 | 0 | 1 | 0 | 0 | **1** |
-| `/gastos` | 1280 | 0 | 3 | 0 | 0 | **3** |
-| `/gastos` | 390 | 0 | 2 | 0 | 0 | **2** |
-| `/` | 1280 | 0 | 30 | 0 | 0 | **30** |
-| `/` | 390 | 0 | 29 | 0 | 0 | **29** |
-| `/ingresos` | 1280 | 0 | 9 | 0 | 0 | **9** |
-| `/ingresos` | 390 | 0 | 8 | 0 | 0 | **8** |
-| `/login` | 1280 | 0 | 0 | 0 | 0 | **0** |
-| `/login` | 390 | 0 | 0 | 0 | 0 | **0** |
-| `/mi-base-financiera` | 1280 | 0 | 23 | 0 | 0 | **23** |
-| `/mi-base-financiera` | 390 | 0 | 22 | 0 | 0 | **22** |
-| `/mi-perfil-financiero` | 1280 | 0 | 4 | 0 | 0 | **4** |
-| `/mi-perfil-financiero` | 390 | 0 | 3 | 0 | 0 | **3** |
-| `/mi-rich-life` | 1280 | 0 | 5 | 0 | 0 | **5** |
-| `/mi-rich-life` | 390 | 0 | 4 | 0 | 0 | **4** |
-| `/mis-acciones` | 1280 | 0 | 12 | 0 | 0 | **12** |
-| `/mis-acciones` | 390 | 0 | 11 | 0 | 0 | **11** |
-| `/mis-acciones?tab=decisiones` | 1280 | 0 | 7 | 0 | 0 | **7** |
-| `/mis-acciones?tab=decisiones` | 390 | 0 | 6 | 0 | 0 | **6** |
-| `/mis-acciones?tab=progreso` | 1280 | 0 | 7 | 0 | 0 | **7** |
-| `/mis-acciones?tab=progreso` | 390 | 0 | 6 | 0 | 0 | **6** |
-| `/patrimonio` | 1280 | 0 | 4 | 0 | 0 | **4** |
-| `/patrimonio` | 390 | 0 | 3 | 0 | 0 | **3** |
-| `/patrimonio/indicadores` | 1280 | 0 | 6 | 0 | 0 | **6** |
-| `/patrimonio/indicadores` | 390 | 0 | 6 | 0 | 0 | **6** |
-| `/patrimonio/proteccion` | 1280 | 0 | 6 | 0 | 0 | **6** |
-| `/patrimonio/proteccion` | 390 | 0 | 6 | 0 | 0 | **6** |
-| `/suscripcion` | 1280 | 0 | 1 | 0 | 0 | **1** |
-| `/suscripcion` | 390 | 0 | 0 | 0 | 0 | **0** |
-| `/transacciones` | 1280 | 0 | 3 | 0 | 0 | **3** |
-| `/transacciones` | 390 | 0 | 2 | 0 | 0 | **2** |
+| Ruta                           | Ancho | critical | serious | moderate | minor | total  |
+| ------------------------------ | ----- | -------- | ------- | -------- | ----- | ------ |
+| `/asistente`                   | 1280  | 0        | 1       | 0        | 0     | **1**  |
+| `/asistente`                   | 390   | 0        | 1       | 0        | 0     | **1**  |
+| `/configuracion`               | 1280  | 0        | 7       | 0        | 0     | **7**  |
+| `/configuracion`               | 390   | 0        | 6       | 0        | 0     | **6**  |
+| `/configurar`                  | 1280  | 0        | 7       | 0        | 0     | **7**  |
+| `/configurar`                  | 390   | 0        | 6       | 0        | 0     | **6**  |
+| `/control-financiero`          | 1280  | 0        | 5       | 0        | 0     | **5**  |
+| `/control-financiero`          | 390   | 0        | 5       | 0        | 0     | **5**  |
+| `/dashboard`                   | 1280  | 0        | 8       | 0        | 0     | **8**  |
+| `/dashboard`                   | 390   | 0        | 8       | 0        | 0     | **8**  |
+| `/deudas`                      | 1280  | 0        | 6       | 0        | 0     | **6**  |
+| `/deudas`                      | 390   | 0        | 5       | 0        | 0     | **5**  |
+| `/empezar`                     | 1280  | 0        | 6       | 0        | 0     | **6**  |
+| `/empezar`                     | 390   | 0        | 6       | 0        | 0     | **6**  |
+| `/faqs`                        | 1280  | 0        | 2       | 0        | 0     | **2**  |
+| `/faqs`                        | 390   | 0        | 1       | 0        | 0     | **1**  |
+| `/gastos`                      | 1280  | 0        | 3       | 0        | 0     | **3**  |
+| `/gastos`                      | 390   | 0        | 2       | 0        | 0     | **2**  |
+| `/`                            | 1280  | 0        | 30      | 0        | 0     | **30** |
+| `/`                            | 390   | 0        | 29      | 0        | 0     | **29** |
+| `/ingresos`                    | 1280  | 0        | 9       | 0        | 0     | **9**  |
+| `/ingresos`                    | 390   | 0        | 8       | 0        | 0     | **8**  |
+| `/login`                       | 1280  | 0        | 0       | 0        | 0     | **0**  |
+| `/login`                       | 390   | 0        | 0       | 0        | 0     | **0**  |
+| `/mi-base-financiera`          | 1280  | 0        | 23      | 0        | 0     | **23** |
+| `/mi-base-financiera`          | 390   | 0        | 22      | 0        | 0     | **22** |
+| `/mi-perfil-financiero`        | 1280  | 0        | 4       | 0        | 0     | **4**  |
+| `/mi-perfil-financiero`        | 390   | 0        | 3       | 0        | 0     | **3**  |
+| `/mi-rich-life`                | 1280  | 0        | 5       | 0        | 0     | **5**  |
+| `/mi-rich-life`                | 390   | 0        | 4       | 0        | 0     | **4**  |
+| `/mis-acciones`                | 1280  | 0        | 12      | 0        | 0     | **12** |
+| `/mis-acciones`                | 390   | 0        | 11      | 0        | 0     | **11** |
+| `/mis-acciones?tab=decisiones` | 1280  | 0        | 7       | 0        | 0     | **7**  |
+| `/mis-acciones?tab=decisiones` | 390   | 0        | 6       | 0        | 0     | **6**  |
+| `/mis-acciones?tab=progreso`   | 1280  | 0        | 7       | 0        | 0     | **7**  |
+| `/mis-acciones?tab=progreso`   | 390   | 0        | 6       | 0        | 0     | **6**  |
+| `/patrimonio`                  | 1280  | 0        | 4       | 0        | 0     | **4**  |
+| `/patrimonio`                  | 390   | 0        | 3       | 0        | 0     | **3**  |
+| `/patrimonio/indicadores`      | 1280  | 0        | 6       | 0        | 0     | **6**  |
+| `/patrimonio/indicadores`      | 390   | 0        | 6       | 0        | 0     | **6**  |
+| `/patrimonio/proteccion`       | 1280  | 0        | 6       | 0        | 0     | **6**  |
+| `/patrimonio/proteccion`       | 390   | 0        | 6       | 0        | 0     | **6**  |
+| `/suscripcion`                 | 1280  | 0        | 1       | 0        | 0     | **1**  |
+| `/suscripcion`                 | 390   | 0        | 0       | 0        | 0     | **0**  |
+| `/transacciones`               | 1280  | 0        | 3       | 0        | 0     | **3**  |
+| `/transacciones`               | 390   | 0        | 2       | 0        | 0     | **2**  |
 
 ## Superficie `/m` (app móvil)
 
@@ -110,21 +110,21 @@ Solo a 390: `/m` es un shell de teléfono con el viewport bloqueado, y a 1280 se
 
 ### Totales
 
-| Impacto | Nodos |
-| --- | --- |
-| critical | 0 |
-| serious | 89 |
-| moderate | 15 |
-| minor | 0 |
+| Impacto   | Nodos   |
+| --------- | ------- |
+| critical  | 0       |
+| serious   | 89      |
+| moderate  | 15      |
+| minor     | 0       |
 | **total** | **104** |
 
 ### Las 5 reglas más frecuentes
 
-| Regla | Impacto | Nodos | Rutas | Ejemplo de selector |
-| --- | --- | --- | --- | --- |
-| `color-contrast` | serious | 57 | 10 | `a[href$="presupuesto"] > .setup-hub-item-top > .ok.setup-hub` |
-| `aria-hidden-focus` | serious | 32 | 6 | `div:nth-child(1) > .m-swipe > .m-swipe-actions[aria-hidden="` |
-| `meta-viewport` | moderate | 15 | 15 | `meta[name="viewport"]` |
+| Regla               | Impacto  | Nodos | Rutas | Ejemplo de selector                                            |
+| ------------------- | -------- | ----- | ----- | -------------------------------------------------------------- |
+| `color-contrast`    | serious  | 57    | 10    | `a[href$="presupuesto"] > .setup-hub-item-top > .ok.setup-hub` |
+| `aria-hidden-focus` | serious  | 32    | 6     | `div:nth-child(1) > .m-swipe > .m-swipe-actions[aria-hidden="` |
+| `meta-viewport`     | moderate | 15    | 15    | `meta[name="viewport"]`                                        |
 
 - **`color-contrast`** — Elements must meet minimum color contrast ratio thresholds
 - **`aria-hidden-focus`** — ARIA hidden element must not be focusable or contain focusable elements
@@ -132,23 +132,48 @@ Solo a 390: `/m` es un shell de teléfono con el viewport bloqueado, y a 1280 se
 
 ### Por ruta y ancho
 
-| Ruta | Ancho | critical | serious | moderate | minor | total |
-| --- | --- | --- | --- | --- | --- | --- |
-| `/m` | 390 | 0 | 10 | 1 | 0 | **11** |
-| `/m/configurar` | 390 | 0 | 0 | 1 | 0 | **1** |
-| `/m/deudas` | 390 | 0 | 4 | 1 | 0 | **5** |
-| `/m/gastos` | 390 | 0 | 23 | 1 | 0 | **24** |
-| `/m/indicadores` | 390 | 0 | 0 | 1 | 0 | **1** |
-| `/m/ingresos` | 390 | 0 | 3 | 1 | 0 | **4** |
-| `/m/inversiones` | 390 | 0 | 0 | 1 | 0 | **1** |
-| `/m/metas` | 390 | 0 | 2 | 1 | 0 | **3** |
-| `/m/mi-base-financiera` | 390 | 0 | 3 | 1 | 0 | **4** |
-| `/m/mi-perfil-financiero` | 390 | 0 | 7 | 1 | 0 | **8** |
-| `/m/mis-acciones` | 390 | 0 | 6 | 1 | 0 | **7** |
-| `/m/patrimonio` | 390 | 0 | 3 | 1 | 0 | **4** |
-| `/m/perfil` | 390 | 0 | 1 | 1 | 0 | **2** |
-| `/m/proteccion` | 390 | 0 | 6 | 1 | 0 | **7** |
-| `/m/transacciones` | 390 | 0 | 21 | 1 | 0 | **22** |
+| Ruta                      | Ancho | critical | serious | moderate | minor | total  |
+| ------------------------- | ----- | -------- | ------- | -------- | ----- | ------ |
+| `/m`                      | 390   | 0        | 10      | 1        | 0     | **11** |
+| `/m/configurar`           | 390   | 0        | 0       | 1        | 0     | **1**  |
+| `/m/deudas`               | 390   | 0        | 4       | 1        | 0     | **5**  |
+| `/m/gastos`               | 390   | 0        | 23      | 1        | 0     | **24** |
+| `/m/indicadores`          | 390   | 0        | 0       | 1        | 0     | **1**  |
+| `/m/ingresos`             | 390   | 0        | 3       | 1        | 0     | **4**  |
+| `/m/inversiones`          | 390   | 0        | 0       | 1        | 0     | **1**  |
+| `/m/metas`                | 390   | 0        | 2       | 1        | 0     | **3**  |
+| `/m/mi-base-financiera`   | 390   | 0        | 3       | 1        | 0     | **4**  |
+| `/m/mi-perfil-financiero` | 390   | 0        | 7       | 1        | 0     | **8**  |
+| `/m/mis-acciones`         | 390   | 0        | 6       | 1        | 0     | **7**  |
+| `/m/patrimonio`           | 390   | 0        | 3       | 1        | 0     | **4**  |
+| `/m/perfil`               | 390   | 0        | 1       | 1        | 0     | **2**  |
+| `/m/proteccion`           | 390   | 0        | 6       | 1        | 0     | **7**  |
+| `/m/transacciones`        | 390   | 0        | 21      | 1        | 0     | **22** |
 
 Los JSON crudos de cada corrida (con el detalle de cada nodo) quedan en `qa-snapshots/a11y/`,
 fuera de git.
+
+## Colores forzados (`forced-colors`) — hallazgo abierto, fase 5
+
+No está en el inventario de arriba: axe lo mide con la paleta puesta, y esto pasa justo
+cuando la paleta deja de estar disponible. Se ve con el control «Colores forzados» del
+catálogo (`/dev/ui`), que reproduce lo que hace el sistema operativo.
+
+**Bajo `forced-colors`, el calendario de gasto y las donas se quedan sin su rampa.** El
+navegador sustituye los fondos por `Canvas`, así que un relleno que codifica «cuánto» con
+el color —la rampa de calor del calendario, los sectores de la dona— desaparece entero.
+No es un fallo de contraste: es que el único canal que llevaba la magnitud deja de existir.
+
+Lo que ya sostiene la lectura cuando eso pasa, y por qué el hallazgo no es P1:
+
+- el calendario lleva el **paso** de la rampa como columna en su tabla de datos (WCAG 1.4.1),
+  y cada día dice su monto en palabras en el `aria-label`;
+- la dona lleva nombre, porcentaje y monto en su leyenda, en texto.
+
+Queda para la fase 5 decidir si además hace falta un canal visual que sobreviva a
+`forced-colors` — trama, borde o número dentro de la celda.
+
+Ojo con la simulación, que costó un diagnóstico: forzar los tokens de serie a `CanvasText`
+sin descartar el relleno deja la rampa como una escala de GRISES con el texto encima, y axe
+canta contrastes de 1,56:1 que el sistema real nunca produce. La simulación descarta el
+relleno decorativo justamente por eso.
