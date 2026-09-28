@@ -679,11 +679,3 @@
     width: 100%;
   }
 }
-
-/* El botón de la tabla conserva su caja cuando no hay datos: sin esto el encabezado medía
-   distinto y el marco entero cambiaba 7 px entre «con datos» y «vacío» — incumpliendo la
-   invariante que el propio componente promete. `visibility` lo saca además del orden de
-   tabulación, que es lo correcto: no hay tabla que abrir. */
-.cf-btn-tabla[data-reservado] {
-  visibility: hidden;
-}

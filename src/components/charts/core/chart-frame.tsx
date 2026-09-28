@@ -134,12 +134,7 @@ export function ChartFrame({
   }, [onSoltar]);
 
   return (
-    /* `data-estado` no pinta nada: existe para poder AFIRMAR sobre el estado desde fuera.
-       La tabla solo se monta con datos —un marco vacío o en error no tiene nada que tabular—,
-       así que la invariante «todo marco tiene su tabla» solo se puede comprobar si se puede
-       distinguir un marco con datos de uno sin ellos. Antes se comprobaba sobre la página
-       entera, y el catálogo de estados la rompió con 36 marcos y 24 tablas. */
-    <figure className="cf" data-estado={estado} ref={figuraRef}>
+    <figure className="cf" ref={figuraRef}>
       <figcaption className="cf-cab">
         <div className="cf-titulos">
           <h3 className="cf-titulo">
@@ -148,29 +143,17 @@ export function ChartFrame({
           </h3>
           {subtitulo ? <p className="cf-sub">{subtitulo}</p> : null}
         </div>
-        {/*
-         * El botón se PINTA SIEMPRE y solo se esconde cuando no hay datos.
-         *
-         * Quitarlo cambiaba el alto del encabezado, y con él el de todo el marco: 220 px con
-         * datos contra 213 px vacío. O sea que este componente incumplía, por 7 px, la
-         * invariante que su propia cabecera promete —«los cuatro estados ocupan LA MISMA
-         * altura»— y nadie lo veía porque en producción ningún llamador pasa `estado`.
-         *
-         * `visibility: hidden` y no `display: none`: conserva la caja Y saca el botón del orden
-         * de tabulación, que es justo lo que hace falta — un «Ver tabla» alcanzable con el
-         * teclado cuando no hay tabla sería una promesa vacía.
-         */}
-        <button
-          type="button"
-          className="cf-btn-tabla"
-          data-reservado={estado === "datos" ? undefined : ""}
-          aria-hidden={estado === "datos" ? undefined : true}
-          aria-expanded={verTabla}
-          aria-controls={idTabla}
-          onClick={() => setVerTabla((v) => !v)}
-        >
-          {verTabla ? "Ver gráfico" : "Ver tabla"}
-        </button>
+        {estado === "datos" ? (
+          <button
+            type="button"
+            className="cf-btn-tabla"
+            aria-expanded={verTabla}
+            aria-controls={idTabla}
+            onClick={() => setVerTabla((v) => !v)}
+          >
+            {verTabla ? "Ver gráfico" : "Ver tabla"}
+          </button>
+        ) : null}
       </figcaption>
 
       {/* `radiogroup` y no una lista de botones: los presets son una elección entre

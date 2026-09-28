@@ -12,18 +12,6 @@ import { ESTADO_SESION } from "./sesion";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
-/**
- * TODO lo de este archivo se busca DENTRO de la demo del calendario, nunca en la página.
- *
- * `/dev/ui` monta el calendario siete veces: una acá y seis en el catálogo de estados, que
- * lo dibuja con datos, vacío, cargando y en error. Un `.cal-grid` a secas resolvía a siete
- * elementos y los veinte casos de este archivo caían en rojo hablando de un problema que no
- * existía. El ancla la pone `calendario-demo.tsx`.
- */
-function dentro(page: import("@playwright/test").Page) {
-  return page.locator("#demo-calendario");
-}
-
 async function abrir(
   browser: Browser,
   tema: "light" | "dark" = "light",
@@ -50,7 +38,7 @@ async function abrir(
   const page = await ctx.newPage();
   await page.goto("/dev/ui", { waitUntil: "networkidle", timeout: 60_000 });
   await page.waitForTimeout(800);
-  await dentro(page).locator(".cal-grid").scrollIntoViewIfNeeded();
+  await page.locator(".cal-grid").scrollIntoViewIfNeeded();
   return { ctx, page };
 }
 
@@ -60,9 +48,7 @@ async function abrir(
  * pero en `.sr-only` hasta que se pulsa «Ver tabla», que es lo que hace una persona.
  */
 function marcoCon(page: import("@playwright/test").Page, selector: string) {
-  return dentro(page)
-    .locator("figure.cf")
-    .filter({ has: page.locator(selector) });
+  return page.locator("figure.cf").filter({ has: page.locator(selector) });
 }
 
 async function abrirTabla(page: import("@playwright/test").Page, selector: string) {
@@ -76,15 +62,15 @@ async function abrirTabla(page: import("@playwright/test").Page, selector: strin
 test("la rejilla es UNA sola parada de Tab", async ({ browser }) => {
   // Con 30 días, tabular treinta veces para cruzar el calendario es inaceptable.
   const { ctx, page } = await abrir(browser);
-  const tabulables = await dentro(page).locator(".cal-dia[tabindex='0']").count();
+  const tabulables = await page.locator(".cal-dia[tabindex='0']").count();
   expect(tabulables).toBe(1);
-  expect(await dentro(page).locator(".cal-dia[tabindex='-1']").count()).toBeGreaterThan(20);
+  expect(await page.locator(".cal-dia[tabindex='-1']").count()).toBeGreaterThan(20);
   await ctx.close();
 });
 
 test("las flechas mueven el foco dentro de la rejilla", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
-  await dentro(page).locator(".cal-dia[tabindex='0']").focus();
+  await page.locator(".cal-dia[tabindex='0']").focus();
   const primero = await page.evaluate(() => document.activeElement?.getAttribute("aria-label"));
 
   await page.keyboard.press("ArrowRight");
@@ -100,9 +86,9 @@ test("las flechas mueven el foco dentro de la rejilla", async ({ browser }) => {
 
 test("Enter fija el día y lo anuncia", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
-  await dentro(page).locator(".cal-dia[tabindex='0']").focus();
+  await page.locator(".cal-dia[tabindex='0']").focus();
   await page.keyboard.press("Enter");
-  await expect(dentro(page).locator(".cal-dia[aria-selected='true']")).toHaveCount(1);
+  await expect(page.locator(".cal-dia[aria-selected='true']")).toHaveCount(1);
   await ctx.close();
 });
 
@@ -126,8 +112,8 @@ test("cada día dice en palabras cuánto se gastó", async ({ browser }) => {
 test("los días futuros se distinguen de los días sin gasto", async ({ browser }) => {
   // Colapsarlos haría que el mes en curso pareciera un mes de ahorro ejemplar.
   const { ctx, page } = await abrir(browser);
-  expect(await dentro(page).locator(".cal-dia[data-futuro='true']").count()).toBeGreaterThan(0);
-  expect(await dentro(page).locator(".cal-dia[data-vacio='true']").count()).toBeGreaterThan(0);
+  expect(await page.locator(".cal-dia[data-futuro='true']").count()).toBeGreaterThan(0);
+  expect(await page.locator(".cal-dia[data-vacio='true']").count()).toBeGreaterThan(0);
   await ctx.close();
 });
 
@@ -135,13 +121,11 @@ test("hoy está marcado en la semántica, no solo con el anillo", async ({ brows
   // Sin `aria-current` un lector de pantalla recorre 30 celdas iguales y no hay forma de
   // saber en cuál está parado el mes: el anillo de 2 px no existe para quien no lo ve.
   const { ctx, page } = await abrir(browser);
-  const hoy = dentro(page).locator(".cal-dia[aria-current='date']");
+  const hoy = page.locator(".cal-dia[aria-current='date']");
   await expect(hoy).toHaveCount(1);
-  await expect(dentro(page).locator(".cal-dia[data-hoy='true']")).toHaveCount(1);
+  await expect(page.locator(".cal-dia[data-hoy='true']")).toHaveCount(1);
   // Y hoy NO es un día futuro: el mes está a medias justo ahí.
-  await expect(
-    dentro(page).locator(".cal-dia[aria-current='date'][data-futuro='true']"),
-  ).toHaveCount(0);
+  await expect(page.locator(".cal-dia[aria-current='date'][data-futuro='true']")).toHaveCount(0);
   await ctx.close();
 });
 
@@ -149,7 +133,7 @@ test("la celda sin gasto no lleva relleno, sino borde continuo", async ({ browse
   // Con relleno competía con el paso más bajo de la rampa: dos grises parecidos, uno
   // DENTRO de la escala y otro fuera, y el mes parecía tener gasto todos los días.
   const { ctx, page } = await abrir(browser);
-  const vacio = dentro(page).locator(".cal-dia[data-vacio='true']").first();
+  const vacio = page.locator(".cal-dia[data-vacio='true']").first();
   const estilo = await vacio.evaluate((el) => {
     const c = getComputedStyle(el);
     return { fondo: c.backgroundColor, borde: c.borderStyle, ancho: c.borderWidth };
@@ -158,7 +142,7 @@ test("la celda sin gasto no lleva relleno, sino borde continuo", async ({ browse
   expect(estilo.borde).toBe("solid");
 
   // El futuro, en cambio, va PUNTEADO: es lo que los separa a simple vista.
-  const futuro = dentro(page).locator(".cal-dia[data-futuro='true']").first();
+  const futuro = page.locator(".cal-dia[data-futuro='true']").first();
   expect(await futuro.evaluate((el) => getComputedStyle(el).borderStyle)).toBe("dashed");
   await ctx.close();
 });
@@ -167,7 +151,7 @@ test("la leyenda nombra los tres estados y da los rangos en texto", async ({ bro
   // Un degradado de «menos» a «más» no dice cuánto es «más», y el `title` de cada muestra
   // no existe en táctil ni lo anuncia ningún lector de pantalla.
   const { ctx, page } = await abrir(browser);
-  const leyenda = dentro(page).locator(".cal-leyenda");
+  const leyenda = page.locator(".cal-leyenda");
   await expect(leyenda).toContainText("Sin gasto");
   await expect(leyenda).toContainText("Futuro");
   // Cinco pasos + «sin gasto» + «futuro» = siete entradas.
@@ -189,7 +173,7 @@ test("el eje Y del zoom es visible y su dominio sigue al rango", async ({ browse
   // Con el eje oculto, recortar la serie cambiaba la escala en silencio y dos capturas del
   // mismo gráfico no eran comparables.
   const { ctx, page } = await abrir(browser);
-  const grupo = dentro(page).locator("[role='radiogroup'][aria-label='Rango del gráfico']");
+  const grupo = page.locator("[role='radiogroup'][aria-label='Rango del gráfico']");
   await grupo.scrollIntoViewIfNeeded();
   const marco = marcoCon(page, "[aria-label='Rango del gráfico']");
   // Los rótulos de AMBOS ejes comparten clase (`recharts-cartesian-axis-tick-value`) y
@@ -224,7 +208,7 @@ test("la serie termina en el mes en curso, no en el futuro", async ({ browser })
   // terminando en 2026-12, así que tenía meses de futuro y «los últimos 6 meses» se
   // recortaban contra un final que no había llegado.
   const { ctx, page } = await abrir(browser);
-  const grupo = dentro(page).locator("[role='radiogroup'][aria-label='Rango del gráfico']");
+  const grupo = page.locator("[role='radiogroup'][aria-label='Rango del gráfico']");
   await grupo.scrollIntoViewIfNeeded();
   await grupo.getByRole("radio").filter({ hasText: "Todo" }).click();
   await page.waitForTimeout(400);
@@ -364,18 +348,11 @@ test("y con movimiento permitido, el relleno se desvanece en 200 ms", async ({ b
 
 test("los presets recortan la serie y la tabla a la vez", async ({ browser }) => {
   const { ctx, page } = await abrir(browser);
-  const grupo = dentro(page).locator("[role='radiogroup'][aria-label='Rango del gráfico']");
+  const grupo = page.locator("[role='radiogroup'][aria-label='Rango del gráfico']");
   await grupo.scrollIntoViewIfNeeded();
 
-  // `has:` se resuelve DENTRO del elemento que se filtra, así que no puede llevar `grupo`:
-  // ese ya arranca en `#demo-calendario`, y buscarlo dentro de un `.cf` no encuentra nada
-  // —devolvía 0 filas y el caso culpaba a los presets—. Va un localizador relativo.
   const filas = () =>
-    dentro(page)
-      .locator(".cf")
-      .filter({ has: page.locator("[role='radiogroup'][aria-label='Rango del gráfico']") })
-      .locator("table.cf-tabla tbody tr")
-      .count();
+    page.locator(".cf").filter({ has: grupo }).locator("table.cf-tabla tbody tr").count();
 
   await expect(grupo.locator("[aria-checked='true']")).toHaveText("1A");
   expect(await filas()).toBe(12);
@@ -400,7 +377,7 @@ test("los presets son un radiogroup, no botones sueltos", async ({ browser }) =>
   // Son una elección entre opciones excluyentes: así el lector anuncia «2 de 3» y las
   // flechas recorren el grupo.
   const { ctx, page } = await abrir(browser);
-  const grupo = dentro(page).locator("[role='radiogroup'][aria-label='Rango del gráfico']");
+  const grupo = page.locator("[role='radiogroup'][aria-label='Rango del gráfico']");
   await expect(grupo.getByRole("radio")).toHaveCount(4);
   await expect(grupo.locator("[aria-checked='true']")).toHaveCount(1);
   // Una sola parada de Tab en el grupo, como manda el patrón.
