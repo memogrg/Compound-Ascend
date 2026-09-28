@@ -34,14 +34,17 @@ describe("ningún job del CI se salta su propio veredicto", () => {
   });
 });
 
-describe("los tres guards siguen existiendo", () => {
+describe("los guards siguen existiendo", () => {
   const ESPERADOS = [
     "Lint, Typecheck, Test & Build",
     "Migraciones aplican en BD fresca",
     "E2E smoke",
+    // La suite de accesibilidad entra a CI porque su ausencia ya costó: 22 casos en rojo en
+    // la máquina con el PR en verde, y nadie se enteró hasta correrla a mano.
+    "E2E a11y",
   ];
 
-  it("los tres jobs están declarados con su nombre", () => {
+  it("los jobs están declarados con su nombre", () => {
     // El nombre es lo que branch protection referencia: renombrarlo sin más
     // desengancha el check requerido y el guard deja de bloquear en la práctica.
     for (const nombre of ESPERADOS) {
@@ -74,9 +77,10 @@ describe("los tres guards siguen existiendo", () => {
  * una clave que no cambia con ellas sirve un tarball viejo y el arranque falla por dentro.
  */
 describe("la caché de imágenes del stack", () => {
-  const JOBS_CON_SUPABASE = 3;
+  // migrations, E2E smoke, E2E nav-v2 y E2E a11y.
+  const JOBS_CON_SUPABASE = 4;
 
-  it("está en los tres jobs que levantan el stack", () => {
+  it("está en todos los jobs que levantan el stack", () => {
     for (const paso of [
       "Caché de imágenes del stack",
       "Cargar imágenes de la caché",
@@ -86,7 +90,7 @@ describe("la caché de imágenes del stack", () => {
     }
   });
 
-  it("cada job tiene su propia clave: los tres excluyen servicios distintos", () => {
+  it("cada job tiene su propia clave, para no servirse el tarball ajeno", () => {
     // Una clave compartida serviría el tarball de `migrations` —que excluye trece
     // servicios— a los E2E, que necesitan ocho. El arranque fallaría bajando lo que falta,
     // que es exactamente lo que la caché venía a evitar.
@@ -107,6 +111,22 @@ describe("la caché de imágenes del stack", () => {
       expect(linea, linea).toContain("$EXC");
     }
     expect(DIRECTIVAS).toContain("sha256sum supabase/config.toml");
+  });
+
+  it("el job de a11y corre la suite ENTERA, sin acotar a unos ficheros", () => {
+    // Acotarla a unos specs es lo que la volvería inútil: los 21 casos que se rompieron
+    // estaban repartidos entre tres ficheros que nadie habría elegido a mano.
+    const bloque = DIRECTIVAS.slice(DIRECTIVAS.indexOf("  e2e_a11y:"));
+    expect(bloque).toContain("npx playwright test -c playwright.a11y.config.ts\n");
+  });
+
+  it("el job de a11y siembra con DEMO_ENV_FILE, nunca contra producción", () => {
+    // El sembrador BORRA y reescribe las cuentas de demo, y esas cuentas existen también en
+    // producción: por eso exige que el entorno se nombre. El fichero que se le nombra acá lo
+    // escribe el propio job con la URL del stack efímero que acaba de arrancar.
+    const bloque = DIRECTIVAS.slice(DIRECTIVAS.indexOf("  e2e_a11y:"));
+    expect(bloque).toContain("DEMO_ENV_FILE=.env.local node scripts/demo/seed-demo-familia.mjs");
+    expect(bloque).toContain("> .env.local");
   });
 
   it("la caché de Next no lleva un hash de `src/**`", () => {
