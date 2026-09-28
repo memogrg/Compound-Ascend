@@ -6,7 +6,7 @@
 // así un solo override reconfigura a los dos usuarios de la demo.
 //
 // Este valor por defecto es un correo de dominio real a propósito (la cuenta demo de producción).
-// El guardacorreos (tests/unit/no-real-emails.test.ts) lo tiene en su allowlist; cuando la CI pase
+// El guardacorreos (tests/unit/higiene-repo-publico.test.ts) lo tiene en su allowlist; cuando la CI pase
 // a demo@ci.local, ese default debería moverse a un dominio sintético y salir de la allowlist.
 export const DEMO_EMAIL_DEFAULT = "information.theglowup@gmail.com";
 
