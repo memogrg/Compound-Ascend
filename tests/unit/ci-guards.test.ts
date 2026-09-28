@@ -118,3 +118,27 @@ describe("la caché de imágenes del stack", () => {
     expect(clave, clave).not.toContain("src/**");
   });
 });
+
+/**
+ * Los jobs E2E corren también en push a main, y NO es un detalle de gusto.
+ *
+ * `actions/cache` restaura desde la rama actual y desde la rama por defecto. Mientras estos dos
+ * jobs solo corrían en `pull_request`, su tarball de imágenes nunca llegaba a `refs/heads/main`,
+ * así que ninguna rama nueva podía restaurarlo: medido en un PR de una línea abierto justo para
+ * comprobarlo, `Pulling` fue 89, 96 y 63, sin una sola línea de «Cache restored from key:
+ * imagenes-v2-…». La única caché que acertaba era la de `migrations`, el único job que ya corría
+ * en push.
+ */
+describe("los jobs E2E pueblan la caché de la rama por defecto", () => {
+  for (const job of ["e2e", "e2e_nav_v2"]) {
+    it(`${job} corre en pull_request y en push`, () => {
+      const desde = DIRECTIVAS.indexOf(`  ${job}:`);
+      expect(desde, `no se encontró el job ${job}`).toBeGreaterThan(-1);
+      const bloque = DIRECTIVAS.slice(desde, desde + 1200);
+      expect(bloque).toContain("github.event_name == 'pull_request'");
+      expect(bloque, `${job} no corre en push: su caché nunca llega a main`).toContain(
+        "github.event_name == 'push'",
+      );
+    });
+  }
+});
