@@ -336,14 +336,33 @@ async function iniciarSesion(browser, baseUrl, email, password) {
   await page.getByLabel("Correo").fill(email);
   // #password y no getByLabel: el toggle de visibilidad también matchea "Contraseña".
   await page.locator("#password").fill(password);
+  /**
+   * Un solo clic, y una espera LARGA. El reintento vuelve a pulsar solo si el botón está otra
+   * vez en reposo.
+   *
+   * El bucle anterior —tres clics buscando el botón por su nombre— colgaba en CI y mentía
+   * sobre la causa. `SubmitButton` es `disabled={pending}` y **cambia su texto a «Un
+   * momento…»** mientras envía: si la primera navegación tarda más que el tope, el reintento
+   * busca un botón llamado «Iniciar sesión» que en ese instante no existe, y Playwright
+   * reporta «esperando el botón, visible y habilitado». Eso manda a mirar la pantalla de
+   * login, cuando el problema estaba en otro lado: el primer `/dashboard` con la base recién
+   * sembrada tarda bastante más de 20 s.
+   */
+  const boton = page.getByRole("button", { name: "Iniciar sesión" });
+  await boton.click();
   for (let intento = 0; intento < 3; intento++) {
-    await page.getByRole("button", { name: "Iniciar sesión" }).click();
     try {
-      await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
+      await page.waitForURL(/\/dashboard/, { timeout: 90_000 });
       break;
     } catch {
-      if (intento === 2) throw new Error("Login no navegó tras 3 intentos");
-      await page.waitForTimeout(1000);
+      if (intento === 2) {
+        throw new Error(
+          `Login no navegó a /dashboard tras 3 intentos (90 s cada uno). URL actual: ${page.url()}`,
+        );
+      }
+      // Solo se vuelve a pulsar si el formulario volvió a reposo; si sigue enviando, se espera.
+      if (await boton.isEnabled().catch(() => false)) await boton.click();
+      else await page.waitForTimeout(2000);
     }
   }
   const storageState = await context.storageState();
