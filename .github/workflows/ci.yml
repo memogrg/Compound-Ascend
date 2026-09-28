@@ -874,3 +874,398 @@ jobs:
           path: /tmp/compound-a11y-results
           retention-days: 7
           if-no-files-found: ignore
+
+  # ── El acelerador visual ──────────────────────────────────────────────────────────────
+  #
+  # La evidencia visual de un PR eran dos capturas a mano de 25 minutos cada una, en la
+  # máquina de quien lo escribía. Eso no escala y, peor, es donde se cuelan las medidas
+  # falsas: un puerto ocupado, una compilación bajo el servidor, dos orígenes distintos.
+  # Acá lo produce CI, con el mismo arnés y las mismas guardas.
+
+  capturas_main:
+    name: Capturas de main (${{ matrix.shard }}/2)
+    runs-on: ubuntu-24.04
+    needs: ci
+    # Solo en push: son la BASE contra la que se compara cada PR.
+    if: github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    env:
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
+      EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+        env:
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Recuperar el fallback de registros del CLI
+        run: echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
+
+      - name: Login en ghcr.io (cuota por usuario en vez de por IP del runner)
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clave de la caché de imágenes
+        id: clave_imagenes
+        run: |
+          CFG=$(sha256sum supabase/config.toml | cut -c1-12)
+          EXC=$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)
+          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-visual${{ matrix.shard }}-$CFG-$EXC" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de imágenes del stack
+        id: cache_imagenes
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/supabase-imagenes/stack.tar
+          key: ${{ steps.clave_imagenes.outputs.valor }}
+
+      - name: Cargar imágenes de la caché
+        run: scripts/ci/imagenes-supabase.sh cargar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Levantar el stack
+        run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
+
+      - name: Guardar imágenes para la próxima corrida
+        if: steps.cache_imagenes.outputs.cache-hit != 'true'
+        run: scripts/ci/imagenes-supabase.sh guardar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Migraciones y variables del stack efímero
+        run: |
+          supabase migration up --local
+          supabase status -o env | while IFS='=' read -r key val; do
+            val="${val%\"}"; val="${val#\"}"
+            case "$key" in
+              API_URL)
+                echo "SUPABASE_URL=$val"
+                echo "NEXT_PUBLIC_SUPABASE_URL=$val"
+                ;;
+              ANON_KEY) echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$val" ;;
+              SERVICE_ROLE_KEY) echo "SUPABASE_SERVICE_ROLE_KEY=$val" ;;
+              DB_URL) echo "DB_URL=$val" ;;
+            esac
+          done >> "$GITHUB_ENV"
+
+      # UN instante para la siembra y para la app. Lo calcula el arnés, que desde el arreglo
+      # del 28-sep no devuelve nunca uno futuro: con el reloj adelantado el token que emite
+      # gotrue con la hora REAL parece vencido en cada render y la página no termina de cargar.
+      - name: Instante congelado, uno solo
+        run: |
+          INSTANTE=$(node -e "import('./scripts/qa/snap.mjs').then(m => console.log(m.instanteCongelado().toISOString()))")
+          echo "QA_FREEZE=$INSTANTE" >> "$GITHUB_ENV"
+          echo "::notice::instante congelado (siembra y app): $INSTANTE"
+
+      - name: Entorno del stack efímero en .env.local
+        run: |
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY"
+            echo "DEMO_PASSWORD=$DEMO_PASSWORD"
+          } > .env.local
+        env:
+          DEMO_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+      # La captura mide pantallas CON datos: sin ellas media evidencia serían estados vacíos.
+      - name: Sembrar la cuenta demo
+        run: DEMO_ENV_FILE=.env.local node scripts/demo/seed-demo-familia.mjs
+
+      - name: Compilar con las banderas de producción
+        run: node scripts/dev/con-env.mjs npm run build
+
+      - name: Navegador Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Servidor congelado
+        run: |
+          node scripts/dev/con-env.mjs npm run qa:start -- --port 3001 &
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:3001/login; then exit 0; fi
+            sleep 2
+          done
+          echo "::error::el servidor congelado no respondió en 120s"
+          exit 1
+
+      - name: Capturar (shard ${{ matrix.shard }} de 2)
+        env:
+          E2E_EMAIL: information.theglowup@gmail.com
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: |
+          node scripts/qa/snap.mjs --base-url http://localhost:3001 \
+            --shard ${{ matrix.shard }}/2 --out capturas
+
+      - name: Subir las capturas como base
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-${{ github.sha }}-${{ matrix.shard }}
+          path: capturas
+          retention-days: 14
+
+  capturas_rama:
+    name: Capturas de la rama (${{ matrix.shard }}/2)
+    runs-on: ubuntu-24.04
+    needs: ci
+    if: github.event_name == 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    env:
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
+      EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+        env:
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Recuperar el fallback de registros del CLI
+        run: echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
+
+      - name: Login en ghcr.io (cuota por usuario en vez de por IP del runner)
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clave de la caché de imágenes
+        id: clave_imagenes
+        run: |
+          CFG=$(sha256sum supabase/config.toml | cut -c1-12)
+          EXC=$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)
+          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-visual${{ matrix.shard }}-$CFG-$EXC" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de imágenes del stack
+        id: cache_imagenes
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/supabase-imagenes/stack.tar
+          key: ${{ steps.clave_imagenes.outputs.valor }}
+
+      - name: Cargar imágenes de la caché
+        run: scripts/ci/imagenes-supabase.sh cargar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Levantar el stack
+        run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
+
+      - name: Guardar imágenes para la próxima corrida
+        if: steps.cache_imagenes.outputs.cache-hit != 'true'
+        run: scripts/ci/imagenes-supabase.sh guardar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Migraciones y variables del stack efímero
+        run: |
+          supabase migration up --local
+          supabase status -o env | while IFS='=' read -r key val; do
+            val="${val%\"}"; val="${val#\"}"
+            case "$key" in
+              API_URL)
+                echo "SUPABASE_URL=$val"
+                echo "NEXT_PUBLIC_SUPABASE_URL=$val"
+                ;;
+              ANON_KEY) echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$val" ;;
+              SERVICE_ROLE_KEY) echo "SUPABASE_SERVICE_ROLE_KEY=$val" ;;
+              DB_URL) echo "DB_URL=$val" ;;
+            esac
+          done >> "$GITHUB_ENV"
+
+      # UN instante para la siembra y para la app. Lo calcula el arnés, que desde el arreglo
+      # del 28-sep no devuelve nunca uno futuro: con el reloj adelantado el token que emite
+      # gotrue con la hora REAL parece vencido en cada render y la página no termina de cargar.
+      - name: Instante congelado, uno solo
+        run: |
+          INSTANTE=$(node -e "import('./scripts/qa/snap.mjs').then(m => console.log(m.instanteCongelado().toISOString()))")
+          echo "QA_FREEZE=$INSTANTE" >> "$GITHUB_ENV"
+          echo "::notice::instante congelado (siembra y app): $INSTANTE"
+
+      - name: Entorno del stack efímero en .env.local
+        run: |
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY"
+            echo "DEMO_PASSWORD=$DEMO_PASSWORD"
+          } > .env.local
+        env:
+          DEMO_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+      # La captura mide pantallas CON datos: sin ellas media evidencia serían estados vacíos.
+      - name: Sembrar la cuenta demo
+        run: DEMO_ENV_FILE=.env.local node scripts/demo/seed-demo-familia.mjs
+
+      - name: Compilar con las banderas de producción
+        run: node scripts/dev/con-env.mjs npm run build
+
+      - name: Navegador Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Servidor congelado
+        run: |
+          node scripts/dev/con-env.mjs npm run qa:start -- --port 3001 &
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:3001/login; then exit 0; fi
+            sleep 2
+          done
+          echo "::error::el servidor congelado no respondió en 120s"
+          exit 1
+
+      - name: Capturar (shard ${{ matrix.shard }} de 2)
+        env:
+          E2E_EMAIL: information.theglowup@gmail.com
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: |
+          node scripts/qa/snap.mjs --base-url http://localhost:3001 \
+            --shard ${{ matrix.shard }}/2 --out capturas
+
+      - name: Subir las capturas de la rama
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-pr${{ github.event.number }}-${{ matrix.shard }}
+          path: capturas
+          retention-days: 14
+
+  diff_visual:
+    name: Diff visual
+    runs-on: ubuntu-24.04
+    needs: capturas_rama
+    if: github.event_name == 'pull_request'
+    # Informativo en su primera vida, pero SIN `continue-on-error` — esa directiva está
+    # prohibida en este archivo (`tests/unit/ci-guards.test.ts`) porque un job que se salta su
+    # propio veredicto ya costó un incidente. No hace falta: mientras no esté en el ruleset,
+    # un rojo acá se ve y no bloquea. Cuando acumule tres verdes, se añade al ruleset y pasa a
+    # bloquear sin tocar una línea de este workflow.
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Bajar las capturas de la rama
+        uses: actions/download-artifact@v4
+        with:
+          pattern: capturas-pr${{ github.event.number }}-*
+          merge-multiple: true
+          path: rama
+
+      # La base es el MERGE-BASE, no la punta de `main`: comparar contra una punta que ya
+      # avanzó mete en el diff cambios de otros PR y el veredicto deja de ser sobre este.
+      - name: Bajar las capturas de la base (merge-base con main)
+        id: base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BASE=$(git merge-base origin/${{ github.base_ref }} HEAD)
+          echo "sha=$BASE" >> "$GITHUB_OUTPUT"
+          RID=$(gh run list --commit "$BASE" --workflow ci.yml --json databaseId,conclusion \
+            --jq '[.[] | select(.conclusion=="success")][0].databaseId')
+          if [ -z "$RID" ]; then
+            echo "hay=no" >> "$GITHUB_OUTPUT"
+            echo "::warning::no hay capturas para el merge-base $BASE; el diff de este PR no se puede hacer contra su base."
+            exit 0
+          fi
+          mkdir -p base
+          if gh run download "$RID" --pattern "capturas-$BASE-*" --dir /tmp/base-art; then
+            find /tmp/base-art -mindepth 1 -maxdepth 1 -type d -exec cp -a {}/. base/ \;
+            echo "hay=si" >> "$GITHUB_OUTPUT"
+          else
+            echo "hay=no" >> "$GITHUB_OUTPUT"
+            echo "::warning::la corrida $RID del merge-base $BASE no tiene el artefacto de capturas."
+          fi
+
+      # Sin base no se inventa un veredicto: se dice que no hay con qué comparar y se sale.
+      - name: Sin base con la que comparar
+        if: steps.base.outputs.hay != 'si'
+        run: |
+          echo "::notice::Sin capturas de la base ($(echo ${{ steps.base.outputs.sha }} | cut -c1-8))."
+          echo "Este PR no lleva diff visual. Ocurre la primera vez que un commit de \`main\` no"
+          echo "pasó todavía por el job de capturas — la siguiente corrida de \`main\` lo deja listo."
+
+      - name: Comparar
+        if: steps.base.outputs.hay == 'si'
+        run: |
+          set -o pipefail
+          node scripts/qa/diff.mjs --a base --b rama --out-diff diffs \
+            --exclude home,dev_ui --max-diff-pixels 60 --max-delta 2 --ignore-delta-below 5 \
+            | tee diff.log || echo "DIFF_FALLA=1" >> "$GITHUB_ENV"
+
+      - name: Página de comparación
+        if: steps.base.outputs.hay == 'si'
+        run: |
+          node scripts/qa/comparacion.mjs --a base --b rama --diff diffs --out comparacion \
+            --titulo "PR #${{ github.event.number }} · ${{ github.event.pull_request.title }}"
+          cp diff.log comparacion/
+          cp diffs/reporte.json comparacion/
+
+      # El resumen del PR dice QUÉ rutas cambian. El log completo queda en el artefacto; lo
+      # que se lee de un vistazo tiene que ser la lista, no 200 líneas de ceros.
+      - name: Resumen
+        if: always() && steps.base.outputs.hay == 'si'
+        run: |
+          {
+            echo "## Diff visual"
+            echo
+            node -e '
+              const r = require("./diffs/reporte.json");
+              const rep = r.capturas.filter(c => c.reprobada);
+              console.log(`**${r.comparadas} comparadas · ${rep.length} reprobada(s)**`);
+              if (r.parcial) console.log(`\n⚠ PARCIAL: ${r.parcial.comparadas} de ${r.parcial.esperadas}.`);
+              if (rep.length) {
+                console.log("\n| captura | px | delta |");
+                console.log("|---|---|---|");
+                for (const c of rep) console.log(`| \`${c.imagen}\` | ${c.px} | ${c.maxDelta} |`);
+              } else console.log("\nNinguna pantalla de producción se movió.");
+            '
+            echo
+            echo "La página \`comparacion.html\` (antes / después / diferencia, lado a lado) va en el artefacto."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Subir la comparación
+        if: always() && steps.base.outputs.hay == 'si'
+        uses: actions/upload-artifact@v4
+        with:
+          name: comparacion-visual-pr${{ github.event.number }}
+          path: comparacion
+          retention-days: 14
+
+      - name: Veredicto
+        if: steps.base.outputs.hay == 'si'
+        run: |
+          if [ "${DIFF_FALLA:-}" = "1" ]; then
+            echo "::error::el diff visual reprobó — mirá la página de comparación en el artefacto"
+            exit 1
+          fi

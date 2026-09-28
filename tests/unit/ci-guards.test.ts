@@ -74,7 +74,8 @@ describe("los tres guards siguen existiendo", () => {
  * una clave que no cambia con ellas sirve un tarball viejo y el arranque falla por dentro.
  */
 describe("la caché de imágenes del stack", () => {
-  const JOBS_CON_SUPABASE = 3;
+  // migrations, E2E smoke, E2E nav-v2 y los dos de capturas visuales.
+  const JOBS_CON_SUPABASE = 5;
 
   it("está en los tres jobs que levantan el stack", () => {
     for (const paso of [
@@ -86,15 +87,38 @@ describe("la caché de imágenes del stack", () => {
     }
   });
 
-  it("cada job tiene su propia clave: los tres excluyen servicios distintos", () => {
-    // Una clave compartida serviría el tarball de `migrations` —que excluye trece
-    // servicios— a los E2E, que necesitan ocho. El arranque fallaría bajando lo que falta,
-    // que es exactamente lo que la caché venía a evitar.
-    const claves = [...DIRECTIVAS.matchAll(/valor=imagenes-v2-[^\n]*?-([a-z0-9]+)-\$CFG/g)].map(
-      (m) => m[1],
-    );
-    expect(claves).toHaveLength(JOBS_CON_SUPABASE);
-    expect(new Set(claves).size, `claves: ${claves.join(", ")}`).toBe(JOBS_CON_SUPABASE);
+  it("dos jobs solo comparten clave si excluyen los MISMOS servicios", () => {
+    // Una clave compartida entre jobs que excluyen cosas distintas serviría el tarball de
+    // `migrations` —que excluye trece servicios— a los E2E, que necesitan ocho: el arranque
+    // fallaría bajando lo que falta, que es justo lo que la caché venía a evitar.
+    //
+    // Compartirla entre jobs con las MISMAS exclusiones sí es correcto y deseable: es el
+    // mismo tarball. Por eso la regla no es «una clave por job» —eso obligaría a duplicar
+    // entradas sin motivo— sino que el token y las exclusiones vayan de la mano.
+    const porJob = [...DIRECTIVAS.matchAll(/^  ([a-z0-9_]+):$/gm)]
+      .map((m, i, todos) => {
+        const desde = m.index ?? 0;
+        const hasta = todos[i + 1]?.index ?? DIRECTIVAS.length;
+        return DIRECTIVAS.slice(desde, hasta);
+      })
+      .map((bloque) => ({
+        token: /valor=imagenes-v2-[^\n]*?-([a-z0-9${}. ]+?)-\$CFG/.exec(bloque)?.[1],
+        excluye: /EXCLUIR_SERVICIOS:\s*([^\n]+)/.exec(bloque)?.[1]?.trim(),
+      }))
+      .filter((x) => x.token);
+
+    expect(porJob.length, "jobs con caché de imágenes").toBe(JOBS_CON_SUPABASE);
+    const porToken = new Map<string, Set<string>>();
+    for (const { token, excluye } of porJob) {
+      if (!porToken.has(token!)) porToken.set(token!, new Set());
+      porToken.get(token!)!.add(excluye ?? "(sin declarar)");
+    }
+    for (const [token, exclusiones] of porToken) {
+      expect(
+        exclusiones.size,
+        `el token «${token}» lo comparten jobs que excluyen cosas distintas: ${[...exclusiones].join(" | ")}`,
+      ).toBe(1);
+    }
   });
 
   it("la clave cambia con el CLI, con config.toml y con las exclusiones", () => {

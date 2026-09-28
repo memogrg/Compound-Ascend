@@ -17,6 +17,7 @@
  */
 import { chromium } from "playwright";
 import { CABECERA_BANDERAS } from "./banderas.mjs";
+import { repartirEnShards } from "./shard.mjs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -415,7 +416,24 @@ async function main() {
           .filter(Boolean),
       )
     : null;
-  const rutas = soloRutas ? ROUTES.filter((r) => soloRutas.has(r.path)) : ROUTES;
+  const conFiltro = soloRutas ? ROUTES.filter((r) => soloRutas.has(r.path)) : ROUTES;
+
+  /**
+   * `--shard 1/2` captura la mitad del inventario. Es para CI: las 200 pantallas no caben en
+   * el tope de un job, y la alternativa —acotar por rutas— elegiría a mano lo que se mira.
+   *
+   * El reparto es determinista y por posición, así que la base y la rama capturan el MISMO
+   * conjunto en cada shard. Ver `shard.mjs`.
+   */
+  const rutas = (() => {
+    if (!args.shard) return conFiltro;
+    const m = /^(\d+)\s*\/\s*(\d+)$/.exec(String(args.shard));
+    if (!m) {
+      console.error(`--shard inválido: ${args.shard} (se espera N/M, p. ej. 1/2)`);
+      process.exit(2);
+    }
+    return repartirEnShards(conFiltro, Number(m[1]), Number(m[2]));
+  })();
   if (soloRutas) {
     const encontradas = rutas.map((r) => r.path);
     const faltan = [...soloRutas].filter((r) => !encontradas.includes(r));
