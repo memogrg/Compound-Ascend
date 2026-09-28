@@ -358,7 +358,29 @@ async function iniciarSesion(browser, baseUrl, email, password) {
    * sembrada tarda bastante más de 20 s.
    */
   const boton = page.getByRole("button", { name: "Iniciar sesión" });
-  await boton.click();
+
+  /**
+   * Si el clic no se puede dar, se guarda QUÉ se estaba viendo antes de morir.
+   *
+   * Dos diagnósticos seguidos fallaron por adivinar sobre un mensaje que solo dice «esperando
+   * el botón, visible, enabled y estable» — sin decir CUÁL de las tres condiciones falta.
+   * Una captura y el HTML del momento cuestan nada y cierran la discusión.
+   */
+  try {
+    await boton.click({ timeout: 30_000 });
+  } catch (e) {
+    const { writeFile } = await import("node:fs/promises");
+    await page.screenshot({ path: "qa-fallo-login.png", fullPage: true }).catch(() => {});
+    await writeFile("qa-fallo-login.html", await page.content()).catch(() => {});
+    const caja = await boton.boundingBox().catch(() => null);
+    console.error(
+      `login: no se pudo pulsar el botón. URL=${page.url()} · caja=${JSON.stringify(caja)} · ` +
+        `visible=${await boton.isVisible().catch(() => "?")} · habilitado=${await boton
+          .isEnabled()
+          .catch(() => "?")}`,
+    );
+    throw e;
+  }
   for (let intento = 0; intento < 3; intento++) {
     try {
       await page.waitForURL(/\/dashboard/, { timeout: 90_000 });

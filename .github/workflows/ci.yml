@@ -1344,6 +1344,20 @@ jobs:
           node scripts/qa/snap.mjs --base-url http://localhost:3001 \
             --shard ${{ matrix.shard }}/2 --out capturas
 
+      # Evidencia del fallo de login: el mensaje de Playwright no dice cuál de las tres
+      # condiciones —visible, habilitado, estable— es la que falta, y adivinarlo ya costó dos
+      # vueltas de CI.
+      - name: Subir la evidencia si el login falló
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fallo-login-${{ matrix.shard }}
+          path: |
+            qa-fallo-login.png
+            qa-fallo-login.html
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Subir las capturas de la rama
         uses: actions/upload-artifact@v4
         with:
