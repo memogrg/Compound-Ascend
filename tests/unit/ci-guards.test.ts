@@ -175,6 +175,43 @@ describe("la caché de imágenes del stack", () => {
     expect(DIRECTIVAS).toContain('echo "QA_FREEZE=$INSTANTE" >> "$GITHUB_ENV"');
   });
 
+  it("sin capturas de la base, el diff visual NO se pone verde", () => {
+    // Un diff que no se pudo hacer no es un diff que salió bien. Dar verde ahí es exactamente
+    // la medida falsa que este job viene a impedir: el PR luciría revisado sin que nadie
+    // comparara nada.
+    const bloque = DIRECTIVAS.slice(DIRECTIVAS.indexOf("  diff_visual:"));
+    expect(bloque).toMatch(/no existe ninguna corrida[\s\S]*?exit 1/);
+    expect(bloque).toMatch(/terminó en \$ESTADO[\s\S]*?exit 1/);
+    // Y espera a la corrida de la base si va por delante, en vez de rendirse al primer no.
+    expect(bloque).toContain("sleep 60");
+    expect(bloque).toMatch(/seq 1 25/);
+  });
+
+  it("ningún correo de un dominio REAL está escrito en el workflow", () => {
+    // Un correo personal en un fichero público del repo es un dato de contacto regalado a
+    // cualquiera que mire el historial. Va en una variable del repositorio.
+    //
+    // Se permiten los sintéticos en `.local` —`e2e@ci.local` es del propio CI y no existe
+    // fuera de él—. La primera versión de esta guarda los señalaba también, y una guarda que
+    // obliga a cambiar código correcto se gana que la siguiente persona la quite entera.
+    const reales = [...DIRECTIVAS.matchAll(/[\w.+-]+@[\w-]+\.[a-z]{2,}/gi)]
+      .map((m) => m[0])
+      .filter((c) => !c.endsWith(".local"));
+    expect(reales, `correo(s) de dominio real: ${reales.join(", ")}`).toEqual([]);
+    expect(DIRECTIVAS).toContain("vars.DEMO_EMAIL");
+  });
+
+  it("las capturas se saltan cuando el PR no toca interfaz", () => {
+    // Cuatro jobs de captura por un cambio en un README son 40 minutos de runner tirados, y
+    // el ruido acostumbra a mirar los verdes sin leerlos.
+    const bloque = DIRECTIVAS.slice(DIRECTIVAS.indexOf("  toca_interfaz:"));
+    expect(bloque).toContain("git diff --name-only");
+    for (const ruta of ["src/", "public/", "scripts/qa/", "scripts/demo/"]) {
+      expect(bloque, `falta ${ruta} en el filtro`).toContain(ruta);
+    }
+    expect(DIRECTIVAS).toContain("needs.toca_interfaz.outputs.si == 'true'");
+  });
+
   it("la caché de Next no lleva un hash de `src/**`", () => {
     // Con él, la clave cambiaba en cada commit: no acertaba nunca y cada corrida escribía
     // ~450 MB que no se reusarían jamás. 21 entradas, 9,2 GB de un cupo de 10, y al pasarse

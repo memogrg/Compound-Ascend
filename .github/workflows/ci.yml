@@ -912,7 +912,9 @@ jobs:
       # deja de ser comparable entre días.
       QA_INSTANTE: "2026-09-18T18:00:00Z"
       # La cuenta demo que siembra `seed-demo-familia.mjs`. Se resuelve por email, nunca por id.
-      E2E_EMAIL: information.theglowup@gmail.com
+      # Sale de una variable del repositorio: un correo personal escrito en un fichero público
+      # del repo es un dato de contacto regalado a cualquiera que mire el historial.
+      E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
     steps:
       - uses: actions/checkout@v7
 
@@ -1080,6 +1082,34 @@ jobs:
   # falsas: un puerto ocupado, una compilación bajo el servidor, dos orígenes distintos.
   # Acá lo produce CI, con el mismo arnés y las mismas guardas.
 
+  # ¿Hay interfaz que capturar? Cuatro jobs de captura por un cambio en un README son 40
+  # minutos de runner tirados, y el ruido acostumbra a mirar los verdes sin leerlos.
+  #
+  # Sin acciones de terceros: `git diff --name-only` contra el merge-base y ya. Una acción
+  # para esto sería una dependencia más que auditar por una línea de shell.
+  toca_interfaz:
+    name: ¿El PR toca interfaz?
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request'
+    outputs:
+      si: ${{ steps.mirar.outputs.si }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - id: mirar
+        run: |
+          BASE=$(git merge-base origin/${{ github.base_ref }} HEAD)
+          CAMBIOS=$(git diff --name-only "$BASE" HEAD)
+          if echo "$CAMBIOS" | grep -qE '^(src/|public/|scripts/qa/|scripts/demo/|package(-lock)?\.json|next\.config\.|\.github/workflows/ci\.yml)'; then
+            echo "si=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::el PR toca interfaz: se capturan las pantallas"
+          else
+            echo "si=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::el PR no toca interfaz (ni src, ni public, ni el arnés, ni las dependencias): capturas y diff se saltan"
+          fi
+
   capturas_main:
     name: Capturas de main (${{ matrix.shard }}/2)
     runs-on: ubuntu-24.04
@@ -1203,7 +1233,7 @@ jobs:
 
       - name: Capturar (shard ${{ matrix.shard }} de 2)
         env:
-          E2E_EMAIL: information.theglowup@gmail.com
+          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
         run: |
           node scripts/qa/snap.mjs --base-url http://localhost:3001 \
@@ -1219,8 +1249,9 @@ jobs:
   capturas_rama:
     name: Capturas de la rama (${{ matrix.shard }}/2)
     runs-on: ubuntu-24.04
-    needs: ci
-    if: github.event_name == 'pull_request'
+    needs: [ci, toca_interfaz]
+    # Un check SALTADO cuenta como cumplido en el ruleset, así que saltarlo no abre un agujero.
+    if: github.event_name == 'pull_request' && needs.toca_interfaz.outputs.si == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -1338,7 +1369,7 @@ jobs:
 
       - name: Capturar (shard ${{ matrix.shard }} de 2)
         env:
-          E2E_EMAIL: information.theglowup@gmail.com
+          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
         run: |
           node scripts/qa/snap.mjs --base-url http://localhost:3001 \
@@ -1368,8 +1399,8 @@ jobs:
   diff_visual:
     name: Diff visual
     runs-on: ubuntu-24.04
-    needs: capturas_rama
-    if: github.event_name == 'pull_request'
+    needs: [capturas_rama, toca_interfaz]
+    if: github.event_name == 'pull_request' && needs.toca_interfaz.outputs.si == 'true'
     # Informativo en su primera vida, pero SIN `continue-on-error` — esa directiva está
     # prohibida en este archivo (`tests/unit/ci-guards.test.ts`) porque un job que se salta su
     # propio veredicto ya costó un incidente. No hace falta: mientras no esté en el ruleset,
@@ -1396,6 +1427,13 @@ jobs:
 
       # La base es el MERGE-BASE, no la punta de `main`: comparar contra una punta que ya
       # avanzó mete en el diff cambios de otros PR y el veredicto deja de ser sobre este.
+      # La base es el MERGE-BASE, no la punta de `main`: comparar contra una punta que ya
+      # avanzó mete en el diff cambios de otros PR y el veredicto deja de ser sobre este.
+      #
+      # Y si no hay base, el job NO se pone verde. Un diff que no se pudo hacer no es un diff
+      # que salió bien — dar verde ahí es exactamente la clase de medida falsa que este job
+      # viene a impedir. Si la corrida de la base está en marcha, se espera; si no existe o
+      # falló, se termina en rojo diciendo qué hacer.
       - name: Bajar las capturas de la base (merge-base con main)
         id: base
         env:
@@ -1403,32 +1441,43 @@ jobs:
         run: |
           BASE=$(git merge-base origin/${{ github.base_ref }} HEAD)
           echo "sha=$BASE" >> "$GITHUB_OUTPUT"
+          echo "::notice::merge-base = $BASE"
+
+          # Hasta 25 min de sondeo cada 60 s: la corrida de `main` puede ir por delante.
+          for i in $(seq 1 25); do
+            ESTADO=$(gh run list --commit "$BASE" --workflow ci.yml --json status,conclusion \
+              --jq '[.[]][0] | "\(.status)/\(.conclusion // "-")"')
+            case "$ESTADO" in
+              completed/success) break ;;
+              completed/*)
+                echo "::error::la corrida de ci.yml del merge-base $BASE terminó en $ESTADO."
+                echo "Sin capturas de la base no hay diff, y sin diff este job no se pone verde."
+                echo "Qué hacer: arreglá esa corrida de \`main\` y relanzá este job."
+                exit 1 ;;
+              "") 
+                echo "::error::no existe ninguna corrida de ci.yml para el merge-base $BASE."
+                echo "Pasa cuando la base es anterior al job de capturas, o si se borró la corrida."
+                echo "Qué hacer: relanzá este job cuando la corrida de \`main\` de ese commit exista y termine."
+                exit 1 ;;
+              *)
+                echo "corrida de la base en $ESTADO — esperando (intento $i de 25)"
+                sleep 60 ;;
+            esac
+          done
+
           RID=$(gh run list --commit "$BASE" --workflow ci.yml --json databaseId,conclusion \
             --jq '[.[] | select(.conclusion=="success")][0].databaseId')
           if [ -z "$RID" ]; then
-            echo "hay=no" >> "$GITHUB_OUTPUT"
-            echo "::warning::no hay capturas para el merge-base $BASE; el diff de este PR no se puede hacer contra su base."
-            exit 0
+            echo "::error::la corrida del merge-base $BASE no terminó en verde tras 25 min de espera."
+            echo "Qué hacer: relanzar cuando la corrida de main termine."
+            exit 1
           fi
           mkdir -p base
-          if gh run download "$RID" --pattern "capturas-$BASE-*" --dir /tmp/base-art; then
-            find /tmp/base-art -mindepth 1 -maxdepth 1 -type d -exec cp -a {}/. base/ \;
-            echo "hay=si" >> "$GITHUB_OUTPUT"
-          else
-            echo "hay=no" >> "$GITHUB_OUTPUT"
-            echo "::warning::la corrida $RID del merge-base $BASE no tiene el artefacto de capturas."
-          fi
-
-      # Sin base no se inventa un veredicto: se dice que no hay con qué comparar y se sale.
-      - name: Sin base con la que comparar
-        if: steps.base.outputs.hay != 'si'
-        run: |
-          echo "::notice::Sin capturas de la base ($(echo ${{ steps.base.outputs.sha }} | cut -c1-8))."
-          echo "Este PR no lleva diff visual. Ocurre la primera vez que un commit de \`main\` no"
-          echo "pasó todavía por el job de capturas — la siguiente corrida de \`main\` lo deja listo."
+          gh run download "$RID" --pattern "capturas-$BASE-*" --dir /tmp/base-art
+          find /tmp/base-art -mindepth 1 -maxdepth 1 -type d -exec cp -a {}/. base/ \;
+          echo "hay=si" >> "$GITHUB_OUTPUT"
 
       - name: Comparar
-        if: steps.base.outputs.hay == 'si'
         run: |
           set -o pipefail
           node scripts/qa/diff.mjs --a base --b rama --out-diff diffs \
@@ -1436,7 +1485,6 @@ jobs:
             | tee diff.log || echo "DIFF_FALLA=1" >> "$GITHUB_ENV"
 
       - name: Página de comparación
-        if: steps.base.outputs.hay == 'si'
         run: |
           node scripts/qa/comparacion.mjs --a base --b rama --diff diffs --out comparacion \
             --titulo "PR #${{ github.event.number }} · ${{ github.event.pull_request.title }}"
@@ -1446,7 +1494,7 @@ jobs:
       # El resumen del PR dice QUÉ rutas cambian. El log completo queda en el artefacto; lo
       # que se lee de un vistazo tiene que ser la lista, no 200 líneas de ceros.
       - name: Resumen
-        if: always() && steps.base.outputs.hay == 'si'
+        if: always()
         run: |
           {
             echo "## Diff visual"
@@ -1467,7 +1515,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Subir la comparación
-        if: always() && steps.base.outputs.hay == 'si'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: comparacion-visual-pr${{ github.event.number }}
@@ -1475,7 +1523,6 @@ jobs:
           retention-days: 14
 
       - name: Veredicto
-        if: steps.base.outputs.hay == 'si'
         run: |
           if [ "${DIFF_FALLA:-}" = "1" ]; then
             echo "::error::el diff visual reprobó — mirá la página de comparación en el artefacto"

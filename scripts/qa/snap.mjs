@@ -170,7 +170,7 @@ function slug(routePath) {
  * ¿Quedó algún «Cargando…» VISIBLE? Medición del render tardío: la pantalla puede verse completa
  * y aun así tener un límite `dynamic({ssr:false})` sin hidratar. No se arregla acá — se registra.
  */
-async function esperarSinCargando(page) {
+async function esperarSinCargando(page, modoEspera) {
   try {
     await page.waitForFunction(
       () =>
@@ -183,7 +183,7 @@ async function esperarSinCargando(page) {
           return cs.visibility !== "hidden" && cs.display !== "none" && cs.opacity !== "0";
         }),
       undefined,
-      { timeout: TIMEOUT_CARGANDO_MS },
+      { timeout: TIMEOUT_CARGANDO_MS, ...(modoEspera ?? {}) },
     );
     return false;
   } catch {
@@ -205,7 +205,7 @@ async function esperarSinCargando(page) {
  * con su leyenda. El alto de la página era estable en las dos, así que esperar a que el alto se
  * asiente tampoco lo habría atrapado: hace falta la señal positiva de que el gráfico llegó.
  */
-async function esperarSinEsqueletos(page) {
+async function esperarSinEsqueletos(page, modoEspera) {
   try {
     await page.waitForFunction(
       () =>
@@ -216,7 +216,7 @@ async function esperarSinEsqueletos(page) {
           return cs.visibility !== "hidden" && cs.display !== "none" && cs.opacity !== "0";
         }),
       undefined,
-      { timeout: TIMEOUT_CARGANDO_MS },
+      { timeout: TIMEOUT_CARGANDO_MS, ...(modoEspera ?? {}) },
     );
     return false;
   } catch {
@@ -329,7 +329,22 @@ async function finalizarAnimaciones(page) {
   }
 }
 
-async function iniciarSesion(browser, baseUrl, email, password) {
+/**
+ * El login corre en un Chromium **sin banderas de determinismo**, y devuelve solo la sesión.
+ *
+ * Las banderas de captura —`--deterministic-mode` con `--disable-gpu`— dejan al navegador sin
+ * producir fotogramas por su cuenta, y eso rompe tres cosas a la vez en CI: Playwright nunca
+ * ve el botón «estable» (su comprobación se apoya en `requestAnimationFrame`),
+ * `page.screenshot()` se queda esperando un fotograma que no llega, y `page.content()` sí
+ * responde porque no necesita compositor. La evidencia del artefacto lo dijo sin margen:
+ * `visible=true · habilitado=true · caja={x:461, y:504.28125, …}` y ninguna captura.
+ *
+ * `tests/a11y/sesion.ts` hace este mismo login en CI y pasa, precisamente porque lanza un
+ * Chromium normal. Acá se hace igual: navegador propio, sesión, y se cierra. Las banderas se
+ * quedan donde hacen falta — en el navegador que CAPTURA.
+ */
+async function iniciarSesion(_browserSinUsar, baseUrl, email, password) {
+  const browser = await chromium.launch();
   /**
    * `reducedMotion: "reduce"`, igual que los contextos de captura de más abajo.
    *
@@ -398,6 +413,8 @@ async function iniciarSesion(browser, baseUrl, email, password) {
   }
   const storageState = await context.storageState();
   await context.close();
+  // El navegador del login se cierra acá: solo existía para conseguir la sesión.
+  await browser.close();
   return storageState;
 }
 
@@ -507,8 +524,45 @@ async function main() {
       "--deterministic-mode",
     ],
   });
+  /**
+   * ¿Avanza `requestAnimationFrame` en ESTE navegador?
+   *
+   * No es curiosidad: `--deterministic-mode` con `--disable-gpu` puede dejarlo sin producir
+   * fotogramas, y de eso dependen la comprobación de estabilidad de Playwright, las capturas
+   * y cualquier `waitForFunction` que espere a que algo se asiente. Si no avanza hay que
+   * saberlo ANTES de las 200 pantallas, no deducirlo de un timeout a la mitad.
+   */
+  const rAF = await (async () => {
+    const p = await browser.newPage();
+    const t0 = Date.now();
+    const avanza = await p
+      .evaluate(
+        () =>
+          new Promise((res) => {
+            const t = setTimeout(() => res(false), 5000);
+            requestAnimationFrame(() => {
+              clearTimeout(t);
+              res(true);
+            });
+          }),
+      )
+      .catch(() => false);
+    const ms = Date.now() - t0;
+    await p.close();
+    return { avanza, ms };
+  })();
+  console.log(`rAF avanza: ${rAF.avanza ? "sí" : "NO"} · ${rAF.ms} ms`);
+  if (!rAF.avanza) {
+    console.log(
+      "  Sin fotogramas, las esperas por `waitForFunction` pasan a sondeo por intervalo:\n" +
+        "  su modo por defecto es `raf`, que acá no dispararía nunca y venceria el tope entero.",
+    );
+  }
+  const modoEspera = rAF.avanza ? undefined : { polling: 250 };
+
   const entries = [];
   let conTerminos = 0;
+  let vencidos = 0;
 
   try {
     const storageState = await iniciarSesion(browser, baseUrl, email, password);
@@ -566,9 +620,11 @@ async function main() {
           await esperarFuentes(page);
           await finalizarAnimaciones(page);
           await enmascararNoDeterminista(page);
-          const loadingResidual = await esperarSinCargando(page);
+          const loadingResidual = await esperarSinCargando(page, modoEspera);
+          if (loadingResidual) vencidos++;
           // Y los esqueletos de gráfico, que NO dicen «Cargando…»: ver `esperarSinEsqueletos`.
-          const esqueletoResidual = await esperarSinEsqueletos(page);
+          const esqueletoResidual = await esperarSinEsqueletos(page, modoEspera);
+          if (esqueletoResidual) vencidos++;
           const termsModal = await hayModalTerminos(page);
           if (termsModal) conTerminos++;
 
