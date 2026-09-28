@@ -60,3 +60,61 @@ describe("los tres guards siguen existiendo", () => {
     expect(bloque).toContain("github.event_name == 'pull_request'");
   });
 });
+
+/**
+ * La caché de imágenes del stack, en los TRES jobs que arrancan Supabase.
+ *
+ * Los dos jobs E2E no la tenían, por una decisión medida en su momento (bajar era un minuto
+ * más rápido que restaurar). La revertimos cuando el minuto dejó de ser el problema: en una
+ * sola noche, tres corridas murieron con `toomanyrequests: Data limit exceeded` bajando esas
+ * imágenes, y cada relanzamiento gastaba el cupo del siguiente.
+ *
+ * Esto vigila que no se caiga otra vez sin querer, y que la clave siga llevando las tres cosas
+ * que deciden QUÉ se baja — versión del CLI, `config.toml` y la lista de exclusiones — porque
+ * una clave que no cambia con ellas sirve un tarball viejo y el arranque falla por dentro.
+ */
+describe("la caché de imágenes del stack", () => {
+  const JOBS_CON_SUPABASE = 3;
+
+  it("está en los tres jobs que levantan el stack", () => {
+    for (const paso of [
+      "Caché de imágenes del stack",
+      "Cargar imágenes de la caché",
+      "Guardar imágenes para la próxima corrida",
+    ]) {
+      expect(DIRECTIVAS.split(`name: ${paso}`).length - 1, `«${paso}»`).toBe(JOBS_CON_SUPABASE);
+    }
+  });
+
+  it("cada job tiene su propia clave: los tres excluyen servicios distintos", () => {
+    // Una clave compartida serviría el tarball de `migrations` —que excluye trece
+    // servicios— a los E2E, que necesitan ocho. El arranque fallaría bajando lo que falta,
+    // que es exactamente lo que la caché venía a evitar.
+    const claves = [...DIRECTIVAS.matchAll(/valor=imagenes-v2-[^\n]*?-([a-z0-9]+)-\$CFG/g)].map(
+      (m) => m[1],
+    );
+    expect(claves).toHaveLength(JOBS_CON_SUPABASE);
+    expect(new Set(claves).size, `claves: ${claves.join(", ")}`).toBe(JOBS_CON_SUPABASE);
+  });
+
+  it("la clave cambia con el CLI, con config.toml y con las exclusiones", () => {
+    const bloques = DIRECTIVAS.split("valor=imagenes-v2-").slice(1);
+    expect(bloques).toHaveLength(JOBS_CON_SUPABASE);
+    for (const b of bloques) {
+      const linea = b.split("\n")[0] ?? "";
+      expect(linea, linea).toContain("SUPABASE_CLI_VERSION");
+      expect(linea, linea).toContain("$CFG");
+      expect(linea, linea).toContain("$EXC");
+    }
+    expect(DIRECTIVAS).toContain("sha256sum supabase/config.toml");
+  });
+
+  it("la caché de Next no lleva un hash de `src/**`", () => {
+    // Con él, la clave cambiaba en cada commit: no acertaba nunca y cada corrida escribía
+    // ~450 MB que no se reusarían jamás. 21 entradas, 9,2 GB de un cupo de 10, y al pasarse
+    // GitHub desaloja por antigüedad — empezando por la caché de imágenes.
+    const clave = /key: next-\$\{\{ runner\.os \}\}-[^\n]*/.exec(DIRECTIVAS)?.[0] ?? "";
+    expect(clave, "no se encontró la clave de la caché de Next").not.toBe("");
+    expect(clave, clave).not.toContain("src/**");
+  });
+});
