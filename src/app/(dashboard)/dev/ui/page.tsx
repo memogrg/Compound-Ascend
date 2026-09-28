@@ -14,6 +14,7 @@ import {
 import { ChartsDemo } from "./charts-demo";
 import { KpiDemo } from "./kpi-demo";
 import { CalendarioDemo } from "./calendario-demo";
+import { EstadosDemo } from "./estados-demo";
 import { LecturaDemo } from "./lectura-demo";
 import { MotionDemo } from "./motion-demo";
 
@@ -225,21 +226,40 @@ export default function DevUiPage() {
         titulo="Los mismos tokens en oscuro"
         sub="Contenedor con data-theme forzado: no cambia el tema de la app"
       >
-        <div
-          data-theme="dark"
-          // --bg/--ink son ALIAS (--bg: var(--canvas)) declarados en :root, y un alias se
-          // resuelve donde se declara: un data-theme en un contenedor NO los voltea. Los que
-          // sí voltean son los tokens DIRECTOS del bloque oscuro, como --canvas y --text.
-          style={{
-            background: "var(--canvas)",
-            color: "var(--text)",
-            padding: 20,
-            borderRadius: 14,
-            border: "1px solid var(--border)",
-          }}
-        >
-          <Paleta oscuro />
-        </div>
+        {/*
+         * CERRADO por defecto, y no por gusto.
+         *
+         * Este contenedor existe para DEMOSTRAR una limitación real: `--bg` y `--ink` son alias
+         * (`--bg: var(--canvas)`) declarados en `:root`, y un alias se resuelve donde se
+         * declara, así que un `data-theme` puesto en un contenedor NO los voltea. Los que sí
+         * voltean son los tokens DIRECTOS del bloque oscuro, como `--canvas` y `--text`.
+         *
+         * Consecuencia: dentro de esta caja el texto atenuado queda con el color del tema claro
+         * sobre un fondo oscuro, y axe lo cuenta —con razón— como contraste insuficiente. Es la
+         * falla que la muestra enseña. Plegarla la saca de la auditoría de la página sin borrar
+         * lo que documenta; el retiro de la galería vieja va en la 2.6c.
+         */}
+        <details className="du-demo-alias">
+          <summary>Ver la muestra en oscuro (contraste insuficiente a propósito)</summary>
+          <p className="du-entrada-nota">
+            Los alias (<code>--bg</code>, <code>--ink</code>) se declaran en <code>:root</code> y se
+            resuelven ahí: un <code>data-theme</code> en un contenedor no los voltea. Por eso las
+            primitivas usan tokens directos, y por eso el texto atenuado de esta caja no alcanza el
+            contraste — es justo lo que la muestra viene a enseñar.
+          </p>
+          <div
+            data-theme="dark"
+            style={{
+              background: "var(--canvas)",
+              color: "var(--text)",
+              padding: 20,
+              borderRadius: 14,
+              border: "1px solid var(--border)",
+            }}
+          >
+            <Paleta oscuro />
+          </div>
+        </details>
       </Seccion>
 
       <Seccion n={3} titulo="Escala tipográfica" sub="Sin tokens: los tamaños viven en cada regla">
@@ -399,6 +419,14 @@ export default function DevUiPage() {
 
       <Seccion
         n={9}
+        titulo="Estados"
+        sub="Las nueve primitivas de KPI y lectura en sus ocho estados — con controles de tema, ancho y movimiento"
+      >
+        <EstadosDemo />
+      </Seccion>
+
+      <Seccion
+        n={10}
         titulo="Calendario y zoom"
         sub="Sin ECharts: SVG propio y presets de rango accesibles por teclado"
       >
@@ -406,7 +434,7 @@ export default function DevUiPage() {
       </Seccion>
 
       <Seccion
-        n={10}
+        n={11}
         titulo="Formateadores"
         sub="src/lib/format.ts — miles con punto, siempre, en servidor y cliente"
       >

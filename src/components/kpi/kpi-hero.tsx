@@ -1,6 +1,7 @@
 "use client";
 
 import NumberFlow from "@number-flow/react";
+import { EstadoCifra } from "./estado-kpi";
 
 import { formatMoney } from "@/lib/format";
 
@@ -35,6 +36,8 @@ export function KpiHero({
   delta,
   puntos,
   medidor,
+  cargando,
+  error,
 }: {
   /** Qué mide, en palabras. Va arriba, pequeño: la cifra sin sujeto no informa. */
   etiqueta: string;
@@ -47,39 +50,78 @@ export function KpiHero({
   /** 12 puntos de tendencia. Decorativos: el dato está en la cifra. */
   puntos?: readonly number[];
   medidor?: { valor: number; etiqueta: string; max?: number; umbrales?: UmbralesMeter };
+  /** Todavía no llegó el dato. El marco NO cambia de alto: ver `estado-kpi.tsx`. */
+  cargando?: boolean;
+  /** No se pudo calcular. Se dice en el lugar de la cifra, sin mover nada. */
+  error?: string;
 }) {
   const partes = partesNumero(valor, moneda, decimales);
   const texto = formatMoney(valor, moneda, decimales);
+  const sinDato = Boolean(cargando || error);
 
   return (
     <div className="kpi-hero">
       <p className="kpi-hero-etiqueta">{etiqueta}</p>
 
       <p className="kpi-hero-cifra">
-        {/* El número entero, una sola vez, para quien escucha la pantalla. */}
-        <span className="sr-only">{texto}</span>
-        {/* El signo y el símbolo se pintan acá y NO se le pasan a NumberFlow como `prefix`:
+        <EstadoCifra cargando={cargando} error={error}>
+          <>
+            {/* El número entero, una sola vez, para quien escucha la pantalla. */}
+            <span className="sr-only">{texto}</span>
+            {/* El signo y el símbolo se pintan acá y NO se le pasan a NumberFlow como `prefix`:
             dentro de su shadow root no hay forma de darles un tamaño ni un color propios.
             El símbolo se atenúa y se achica —es la unidad, no el dato—; el signo conserva
             el peso y el color, que para eso indica que el número es negativo. */}
-        <span aria-hidden="true" className="kpi-cifra-signo">
-          {partes.signo}
-        </span>
-        <span aria-hidden="true" className="kpi-cifra-simbolo">
-          {partes.simbolo}
-        </span>
-        <NumberFlow
-          aria-hidden="true"
-          value={partes.valor}
-          locales={partes.locales}
-          format={partes.format}
-          // Sin `isolate`, el ancho del hero empujaría el layout en cada tick.
-          isolate
-          willChange
-        />
+            <span aria-hidden="true" className="kpi-cifra-signo">
+              {partes.signo}
+            </span>
+            <span aria-hidden="true" className="kpi-cifra-simbolo">
+              {partes.simbolo}
+            </span>
+            <NumberFlow
+              aria-hidden="true"
+              value={partes.valor}
+              locales={partes.locales}
+              format={partes.format}
+              // Sin `isolate`, el ancho del hero empujaría el layout en cada tick.
+              isolate
+              willChange
+            />
+          </>
+        </EstadoCifra>
       </p>
 
-      {delta || puntos ? (
+      {/* Sin dato no hay delta, ni tendencia, ni medidor: serían una comparación, una curva y
+          un progreso inventados sobre un número que no existe. La NOTA sí se queda — dice qué
+          se está midiendo, y eso sigue siendo cierto mientras carga.
+       *
+       * Pero el SITIO se reserva. Quitar la fila entera encogía la tarjeta 45 px, así que la
+       * página daba el salto exacto que este estado venía a evitar — lo midió el caso
+       * «el esqueleto NO mueve el marco», que falló con «con datos 152,25 px · cargando
+       * 107,02 px». Lo que cambia es el contenido de la fila, nunca su existencia. */}
+      {(delta || puntos) && sinDato ? (
+        // La MISMA fila que con datos, con el contenido real invisible: así el alto no puede
+        // separarse. La barra gris va solo sobre la cifra.
+        <div className="kpi-hero-contexto" aria-hidden="true">
+          {delta ? (
+            <span className="kpi-velado">
+              <DeltaChip
+                valor={delta.valor}
+                moneda={moneda}
+                vsEtiqueta={delta.vsEtiqueta}
+                sentidoBueno={delta.sentidoBueno}
+              />
+            </span>
+          ) : null}
+          {puntos ? (
+            <span className="kpi-velado">
+              <Sparkline puntos={puntos} />
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {(delta || puntos) && !sinDato ? (
         <div className="kpi-hero-contexto">
           {delta ? (
             <DeltaChip
@@ -93,7 +135,19 @@ export function KpiHero({
         </div>
       ) : null}
 
-      {medidor ? (
+      {medidor && sinDato ? (
+        <div className="kpi-hero-medidor kpi-velado" aria-hidden="true">
+          <Meter
+            valor={medidor.valor}
+            max={medidor.max}
+            etiqueta={medidor.etiqueta}
+            umbrales={medidor.umbrales}
+          />
+          <p className="kpi-hero-nota">{medidor.etiqueta}</p>
+        </div>
+      ) : null}
+
+      {medidor && !sinDato ? (
         <div className="kpi-hero-medidor">
           <Meter
             valor={medidor.valor}
