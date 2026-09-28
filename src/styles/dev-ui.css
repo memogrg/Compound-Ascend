@@ -42,6 +42,21 @@
   letter-spacing: 0.06em;
 }
 
+/**
+ * El panel único del catálogo (delta 2.6c) queda pegado arriba: el catálogo mide varias
+ * pantallas de alto, y con el panel al principio de la sección había que subir hasta el
+ * título para cambiar de tema y volver a bajar al estado que se estaba mirando.
+ *
+ * `--surface` opaco a propósito: debajo pasan gráficos y tarjetas, y un panel translúcido
+ * deja leer dos cifras encimadas.
+ */
+.du-controles-sticky {
+  position: sticky;
+  top: 8px;
+  z-index: 3;
+  background: var(--surface);
+}
+
 .du-controles label,
 .du-check {
   display: inline-flex;
@@ -224,4 +239,50 @@
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--muted);
+}
+
+/* ── Colores forzados ─────────────────────────────────────────────────────────
+ *
+ * `forced-colors` no se puede activar desde la página: lo decide el sistema operativo. Lo que
+ * este control hace es REPRODUCIR su efecto sobre el lienzo —el sistema sustituye todo color por
+ * su paleta y descarta los fondos decorativos— para poder mirar qué se cae cuando el color deja
+ * de estar disponible como canal.
+ *
+ * `forced-color-adjust: none` NO se usa acá: sería pedirle al sistema que respete nuestros
+ * colores, o sea justo lo contrario de lo que hay que comprobar. */
+.du-lienzo[data-forzados="1"] {
+  --chart-1: CanvasText;
+  --chart-2: CanvasText;
+  --chart-3: CanvasText;
+  --chart-4: CanvasText;
+  --chart-5: CanvasText;
+  --chart-6: CanvasText;
+  --pos: CanvasText;
+  --neg: CanvasText;
+  --accent: LinkText;
+  background: Canvas;
+  color: CanvasText;
+}
+
+.du-lienzo[data-forzados="1"] * {
+  border-color: CanvasText;
+}
+
+/**
+ * Los rellenos DECORATIVOS se descartan, que es lo que hace el sistema de verdad: en
+ * `forced-colors` el navegador sustituye los fondos por `Canvas`, así que una rampa de calor
+ * —el calendario— desaparece entera. Eso es justamente la lección, no un efecto secundario:
+ * lo que codifica con color y nada más deja de decir algo.
+ *
+ * Sin esta regla la simulación mentía en la dirección contraria. Al forzar `--chart-1` a
+ * `CanvasText` la rampa se volvía una escala de GRISES oscuros con el número del día todavía
+ * en tinta encima: 1,56:1 en el paso 3. Diez avisos de contraste de axe sobre una situación
+ * que el sistema real no produce, mientras la de verdad —quedarse sin rampa— no se veía.
+ */
+.du-lienzo[data-forzados="1"] .cal-dia {
+  /* `!important` porque el relleno de la rampa va INLINE —`color-mix()` calculado por celda—
+     y una regla de hoja no le gana a un atributo `style`. Es la única forma de reproducir
+     acá lo que el sistema hace por encima de todo. */
+  background: Canvas !important;
+  color: CanvasText !important;
 }

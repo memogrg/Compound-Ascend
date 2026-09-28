@@ -65,7 +65,9 @@ export function LecturaDemo() {
   const filtradas = foco ? items.filter((i) => i.relacionado?.id === foco) : items;
 
   return (
-    <div className="lec-demo">
+    /* El `id` es el ancla de `tests/a11y/lectura.spec.ts`: el catálogo de estados monta las
+       mismas primitivas de lectura en sus ocho estados, y `.lec-fila` pasó de 7 a 24. */
+    <div id="demo-lectura" className="lec-demo">
       <div className="lec-bloque">
         <SectionHeader
           titulo="A dónde se fue"
