@@ -34,14 +34,17 @@ describe("ningún job del CI se salta su propio veredicto", () => {
   });
 });
 
-describe("los tres guards siguen existiendo", () => {
+describe("los guards siguen existiendo", () => {
   const ESPERADOS = [
     "Lint, Typecheck, Test & Build",
     "Migraciones aplican en BD fresca",
     "E2E smoke",
+    // La suite de accesibilidad entra a CI porque su ausencia ya costó: 22 casos en rojo en
+    // la máquina con el PR en verde, y nadie se enteró hasta correrla a mano.
+    "E2E a11y",
   ];
 
-  it("los tres jobs están declarados con su nombre", () => {
+  it("los jobs están declarados con su nombre", () => {
     // El nombre es lo que branch protection referencia: renombrarlo sin más
     // desengancha el check requerido y el guard deja de bloquear en la práctica.
     for (const nombre of ESPERADOS) {
@@ -74,9 +77,10 @@ describe("los tres guards siguen existiendo", () => {
  * una clave que no cambia con ellas sirve un tarball viejo y el arranque falla por dentro.
  */
 describe("la caché de imágenes del stack", () => {
-  const JOBS_CON_SUPABASE = 3;
+  // migrations, E2E smoke, E2E nav-v2 y E2E a11y.
+  const JOBS_CON_SUPABASE = 4;
 
-  it("está en los tres jobs que levantan el stack", () => {
+  it("está en todos los jobs que levantan el stack", () => {
     for (const paso of [
       "Caché de imágenes del stack",
       "Cargar imágenes de la caché",
@@ -86,13 +90,16 @@ describe("la caché de imágenes del stack", () => {
     }
   });
 
-  it("cada job tiene su propia clave: los tres excluyen servicios distintos", () => {
+  it("cada job tiene su propia clave, para no servirse el tarball ajeno", () => {
     // Una clave compartida serviría el tarball de `migrations` —que excluye trece
     // servicios— a los E2E, que necesitan ocho. El arranque fallaría bajando lo que falta,
     // que es exactamente lo que la caché venía a evitar.
-    const claves = [...DIRECTIVAS.matchAll(/valor=imagenes-v2-[^\n]*?-([a-z0-9]+)-\$CFG/g)].map(
-      (m) => m[1],
-    );
+    // El token puede llevar dentro la expresión del shard (`a11y${{ matrix.shard }}`), que
+    // en la corrida se expande a `a11y1` y `a11y2`: dos entradas distintas, que es lo que se
+    // quiere.
+    const claves = [
+      ...DIRECTIVAS.matchAll(/valor=imagenes-v2-[^\n]*?-([a-z0-9$${} .a-z]+?)-\$CFG/g),
+    ].map((m) => m[1]);
     expect(claves).toHaveLength(JOBS_CON_SUPABASE);
     expect(new Set(claves).size, `claves: ${claves.join(", ")}`).toBe(JOBS_CON_SUPABASE);
   });
@@ -107,6 +114,35 @@ describe("la caché de imágenes del stack", () => {
       expect(linea, linea).toContain("$EXC");
     }
     expect(DIRECTIVAS).toContain("sha256sum supabase/config.toml");
+  });
+
+  it("el job de a11y corre la suite ENTERA: se parte por shards, nunca por ficheros", () => {
+    // Acotarla a unos specs es lo que la volvería inútil: los 21 casos que se rompieron
+    // estaban repartidos entre tres ficheros que nadie habría elegido a mano. Partirla por
+    // SHARD no elige nada — Playwright reparte todo lo que hay — y por eso es la única forma
+    // de partirla que no deja un hueco.
+    const bloque = DIRECTIVAS.slice(DIRECTIVAS.indexOf("  e2e_a11y:"));
+    expect(bloque).toContain("npx playwright test -c playwright.a11y.config.ts --shard=");
+    // Ni un nombre de fichero detrás del config: eso sí sería acotar.
+    expect(bloque).not.toMatch(/playwright\.a11y\.config\.ts[^\n]*\.spec\.ts/);
+    // Y los shards cubren el total: si alguien pone 1/3 y 2/3, falta un tercio.
+    const shards = [...bloque.matchAll(/--shard=\$\{\{ matrix\.shard \}\}\/(\d+)/g)].map((m) =>
+      Number(m[1]),
+    );
+    expect(shards.length, "el shard sale de la matriz").toBeGreaterThan(0);
+    const matriz = bloque.match(/shard: \[([^\]]+)\]/)?.[1] ?? "";
+    const cuantos = matriz.split(",").filter((x) => x.trim()).length;
+    for (const total of shards)
+      expect(total, `matriz de ${cuantos} contra /${total}`).toBe(cuantos);
+  });
+
+  it("el job de a11y siembra con DEMO_ENV_FILE, nunca contra producción", () => {
+    // El sembrador BORRA y reescribe las cuentas de demo, y esas cuentas existen también en
+    // producción: por eso exige que el entorno se nombre. El fichero que se le nombra acá lo
+    // escribe el propio job con la URL del stack efímero que acaba de arrancar.
+    const bloque = DIRECTIVAS.slice(DIRECTIVAS.indexOf("  e2e_a11y:"));
+    expect(bloque).toContain("DEMO_ENV_FILE=.env.local node scripts/demo/seed-demo-familia.mjs");
+    expect(bloque).toContain("> .env.local");
   });
 
   it("la siembra y la app comparten instante: ni un `now()` en el período sembrado", () => {
