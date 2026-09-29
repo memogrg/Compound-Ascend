@@ -124,3 +124,24 @@ se está iterando, no para el PR.
 <!-- Una línea, a propósito: este cambio existe para comprobar que una rama NUEVA acierta la
      caché de imágenes poblada en `main`. Si acierta, los tres jobs dicen «Cache restored from
      key» y ninguno descarga nada. -->
+
+## Dónde vive la evidencia: local se itera, CI mide
+
+Desde el acelerador visual (`chore/ci-diff-visual`), la regla es corta:
+
+- **En local se ITERA.** `--rutas /gastos,/ingresos` está permitido y es lo sensato: capturar
+  las 200 pantallas para mirar dos son 40 minutos. El diff parcial se marca como PARCIAL y no
+  vale como evidencia — solo dice que lo que se miró no cambió.
+- **La evidencia la produce CI.** Cada push a `main` captura el juego completo y lo sube como
+  artefacto `capturas-<sha>`; cada PR captura su rama, baja el artefacto del **merge-base** y
+  compara con el criterio estricto. El resultado es un artefacto con el reporte, los PNG de lo
+  que cambió y una página `comparacion.html` con el antes, el después y la diferencia lado a
+  lado, solo de las capturas que se movieron.
+
+No es burocracia: es que la captura a mano es donde se colaron todas las medidas falsas de
+esta semana —un puerto ocupado sirviendo otro commit, una compilación bajo el servidor vivo,
+dos capturas con orígenes distintos—. En CI el entorno es de un solo uso y las guardas del
+arnés corren igual.
+
+La base es el **merge-base**, no la punta de `main`: comparar contra una punta que ya avanzó
+mete en el diff los cambios de otros PR y el veredicto deja de ser sobre el tuyo.

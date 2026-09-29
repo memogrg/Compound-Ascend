@@ -77,8 +77,8 @@ describe("los guards siguen existiendo", () => {
  * una clave que no cambia con ellas sirve un tarball viejo y el arranque falla por dentro.
  */
 describe("la caché de imágenes del stack", () => {
-  // migrations, E2E smoke, E2E nav-v2 y E2E a11y.
-  const JOBS_CON_SUPABASE = 4;
+  // migrations, E2E smoke, E2E nav-v2, E2E a11y y los dos de capturas visuales.
+  const JOBS_CON_SUPABASE = 6;
 
   it("está en todos los jobs que levantan el stack", () => {
     for (const paso of [
@@ -90,18 +90,38 @@ describe("la caché de imágenes del stack", () => {
     }
   });
 
-  it("cada job tiene su propia clave, para no servirse el tarball ajeno", () => {
-    // Una clave compartida serviría el tarball de `migrations` —que excluye trece
-    // servicios— a los E2E, que necesitan ocho. El arranque fallaría bajando lo que falta,
-    // que es exactamente lo que la caché venía a evitar.
-    // El token puede llevar dentro la expresión del shard (`a11y${{ matrix.shard }}`), que
-    // en la corrida se expande a `a11y1` y `a11y2`: dos entradas distintas, que es lo que se
-    // quiere.
-    const claves = [
-      ...DIRECTIVAS.matchAll(/valor=imagenes-v2-[^\n]*?-([a-z0-9$${} .a-z]+?)-\$CFG/g),
-    ].map((m) => m[1]);
-    expect(claves).toHaveLength(JOBS_CON_SUPABASE);
-    expect(new Set(claves).size, `claves: ${claves.join(", ")}`).toBe(JOBS_CON_SUPABASE);
+  it("dos jobs solo comparten clave si excluyen los MISMOS servicios", () => {
+    // Una clave compartida entre jobs que excluyen cosas distintas serviría el tarball de
+    // `migrations` —que excluye trece servicios— a los E2E, que necesitan ocho: el arranque
+    // fallaría bajando lo que falta, que es justo lo que la caché venía a evitar.
+    //
+    // Compartirla entre jobs con las MISMAS exclusiones sí es correcto y deseable: es el
+    // mismo tarball. Por eso la regla no es «una clave por job» —eso obligaría a duplicar
+    // entradas sin motivo— sino que el token y las exclusiones vayan de la mano.
+    const porJob = [...DIRECTIVAS.matchAll(/^  ([a-z0-9_]+):$/gm)]
+      .map((m, i, todos) => {
+        const desde = m.index ?? 0;
+        const hasta = todos[i + 1]?.index ?? DIRECTIVAS.length;
+        return DIRECTIVAS.slice(desde, hasta);
+      })
+      .map((bloque) => ({
+        token: /valor=imagenes-v2-[^\n]*?-([a-z0-9${}. ]+?)-\$CFG/.exec(bloque)?.[1],
+        excluye: /EXCLUIR_SERVICIOS:\s*([^\n]+)/.exec(bloque)?.[1]?.trim(),
+      }))
+      .filter((x) => x.token);
+
+    expect(porJob.length, "jobs con caché de imágenes").toBe(JOBS_CON_SUPABASE);
+    const porToken = new Map<string, Set<string>>();
+    for (const { token, excluye } of porJob) {
+      if (!porToken.has(token!)) porToken.set(token!, new Set());
+      porToken.get(token!)!.add(excluye ?? "(sin declarar)");
+    }
+    for (const [token, exclusiones] of porToken) {
+      expect(
+        exclusiones.size,
+        `el token «${token}» lo comparten jobs que excluyen cosas distintas: ${[...exclusiones].join(" | ")}`,
+      ).toBe(1);
+    }
   });
 
   it("la clave cambia con el CLI, con config.toml y con las exclusiones", () => {
@@ -153,6 +173,43 @@ describe("la caché de imágenes del stack", () => {
     expect(DIRECTIVAS).not.toContain("extract(month from now())");
     expect(DIRECTIVAS).toContain("instanteCongelado()");
     expect(DIRECTIVAS).toContain('echo "QA_FREEZE=$INSTANTE" >> "$GITHUB_ENV"');
+  });
+
+  it("sin capturas de la base, el diff visual NO se pone verde", () => {
+    // Un diff que no se pudo hacer no es un diff que salió bien. Dar verde ahí es exactamente
+    // la medida falsa que este job viene a impedir: el PR luciría revisado sin que nadie
+    // comparara nada.
+    const bloque = DIRECTIVAS.slice(DIRECTIVAS.indexOf("  diff_visual:"));
+    expect(bloque).toMatch(/no existe ninguna corrida[\s\S]*?exit 1/);
+    expect(bloque).toMatch(/terminó en \$ESTADO[\s\S]*?exit 1/);
+    // Y espera a la corrida de la base si va por delante, en vez de rendirse al primer no.
+    expect(bloque).toContain("sleep 60");
+    expect(bloque).toMatch(/seq 1 25/);
+  });
+
+  it("ningún correo de un dominio REAL está escrito en el workflow", () => {
+    // Un correo personal en un fichero público del repo es un dato de contacto regalado a
+    // cualquiera que mire el historial. Va en una variable del repositorio.
+    //
+    // Se permiten los sintéticos en `.local` —`e2e@ci.local` es del propio CI y no existe
+    // fuera de él—. La primera versión de esta guarda los señalaba también, y una guarda que
+    // obliga a cambiar código correcto se gana que la siguiente persona la quite entera.
+    const reales = [...DIRECTIVAS.matchAll(/[\w.+-]+@[\w-]+\.[a-z]{2,}/gi)]
+      .map((m) => m[0])
+      .filter((c) => !c.endsWith(".local"));
+    expect(reales, `correo(s) de dominio real: ${reales.join(", ")}`).toEqual([]);
+    expect(DIRECTIVAS).toContain("vars.DEMO_EMAIL");
+  });
+
+  it("las capturas se saltan cuando el PR no toca interfaz", () => {
+    // Cuatro jobs de captura por un cambio en un README son 40 minutos de runner tirados, y
+    // el ruido acostumbra a mirar los verdes sin leerlos.
+    const bloque = DIRECTIVAS.slice(DIRECTIVAS.indexOf("  toca_interfaz:"));
+    expect(bloque).toContain("git diff --name-only");
+    for (const ruta of ["src/", "public/", "scripts/qa/", "scripts/demo/"]) {
+      expect(bloque, `falta ${ruta} en el filtro`).toContain(ruta);
+    }
+    expect(DIRECTIVAS).toContain("needs.toca_interfaz.outputs.si == 'true'");
   });
 
   it("la caché de Next no lleva un hash de `src/**`", () => {

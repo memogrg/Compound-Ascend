@@ -25,6 +25,7 @@
  */
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
+import { resolveDemoEmails } from "./demo-emails.mjs";
 
 // ── env ───────────────────────────────────────────────────────────────────────
 const env = {};
@@ -148,9 +149,12 @@ const d = (y, m, day) =>
 const fase = (k) => (k <= "2025-12" ? "antes" : k === "2026-01" ? "giro" : "despues");
 
 // ── identidades ───────────────────────────────────────────────────────────────
+// DEMO_EMAIL_OVERRIDE (del fichero de entorno o del propio process.env) permite sembrar contra
+// una cuenta sintética; por defecto es el buzón real de demo. Marta se deriva por plus-addressing.
+const DEMO_EMAILS = resolveDemoEmails(env.DEMO_EMAIL_OVERRIDE ?? process.env.DEMO_EMAIL_OVERRIDE);
 const PERSONAS = [
-  { email: "information.theglowup@gmail.com", name: "José Ramírez", role: "owner" },
-  { email: "information.theglowup+marta@gmail.com", name: "Marta Solano", role: "adult" },
+  { email: DEMO_EMAILS.owner, name: "José Ramírez", role: "owner" },
+  { email: DEMO_EMAILS.marta, name: "Marta Solano", role: "adult" },
 ];
 
 async function upsertUser(email, name) {

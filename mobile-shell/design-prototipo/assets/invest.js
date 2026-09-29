@@ -535,7 +535,9 @@
   /* ============================================================
      MONITOR DE FONDOS (Finnhub con respaldo a demo)
      ============================================================ */
-  const FINNHUB_TOKEN = 'd7p1rppr01qr68pbdaigd7p1rppr01qr68pbdaj0';
+  // Sin token, el prototipo se queda en modo demo (los precios `demo` de WATCH). Para ver
+  // precios en vivo, poné un token de Finnhub acá — nunca lo comitees: este archivo es público.
+  const FINNHUB_TOKEN = '';
   const WATCH = [
     { sym:'VTI', name:'Vanguard Total Market', col:'linear-gradient(135deg,var(--info),var(--teal))', demo:284.12, dc:1.42 },
     { sym:'VOO', name:'Vanguard S&P 500', col:'linear-gradient(135deg,var(--c-invest),var(--info))', demo:512.40, dc:0.88 },
@@ -578,6 +580,7 @@
   async function loadMonitor() {
     if (monLoaded) return; monLoaded = true;
     renderMonitor({}, false);
+    if (!FINNHUB_TOKEN) return; // sin token: modo demo, sin pegarle a la red
     const quotes = {}; let any = false;
     await Promise.all(WATCH.filter(w=>w.sym!=='BTC').map(async w => {
       try {
