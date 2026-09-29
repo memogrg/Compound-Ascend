@@ -315,6 +315,31 @@ describe("la caché de imágenes del stack", () => {
     }
   });
 
+  it("el instante congelado es FIJO y lo comparten a11y y las capturas", () => {
+    // Los jobs de captura lo calculaban del reloj de pared. Medido: mismo PR, misma base
+    // (`516966ad`), dos corridas — la que compartió día con la base dio 11 capturas distintas y
+    // la del día siguiente dio 30, con `/transacciones`, `/gastos` y `/empezar` sumadas por el
+    // calendario. Un instante que depende de CUÁNDO corre el job no puede comparar dos corridas.
+    expect(DIRECTIVAS, "un literal en el env del workflow").toMatch(
+      /^ {2}QA_INSTANTE: "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"$/m,
+    );
+    // Y en el pasado: con el reloj adelantado, el token de gotrue parece vencido en cada render
+    // y la página no termina de cargar. Eso ya tumbó `main` cuatro horas.
+    const iso = /^ {2}QA_INSTANTE: "([^"]+)"$/m.exec(DIRECTIVAS)?.[1] ?? "";
+    expect(new Date(iso).getTime(), `«${iso}» tiene que estar en el pasado`).toBeLessThan(
+      Date.now(),
+    );
+    // Ningún job se lo calcula por su cuenta.
+    expect(DIRECTIVAS, "nadie llama a instanteCongelado() en los jobs de captura").not.toMatch(
+      /capturas[\s\S]*?instanteCongelado\(\)/,
+    );
+    for (const job of ["capturas_main", "capturas_rama", "e2e_a11y"]) {
+      const bloque =
+        DIRECTIVAS.slice(DIRECTIVAS.indexOf(`  ${job}:`)).split(/\n  [a-z0-9_]+:\n/)[0] ?? "";
+      expect(bloque, `${job}: usa el instante del workflow`).toContain("env.QA_INSTANTE");
+    }
+  });
+
   it("las capturas se saltan cuando el PR no toca interfaz", () => {
     // Cuatro jobs de captura por un cambio en un README son 40 minutos de runner tirados, y
     // el ruido acostumbra a mirar los verdes sin leerlos.

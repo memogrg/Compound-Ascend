@@ -250,6 +250,42 @@ async function leerManifest(dir) {
  * confundir «no lo sé» con «son distintas» haría imposible comparar contra cualquier base
  * antigua. Se avisa, en voz alta, y quien mira decide.
  */
+/**
+ * Se niega a comparar dos corridas congeladas en INSTANTES distintos.
+ *
+ * El arnés congela el reloj para que «el mes en curso» no cambie a mitad de una captura. Pero el
+ * instante se calculaba del reloj de pared en cada corrida, así que una base capturada ayer y una
+ * rama capturada hoy congelaban en días distintos — y entonces toda pantalla con fechas difiere.
+ *
+ * Medido: mismo PR, misma base (`516966ad`), dos corridas. La primera congeló en el mismo día que
+ * la base y dio 11 capturas distintas; la segunda congeló un día después y dio 30, con
+ * `/transacciones`, `/gastos` y `/empezar` sumándose. Ninguna de esas 19 la movió el PR: las movió
+ * el calendario. Un diff así no es un diff con ruido, es una comparación inválida — la misma
+ * categoría que comparar dos builds con banderas distintas, y por eso se trata igual: no se avisa,
+ * se niega.
+ */
+async function exigirMismoInstante(dirA, dirB) {
+  const [ma, mb] = await Promise.all([leerManifest(dirA), leerManifest(dirB)]);
+  const ia = ma?.fixedTime ?? null;
+  const ib = mb?.fixedTime ?? null;
+  if (ia == null || ib == null) {
+    console.log(
+      `\n  ⚠ Instante congelado desconocido en ${ia == null ? dirA : dirB}: ` +
+        `no se puede comprobar que las dos corridas miren el mismo día.`,
+    );
+    return;
+  }
+  if (ia === ib) return;
+  console.error(`\n  ✖ Las dos corridas se congelaron en instantes distintos.\n`);
+  console.error(`      ${dirA} = ${ia}\n      ${dirB} = ${ib}\n`);
+  console.error(
+    `    No se compara: con otro «hoy» cambian los meses, los rótulos de período y los\n` +
+      `    estados «en curso», y el diff diría que los movió el PR. Las dos corridas tienen que\n` +
+      `    usar el MISMO instante fijo (\`QA_INSTANTE\` en el workflow), no el reloj de pared.\n`,
+  );
+  process.exit(2);
+}
+
 async function exigirMismasBanderas(dirA, dirB) {
   const [ma, mb] = await Promise.all([leerManifest(dirA), leerManifest(dirB)]);
   const ba = ma?.banderas ?? null;
@@ -325,6 +361,7 @@ async function main() {
   // medía nada: la navegación entera era otra. Comparar así no es un margen que haya que
   // ajustar, es una comparación inválida, y por eso esto no avisa: se niega.
   await exigirMismasBanderas(dirA, dirB);
+  await exigirMismoInstante(dirA, dirB);
 
   /**
    * Rutas que la sonda de determinismo marcó: no salen iguales dos veces seguidas contra la

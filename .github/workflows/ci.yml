@@ -24,6 +24,17 @@ env:
   # imágenes los decide el CLI). Ver el comentario del job de migraciones para por qué es
   # una versión fija y no "latest".
   SUPABASE_CLI_VERSION: 2.109.1
+  # El instante en el que se congela el reloj para TODO lo que se compara entre corridas.
+  #
+  # Es un literal y no `new Date()` por una razón medida: los jobs de captura lo calculaban del
+  # reloj de pared, así que una base capturada ayer y una rama capturada hoy congelaban en días
+  # distintos. Mismo PR, misma base, dos corridas: la primera compartió día con la base y dio 11
+  # capturas distintas; la segunda, un día después, dio 30 — `/transacciones`, `/gastos` y
+  # `/empezar` sumadas por el calendario, no por el cambio.
+  #
+  # Tiene que estar en el PASADO: con el reloj adelantado, el token que emite gotrue con la hora
+  # real parece vencido en cada render y la página no termina de cargar (409 de refresco).
+  QA_INSTANTE: "2026-09-18T18:00:00Z"
 
 jobs:
   ci:
@@ -974,10 +985,9 @@ jobs:
       # La auditoría abre un navegador, inicia sesión y recorre pantallas con datos. Fuera
       # quedan los cinco que nada de eso toca.
       EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
-      # El MISMO instante que usan las capturas visuales. No es cosmético: con el reloj vivo,
-      # «el mes en curso» cambia el DOM y con él el conteo de nodos de axe, y el inventario
-      # deja de ser comparable entre días.
-      QA_INSTANTE: "2026-09-18T18:00:00Z"
+      # El MISMO instante que usan las capturas visuales, ahora de verdad: se lee del `env` del
+      # workflow para que no haya dos copias que puedan separarse.
+      QA_INSTANTE: ${{ env.QA_INSTANTE }}
       # La cuenta demo que siembra `seed-demo-familia.mjs`. Se resuelve por email, nunca por id.
       # Es una cuenta SINTÉTICA, escrita acá a la vista: `.local` es un TLD reservado
       # (RFC 6762), así que no hay —ni puede haber— buzón detrás. Antes salía de la variable
@@ -1265,14 +1275,16 @@ jobs:
             esac
           done >> "$GITHUB_ENV"
 
-      # UN instante para la siembra y para la app. Lo calcula el arnés, que desde el arreglo
-      # del 28-sep no devuelve nunca uno futuro: con el reloj adelantado el token que emite
-      # gotrue con la hora REAL parece vencido en cada render y la página no termina de cargar.
+      # UN instante para la siembra y para la app, y FIJO — no del reloj de pared.
+      #
+      # Calcularlo hacía que una base capturada ayer y una rama capturada hoy congelaran en días
+      # distintos, y entonces toda pantalla con fechas difería sin que el PR la tocara. `diff.mjs`
+      # ahora se NIEGA a comparar dos corridas con instantes distintos, así que esto no puede
+      # volver a pasar en silencio; fijarlo acá es lo que hace que no pase nunca.
       - name: Instante congelado, uno solo
         run: |
-          INSTANTE=$(node -e "import('./scripts/qa/snap.mjs').then(m => console.log(m.instanteCongelado().toISOString()))")
-          echo "QA_FREEZE=$INSTANTE" >> "$GITHUB_ENV"
-          echo "::notice::instante congelado (siembra y app): $INSTANTE"
+          echo "QA_FREEZE=${{ env.QA_INSTANTE }}" >> "$GITHUB_ENV"
+          echo "::notice::instante congelado (siembra y app): ${{ env.QA_INSTANTE }}"
 
       - name: Entorno del stack efímero en .env.local
         run: |
@@ -1476,14 +1488,16 @@ jobs:
             esac
           done >> "$GITHUB_ENV"
 
-      # UN instante para la siembra y para la app. Lo calcula el arnés, que desde el arreglo
-      # del 28-sep no devuelve nunca uno futuro: con el reloj adelantado el token que emite
-      # gotrue con la hora REAL parece vencido en cada render y la página no termina de cargar.
+      # UN instante para la siembra y para la app, y FIJO — no del reloj de pared.
+      #
+      # Calcularlo hacía que una base capturada ayer y una rama capturada hoy congelaran en días
+      # distintos, y entonces toda pantalla con fechas difería sin que el PR la tocara. `diff.mjs`
+      # ahora se NIEGA a comparar dos corridas con instantes distintos, así que esto no puede
+      # volver a pasar en silencio; fijarlo acá es lo que hace que no pase nunca.
       - name: Instante congelado, uno solo
         run: |
-          INSTANTE=$(node -e "import('./scripts/qa/snap.mjs').then(m => console.log(m.instanteCongelado().toISOString()))")
-          echo "QA_FREEZE=$INSTANTE" >> "$GITHUB_ENV"
-          echo "::notice::instante congelado (siembra y app): $INSTANTE"
+          echo "QA_FREEZE=${{ env.QA_INSTANTE }}" >> "$GITHUB_ENV"
+          echo "::notice::instante congelado (siembra y app): ${{ env.QA_INSTANTE }}"
 
       - name: Entorno del stack efímero en .env.local
         run: |
