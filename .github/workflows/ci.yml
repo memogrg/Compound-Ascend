@@ -24,6 +24,17 @@ env:
   # imágenes los decide el CLI). Ver el comentario del job de migraciones para por qué es
   # una versión fija y no "latest".
   SUPABASE_CLI_VERSION: 2.109.1
+  # El instante en el que se congela el reloj para TODO lo que se compara entre corridas.
+  #
+  # Es un literal y no `new Date()` por una razón medida: los jobs de captura lo calculaban del
+  # reloj de pared, así que una base capturada ayer y una rama capturada hoy congelaban en días
+  # distintos. Mismo PR, misma base, dos corridas: la primera compartió día con la base y dio 11
+  # capturas distintas; la segunda, un día después, dio 30 — `/transacciones`, `/gastos` y
+  # `/empezar` sumadas por el calendario, no por el cambio.
+  #
+  # Tiene que estar en el PASADO: con el reloj adelantado, el token que emite gotrue con la hora
+  # real parece vencido en cada render y la página no termina de cargar (409 de refresco).
+  QA_INSTANTE: "2026-09-18T18:00:00Z"
 
 jobs:
   ci:
@@ -107,9 +118,15 @@ jobs:
       # todos los pasos siguientes. Hay que volver a vaciarla DESPUÉS de ese paso; se deja
       # aquí igualmente para que el valor sea explícito allá donde se lea.
       SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
-      # De las trece imágenes, este job solo necesita **Postgres**: `db reset` aplica SQL y
-      # nada más. Vive en el `env` porque lo leen el arranque Y la clave de la caché.
-      EXCLUIR_SERVICIOS: gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+      # Este job ya no solo APLICA el esquema: también corre `tests/rls` contra él, y esos
+      # tests hablan HTTP —`/rest/v1` y `/auth/v1/admin`—, no SQL. Así que a Postgres se le
+      # suman tres: **kong** (la puerta que enruta esas dos rutas), **gotrue** (crea y borra
+      # los usuarios de prueba) y **postgrest** (lee y escribe las filas). Las otras diez
+      # siguen fuera; `mailpit` también, porque los usuarios se crean con `email_confirm`
+      # y no se manda ningún correo.
+      # Vive en el `env` porque lo leen el arranque Y la clave de la caché — que incluye
+      # `$EXC`, así que cambiar esta línea invalida el tarball viejo por sí sola.
+      EXCLUIR_SERVICIOS: realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
     steps:
       - uses: actions/checkout@v7
 
@@ -225,6 +242,67 @@ jobs:
 
       - name: Apply fresco de toda la cadena de migraciones
         run: supabase db reset
+
+      # Hasta acá el job demostraba que la cadena APLICA. `tests/rls` demuestra que lo
+      # aplicado se COMPORTA: aislamiento por usuario, y el incremento atómico del ledger de
+      # IA bajo concurrencia. Corre acá y no en otro job porque el stack ya está arriba con la
+      # cadena entera aplicada, así que las funciones nuevas existen sin montar nada más.
+      # Este job no traía Node ni dependencias; de ahí los dos pasos que siguen.
+      - uses: actions/setup-node@v6
+        with:
+          # 22 y no 20 a propósito. Cinco de los siete ficheros de `tests/rls` usan
+          # `@supabase/supabase-js`, que construye un `RealtimeClient` dentro de
+          # `createClient` y exige `WebSocket` nativo: en Node 20 revienta con «native
+          # WebSocket not found» ANTES de la primera aserción. Medido en mi Mac: con v20,
+          # 2 ficheros en rojo y 13 pruebas omitidas; con v22, 7 ficheros y 25 pruebas, todas
+          # pasando.
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      - name: Evidencia RLS — el esquema se comporta (tests/rls)
+        run: |
+          # `supabase status -o env` entrecomilla los valores; se les quitan las comillas
+          # (idéntico al paso «Migraciones y variables del stack efímero» de los E2E).
+          #
+          # Las TRES credenciales, no dos. Cada fichero de `tests/rls` se auto-salta con
+          # `describe.skipIf(!ready)` y `ready` incluye la ANON en seis de los siete: sin
+          # exportarla, vitest sale 0 habiendo omitido la mayor parte de la suite. Es la
+          # forma exacta que tiene este arnés de dar un verde falso, así que abajo se
+          # comprueba que no omitió NADA.
+          while IFS='=' read -r key val; do
+            val="${val%\"}"; val="${val#\"}"
+            case "$key" in
+              API_URL) export SUPABASE_TEST_URL="$val" ;;
+              ANON_KEY) export SUPABASE_TEST_ANON_KEY="$val" ;;
+              SERVICE_ROLE_KEY) export SUPABASE_TEST_SERVICE_ROLE_KEY="$val" ;;
+            esac
+          done < <(supabase status -o env)
+
+          # `NO_COLOR` porque en CI vitest colorea: la línea del resumen sale como
+          # «ESC[2m      Tests ESC[22m …», y la guarda de abajo la buscaba por «^ *Tests».
+          # En mi Mac el pipe salía sin color, así que el fallo solo existía en CI — y el
+          # síntoma fue un rojo que decía «la suite no llegó a correr» debajo de la suite
+          # entera en verde. Se quita el color Y se limpian los escapes al leer: una guarda
+          # que depende de cómo venga coloreada la salida vuelve a fallar al primer cambio.
+          set -o pipefail
+          NO_COLOR=1 npx vitest run tests/rls 2>&1 | tee /tmp/rls.log
+
+      # Un `exit 0` de vitest no dice que la suite corriera: con las credenciales sin
+      # exportar sale 0 con todo omitido. Esta guarda convierte ese silencio en rojo.
+      - name: La suite de RLS corrió entera
+        run: |
+          RESUMEN=$(sed -E 's/\x1b\[[0-9;]*m//g' /tmp/rls.log | grep -E '^ *Tests +[0-9]' | tail -1)
+          echo "$RESUMEN"
+          if [ -z "$RESUMEN" ]; then
+            echo "::error::vitest no imprimió el resumen de pruebas: la suite de RLS no llegó a correr."
+            exit 1
+          fi
+          if echo "$RESUMEN" | grep -q 'skipped'; then
+            echo "::error::la suite de RLS omitió pruebas: $RESUMEN"
+            echo "Casi siempre es una credencial SUPABASE_TEST_* sin exportar, no un test roto."
+            exit 1
+          fi
 
   # Guard BLOQUEANTE: levanta la app contra un Supabase real, crea un usuario y
   # navega. Es el ÚNICO job que EJERCITA el esquema en vez de solo aplicarlo, y
@@ -907,26 +985,14 @@ jobs:
       # La auditoría abre un navegador, inicia sesión y recorre pantallas con datos. Fuera
       # quedan los cinco que nada de eso toca.
       EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
-      # El MISMO instante que usan las capturas visuales. No es cosmético: con el reloj vivo,
-      # «el mes en curso» cambia el DOM y con él el conteo de nodos de axe, y el inventario
-      # deja de ser comparable entre días.
-      QA_INSTANTE: "2026-09-18T18:00:00Z"
       # La cuenta demo que siembra `seed-demo-familia.mjs`. Se resuelve por email, nunca por id.
-      # Sale de una variable del repositorio: un correo personal escrito en un fichero público
-      # del repo es un dato de contacto regalado a cualquiera que mire el historial.
-      E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+      # Es una cuenta SINTÉTICA, escrita acá a la vista: `.local` es un TLD reservado
+      # (RFC 6762), así que no hay —ni puede haber— buzón detrás. Antes salía de la variable
+      # `DEMO_EMAIL`, que apuntaba al buzón REAL de la demo de producción: un correo personal
+      # legible por cualquiera con acceso a los logs de un repo público, y una cuenta de
+      # producción que cada corrida de CI borraba y reescribía.
+      E2E_EMAIL: demo@ci.local
     steps:
-      # Falla acá y con instrucciones, no cuarenta líneas más abajo dentro de un script. La
-      # primera corrida con la variable sin crear murió con «Faltan E2E_EMAIL» en mitad del
-      # arnés, que no le dice a nadie qué hay que hacer.
-      - name: La variable DEMO_EMAIL tiene que existir
-        run: |
-          if [ -z "${{ vars.DEMO_EMAIL }}" ]; then
-            echo "::error::falta la variable de repositorio DEMO_EMAIL (el correo de la cuenta demo)."
-            echo "Creala con:  gh variable set DEMO_EMAIL --body '<correo>' --repo ${{ github.repository }}"
-            exit 1
-          fi
-
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
@@ -1036,7 +1102,11 @@ jobs:
       # La auditoría mide pantallas CON datos: sin ellas, media suite se pasea por estados
       # vacíos y el inventario no dice nada de lo que ve una persona.
       - name: Sembrar la cuenta demo
-        run: DEMO_ENV_FILE=.env.local node scripts/demo/seed-demo-familia.mjs
+        # `DEMO_EMAIL_OVERRIDE` reapunta las DOS identidades de la demo (el titular y Marta,
+        # que cuelga del mismo buzón por plus-addressing) a la cuenta sintética. Sin él, el
+        # seeder cae a su default, que es el buzón real de producción — y el seeder BORRA y
+        # reescribe lo que encuentra, así que ese default no puede ser lo que corra en CI.
+        run: DEMO_ENV_FILE=.env.local DEMO_EMAIL_OVERRIDE=demo@ci.local node scripts/demo/seed-demo-familia.mjs
 
       # Los términos se dejan PENDIENTES a propósito, igual que en nav-v2: la barra legal es
       # una pieza global, y sus specs son parte de esta suite. Con el seed marcándolos, la
@@ -1122,7 +1192,7 @@ jobs:
           fi
 
   capturas_main:
-    name: Capturas de main (${{ matrix.shard }}/2)
+    name: Capturas de main (${{ matrix.shard }}/4)
     runs-on: ubuntu-24.04
     needs: ci
     # Solo en push: son la BASE contra la que se compara cada PR.
@@ -1130,22 +1200,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     env:
       SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
       EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
     steps:
-      # Falla acá y con instrucciones, no cuarenta líneas más abajo dentro de un script. La
-      # primera corrida con la variable sin crear murió con «Faltan E2E_EMAIL» en mitad del
-      # arnés, que no le dice a nadie qué hay que hacer.
-      - name: La variable DEMO_EMAIL tiene que existir
-        run: |
-          if [ -z "${{ vars.DEMO_EMAIL }}" ]; then
-            echo "::error::falta la variable de repositorio DEMO_EMAIL (el correo de la cuenta demo)."
-            echo "Creala con:  gh variable set DEMO_EMAIL --body '<correo>' --repo ${{ github.repository }}"
-            exit 1
-          fi
-
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
@@ -1213,14 +1272,16 @@ jobs:
             esac
           done >> "$GITHUB_ENV"
 
-      # UN instante para la siembra y para la app. Lo calcula el arnés, que desde el arreglo
-      # del 28-sep no devuelve nunca uno futuro: con el reloj adelantado el token que emite
-      # gotrue con la hora REAL parece vencido en cada render y la página no termina de cargar.
+      # UN instante para la siembra y para la app, y FIJO — no del reloj de pared.
+      #
+      # Calcularlo hacía que una base capturada ayer y una rama capturada hoy congelaran en días
+      # distintos, y entonces toda pantalla con fechas difería sin que el PR la tocara. `diff.mjs`
+      # ahora se NIEGA a comparar dos corridas con instantes distintos, así que esto no puede
+      # volver a pasar en silencio; fijarlo acá es lo que hace que no pase nunca.
       - name: Instante congelado, uno solo
         run: |
-          INSTANTE=$(node -e "import('./scripts/qa/snap.mjs').then(m => console.log(m.instanteCongelado().toISOString()))")
-          echo "QA_FREEZE=$INSTANTE" >> "$GITHUB_ENV"
-          echo "::notice::instante congelado (siembra y app): $INSTANTE"
+          echo "QA_FREEZE=${{ env.QA_INSTANTE }}" >> "$GITHUB_ENV"
+          echo "::notice::instante congelado (siembra y app): ${{ env.QA_INSTANTE }}"
 
       - name: Entorno del stack efímero en .env.local
         run: |
@@ -1235,7 +1296,11 @@ jobs:
 
       # La captura mide pantallas CON datos: sin ellas media evidencia serían estados vacíos.
       - name: Sembrar la cuenta demo
-        run: DEMO_ENV_FILE=.env.local node scripts/demo/seed-demo-familia.mjs
+        # `DEMO_EMAIL_OVERRIDE` reapunta las DOS identidades de la demo (el titular y Marta,
+        # que cuelga del mismo buzón por plus-addressing) a la cuenta sintética. Sin él, el
+        # seeder cae a su default, que es el buzón real de producción — y el seeder BORRA y
+        # reescribe lo que encuentra, así que ese default no puede ser lo que corra en CI.
+        run: DEMO_ENV_FILE=.env.local DEMO_EMAIL_OVERRIDE=demo@ci.local node scripts/demo/seed-demo-familia.mjs
 
       - name: Compilar con las banderas de producción
         run: node scripts/dev/con-env.mjs npm run build
@@ -1253,16 +1318,16 @@ jobs:
           echo "::error::el servidor congelado no respondió en 120s"
           exit 1
 
-      - name: Capturar (shard ${{ matrix.shard }} de 2)
+      - name: Capturar (shard ${{ matrix.shard }} de 4)
         env:
-          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+          E2E_EMAIL: demo@ci.local
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           # En CI se retira `--deterministic-mode` (no produce fotogramas en el runner). Ver
           # `snap.mjs`; lo que esa bandera prometía se demuestra en el paso siguiente.
           QA_CI: "1"
         run: |
           node scripts/qa/snap.mjs --base-url http://localhost:3001 \
-            --shard ${{ matrix.shard }}/2 --out capturas
+            --shard ${{ matrix.shard }}/4 --out capturas
 
       # Quitar la bandera del determinismo y confiar sería cambiar una garantía por una
       # suposición. Se vuelve a capturar un puñado de rutas contra el MISMO servidor y la misma
@@ -1270,7 +1335,7 @@ jobs:
       # inestabilidad, y entonces las capturas no sirven como evidencia.
       - name: Sonda de determinismo (20 rutas, dos veces)
         env:
-          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+          E2E_EMAIL: demo@ci.local
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           QA_CI: "1"
         run: |
@@ -1292,7 +1357,45 @@ jobs:
               --rutas "$RUTAS" --theme light --widths 1280 --out "$TANDA"
           done
           node scripts/qa/sonda-determinismo.mjs --a det-a --b det-b \
-            --out-diff diff-determinismo
+            --out-diff diff-determinismo --tope 2
+
+      # Lo que la sonda descubrió tiene que VIAJAR: los dos jobs no comparten disco, y lo único
+      # que llega al diff visual es este artefacto. Sin este paso, el diff no sabría qué rutas
+      # se mueven solas y volvería a culpar al PR de una pantalla que cambia sin que nadie la
+      # toque — que es el error que la sonda existe para no cometer.
+      - name: Marcar las rutas inestables en el manifiesto
+        run: |
+          node scripts/qa/marcar-inestables.mjs --capturas capturas \
+            --inestables diff-determinismo/inestables.json --tanda-a det-a --tanda-b det-b
+
+          # Cada shard guarda SU manifiesto con su número. `download-artifact` con patrón deja
+          # los artefactos aplanados en la misma carpeta, así que cuatro `manifest.json` se
+          # pisan y sobrevive uno solo — y con él se pierde lo que los otros tres midieron. Los
+          # PNG no colisionan (cada shard captura rutas distintas), así que el estropicio no se
+          # ve: 200 capturas comparadas y el manifiesto de un cuarto de ellas.
+          mv capturas/manifest.json "capturas/manifest-${{ matrix.shard }}.json"
+
+      # Una guarda que bloquea y no deja ver qué vio se desactiva a la semana. Cuando la sonda
+      # reprueba, lo único que queda en el log es un conteo de píxeles («106 · delta 21»), y con
+      # eso no se puede decidir si es un número que anima, una fecha que se coló o una animación
+      # que `finalizarAnimaciones` no apaga. Las dos tandas y su página de comparación suben
+      # SOLO en el fallo: en verde no hay nada que mirar y serían 40 MB por corrida.
+      - name: Página de comparación de la sonda (solo si reprobó)
+        if: failure()
+        run: |
+          node scripts/qa/comparacion.mjs --a det-a --b det-b \
+            --diff diff-determinismo --out comparacion-determinismo \
+            --titulo "Sonda de determinismo · misma compilación, dos tandas"
+
+      - name: Subir la evidencia de la sonda (solo si reprobó)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonda-determinismo-${{ github.job }}-${{ matrix.shard }}
+          path: |
+            comparacion-determinismo
+            diff-determinismo
+          retention-days: 14
 
       - name: Subir las capturas como base
         uses: actions/upload-artifact@v4
@@ -1302,7 +1405,7 @@ jobs:
           retention-days: 14
 
   capturas_rama:
-    name: Capturas de la rama (${{ matrix.shard }}/2)
+    name: Capturas de la rama (${{ matrix.shard }}/4)
     runs-on: ubuntu-24.04
     needs: [ci, toca_interfaz]
     # Un check SALTADO cuenta como cumplido en el ruleset, así que saltarlo no abre un agujero.
@@ -1310,22 +1413,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     env:
       SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
       EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
     steps:
-      # Falla acá y con instrucciones, no cuarenta líneas más abajo dentro de un script. La
-      # primera corrida con la variable sin crear murió con «Faltan E2E_EMAIL» en mitad del
-      # arnés, que no le dice a nadie qué hay que hacer.
-      - name: La variable DEMO_EMAIL tiene que existir
-        run: |
-          if [ -z "${{ vars.DEMO_EMAIL }}" ]; then
-            echo "::error::falta la variable de repositorio DEMO_EMAIL (el correo de la cuenta demo)."
-            echo "Creala con:  gh variable set DEMO_EMAIL --body '<correo>' --repo ${{ github.repository }}"
-            exit 1
-          fi
-
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
@@ -1393,14 +1485,16 @@ jobs:
             esac
           done >> "$GITHUB_ENV"
 
-      # UN instante para la siembra y para la app. Lo calcula el arnés, que desde el arreglo
-      # del 28-sep no devuelve nunca uno futuro: con el reloj adelantado el token que emite
-      # gotrue con la hora REAL parece vencido en cada render y la página no termina de cargar.
+      # UN instante para la siembra y para la app, y FIJO — no del reloj de pared.
+      #
+      # Calcularlo hacía que una base capturada ayer y una rama capturada hoy congelaran en días
+      # distintos, y entonces toda pantalla con fechas difería sin que el PR la tocara. `diff.mjs`
+      # ahora se NIEGA a comparar dos corridas con instantes distintos, así que esto no puede
+      # volver a pasar en silencio; fijarlo acá es lo que hace que no pase nunca.
       - name: Instante congelado, uno solo
         run: |
-          INSTANTE=$(node -e "import('./scripts/qa/snap.mjs').then(m => console.log(m.instanteCongelado().toISOString()))")
-          echo "QA_FREEZE=$INSTANTE" >> "$GITHUB_ENV"
-          echo "::notice::instante congelado (siembra y app): $INSTANTE"
+          echo "QA_FREEZE=${{ env.QA_INSTANTE }}" >> "$GITHUB_ENV"
+          echo "::notice::instante congelado (siembra y app): ${{ env.QA_INSTANTE }}"
 
       - name: Entorno del stack efímero en .env.local
         run: |
@@ -1415,7 +1509,11 @@ jobs:
 
       # La captura mide pantallas CON datos: sin ellas media evidencia serían estados vacíos.
       - name: Sembrar la cuenta demo
-        run: DEMO_ENV_FILE=.env.local node scripts/demo/seed-demo-familia.mjs
+        # `DEMO_EMAIL_OVERRIDE` reapunta las DOS identidades de la demo (el titular y Marta,
+        # que cuelga del mismo buzón por plus-addressing) a la cuenta sintética. Sin él, el
+        # seeder cae a su default, que es el buzón real de producción — y el seeder BORRA y
+        # reescribe lo que encuentra, así que ese default no puede ser lo que corra en CI.
+        run: DEMO_ENV_FILE=.env.local DEMO_EMAIL_OVERRIDE=demo@ci.local node scripts/demo/seed-demo-familia.mjs
 
       - name: Compilar con las banderas de producción
         run: node scripts/dev/con-env.mjs npm run build
@@ -1433,16 +1531,16 @@ jobs:
           echo "::error::el servidor congelado no respondió en 120s"
           exit 1
 
-      - name: Capturar (shard ${{ matrix.shard }} de 2)
+      - name: Capturar (shard ${{ matrix.shard }} de 4)
         env:
-          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+          E2E_EMAIL: demo@ci.local
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           # En CI se retira `--deterministic-mode` (no produce fotogramas en el runner). Ver
           # `snap.mjs`; lo que esa bandera prometía se demuestra en el paso siguiente.
           QA_CI: "1"
         run: |
           node scripts/qa/snap.mjs --base-url http://localhost:3001 \
-            --shard ${{ matrix.shard }}/2 --out capturas
+            --shard ${{ matrix.shard }}/4 --out capturas
 
       # Quitar la bandera del determinismo y confiar sería cambiar una garantía por una
       # suposición. Se vuelve a capturar un puñado de rutas contra el MISMO servidor y la misma
@@ -1450,7 +1548,7 @@ jobs:
       # inestabilidad, y entonces las capturas no sirven como evidencia.
       - name: Sonda de determinismo (20 rutas, dos veces)
         env:
-          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+          E2E_EMAIL: demo@ci.local
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           QA_CI: "1"
         run: |
@@ -1472,7 +1570,45 @@ jobs:
               --rutas "$RUTAS" --theme light --widths 1280 --out "$TANDA"
           done
           node scripts/qa/sonda-determinismo.mjs --a det-a --b det-b \
-            --out-diff diff-determinismo
+            --out-diff diff-determinismo --tope 2
+
+      # Lo que la sonda descubrió tiene que VIAJAR: los dos jobs no comparten disco, y lo único
+      # que llega al diff visual es este artefacto. Sin este paso, el diff no sabría qué rutas
+      # se mueven solas y volvería a culpar al PR de una pantalla que cambia sin que nadie la
+      # toque — que es el error que la sonda existe para no cometer.
+      - name: Marcar las rutas inestables en el manifiesto
+        run: |
+          node scripts/qa/marcar-inestables.mjs --capturas capturas \
+            --inestables diff-determinismo/inestables.json --tanda-a det-a --tanda-b det-b
+
+          # Cada shard guarda SU manifiesto con su número. `download-artifact` con patrón deja
+          # los artefactos aplanados en la misma carpeta, así que cuatro `manifest.json` se
+          # pisan y sobrevive uno solo — y con él se pierde lo que los otros tres midieron. Los
+          # PNG no colisionan (cada shard captura rutas distintas), así que el estropicio no se
+          # ve: 200 capturas comparadas y el manifiesto de un cuarto de ellas.
+          mv capturas/manifest.json "capturas/manifest-${{ matrix.shard }}.json"
+
+      # Una guarda que bloquea y no deja ver qué vio se desactiva a la semana. Cuando la sonda
+      # reprueba, lo único que queda en el log es un conteo de píxeles («106 · delta 21»), y con
+      # eso no se puede decidir si es un número que anima, una fecha que se coló o una animación
+      # que `finalizarAnimaciones` no apaga. Las dos tandas y su página de comparación suben
+      # SOLO en el fallo: en verde no hay nada que mirar y serían 40 MB por corrida.
+      - name: Página de comparación de la sonda (solo si reprobó)
+        if: failure()
+        run: |
+          node scripts/qa/comparacion.mjs --a det-a --b det-b \
+            --diff diff-determinismo --out comparacion-determinismo \
+            --titulo "Sonda de determinismo · misma compilación, dos tandas"
+
+      - name: Subir la evidencia de la sonda (solo si reprobó)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonda-determinismo-${{ github.job }}-${{ matrix.shard }}
+          path: |
+            comparacion-determinismo
+            diff-determinismo
+          retention-days: 14
 
       # Evidencia del fallo de login: el mensaje de Playwright no dice cuál de las tres
       # condiciones —visible, habilitado, estable— es la que falta, y adivinarlo ya costó dos
@@ -1516,6 +1652,13 @@ jobs:
           cache: "npm"
 
       - run: npm ci
+
+      # `diff.mjs` compara los PNG dentro de un Chromium —el canvas del navegador hace de
+      # decodificador, para no traer una librería de imágenes a un repo que ya trae un
+      # navegador entero—, así que este job necesita el binario. Faltaba desde que existe, y
+      # no se notó porque hasta ahora el job siempre moría antes, resolviendo la base.
+      - name: Navegador Playwright
+        run: npx playwright install --with-deps chromium
 
       - name: Bajar las capturas de la rama
         uses: actions/download-artifact@v4
@@ -1617,6 +1760,18 @@ jobs:
                 console.log("|---|---|---|");
                 for (const c of rep) console.log(`| \`${c.imagen}\` | ${c.px} | ${c.maxDelta} |`);
               } else console.log("\nNinguna pantalla de producción se movió.");
+              // Aparte y nombradas: no cuentan para el veredicto, pero esconderlas sería
+              // presentar como «0 cambios» un diff que no miró esas pantallas.
+              const ines = r.inestables ?? [];
+              if (ines.length) {
+                console.log(`\n### ${ines.length} ruta(s) INESTABLE(S), fuera del veredicto`);
+                console.log("\nLa sonda las vio cambiar entre dos tandas de la **misma** compilación,");
+                console.log("así que compararlas entre base y rama no mide nada. Las dos tandas de cada");
+                console.log("una están en `comparacion.html`.");
+                console.log("\n| ruta | px entre tandas | delta |");
+                console.log("|---|---|---|");
+                for (const i of ines) console.log(`| \`${i.ruta}\` | ${i.px} | ${i.maxDelta} |`);
+              }
             '
             echo
             echo "La página \`comparacion.html\` (antes / después / diferencia, lado a lado) va en el artefacto."
