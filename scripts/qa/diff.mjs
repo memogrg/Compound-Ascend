@@ -71,7 +71,15 @@ function parseArgs(argv) {
   return args;
 }
 
-/** Todos los .png bajo `dir`, con su ruta relativa (que es la identidad de la captura). */
+/**
+ * Todos los .png bajo `dir`, con su ruta relativa (que es la identidad de la captura).
+ *
+ * Menos `_sonda/`, que no son capturas de la corrida: son las dos tandas que la sonda de
+ * determinismo guardó de las rutas inestables, para poder verlas en `comparacion.html`. Viajan
+ * dentro del artefacto de la rama y no existen en el de la base, así que contarlas las dejaba
+ * como «solo en B» — y eso, por sí solo, ponía el diff en rojo. Un fichero de diagnóstico no
+ * puede hacer fallar el diagnóstico.
+ */
 async function listarPngs(dir) {
   const out = [];
   async function walk(actual) {
@@ -83,6 +91,7 @@ async function listarPngs(dir) {
     }
     for (const it of items) {
       const p = path.join(actual, it.name);
+      if (it.isDirectory() && it.name === "_sonda") continue;
       if (it.isDirectory()) await walk(p);
       else if (it.name.endsWith(".png")) out.push(path.relative(dir, p));
     }
@@ -276,6 +285,45 @@ async function main() {
   // ajustar, es una comparación inválida, y por eso esto no avisa: se niega.
   await exigirMismasBanderas(dirA, dirB);
 
+  /**
+   * Rutas que la sonda de determinismo marcó: no salen iguales dos veces seguidas contra la
+   * MISMA compilación, así que compararlas entre dos compilaciones distintas no mide nada. Se
+   * comparan igual y se reportan —el dato sigue siendo interesante—, pero NO entran al
+   * veredicto: culpar al PR de una pantalla que se mueve sola es exactamente el error que este
+   * job existe para no cometer.
+   *
+   * Se leen de los DOS manifiestos y se unen: si una ruta se volvió inestable en la rama, la
+   * base no lo sabe, y al revés.
+   */
+  const inestables = new Map();
+  for (const dir of [dirA, dirB]) {
+    const man = await leerManifest(dir);
+    for (const r of man?.rutasInestables ?? []) {
+      const previo = inestables.get(r.ruta);
+      inestables.set(r.ruta, {
+        ruta: r.ruta,
+        px: Math.max(previo?.px ?? 0, r.px ?? 0),
+        maxDelta: Math.max(previo?.maxDelta ?? 0, r.maxDelta ?? 0),
+      });
+    }
+  }
+
+  /**
+   * De la ruta a TODAS sus capturas (los dos temas y todos sus anchos).
+   *
+   * La sonda solo mira `light/1280`, pero una pantalla que se mueve sola se mueve en los seis
+   * combinados. Excluir solo la imagen que la sonda miró dejaría las otras cinco culpando al
+   * PR, que es el mismo error con menos ruido.
+   */
+  const imagenesInestables = new Set();
+  if (inestables.size) {
+    for (const dir of [dirA, dirB]) {
+      const man = await leerManifest(dir);
+      for (const e of man?.entries ?? [])
+        if (e.file && inestables.has(e.route)) imagenesInestables.add(e.file);
+    }
+  }
+
   const [pngsA, pngsB] = await Promise.all([listarPngs(dirA), listarPngs(dirB)]);
   const setB = new Set(pngsB);
   const soloA = pngsA.filter((p) => !setB.has(p));
@@ -309,6 +357,7 @@ async function main() {
         pct: r.totalPixels ? (r.diffPixels / r.totalPixels) * 100 : 0,
         sizeMismatch: Boolean(r.sizeMismatch),
         excluida: excluidos.has(slugDe(rel)),
+        inestable: imagenesInestables.has(rel),
       });
     }
   } finally {
@@ -323,14 +372,17 @@ async function main() {
   for (const f of filas.slice(0, 60)) {
     const nombre = f.imagen.length > 58 ? `…${f.imagen.slice(-57)}` : f.imagen.padEnd(58);
     const marca =
-      (f.sizeMismatch ? " (tamaño distinto)" : "") + (f.excluida ? " (excluida del estricto)" : "");
+      (f.sizeMismatch ? " (tamaño distinto)" : "") +
+      (f.excluida ? " (excluida del estricto)" : "") +
+      (f.inestable ? " (INESTABLE: fuera del veredicto)" : "");
     console.log(
       `${nombre} ${String(f.diffPixels).padStart(12)} ${f.pct.toFixed(4).padStart(8)} ${String(f.maxDelta).padStart(6)}${marca}`,
     );
   }
   if (filas.length > 60) console.log(`… y ${filas.length - 60} más`);
 
-  const estrictas = conDiff.filter((f) => !f.excluida);
+  const inestablesConDiff = conDiff.filter((f) => f.inestable);
+  const estrictas = conDiff.filter((f) => !f.excluida && !f.inestable);
   console.log(
     `\n${comunes.length} comparadas · ${conDiff.length} con diferencias · umbral ${threshold} · permitido hasta ${maxDiffPixels}px Y delta ${maxDelta}`,
   );
@@ -359,6 +411,19 @@ async function main() {
 
   // Una imagen falla si se pasa de CUALQUIERA de las dos: demasiados píxeles o un delta demasiado
   // grande. El ruido de rasterizado se queda corto en las dos; un cambio real se pasa en alguna.
+  if (inestables.size) {
+    console.log(
+      `\nrutas INESTABLES (${inestables.size}), fuera del veredicto — la sonda las vio cambiar ` +
+        `entre dos tandas de la MISMA compilación:`,
+    );
+    for (const i of inestables.values())
+      console.log(`  ${i.ruta}  ·  hasta ${i.px} px  ·  delta ${i.maxDelta} entre tandas`);
+    console.log(
+      `  ${inestablesConDiff.length} de sus capturas difieren también entre base y rama, y NO cuentan.`,
+    );
+    console.log("  Las dos tandas de cada una están en comparacion.html, para ver qué se mueve.");
+  }
+
   const reprobadas = estrictas.filter((f) => f.diffPixels > maxDiffPixels || f.maxDelta > maxDelta);
   if (reprobadas.length) {
     console.log(
@@ -408,6 +473,8 @@ async function main() {
           excluidos: [...excluidos],
         },
         parcial: parcial ?? null,
+        // Las lee `comparacion.mjs` para pintarles su propia sección con las dos tandas.
+        inestables: [...inestables.values()],
         soloA,
         soloB,
         capturas: conDiff.map((f) => ({
@@ -417,6 +484,7 @@ async function main() {
           maxDelta: f.maxDelta,
           ignorados: f.ignorados,
           excluida: Boolean(f.excluida),
+          inestable: Boolean(f.inestable),
           reprobada: reprobadasSet.has(f.imagen),
           tamañoDistinto: Boolean(f.sizeMismatch),
         })),

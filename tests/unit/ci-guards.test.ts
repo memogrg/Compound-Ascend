@@ -243,6 +243,46 @@ describe("la caché de imágenes del stack", () => {
       expect(excluye.split(","), `«${s}» no puede estar excluido`).not.toContain(s);
   });
 
+  it("los jobs de capturas reparten en tantos shards como dice su matriz", () => {
+    // `--shard N/4` con una matriz de 2 captura la mitad del inventario y sube un artefacto que
+    // PARECE completo: el diff compararía 100 de 200 y diría «nada se movió» de lo que no miró.
+    // El desajuste no lo ve nadie leyendo el YAML —los dos números están a treinta líneas— así
+    // que se comprueba que coincidan.
+    for (const job of ["capturas_main", "capturas_rama"]) {
+      const bloque =
+        DIRECTIVAS.slice(DIRECTIVAS.indexOf(`  ${job}:`)).split(/\n  [a-z0-9_]+:\n/)[0] ?? "";
+      const matriz = (/shard: \[([^\]]+)\]/.exec(bloque)?.[1] ?? "").split(",").length;
+      const usos = [...bloque.matchAll(/--shard \$\{\{ matrix\.shard \}\}\/(\d+)/g)].map((m) =>
+        Number(m[1]),
+      );
+      const nombre = /name: Capturas de [^\n]*?\/(\d+)\)/.exec(bloque)?.[1];
+      expect(usos.length, `${job}: un --shard`).toBe(1);
+      expect(usos[0], `${job}: --shard /N contra matriz de ${matriz}`).toBe(matriz);
+      expect(Number(nombre), `${job}: el nombre dice /N`).toBe(matriz);
+    }
+  });
+
+  it("lo que la sonda marca viaja al diff dentro del artefacto", () => {
+    // Los dos jobs no comparten disco. Si `marcar-inestables.mjs` no corre, el manifiesto llega
+    // sin `rutasInestables` y el diff vuelve a culpar al PR de una pantalla que se mueve sola:
+    // el hallazgo existiría solo en el log de un job que nadie abre.
+    for (const job of ["capturas_main", "capturas_rama"]) {
+      const bloque =
+        DIRECTIVAS.slice(DIRECTIVAS.indexOf(`  ${job}:`)).split(/\n  [a-z0-9_]+:\n/)[0] ?? "";
+      const iSonda = bloque.indexOf("sonda-determinismo.mjs");
+      const iMarca = bloque.indexOf("marcar-inestables.mjs");
+      const iSubida = bloque.indexOf("upload-artifact", iMarca);
+      expect(iSonda, `${job}: corre la sonda`).toBeGreaterThan(-1);
+      expect(iMarca, `${job}: marca las inestables`).toBeGreaterThan(iSonda);
+      expect(iSubida, `${job}: y las sube después de marcarlas`).toBeGreaterThan(iMarca);
+    }
+    // Y el diff baja TODOS los shards por patrón, no por nombre: pasar de 2 a 4 no puede
+    // requerir tocar el job que compara.
+    const bloque = DIRECTIVAS.slice(DIRECTIVAS.indexOf("  diff_visual:"));
+    expect(bloque).toContain("pattern: capturas-pr${{ github.event.number }}-*");
+    expect(bloque).toMatch(/--pattern "capturas-\$BASE-\*"/);
+  });
+
   it("las capturas se saltan cuando el PR no toca interfaz", () => {
     // Cuatro jobs de captura por un cambio en un README son 40 minutos de runner tirados, y
     // el ruido acostumbra a mirar los verdes sin leerlos.

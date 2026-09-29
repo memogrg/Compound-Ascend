@@ -8,12 +8,26 @@
  * sobre las mismas pantallas.
  *
  * Veinte rutas fijas, un tema y un ancho: suficiente para cazar antialiasing inestable sin
- * pagar otras 200 capturas. Si el resultado no es 0 de 20, el job falla y dice cuáles y con
- * qué delta — no se ajusta el umbral, que sería tapar justo lo que se viene a medir.
+ * pagar otras 200 capturas.
  *
- *   node scripts/qa/sonda-determinismo.mjs --a <tanda1> --b <tanda2>
+ * Qué hace con lo que encuentra, y por qué cambió: al principio CUALQUIER ruta inestable
+ * tumbaba el job. Eso confunde dos cosas distintas —«esta pantalla no se puede medir» y «el
+ * arnés está roto»— y le entrega a una sola ruta el poder de bloquear todos los PR, que es
+ * exactamente cómo una guarda se gana que la desactiven. Ahora las NOMBRA: escribe
+ * `inestables.json` con las rutas que difieren entre sus dos tandas, y el job sigue. El diff
+ * visual las excluye de su veredicto y las lista aparte, con las dos tandas a la vista, para
+ * que se vea qué se mueve en vez de adivinarlo.
+ *
+ * El tope sigue existiendo: más de `--tope` rutas inestables (2 por defecto) ya no es una
+ * pantalla rara, es el arnés perdiendo repetibilidad, y entonces sí falla.
+ *
+ * NO se ajustan los umbrales del diff: siguen en cero. Una ruta inestable no es una ruta que
+ * se compara con más manga ancha, es una ruta que NO se compara y se dice.
+ *
+ *   node scripts/qa/sonda-determinismo.mjs --a <tanda1> --b <tanda2> [--tope 2]
  */
 import path from "node:path";
+import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
@@ -74,17 +88,77 @@ const total = Number(m[1]);
 const distintas = Number(m[2]);
 
 console.log(`sonda de determinismo: ${distintas}/${total}`);
+
+const outDiff = args["out-diff"] ?? "diff-determinismo";
+const tope = Number(args.tope ?? 2);
+
+/**
+ * De `light/1280/mi-base-financiera.png` a `/mi-base-financiera`.
+ *
+ * El mapeo sale del manifiesto de la tanda, no del nombre del fichero: el slug es una
+ * transformación con pérdida (`/patrimonio/proteccion` → `patrimonio_proteccion`) y
+ * reconstruir la ruta a mano sería adivinar. El manifiesto ya guarda las dos.
+ */
+async function rutasPorImagen(dir) {
+  const mapa = new Map();
+  try {
+    const man = JSON.parse(await readFile(path.join(dir, "manifest.json"), "utf8"));
+    for (const e of man.entries ?? []) if (e.file && e.route) mapa.set(e.file, e.route);
+  } catch {
+    /* sin manifiesto se cae al nombre del fichero, abajo */
+  }
+  return mapa;
+}
+
+let inestables = [];
 if (distintas !== 0) {
-  console.log(
-    salida
-      .split("\n")
-      .filter((l) => /\.png/.test(l))
-      .slice(0, 20)
-      .join("\n"),
+  const reporte = JSON.parse(
+    await readFile(path.join(outDiff, "reporte.json"), "utf8").catch(() => "null"),
   );
+  const mapa = await rutasPorImagen(args.a);
+  const conDiff = (reporte?.capturas ?? []).filter((c) => c.px > 0);
+
+  // Se cuenta por RUTA, no por imagen. La sonda captura un tema y un ancho, así que hoy es lo
+  // mismo; pero el tope habla de «rutas inestables», y si algún día la sonda mirara dos anchos,
+  // una sola pantalla rara gastaría el tope entero y tumbaría el job por parecer tres.
+  const porRuta = new Map();
+  for (const c of conDiff) {
+    const ruta = mapa.get(c.imagen) ?? `?${path.basename(c.imagen, ".png")}`;
+    const previo = porRuta.get(ruta);
+    porRuta.set(ruta, {
+      ruta,
+      imagenes: [...(previo?.imagenes ?? []), c.imagen],
+      px: Math.max(previo?.px ?? 0, c.px),
+      maxDelta: Math.max(previo?.maxDelta ?? 0, c.maxDelta),
+    });
+  }
+  inestables = [...porRuta.values()].sort((x, y) => y.px - x.px);
+
+  console.log("\nrutas inestables (difieren entre dos tandas de la MISMA compilación):");
+  for (const i of inestables)
+    console.log(`  ${i.ruta}  ·  ${i.px} px  ·  delta ${i.maxDelta}  ·  ${i.imagenes.join(", ")}`);
+}
+
+await writeFile(
+  path.join(outDiff, "inestables.json"),
+  JSON.stringify(
+    { generadoEn: new Date().toISOString(), tope, comparadas: total, inestables },
+    null,
+    2,
+  ),
+);
+
+if (inestables.length > tope) {
   console.error(
-    "::error::las dos tandas de la MISMA compilación no salieron iguales. " +
-      "No se ajusta el umbral: si esto no da cero, las capturas no sirven como evidencia.",
+    `::error::${inestables.length} rutas inestables, más del tope de ${tope}. ` +
+      "Una pantalla rara se nombra y se sigue; esto ya es el arnés perdiendo repetibilidad, " +
+      "y entonces las capturas no sirven como evidencia. No se ajusta el umbral.",
   );
   process.exit(1);
+}
+if (inestables.length > 0) {
+  console.log(
+    `\n⚠ ${inestables.length} ruta(s) inestable(s), dentro del tope de ${tope}: quedan FUERA del ` +
+      "veredicto del diff visual y se listan aparte, con sus dos tandas, en comparacion.html.",
+  );
 }

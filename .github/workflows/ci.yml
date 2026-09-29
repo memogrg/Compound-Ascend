@@ -1342,7 +1342,16 @@ jobs:
               --rutas "$RUTAS" --theme light --widths 1280 --out "$TANDA"
           done
           node scripts/qa/sonda-determinismo.mjs --a det-a --b det-b \
-            --out-diff diff-determinismo
+            --out-diff diff-determinismo --tope 2
+
+      # Lo que la sonda descubrió tiene que VIAJAR: los dos jobs no comparten disco, y lo único
+      # que llega al diff visual es este artefacto. Sin este paso, el diff no sabría qué rutas
+      # se mueven solas y volvería a culpar al PR de una pantalla que cambia sin que nadie la
+      # toque — que es el error que la sonda existe para no cometer.
+      - name: Marcar las rutas inestables en el manifiesto
+        run: |
+          node scripts/qa/marcar-inestables.mjs --capturas capturas \
+            --inestables diff-determinismo/inestables.json --tanda-a det-a --tanda-b det-b
 
       # Una guarda que bloquea y no deja ver qué vio se desactiva a la semana. Cuando la sonda
       # reprueba, lo único que queda en el log es un conteo de píxeles («106 · delta 21»), y con
@@ -1537,7 +1546,16 @@ jobs:
               --rutas "$RUTAS" --theme light --widths 1280 --out "$TANDA"
           done
           node scripts/qa/sonda-determinismo.mjs --a det-a --b det-b \
-            --out-diff diff-determinismo
+            --out-diff diff-determinismo --tope 2
+
+      # Lo que la sonda descubrió tiene que VIAJAR: los dos jobs no comparten disco, y lo único
+      # que llega al diff visual es este artefacto. Sin este paso, el diff no sabría qué rutas
+      # se mueven solas y volvería a culpar al PR de una pantalla que cambia sin que nadie la
+      # toque — que es el error que la sonda existe para no cometer.
+      - name: Marcar las rutas inestables en el manifiesto
+        run: |
+          node scripts/qa/marcar-inestables.mjs --capturas capturas \
+            --inestables diff-determinismo/inestables.json --tanda-a det-a --tanda-b det-b
 
       # Una guarda que bloquea y no deja ver qué vio se desactiva a la semana. Cuando la sonda
       # reprueba, lo único que queda en el log es un conteo de píxeles («106 · delta 21»), y con
@@ -1704,6 +1722,18 @@ jobs:
                 console.log("|---|---|---|");
                 for (const c of rep) console.log(`| \`${c.imagen}\` | ${c.px} | ${c.maxDelta} |`);
               } else console.log("\nNinguna pantalla de producción se movió.");
+              // Aparte y nombradas: no cuentan para el veredicto, pero esconderlas sería
+              // presentar como «0 cambios» un diff que no miró esas pantallas.
+              const ines = r.inestables ?? [];
+              if (ines.length) {
+                console.log(`\n### ${ines.length} ruta(s) INESTABLE(S), fuera del veredicto`);
+                console.log("\nLa sonda las vio cambiar entre dos tandas de la **misma** compilación,");
+                console.log("así que compararlas entre base y rama no mide nada. Las dos tandas de cada");
+                console.log("una están en `comparacion.html`.");
+                console.log("\n| ruta | px entre tandas | delta |");
+                console.log("|---|---|---|");
+                for (const i of ines) console.log(`| \`${i.ruta}\` | ${i.px} | ${i.maxDelta} |`);
+              }
             '
             echo
             echo "La página \`comparacion.html\` (antes / después / diferencia, lado a lado) va en el artefacto."
