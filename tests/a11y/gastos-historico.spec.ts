@@ -25,11 +25,23 @@ async function abrir(browser: Browser, ruta: string, ancho = 1280) {
   return { ctx, page };
 }
 
-/** La tarjeta del histórico, y su SVG. */
+/**
+ * La tarjeta del histórico, y su SVG.
+ *
+ * El contenedor se busca por `card` **o** por el marco del núcleo. Al pasar de `ChartCard` a
+ * `ChartFrame` el envoltorio deja de tener clase `card` y pasa a ser `<figure class="cf">`, y
+ * este xpath se quedaba sin ancestro: los trece casos de este fichero morían por timeout en
+ * `scrollIntoViewIfNeeded`, que no se parece a «cambió el marco».
+ *
+ * `cf` se compara como TOKEN completo (` cf `), no con `contains`: si no, el primer ancestro
+ * que casa es `figcaption.cf-cab`, que es la cabecera y no la tarjeta.
+ */
 async function tarjetaHistorico(page: import("@playwright/test").Page) {
   const titulo = page.getByText("Histórico de gastos").first();
   await expect(titulo).toHaveCount(1);
-  const tarjeta = titulo.locator("xpath=ancestor::*[contains(@class,'card')][1]");
+  const tarjeta = titulo.locator(
+    "xpath=ancestor::*[contains(@class,'card') or contains(concat(' ',normalize-space(@class),' '),' cf ')][1]",
+  );
   await tarjeta.scrollIntoViewIfNeeded();
   // El gráfico es `dynamic({ssr:false})`: el título está desde el primer render y las columnas
   // llegan después. Esperar un tiempo fijo alcanzaba casi siempre, y «casi» en un arnés visual
