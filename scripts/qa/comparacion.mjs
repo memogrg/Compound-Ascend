@@ -71,7 +71,7 @@ const porImagen = new Map((reporte?.capturas ?? []).map((c) => [c.imagen, c]));
 const rango = (rel) => {
   const c = porImagen.get(rel);
   if (!c) return 2;
-  return c.reprobada ? 0 : c.inestable ? 3 : c.excluida ? 2 : 1;
+  return c.reprobada ? 0 : c.aprobada ? 1 : c.inestable ? 4 : c.excluida ? 3 : 2;
 };
 /**
  * Manda el REPORTE, no los ficheros que haya en la carpeta. Una carpeta de diffs reusada
@@ -112,11 +112,13 @@ const filas = cambios
       ? ""
       : c.reprobada
         ? '<b class="mal">reprobada</b>'
-        : c.inestable
-          ? '<b class="avisa">INESTABLE · fuera del veredicto</b>'
-          : c.excluida
-            ? '<b class="ok">excluida del estricto</b>'
-            : '<b class="ok">bajo el umbral</b>';
+        : c.aprobada
+          ? '<b class="avisa">APROBADA a mano</b>'
+          : c.inestable
+            ? '<b class="avisa">INESTABLE · fuera del veredicto</b>'
+            : c.excluida
+              ? '<b class="ok">excluida del estricto</b>'
+              : '<b class="ok">bajo el umbral</b>';
     const cifras = c ? `${c.px} px · delta ${c.maxDelta}` : "";
     return `<section>
   <h2>/${ruta} <small>${tema} · ${ancho}px — ${etiqueta} <i>${cifras}</i></small></h2>
@@ -175,6 +177,20 @@ la causa —o el arnés—, no para ignorarlas.</p>
 ${bloques}`;
 }
 
+/**
+ * Las aprobadas a mano se anuncian ARRIBA, no solo con su etiqueta.
+ *
+ * Quien abre esta página para revisar un cambio tiene que enterarse de que hay capturas que
+ * cambiaron y NO cuentan, antes de sacar conclusiones del resumen. Enterrarlo en una etiqueta a
+ * mitad de la lista es como no decirlo.
+ */
+const nAprobadas = (reporte?.aprobadas ?? []).length;
+const avisoAprobadas = nAprobadas
+  ? `<p class="resumen"><b class="avisa">${nAprobadas} captura(s) aprobadas a mano</b> para este PR:
+cambiaron a propósito y quedan fuera del veredicto. La aprobación va atada al sha256 del PNG
+«después», así que si la pantalla vuelve a moverse caduca sola.</p>`
+  : "";
+
 const titulo = typeof args.titulo === "string" ? args.titulo : "Comparación visual";
 const html = `<!doctype html>
 <html lang="es">
@@ -204,6 +220,7 @@ const html = `<!doctype html>
 <p class="resumen">${cambios.length} captura(s) con diferencias, de ${reporte?.comparadas ?? "?"} comparadas · ${
   cambios.filter((r) => porImagen.get(r)?.reprobada).length
 } reprobada(s), primero. Las que no cambian no salen.</p>
+${avisoAprobadas}
 ${filas || "<p>Ninguna captura cambió.</p>"}
 ${seccionInestables}
 </html>`;

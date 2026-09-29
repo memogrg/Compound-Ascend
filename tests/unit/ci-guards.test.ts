@@ -346,6 +346,21 @@ describe("la caché de imágenes del stack", () => {
     }
   });
 
+  it("el diff lee las aprobaciones solo en un PR, y nunca en push a main", () => {
+    // `--pr` es lo que habilita `qa/visual-aprobado.json`. Si se pasara siempre, un fichero
+    // olvidado en `main` dejaría aprobada para siempre una pantalla que nadie vuelve a mirar; y
+    // si no se pasara nunca, el mecanismo entero no existiría. El job de comparar corre solo en
+    // pull_request, pero el número va EXPLÍCITO para que la condición se lea en el YAML.
+    const bloque =
+      DIRECTIVAS.slice(DIRECTIVAS.indexOf("  diff_visual:")).split(/\n  [a-z0-9_]+:\n/)[0] ?? "";
+    expect(bloque).toMatch(/--pr \$\{\{ github\.event\.number \}\}/);
+    expect(bloque, "el job compara solo en PR").toMatch(/if: github\.event_name == 'pull_request'/);
+    // Y el resumen nombra lo aprobado: un «0 reprobadas» sin decir que hubo aprobaciones es
+    // una media verdad, y la media verdad es lo que vacía el mecanismo.
+    expect(bloque).toContain("APROBADAS a mano");
+    expect(bloque).toContain("CADUCADA(S)");
+  });
+
   it("las capturas se saltan cuando el PR no toca interfaz", () => {
     // Cuatro jobs de captura por un cambio en un README son 40 minutos de runner tirados, y
     // el ruido acostumbra a mirar los verdes sin leerlos.
