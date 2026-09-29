@@ -912,8 +912,21 @@ jobs:
       # deja de ser comparable entre días.
       QA_INSTANTE: "2026-09-18T18:00:00Z"
       # La cuenta demo que siembra `seed-demo-familia.mjs`. Se resuelve por email, nunca por id.
-      E2E_EMAIL: information.theglowup@gmail.com
+      # Sale de una variable del repositorio: un correo personal escrito en un fichero público
+      # del repo es un dato de contacto regalado a cualquiera que mire el historial.
+      E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
     steps:
+      # Falla acá y con instrucciones, no cuarenta líneas más abajo dentro de un script. La
+      # primera corrida con la variable sin crear murió con «Faltan E2E_EMAIL» en mitad del
+      # arnés, que no le dice a nadie qué hay que hacer.
+      - name: La variable DEMO_EMAIL tiene que existir
+        run: |
+          if [ -z "${{ vars.DEMO_EMAIL }}" ]; then
+            echo "::error::falta la variable de repositorio DEMO_EMAIL (el correo de la cuenta demo)."
+            echo "Creala con:  gh variable set DEMO_EMAIL --body '<correo>' --repo ${{ github.repository }}"
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
@@ -1072,3 +1085,554 @@ jobs:
           path: /tmp/compound-a11y-results
           retention-days: 7
           if-no-files-found: ignore
+
+  # ── El acelerador visual ──────────────────────────────────────────────────────────────
+  #
+  # La evidencia visual de un PR eran dos capturas a mano de 25 minutos cada una, en la
+  # máquina de quien lo escribía. Eso no escala y, peor, es donde se cuelan las medidas
+  # falsas: un puerto ocupado, una compilación bajo el servidor, dos orígenes distintos.
+  # Acá lo produce CI, con el mismo arnés y las mismas guardas.
+
+  # ¿Hay interfaz que capturar? Cuatro jobs de captura por un cambio en un README son 40
+  # minutos de runner tirados, y el ruido acostumbra a mirar los verdes sin leerlos.
+  #
+  # Sin acciones de terceros: `git diff --name-only` contra el merge-base y ya. Una acción
+  # para esto sería una dependencia más que auditar por una línea de shell.
+  toca_interfaz:
+    name: ¿El PR toca interfaz?
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request'
+    outputs:
+      si: ${{ steps.mirar.outputs.si }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - id: mirar
+        run: |
+          BASE=$(git merge-base origin/${{ github.base_ref }} HEAD)
+          CAMBIOS=$(git diff --name-only "$BASE" HEAD)
+          if echo "$CAMBIOS" | grep -qE '^(src/|public/|scripts/qa/|scripts/demo/|package(-lock)?\.json|next\.config\.|\.github/workflows/ci\.yml)'; then
+            echo "si=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::el PR toca interfaz: se capturan las pantallas"
+          else
+            echo "si=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::el PR no toca interfaz (ni src, ni public, ni el arnés, ni las dependencias): capturas y diff se saltan"
+          fi
+
+  capturas_main:
+    name: Capturas de main (${{ matrix.shard }}/2)
+    runs-on: ubuntu-24.04
+    needs: ci
+    # Solo en push: son la BASE contra la que se compara cada PR.
+    if: github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    env:
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
+      EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
+    steps:
+      # Falla acá y con instrucciones, no cuarenta líneas más abajo dentro de un script. La
+      # primera corrida con la variable sin crear murió con «Faltan E2E_EMAIL» en mitad del
+      # arnés, que no le dice a nadie qué hay que hacer.
+      - name: La variable DEMO_EMAIL tiene que existir
+        run: |
+          if [ -z "${{ vars.DEMO_EMAIL }}" ]; then
+            echo "::error::falta la variable de repositorio DEMO_EMAIL (el correo de la cuenta demo)."
+            echo "Creala con:  gh variable set DEMO_EMAIL --body '<correo>' --repo ${{ github.repository }}"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+        env:
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Recuperar el fallback de registros del CLI
+        run: echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
+
+      - name: Login en ghcr.io (cuota por usuario en vez de por IP del runner)
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clave de la caché de imágenes
+        id: clave_imagenes
+        run: |
+          CFG=$(sha256sum supabase/config.toml | cut -c1-12)
+          EXC=$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)
+          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-visual${{ matrix.shard }}-$CFG-$EXC" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de imágenes del stack
+        id: cache_imagenes
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/supabase-imagenes/stack.tar
+          key: ${{ steps.clave_imagenes.outputs.valor }}
+
+      - name: Cargar imágenes de la caché
+        run: scripts/ci/imagenes-supabase.sh cargar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Levantar el stack
+        run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
+
+      - name: Guardar imágenes para la próxima corrida
+        if: steps.cache_imagenes.outputs.cache-hit != 'true'
+        run: scripts/ci/imagenes-supabase.sh guardar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Migraciones y variables del stack efímero
+        run: |
+          supabase migration up --local
+          supabase status -o env | while IFS='=' read -r key val; do
+            val="${val%\"}"; val="${val#\"}"
+            case "$key" in
+              API_URL)
+                echo "SUPABASE_URL=$val"
+                echo "NEXT_PUBLIC_SUPABASE_URL=$val"
+                ;;
+              ANON_KEY) echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$val" ;;
+              SERVICE_ROLE_KEY) echo "SUPABASE_SERVICE_ROLE_KEY=$val" ;;
+              DB_URL) echo "DB_URL=$val" ;;
+            esac
+          done >> "$GITHUB_ENV"
+
+      # UN instante para la siembra y para la app. Lo calcula el arnés, que desde el arreglo
+      # del 28-sep no devuelve nunca uno futuro: con el reloj adelantado el token que emite
+      # gotrue con la hora REAL parece vencido en cada render y la página no termina de cargar.
+      - name: Instante congelado, uno solo
+        run: |
+          INSTANTE=$(node -e "import('./scripts/qa/snap.mjs').then(m => console.log(m.instanteCongelado().toISOString()))")
+          echo "QA_FREEZE=$INSTANTE" >> "$GITHUB_ENV"
+          echo "::notice::instante congelado (siembra y app): $INSTANTE"
+
+      - name: Entorno del stack efímero en .env.local
+        run: |
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY"
+            echo "DEMO_PASSWORD=$DEMO_PASSWORD"
+          } > .env.local
+        env:
+          DEMO_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+      # La captura mide pantallas CON datos: sin ellas media evidencia serían estados vacíos.
+      - name: Sembrar la cuenta demo
+        run: DEMO_ENV_FILE=.env.local node scripts/demo/seed-demo-familia.mjs
+
+      - name: Compilar con las banderas de producción
+        run: node scripts/dev/con-env.mjs npm run build
+
+      - name: Navegador Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Servidor congelado
+        run: |
+          node scripts/dev/con-env.mjs npm run qa:start -- --port 3001 &
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:3001/login; then exit 0; fi
+            sleep 2
+          done
+          echo "::error::el servidor congelado no respondió en 120s"
+          exit 1
+
+      - name: Capturar (shard ${{ matrix.shard }} de 2)
+        env:
+          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          # En CI se retira `--deterministic-mode` (no produce fotogramas en el runner). Ver
+          # `snap.mjs`; lo que esa bandera prometía se demuestra en el paso siguiente.
+          QA_CI: "1"
+        run: |
+          node scripts/qa/snap.mjs --base-url http://localhost:3001 \
+            --shard ${{ matrix.shard }}/2 --out capturas
+
+      # Quitar la bandera del determinismo y confiar sería cambiar una garantía por una
+      # suposición. Se vuelve a capturar un puñado de rutas contra el MISMO servidor y la misma
+      # compilación, con umbral CERO y sin filtro de antialiasing: cualquier píxel distinto es
+      # inestabilidad, y entonces las capturas no sirven como evidencia.
+      - name: Sonda de determinismo (20 rutas, dos veces)
+        env:
+          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          QA_CI: "1"
+        run: |
+          # Veinte rutas fijas, UN tema y UN ancho: 20 capturas por tanda. Con los seis
+          # combinados serían 120 y la sonda costaría más que lo que vigila.
+          #
+          # Fuera `home` y `dev_ui`, las mismas que excluye el criterio estricto. No es aflojar
+          # el umbral: la landing anima su gráfica de doce meses EN BUCLE a propósito, así que
+          # dos capturas suyas nunca son idénticas —medido: 230 px con delta 2— y una sonda que
+          # falla siempre por una animación intencionada se desactiva a la semana. Las otras 19
+          # dieron 0 px de diferencia, que es lo que esta sonda viene a comprobar.
+          RUTAS=$(node -e "
+            const r = require('./scripts/qa/routes.json');
+            const fuera = new Set(['/', '/dev/ui']);
+            console.log(r.filter(x => !fuera.has(x.path)).slice(0, 20).map(x => x.path).join(','));
+          ")
+          for TANDA in det-a det-b; do
+            node scripts/qa/snap.mjs --base-url http://localhost:3001 \
+              --rutas "$RUTAS" --theme light --widths 1280 --out "$TANDA"
+          done
+          node scripts/qa/sonda-determinismo.mjs --a det-a --b det-b \
+            --out-diff diff-determinismo
+
+      - name: Subir las capturas como base
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-${{ github.sha }}-${{ matrix.shard }}
+          path: capturas
+          retention-days: 14
+
+  capturas_rama:
+    name: Capturas de la rama (${{ matrix.shard }}/2)
+    runs-on: ubuntu-24.04
+    needs: [ci, toca_interfaz]
+    # Un check SALTADO cuenta como cumplido en el ruleset, así que saltarlo no abre un agujero.
+    if: github.event_name == 'pull_request' && needs.toca_interfaz.outputs.si == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    env:
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
+      EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
+    steps:
+      # Falla acá y con instrucciones, no cuarenta líneas más abajo dentro de un script. La
+      # primera corrida con la variable sin crear murió con «Faltan E2E_EMAIL» en mitad del
+      # arnés, que no le dice a nadie qué hay que hacer.
+      - name: La variable DEMO_EMAIL tiene que existir
+        run: |
+          if [ -z "${{ vars.DEMO_EMAIL }}" ]; then
+            echo "::error::falta la variable de repositorio DEMO_EMAIL (el correo de la cuenta demo)."
+            echo "Creala con:  gh variable set DEMO_EMAIL --body '<correo>' --repo ${{ github.repository }}"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+        env:
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Recuperar el fallback de registros del CLI
+        run: echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
+
+      - name: Login en ghcr.io (cuota por usuario en vez de por IP del runner)
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clave de la caché de imágenes
+        id: clave_imagenes
+        run: |
+          CFG=$(sha256sum supabase/config.toml | cut -c1-12)
+          EXC=$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)
+          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-visual${{ matrix.shard }}-$CFG-$EXC" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de imágenes del stack
+        id: cache_imagenes
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/supabase-imagenes/stack.tar
+          key: ${{ steps.clave_imagenes.outputs.valor }}
+
+      - name: Cargar imágenes de la caché
+        run: scripts/ci/imagenes-supabase.sh cargar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Levantar el stack
+        run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
+
+      - name: Guardar imágenes para la próxima corrida
+        if: steps.cache_imagenes.outputs.cache-hit != 'true'
+        run: scripts/ci/imagenes-supabase.sh guardar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Migraciones y variables del stack efímero
+        run: |
+          supabase migration up --local
+          supabase status -o env | while IFS='=' read -r key val; do
+            val="${val%\"}"; val="${val#\"}"
+            case "$key" in
+              API_URL)
+                echo "SUPABASE_URL=$val"
+                echo "NEXT_PUBLIC_SUPABASE_URL=$val"
+                ;;
+              ANON_KEY) echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$val" ;;
+              SERVICE_ROLE_KEY) echo "SUPABASE_SERVICE_ROLE_KEY=$val" ;;
+              DB_URL) echo "DB_URL=$val" ;;
+            esac
+          done >> "$GITHUB_ENV"
+
+      # UN instante para la siembra y para la app. Lo calcula el arnés, que desde el arreglo
+      # del 28-sep no devuelve nunca uno futuro: con el reloj adelantado el token que emite
+      # gotrue con la hora REAL parece vencido en cada render y la página no termina de cargar.
+      - name: Instante congelado, uno solo
+        run: |
+          INSTANTE=$(node -e "import('./scripts/qa/snap.mjs').then(m => console.log(m.instanteCongelado().toISOString()))")
+          echo "QA_FREEZE=$INSTANTE" >> "$GITHUB_ENV"
+          echo "::notice::instante congelado (siembra y app): $INSTANTE"
+
+      - name: Entorno del stack efímero en .env.local
+        run: |
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY"
+            echo "DEMO_PASSWORD=$DEMO_PASSWORD"
+          } > .env.local
+        env:
+          DEMO_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+      # La captura mide pantallas CON datos: sin ellas media evidencia serían estados vacíos.
+      - name: Sembrar la cuenta demo
+        run: DEMO_ENV_FILE=.env.local node scripts/demo/seed-demo-familia.mjs
+
+      - name: Compilar con las banderas de producción
+        run: node scripts/dev/con-env.mjs npm run build
+
+      - name: Navegador Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Servidor congelado
+        run: |
+          node scripts/dev/con-env.mjs npm run qa:start -- --port 3001 &
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:3001/login; then exit 0; fi
+            sleep 2
+          done
+          echo "::error::el servidor congelado no respondió en 120s"
+          exit 1
+
+      - name: Capturar (shard ${{ matrix.shard }} de 2)
+        env:
+          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          # En CI se retira `--deterministic-mode` (no produce fotogramas en el runner). Ver
+          # `snap.mjs`; lo que esa bandera prometía se demuestra en el paso siguiente.
+          QA_CI: "1"
+        run: |
+          node scripts/qa/snap.mjs --base-url http://localhost:3001 \
+            --shard ${{ matrix.shard }}/2 --out capturas
+
+      # Quitar la bandera del determinismo y confiar sería cambiar una garantía por una
+      # suposición. Se vuelve a capturar un puñado de rutas contra el MISMO servidor y la misma
+      # compilación, con umbral CERO y sin filtro de antialiasing: cualquier píxel distinto es
+      # inestabilidad, y entonces las capturas no sirven como evidencia.
+      - name: Sonda de determinismo (20 rutas, dos veces)
+        env:
+          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          QA_CI: "1"
+        run: |
+          # Veinte rutas fijas, UN tema y UN ancho: 20 capturas por tanda. Con los seis
+          # combinados serían 120 y la sonda costaría más que lo que vigila.
+          #
+          # Fuera `home` y `dev_ui`, las mismas que excluye el criterio estricto. No es aflojar
+          # el umbral: la landing anima su gráfica de doce meses EN BUCLE a propósito, así que
+          # dos capturas suyas nunca son idénticas —medido: 230 px con delta 2— y una sonda que
+          # falla siempre por una animación intencionada se desactiva a la semana. Las otras 19
+          # dieron 0 px de diferencia, que es lo que esta sonda viene a comprobar.
+          RUTAS=$(node -e "
+            const r = require('./scripts/qa/routes.json');
+            const fuera = new Set(['/', '/dev/ui']);
+            console.log(r.filter(x => !fuera.has(x.path)).slice(0, 20).map(x => x.path).join(','));
+          ")
+          for TANDA in det-a det-b; do
+            node scripts/qa/snap.mjs --base-url http://localhost:3001 \
+              --rutas "$RUTAS" --theme light --widths 1280 --out "$TANDA"
+          done
+          node scripts/qa/sonda-determinismo.mjs --a det-a --b det-b \
+            --out-diff diff-determinismo
+
+      # Evidencia del fallo de login: el mensaje de Playwright no dice cuál de las tres
+      # condiciones —visible, habilitado, estable— es la que falta, y adivinarlo ya costó dos
+      # vueltas de CI.
+      - name: Subir la evidencia si el login falló
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fallo-login-${{ matrix.shard }}
+          path: |
+            qa-fallo-login.png
+            qa-fallo-login.html
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Subir las capturas de la rama
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-pr${{ github.event.number }}-${{ matrix.shard }}
+          path: capturas
+          retention-days: 14
+
+  diff_visual:
+    name: Diff visual
+    runs-on: ubuntu-24.04
+    needs: [capturas_rama, toca_interfaz]
+    if: github.event_name == 'pull_request' && needs.toca_interfaz.outputs.si == 'true'
+    # Informativo en su primera vida, pero SIN `continue-on-error` — esa directiva está
+    # prohibida en este archivo (`tests/unit/ci-guards.test.ts`) porque un job que se salta su
+    # propio veredicto ya costó un incidente. No hace falta: mientras no esté en el ruleset,
+    # un rojo acá se ve y no bloquea. Cuando acumule tres verdes, se añade al ruleset y pasa a
+    # bloquear sin tocar una línea de este workflow.
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Bajar las capturas de la rama
+        uses: actions/download-artifact@v4
+        with:
+          pattern: capturas-pr${{ github.event.number }}-*
+          merge-multiple: true
+          path: rama
+
+      # La base es el MERGE-BASE, no la punta de `main`: comparar contra una punta que ya
+      # avanzó mete en el diff cambios de otros PR y el veredicto deja de ser sobre este.
+      # La base es el MERGE-BASE, no la punta de `main`: comparar contra una punta que ya
+      # avanzó mete en el diff cambios de otros PR y el veredicto deja de ser sobre este.
+      #
+      # Y si no hay base, el job NO se pone verde. Un diff que no se pudo hacer no es un diff
+      # que salió bien — dar verde ahí es exactamente la clase de medida falsa que este job
+      # viene a impedir. Si la corrida de la base está en marcha, se espera; si no existe o
+      # falló, se termina en rojo diciendo qué hacer.
+      - name: Bajar las capturas de la base (merge-base con main)
+        id: base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BASE=$(git merge-base origin/${{ github.base_ref }} HEAD)
+          echo "sha=$BASE" >> "$GITHUB_OUTPUT"
+          echo "::notice::merge-base = $BASE"
+
+          # Hasta 25 min de sondeo cada 60 s: la corrida de `main` puede ir por delante.
+          for i in $(seq 1 25); do
+            ESTADO=$(gh run list --commit "$BASE" --workflow ci.yml --json status,conclusion \
+              --jq '[.[]][0] | "\(.status)/\(.conclusion // "-")"')
+            case "$ESTADO" in
+              completed/success) break ;;
+              completed/*)
+                echo "::error::la corrida de ci.yml del merge-base $BASE terminó en $ESTADO."
+                echo "Sin capturas de la base no hay diff, y sin diff este job no se pone verde."
+                echo "Qué hacer: arreglá esa corrida de \`main\` y relanzá este job."
+                exit 1 ;;
+              "") 
+                echo "::error::no existe ninguna corrida de ci.yml para el merge-base $BASE."
+                echo "Pasa cuando la base es anterior al job de capturas, o si se borró la corrida."
+                echo "Qué hacer: relanzá este job cuando la corrida de \`main\` de ese commit exista y termine."
+                exit 1 ;;
+              *)
+                echo "corrida de la base en $ESTADO — esperando (intento $i de 25)"
+                sleep 60 ;;
+            esac
+          done
+
+          RID=$(gh run list --commit "$BASE" --workflow ci.yml --json databaseId,conclusion \
+            --jq '[.[] | select(.conclusion=="success")][0].databaseId')
+          if [ -z "$RID" ]; then
+            echo "::error::la corrida del merge-base $BASE no terminó en verde tras 25 min de espera."
+            echo "Qué hacer: relanzar cuando la corrida de main termine."
+            exit 1
+          fi
+          mkdir -p base
+          # Una corrida verde NO implica que tenga capturas: las de `main` anteriores a este
+          # job terminaron bien y no subieron ninguna. Se comprueba y se dice, en vez de dejar
+          # que `gh` escupa «no valid artifacts found» y que quien mire adivine qué significa.
+          if ! gh run download "$RID" --pattern "capturas-$BASE-*" --dir /tmp/base-art; then
+            echo "::error::la corrida $RID del merge-base $BASE terminó en verde pero no tiene capturas."
+            echo "Pasa mientras \`main\` no haya corrido todavía con el job de capturas: su primer"
+            echo "push posterior a este PR deja la base lista."
+            echo "Qué hacer: relanzar este job cuando la corrida de main de $BASE tenga el artefacto."
+            exit 1
+          fi
+          find /tmp/base-art -mindepth 1 -maxdepth 1 -type d -exec cp -a {}/. base/ \;
+          echo "hay=si" >> "$GITHUB_OUTPUT"
+
+      - name: Comparar
+        run: |
+          set -o pipefail
+          node scripts/qa/diff.mjs --a base --b rama --out-diff diffs \
+            --exclude home,dev_ui --max-diff-pixels 60 --max-delta 2 --ignore-delta-below 5 \
+            | tee diff.log || echo "DIFF_FALLA=1" >> "$GITHUB_ENV"
+
+      - name: Página de comparación
+        run: |
+          node scripts/qa/comparacion.mjs --a base --b rama --diff diffs --out comparacion \
+            --titulo "PR #${{ github.event.number }} · ${{ github.event.pull_request.title }}"
+          cp diff.log comparacion/
+          cp diffs/reporte.json comparacion/
+
+      # El resumen del PR dice QUÉ rutas cambian. El log completo queda en el artefacto; lo
+      # que se lee de un vistazo tiene que ser la lista, no 200 líneas de ceros.
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo "## Diff visual"
+            echo
+            node -e '
+              const r = require("./diffs/reporte.json");
+              const rep = r.capturas.filter(c => c.reprobada);
+              console.log(`**${r.comparadas} comparadas · ${rep.length} reprobada(s)**`);
+              if (r.parcial) console.log(`\n⚠ PARCIAL: ${r.parcial.comparadas} de ${r.parcial.esperadas}.`);
+              if (rep.length) {
+                console.log("\n| captura | px | delta |");
+                console.log("|---|---|---|");
+                for (const c of rep) console.log(`| \`${c.imagen}\` | ${c.px} | ${c.maxDelta} |`);
+              } else console.log("\nNinguna pantalla de producción se movió.");
+            '
+            echo
+            echo "La página \`comparacion.html\` (antes / después / diferencia, lado a lado) va en el artefacto."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Subir la comparación
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comparacion-visual-pr${{ github.event.number }}
+          path: comparacion
+          retention-days: 14
+
+      - name: Veredicto
+        run: |
+          if [ "${DIFF_FALLA:-}" = "1" ]; then
+            echo "::error::el diff visual reprobó — mirá la página de comparación en el artefacto"
+            exit 1
+          fi
