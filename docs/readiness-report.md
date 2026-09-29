@@ -29,19 +29,27 @@ seguridad de grado fintech.
 
 - **TypeScript strict** (con `noUncheckedIndexedAccess`, `noUnusedLocals`, etc.): sin errores.
 - **ESLint**: limpio (`@typescript-eslint/no-explicit-any` como error).
-- **Tests**: 45 unitarios + 6 de RLS (estos se ejecutan con un Supabase de prueba).
-  Cobertura de los motores puros (mensualización, base, salud, prioridad,
-  estrategia de deuda, readiness/protección, Rich Life), parsing de acciones IA,
-  límites de tokens y validaciones.
+- **Tests**: al 2026-09-28, ~4.700 tests en ~356 ficheros bajo `tests/` (la cifra
+  original «45 unitarios + 6 de RLS» del 2026-06-01 quedó obsoleta). Los de RLS se
+  ejecutan con un Supabase de prueba. Cobertura de los motores puros (mensualización,
+  base, salud, prioridad, estrategia de deuda, readiness/protección, Rich Life),
+  parsing de acciones IA, límites de tokens y validaciones.
 - **Build de producción**: exitoso.
 - Cada módulo verificado visualmente contra el design system del handoff.
 
 ## Riesgos residuales
 
-Ver `docs/security.md`. Principales: rate-limit/cache en memoria por instancia
-(Redis pendiente para multi-instancia), incremento de tokens no atómico bajo
-concurrencia extrema, tipos de BD a regenerar tras provisionar, dependencia de
-Yahoo (no oficial) en la cadena de precios.
+Detalle y proofs en `docs/security.md`. **Estado verificado el 2026-09-28** (rama
+`chore/higiene-repo-publico`):
+
+- **[CERRADO] Rate-limit multi-instancia:** ya usa Upstash Redis — `src/lib/rate-limit/index.ts`.
+- **[ABIERTO] Cache de precios/indicadores en memoria:** aún solo-memoria —
+  `src/lib/market-data/cache.ts`, `src/lib/economic-indicators/cache.ts`.
+- **[ABIERTO] Incremento de tokens no atómico:** read-modify-write — `src/lib/ai/usage.ts`.
+- **[ABIERTO] Tipos de BD a mano:** `src/lib/supabase/database.types.ts`.
+- **[ABIERTO] Yahoo (no oficial) en la cadena de precios:** `src/lib/market-data/providers.ts`.
+- **[ABIERTO] `postcss` transitiva:** locked en 8.5.15, bump a 8.5.28 pendiente — `package.json`.
+- **[ABIERTO] CSP con `'unsafe-inline'`:** `src/lib/security/headers.ts`.
 
 ## Acciones requeridas antes de producción
 

@@ -23,32 +23,38 @@ Documentamos controles y riesgos residuales.
 ## Acción requerida antes de producción
 
 1. **Rotar** las API keys del handoff (Finnhub, AlphaVantage, Gemini): están comprometidas.
+   _Al 2026-09-28: Finnhub **rotada** (y su literal retirado del prototipo público,
+   `mobile-shell/design-prototipo/assets/invest.js`); falta confirmar AlphaVantage y Gemini._
 2. Configurar `PAYMENT_WEBHOOK_SECRET`, `TURNSTILE_*` y dominios reales.
 3. Configurar SPF/DKIM/DMARC del dominio de correo.
 4. Verificar que el frontend de producción apunta al Supabase de producción.
 
 ## Riesgos residuales (documentados)
 
-- **Cache/rate-limit en memoria:** hoy por instancia. Con múltiples instancias, el
-  rate-limit y el cache de precios no son globales hasta integrar Redis
-  (interfaz ya preparada). El ledger de tokens sí es global (Postgres).
-- **Incremento de `ai_usage_ledger`:** hoy es read-modify-write con service-role;
-  bajo altísima concurrencia podría subcontar. Mitigación futura: función RPC
-  atómica (`increment`) en Postgres.
-- **Tipos de BD:** mantenidos a mano por fase; regenerar con `supabase gen types`
-  tras provisionar para garantizar exactitud total.
-- **Precios de mercado:** Yahoo no es API oficial (UA spoof); puede cambiar. Hay
-  cadena de respaldo, pero conviene monitorear fallos por proveedor.
-- **Vulnerabilidad transitiva:** `postcss` interno de Next (moderada) — se resuelve
-  al actualizar Next; nuestra dependencia directa de postcss está parcheada.
-- **CSP con `'unsafe-inline'` (script-src/style-src):** la política aún permite
-  scripts y estilos inline porque la app usa un script inline de inicialización de
-  tema (anti-FOUC, en `app/layout.tsx`) y varios `dangerouslySetInnerHTML`
-  controlados (títulos, íconos). Endurecer a nonces/hashes es un trabajo de mayor
-  riesgo (puede romper estilos/scripts si algo se escapa) y queda **pendiente como
-  P2 dedicado**. Mitigado en parte por `object-src 'none'`, `base-uri 'self'`,
-  `frame-ancestors 'none'`, `form-action 'self'` y los origin-checks de los
-  endpoints sensibles.
+> **Estado verificado el 2026-09-28** (rama `chore/higiene-repo-publico`). Cada punto lleva
+> su estado real hoy y el fichero que lo prueba. `[CERRADO]`/`[PARCIAL]`/`[ABIERTO]`.
+
+- **[PARCIAL] Cache/rate-limit en memoria:** el **rate-limit ya es coherente entre
+  instancias** vía Upstash Redis (INCR + PEXPIRE, con degradación a memoria si Redis falla)
+  — `src/lib/rate-limit/index.ts` (`RedisRateStore`). Sigue **ABIERTO** el **cache de precios
+  e indicadores económicos**, aún solo-memoria hasta enchufar el adaptador Redis —
+  `src/lib/market-data/cache.ts`. El ledger de tokens sí es global (Postgres).
+- **[ABIERTO] Incremento de `ai_usage_ledger`:** sigue siendo read-modify-write
+  (`select tokens_used,requests` → `upsert`) con service-role — `src/lib/ai/usage.ts`. No hay
+  RPC atómico (`increment`) todavía; bajo altísima concurrencia podría subcontar.
+- **[ABIERTO] Tipos de BD:** `src/lib/supabase/database.types.ts` se mantiene a mano por fases
+  (su propia cabecera lo dice); no se regenera automáticamente tras cada migración.
+- **[ABIERTO] Precios de mercado:** Yahoo sigue en la cadena de respaldo con User-Agent
+  spoofeado — `src/lib/market-data/providers.ts` (`yahoo()`, `yahooHistory()`). No es API
+  oficial; conviene monitorear fallos por proveedor.
+- **[ABIERTO] Vulnerabilidad transitiva `postcss`:** la dependencia directa está en `^8.5.15`
+  con override `$postcss` — `package.json`. El bump a 8.5.28 está **pendiente** (rama Dependabot
+  sin mergear); la transitiva interna de Next se resuelve al actualizar Next.
+- **[ABIERTO] CSP con `'unsafe-inline'` (script-src/style-src):** sigue presente hoy —
+  `src/lib/security/headers.ts` (líneas ~38 y ~53). La política aún permite scripts y estilos
+  inline por el script anti-FOUC de tema y varios `dangerouslySetInnerHTML` controlados.
+  Endurecer a nonces/hashes queda **pendiente como P2 dedicado**. Mitigado por `object-src
+  'none'`, `base-uri 'self'`, `frame-ancestors 'none'`, `form-action 'self'` y los origin-checks.
 
 ## Pruebas de seguridad
 
