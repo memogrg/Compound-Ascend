@@ -156,12 +156,16 @@ describe("la caché de imágenes del stack", () => {
       expect(total, `matriz de ${cuantos} contra /${total}`).toBe(cuantos);
   });
 
-  it("el job de a11y siembra con DEMO_ENV_FILE, nunca contra producción", () => {
-    // El sembrador BORRA y reescribe las cuentas de demo, y esas cuentas existen también en
-    // producción: por eso exige que el entorno se nombre. El fichero que se le nombra acá lo
-    // escribe el propio job con la URL del stack efímero que acaba de arrancar.
+  it("el job de a11y siembra con DEMO_ENV_FILE y contra la cuenta sintética", () => {
+    // El sembrador BORRA y reescribe las cuentas de demo, y su default es el buzón REAL de la
+    // demo de producción: por eso exige que el entorno se nombre (`DEMO_ENV_FILE`) y por eso
+    // acá se le reapunta el correo (`DEMO_EMAIL_OVERRIDE`). Sin el override, una corrida de CI
+    // reescribe la cuenta de producción. El fichero de entorno lo escribe el propio job con la
+    // URL del stack efímero que acaba de arrancar.
     const bloque = DIRECTIVAS.slice(DIRECTIVAS.indexOf("  e2e_a11y:"));
-    expect(bloque).toContain("DEMO_ENV_FILE=.env.local node scripts/demo/seed-demo-familia.mjs");
+    expect(bloque).toMatch(
+      /DEMO_ENV_FILE=\.env\.local DEMO_EMAIL_OVERRIDE=\S+ node scripts\/demo\/seed-demo-familia\.mjs/,
+    );
     expect(bloque).toContain("> .env.local");
   });
 
@@ -198,7 +202,45 @@ describe("la caché de imágenes del stack", () => {
       .map((m) => m[0])
       .filter((c) => !c.endsWith(".local"));
     expect(reales, `correo(s) de dominio real: ${reales.join(", ")}`).toEqual([]);
-    expect(DIRECTIVAS).toContain("vars.DEMO_EMAIL");
+
+    // Y la cuenta demo NO vuelve a salir de `vars.DEMO_EMAIL`. Esa variable apuntaba al buzón
+    // real de la demo de producción, así que «esconderlo en una variable» resolvía la mitad
+    // visible del problema y dejaba la otra: cada corrida de CI borraba y reescribía una
+    // cuenta de producción, y el correo igual acababa impreso en los logs del job. Un
+    // sintético en `.local` —TLD reservado, RFC 6762— se puede escribir a la vista porque no
+    // hay buzón detrás que proteger.
+    expect(DIRECTIVAS).not.toContain("vars.DEMO_EMAIL");
+    expect(DIRECTIVAS).toContain("DEMO_EMAIL_OVERRIDE=");
+  });
+
+  it("el job de migraciones corre tests/rls con las TRES credenciales y sin omitir", () => {
+    // Medido: con `SUPABASE_TEST_URL` y `_SERVICE_ROLE_KEY` pero SIN `_ANON_KEY`, vitest sale
+    // 0 y el resumen dice «25 skipped (25)». O sea: el job se pone verde habiendo corrido cero
+    // pruebas. Seis de los siete ficheros de `tests/rls` piden la ANON en su `skipIf`.
+    //
+    // Por eso se comprueban las tres exportaciones Y la guarda que convierte el silencio en
+    // rojo. Quitar cualquiera de las dos cosas devuelve el verde falso.
+    const bloque = DIRECTIVAS.slice(
+      DIRECTIVAS.indexOf("  migrations:"),
+      DIRECTIVAS.indexOf("  ci:") > DIRECTIVAS.indexOf("  migrations:")
+        ? DIRECTIVAS.indexOf("  ci:")
+        : DIRECTIVAS.indexOf("  e2e:"),
+    );
+    for (const v of [
+      "SUPABASE_TEST_URL",
+      "SUPABASE_TEST_ANON_KEY",
+      "SUPABASE_TEST_SERVICE_ROLE_KEY",
+    ])
+      expect(bloque, `export de ${v}`).toContain(`export ${v}=`);
+    expect(bloque).toContain("npx vitest run tests/rls");
+    expect(bloque, "la guarda del resumen").toMatch(/grep -q 'skipped'[\s\S]*?exit 1/);
+
+    // Y el stack de ese job tiene que levantar las tres piezas que esos tests usan por HTTP:
+    // sin kong no hay `/rest/v1` ni `/auth/v1`, sin gotrue no hay usuario de prueba, sin
+    // postgrest no hay filas. Excluirlas dejaba el job aplicando esquema y nada más.
+    const excluye = /EXCLUIR_SERVICIOS:\s*([^\n]+)/.exec(bloque)?.[1] ?? "";
+    for (const s of ["kong", "gotrue", "postgrest"])
+      expect(excluye.split(","), `«${s}» no puede estar excluido`).not.toContain(s);
   });
 
   it("las capturas se saltan cuando el PR no toca interfaz", () => {

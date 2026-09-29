@@ -107,9 +107,15 @@ jobs:
       # todos los pasos siguientes. Hay que volver a vaciarla DESPUÉS de ese paso; se deja
       # aquí igualmente para que el valor sea explícito allá donde se lea.
       SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
-      # De las trece imágenes, este job solo necesita **Postgres**: `db reset` aplica SQL y
-      # nada más. Vive en el `env` porque lo leen el arranque Y la clave de la caché.
-      EXCLUIR_SERVICIOS: gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+      # Este job ya no solo APLICA el esquema: también corre `tests/rls` contra él, y esos
+      # tests hablan HTTP —`/rest/v1` y `/auth/v1/admin`—, no SQL. Así que a Postgres se le
+      # suman tres: **kong** (la puerta que enruta esas dos rutas), **gotrue** (crea y borra
+      # los usuarios de prueba) y **postgrest** (lee y escribe las filas). Las otras diez
+      # siguen fuera; `mailpit` también, porque los usuarios se crean con `email_confirm`
+      # y no se manda ningún correo.
+      # Vive en el `env` porque lo leen el arranque Y la clave de la caché — que incluye
+      # `$EXC`, así que cambiar esta línea invalida el tarball viejo por sí sola.
+      EXCLUIR_SERVICIOS: realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
     steps:
       - uses: actions/checkout@v7
 
@@ -225,6 +231,61 @@ jobs:
 
       - name: Apply fresco de toda la cadena de migraciones
         run: supabase db reset
+
+      # Hasta acá el job demostraba que la cadena APLICA. `tests/rls` demuestra que lo
+      # aplicado se COMPORTA: aislamiento por usuario, y el incremento atómico del ledger de
+      # IA bajo concurrencia. Corre acá y no en otro job porque el stack ya está arriba con la
+      # cadena entera aplicada, así que las funciones nuevas existen sin montar nada más.
+      # Este job no traía Node ni dependencias; de ahí los dos pasos que siguen.
+      - uses: actions/setup-node@v6
+        with:
+          # 22 y no 20 a propósito. Cinco de los siete ficheros de `tests/rls` usan
+          # `@supabase/supabase-js`, que construye un `RealtimeClient` dentro de
+          # `createClient` y exige `WebSocket` nativo: en Node 20 revienta con «native
+          # WebSocket not found» ANTES de la primera aserción. Medido en mi Mac: con v20,
+          # 2 ficheros en rojo y 13 pruebas omitidas; con v22, 7 ficheros y 25 pruebas, todas
+          # pasando.
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      - name: Evidencia RLS — el esquema se comporta (tests/rls)
+        run: |
+          # `supabase status -o env` entrecomilla los valores; se les quitan las comillas
+          # (idéntico al paso «Migraciones y variables del stack efímero» de los E2E).
+          #
+          # Las TRES credenciales, no dos. Cada fichero de `tests/rls` se auto-salta con
+          # `describe.skipIf(!ready)` y `ready` incluye la ANON en seis de los siete: sin
+          # exportarla, vitest sale 0 habiendo omitido la mayor parte de la suite. Es la
+          # forma exacta que tiene este arnés de dar un verde falso, así que abajo se
+          # comprueba que no omitió NADA.
+          while IFS='=' read -r key val; do
+            val="${val%\"}"; val="${val#\"}"
+            case "$key" in
+              API_URL) export SUPABASE_TEST_URL="$val" ;;
+              ANON_KEY) export SUPABASE_TEST_ANON_KEY="$val" ;;
+              SERVICE_ROLE_KEY) export SUPABASE_TEST_SERVICE_ROLE_KEY="$val" ;;
+            esac
+          done < <(supabase status -o env)
+
+          set -o pipefail
+          npx vitest run tests/rls 2>&1 | tee /tmp/rls.log
+
+      # Un `exit 0` de vitest no dice que la suite corriera: con las credenciales sin
+      # exportar sale 0 con todo omitido. Esta guarda convierte ese silencio en rojo.
+      - name: La suite de RLS corrió entera
+        run: |
+          RESUMEN=$(grep -E '^ *Tests +[0-9]' /tmp/rls.log | tail -1)
+          echo "$RESUMEN"
+          if [ -z "$RESUMEN" ]; then
+            echo "::error::vitest no imprimió el resumen de pruebas: la suite de RLS no llegó a correr."
+            exit 1
+          fi
+          if echo "$RESUMEN" | grep -q 'skipped'; then
+            echo "::error::la suite de RLS omitió pruebas: $RESUMEN"
+            echo "Casi siempre es una credencial SUPABASE_TEST_* sin exportar, no un test roto."
+            exit 1
+          fi
 
   # Guard BLOQUEANTE: levanta la app contra un Supabase real, crea un usuario y
   # navega. Es el ÚNICO job que EJERCITA el esquema en vez de solo aplicarlo, y
@@ -912,21 +973,13 @@ jobs:
       # deja de ser comparable entre días.
       QA_INSTANTE: "2026-09-18T18:00:00Z"
       # La cuenta demo que siembra `seed-demo-familia.mjs`. Se resuelve por email, nunca por id.
-      # Sale de una variable del repositorio: un correo personal escrito en un fichero público
-      # del repo es un dato de contacto regalado a cualquiera que mire el historial.
-      E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+      # Es una cuenta SINTÉTICA, escrita acá a la vista: `.local` es un TLD reservado
+      # (RFC 6762), así que no hay —ni puede haber— buzón detrás. Antes salía de la variable
+      # `DEMO_EMAIL`, que apuntaba al buzón REAL de la demo de producción: un correo personal
+      # legible por cualquiera con acceso a los logs de un repo público, y una cuenta de
+      # producción que cada corrida de CI borraba y reescribía.
+      E2E_EMAIL: demo@ci.local
     steps:
-      # Falla acá y con instrucciones, no cuarenta líneas más abajo dentro de un script. La
-      # primera corrida con la variable sin crear murió con «Faltan E2E_EMAIL» en mitad del
-      # arnés, que no le dice a nadie qué hay que hacer.
-      - name: La variable DEMO_EMAIL tiene que existir
-        run: |
-          if [ -z "${{ vars.DEMO_EMAIL }}" ]; then
-            echo "::error::falta la variable de repositorio DEMO_EMAIL (el correo de la cuenta demo)."
-            echo "Creala con:  gh variable set DEMO_EMAIL --body '<correo>' --repo ${{ github.repository }}"
-            exit 1
-          fi
-
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
@@ -1036,7 +1089,11 @@ jobs:
       # La auditoría mide pantallas CON datos: sin ellas, media suite se pasea por estados
       # vacíos y el inventario no dice nada de lo que ve una persona.
       - name: Sembrar la cuenta demo
-        run: DEMO_ENV_FILE=.env.local node scripts/demo/seed-demo-familia.mjs
+        # `DEMO_EMAIL_OVERRIDE` reapunta las DOS identidades de la demo (el titular y Marta,
+        # que cuelga del mismo buzón por plus-addressing) a la cuenta sintética. Sin él, el
+        # seeder cae a su default, que es el buzón real de producción — y el seeder BORRA y
+        # reescribe lo que encuentra, así que ese default no puede ser lo que corra en CI.
+        run: DEMO_ENV_FILE=.env.local DEMO_EMAIL_OVERRIDE=demo@ci.local node scripts/demo/seed-demo-familia.mjs
 
       # Los términos se dejan PENDIENTES a propósito, igual que en nav-v2: la barra legal es
       # una pieza global, y sus specs son parte de esta suite. Con el seed marcándolos, la
@@ -1135,17 +1192,6 @@ jobs:
       SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
       EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
     steps:
-      # Falla acá y con instrucciones, no cuarenta líneas más abajo dentro de un script. La
-      # primera corrida con la variable sin crear murió con «Faltan E2E_EMAIL» en mitad del
-      # arnés, que no le dice a nadie qué hay que hacer.
-      - name: La variable DEMO_EMAIL tiene que existir
-        run: |
-          if [ -z "${{ vars.DEMO_EMAIL }}" ]; then
-            echo "::error::falta la variable de repositorio DEMO_EMAIL (el correo de la cuenta demo)."
-            echo "Creala con:  gh variable set DEMO_EMAIL --body '<correo>' --repo ${{ github.repository }}"
-            exit 1
-          fi
-
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
@@ -1235,7 +1281,11 @@ jobs:
 
       # La captura mide pantallas CON datos: sin ellas media evidencia serían estados vacíos.
       - name: Sembrar la cuenta demo
-        run: DEMO_ENV_FILE=.env.local node scripts/demo/seed-demo-familia.mjs
+        # `DEMO_EMAIL_OVERRIDE` reapunta las DOS identidades de la demo (el titular y Marta,
+        # que cuelga del mismo buzón por plus-addressing) a la cuenta sintética. Sin él, el
+        # seeder cae a su default, que es el buzón real de producción — y el seeder BORRA y
+        # reescribe lo que encuentra, así que ese default no puede ser lo que corra en CI.
+        run: DEMO_ENV_FILE=.env.local DEMO_EMAIL_OVERRIDE=demo@ci.local node scripts/demo/seed-demo-familia.mjs
 
       - name: Compilar con las banderas de producción
         run: node scripts/dev/con-env.mjs npm run build
@@ -1255,7 +1305,7 @@ jobs:
 
       - name: Capturar (shard ${{ matrix.shard }} de 2)
         env:
-          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+          E2E_EMAIL: demo@ci.local
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           # En CI se retira `--deterministic-mode` (no produce fotogramas en el runner). Ver
           # `snap.mjs`; lo que esa bandera prometía se demuestra en el paso siguiente.
@@ -1270,7 +1320,7 @@ jobs:
       # inestabilidad, y entonces las capturas no sirven como evidencia.
       - name: Sonda de determinismo (20 rutas, dos veces)
         env:
-          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+          E2E_EMAIL: demo@ci.local
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           QA_CI: "1"
         run: |
@@ -1315,17 +1365,6 @@ jobs:
       SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
       EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
     steps:
-      # Falla acá y con instrucciones, no cuarenta líneas más abajo dentro de un script. La
-      # primera corrida con la variable sin crear murió con «Faltan E2E_EMAIL» en mitad del
-      # arnés, que no le dice a nadie qué hay que hacer.
-      - name: La variable DEMO_EMAIL tiene que existir
-        run: |
-          if [ -z "${{ vars.DEMO_EMAIL }}" ]; then
-            echo "::error::falta la variable de repositorio DEMO_EMAIL (el correo de la cuenta demo)."
-            echo "Creala con:  gh variable set DEMO_EMAIL --body '<correo>' --repo ${{ github.repository }}"
-            exit 1
-          fi
-
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
@@ -1415,7 +1454,11 @@ jobs:
 
       # La captura mide pantallas CON datos: sin ellas media evidencia serían estados vacíos.
       - name: Sembrar la cuenta demo
-        run: DEMO_ENV_FILE=.env.local node scripts/demo/seed-demo-familia.mjs
+        # `DEMO_EMAIL_OVERRIDE` reapunta las DOS identidades de la demo (el titular y Marta,
+        # que cuelga del mismo buzón por plus-addressing) a la cuenta sintética. Sin él, el
+        # seeder cae a su default, que es el buzón real de producción — y el seeder BORRA y
+        # reescribe lo que encuentra, así que ese default no puede ser lo que corra en CI.
+        run: DEMO_ENV_FILE=.env.local DEMO_EMAIL_OVERRIDE=demo@ci.local node scripts/demo/seed-demo-familia.mjs
 
       - name: Compilar con las banderas de producción
         run: node scripts/dev/con-env.mjs npm run build
@@ -1435,7 +1478,7 @@ jobs:
 
       - name: Capturar (shard ${{ matrix.shard }} de 2)
         env:
-          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+          E2E_EMAIL: demo@ci.local
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           # En CI se retira `--deterministic-mode` (no produce fotogramas en el runner). Ver
           # `snap.mjs`; lo que esa bandera prometía se demuestra en el paso siguiente.
@@ -1450,7 +1493,7 @@ jobs:
       # inestabilidad, y entonces las capturas no sirven como evidencia.
       - name: Sonda de determinismo (20 rutas, dos veces)
         env:
-          E2E_EMAIL: ${{ vars.DEMO_EMAIL }}
+          E2E_EMAIL: demo@ci.local
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           QA_CI: "1"
         run: |
