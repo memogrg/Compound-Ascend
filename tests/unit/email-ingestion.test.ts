@@ -25,7 +25,7 @@ Referencia: 35689751  Tipo de Transacción: COMPRA  Monto: CRC 11,490.00`;
 
 const BANK_FROM = "notificacion@notificacionesbaccr.com"; // con auto-forward, el From es del banco
 const FLAT_INBOX = "communications@aitechumbrella.com"; // dirección plana del buzón
-const FORWARDER = "memogrg@gmail.com"; // remitente humano de un reenvío manual
+const FORWARDER = "usuario@ejemplo.test"; // remitente humano de un reenvío manual
 const MY_ADDR = "u2g5zmfs5w2@in.aitechumbrella.com"; // dirección de ingesta de la cuenta
 
 /** Cliente IMAP falso: devuelve los correos dados, registra los marcados leídos. */
@@ -91,20 +91,20 @@ describe("email ingestion · extractRecipientCandidates", () => {
     const headers = [
       "Delivered-To: communications@aitechumbrella.com",
       "X-Forwarded-To: communications@aitechumbrella.com",
-      "X-Forwarded-For: memogrg@gmail.com communications@aitechumbrella.com",
-      "Delivered-To: memogrg@gmail.com",
+      "X-Forwarded-For: usuario@ejemplo.test communications@aitechumbrella.com",
+      "Delivered-To: usuario@ejemplo.test",
       "From: BAC Credomatic <notificacion@notificacionesbaccr.com>",
       "To: clientes@notificacionesbaccr.com",
       "Subject: Compra",
     ].join("\r\n");
     const got = extractRecipientCandidates(headers);
-    expect(got).toContain("memogrg@gmail.com");
+    expect(got).toContain("usuario@ejemplo.test");
     expect(got).toContain("communications@aitechumbrella.com");
   });
 
   it("despliega líneas plegadas y normaliza a minúsculas sin duplicados", () => {
-    const headers = "To: Memo\r\n <MEMOGRG@gmail.com>,\r\n memogrg@gmail.com";
-    expect(extractRecipientCandidates(headers)).toEqual(["memogrg@gmail.com"]);
+    const headers = "To: Memo\r\n <USUARIO@ejemplo.test>,\r\n usuario@ejemplo.test";
+    expect(extractRecipientCandidates(headers)).toEqual(["usuario@ejemplo.test"]);
   });
 
   it("ignora cabeceras que no son de destinatario", () => {
@@ -122,7 +122,7 @@ describe("email ingestion · fetchUnseen", () => {
         fromAuthenticated: false,
         envelopeTo: [],
         from: "BAC Credomatic <notificacion@notificacionesbaccr.com>",
-        recipients: [`Comms <${FLAT_INBOX}>`, "MEMOGRG@gmail.com", FLAT_INBOX],
+        recipients: [`Comms <${FLAT_INBOX}>`, "USUARIO@ejemplo.test", FLAT_INBOX],
         subject: "Compra",
         text: "cuerpo",
         receivedAt: "2026-06-11T20:31:00.000Z",
@@ -145,7 +145,7 @@ describe("email ingestion · fetchUnseen", () => {
       {
         uid: 21,
         messageId: "<manual@gmail>",
-        fromAuthenticated: true, // el buzón validó DKIM/SPF de gmail.com
+        fromAuthenticated: true, // el buzón validó DKIM/SPF del dominio del From
         envelopeTo: [],
         from: `Memo <${FORWARDER}>`, // en reenvío manual, el usuario queda en From
         recipients: [FLAT_INBOX], // el To es solo el buzón de ingesta
@@ -275,7 +275,7 @@ describe("email ingestion · processInboundEmails", () => {
   it("sin dirección de ingesta conocida -> ignorado (no propone, no marca procesado)", async () => {
     const { deps, proposals, markedSeen, processed } = fakeDeps({ [MY_ADDR]: owner });
     const summary = await processInboundEmails(
-      [msg({ recipients: [FLAT_INBOX, "otro@gmail.com"], id: "<m2@bac>" })],
+      [msg({ recipients: [FLAT_INBOX, "otro@ejemplo.test"], id: "<m2@bac>" })],
       parseNotification,
       deps,
     );
@@ -503,7 +503,7 @@ describe("email ingestion · fromIsAuthenticated", () => {
     `Delivered-To: ${FLAT_INBOX}\r\nAuthentication-Results: ${v}\r\nSubject: x`;
 
   it("acepta DKIM del mismo dominio del From", () => {
-    const h = AR("mx.google.com; dkim=pass header.i=@gmail.com header.s=20230601; dmarc=pass");
+    const h = AR("mx.google.com; dkim=pass header.i=@ejemplo.test header.s=20230601; dmarc=pass");
     expect(fromIsAuthenticated(h, FORWARDER)).toBe(true);
   });
 
@@ -525,7 +525,7 @@ describe("email ingestion · fromIsAuthenticated", () => {
   });
 
   it("NO confía en ARC-Authentication-Results (es la afirmación de un tercero)", () => {
-    const h = `ARC-Authentication-Results: i=1; mx.google.com; dkim=pass header.i=@gmail.com\r\nSubject: x`;
+    const h = `ARC-Authentication-Results: i=1; mx.google.com; dkim=pass header.i=@ejemplo.test\r\nSubject: x`;
     expect(fromIsAuthenticated(h, FORWARDER)).toBe(false);
   });
 
@@ -545,12 +545,12 @@ describe("email ingestion · dirección de ingesta única", () => {
     const h = [
       "Delivered-To: communications@aitechumbrella.com",
       `X-Gm-Original-To: ${DIR}`,
-      "To: memogrg@gmail.com",
+      "To: usuario@ejemplo.test",
       "Subject: Compra",
     ].join("\r\n");
     expect(extractEnvelopeCandidates(h)).toEqual(["communications@aitechumbrella.com", DIR]);
     // El To NO entra aquí: lo pone el emisor, se mira en el nivel de abajo.
-    expect(extractEnvelopeCandidates(h)).not.toContain("memogrg@gmail.com");
+    expect(extractEnvelopeCandidates(h)).not.toContain("usuario@ejemplo.test");
   });
 
   /** Deps que registran qué candidatos consultó el poller, para probar la prioridad. */
@@ -665,9 +665,9 @@ describe("email ingestion · confirmación de reenvío de Gmail", () => {
     recipients: [FLAT_INBOX],
     envelopeTo: ["u2g5zmfs5w2@in.aitechumbrella.com"],
     senderCandidates: [],
-    subject: "(#123456789) Gmail Forwarding Confirmation - Receive Mail from memogrg@gmail.com",
+    subject: "(#123456789) Gmail Forwarding Confirmation - Receive Mail from usuario@ejemplo.test",
     text: [
-      "memogrg@gmail.com has requested to automatically forward mail to your email address.",
+      "usuario@ejemplo.test has requested to automatically forward mail to your email address.",
       "Confirmation code: 123456789",
       "To allow, click: https://mail-settings.google.com/mail/vf-AbC_123-xyz%2Fq",
       "To cancel, click: https://mail-settings.google.com/mail/uf-AbC_123-xyz",
