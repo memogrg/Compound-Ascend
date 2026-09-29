@@ -199,12 +199,48 @@ async function compararEnPagina(page, aUri, bUri, threshold, ignorarDeltaBajo) {
 }
 
 /** El manifiesto de una corrida, o `null` si no se puede leer (una corrida vieja o a medias). */
-async function leerManifest(dir) {
+async function leerManifests(dir) {
+  let nombres = [];
   try {
-    return JSON.parse(await readFile(path.join(dir, "manifest.json"), "utf8"));
+    nombres = (await readdir(dir)).filter((f) => /^manifest.*\.json$/.test(f)).sort();
   } catch {
-    return null;
+    return [];
   }
+  const out = [];
+  for (const n of nombres) {
+    try {
+      out.push(JSON.parse(await readFile(path.join(dir, n), "utf8")));
+    } catch {
+      /* un manifiesto ilegible no puede tumbar la comparación; se ignora y se nota abajo */
+    }
+  }
+  return out;
+}
+
+/**
+ * Los manifiestos de una corrida, unidos en uno.
+ *
+ * Una corrida repartida en shards sube un artefacto por shard, y `download-artifact` con patrón
+ * los deja APLANADOS en la misma carpeta: los cuatro `manifest.json` se pisan y sobrevive uno
+ * solo. Los PNG no colisionan —cada shard captura rutas distintas— así que el estropicio no se
+ * ve: 200 capturas comparadas y el manifiesto de UN cuarto de ellas.
+ *
+ * Costó una corrida entenderlo: la sonda marcó `/mi-base-financiera` como inestable en el shard
+ * 2, el paso de marcado lo escribió en SU manifiesto, y el diff no se enteró porque leía el de
+ * otro shard. La ruta acabó reprobada, es decir: culpando al PR de lo que el propio arnés ya
+ * había medido que se movía solo.
+ *
+ * Por eso cada shard guarda `manifest-<N>.json` y esto los junta. `banderas` se toma del primero
+ * —todos los shards compilan el mismo build— y `entries` y `rutasInestables` se concatenan.
+ */
+async function leerManifest(dir) {
+  const todos = await leerManifests(dir);
+  if (!todos.length) return null;
+  return {
+    ...todos[0],
+    entries: todos.flatMap((m) => m.entries ?? []),
+    rutasInestables: todos.flatMap((m) => m.rutasInestables ?? []),
+  };
 }
 
 /**

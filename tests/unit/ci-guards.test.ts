@@ -300,6 +300,21 @@ describe("la caché de imágenes del stack", () => {
     }
   });
 
+  it("cada shard guarda su manifiesto con su número", () => {
+    // `download-artifact` con patrón deja los artefactos APLANADOS en una sola carpeta: cuatro
+    // `manifest.json` se pisan y sobrevive uno. Los PNG no colisionan —cada shard captura rutas
+    // distintas—, así que el estropicio es invisible: 200 capturas comparadas y el manifiesto de
+    // un cuarto de ellas. Costó una corrida: la sonda marcó `/mi-base-financiera` inestable en el
+    // shard 2, y el diff la reprobó igual porque leyó el manifiesto de otro shard.
+    for (const job of ["capturas_main", "capturas_rama"]) {
+      const bloque =
+        DIRECTIVAS.slice(DIRECTIVAS.indexOf(`  ${job}:`)).split(/\n  [a-z0-9_]+:\n/)[0] ?? "";
+      expect(bloque, `${job}: renombra el manifiesto por shard`).toMatch(
+        /mv capturas\/manifest\.json "capturas\/manifest-\$\{\{ matrix\.shard \}\}\.json"/,
+      );
+    }
+  });
+
   it("las capturas se saltan cuando el PR no toca interfaz", () => {
     // Cuatro jobs de captura por un cambio en un README son 40 minutos de runner tirados, y
     // el ruido acostumbra a mirar los verdes sin leerlos.

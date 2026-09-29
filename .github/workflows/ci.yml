@@ -1359,6 +1359,13 @@ jobs:
           node scripts/qa/marcar-inestables.mjs --capturas capturas \
             --inestables diff-determinismo/inestables.json --tanda-a det-a --tanda-b det-b
 
+          # Cada shard guarda SU manifiesto con su número. `download-artifact` con patrón deja
+          # los artefactos aplanados en la misma carpeta, así que cuatro `manifest.json` se
+          # pisan y sobrevive uno solo — y con él se pierde lo que los otros tres midieron. Los
+          # PNG no colisionan (cada shard captura rutas distintas), así que el estropicio no se
+          # ve: 200 capturas comparadas y el manifiesto de un cuarto de ellas.
+          mv capturas/manifest.json "capturas/manifest-${{ matrix.shard }}.json"
+
       # Una guarda que bloquea y no deja ver qué vio se desactiva a la semana. Cuando la sonda
       # reprueba, lo único que queda en el log es un conteo de píxeles («106 · delta 21»), y con
       # eso no se puede decidir si es un número que anima, una fecha que se coló o una animación
@@ -1562,6 +1569,13 @@ jobs:
         run: |
           node scripts/qa/marcar-inestables.mjs --capturas capturas \
             --inestables diff-determinismo/inestables.json --tanda-a det-a --tanda-b det-b
+
+          # Cada shard guarda SU manifiesto con su número. `download-artifact` con patrón deja
+          # los artefactos aplanados en la misma carpeta, así que cuatro `manifest.json` se
+          # pisan y sobrevive uno solo — y con él se pierde lo que los otros tres midieron. Los
+          # PNG no colisionan (cada shard captura rutas distintas), así que el estropicio no se
+          # ve: 200 capturas comparadas y el manifiesto de un cuarto de ellas.
+          mv capturas/manifest.json "capturas/manifest-${{ matrix.shard }}.json"
 
       # Una guarda que bloquea y no deja ver qué vio se desactiva a la semana. Cuando la sonda
       # reprueba, lo único que queda en el log es un conteo de píxeles («106 · delta 21»), y con
