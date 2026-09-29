@@ -1179,7 +1179,7 @@ jobs:
           fi
 
   capturas_main:
-    name: Capturas de main (${{ matrix.shard }}/2)
+    name: Capturas de main (${{ matrix.shard }}/4)
     runs-on: ubuntu-24.04
     needs: ci
     # Solo en push: son la BASE contra la que se compara cada PR.
@@ -1187,7 +1187,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     env:
       SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
       EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
@@ -1303,7 +1303,7 @@ jobs:
           echo "::error::el servidor congelado no respondió en 120s"
           exit 1
 
-      - name: Capturar (shard ${{ matrix.shard }} de 2)
+      - name: Capturar (shard ${{ matrix.shard }} de 4)
         env:
           E2E_EMAIL: demo@ci.local
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
@@ -1312,7 +1312,7 @@ jobs:
           QA_CI: "1"
         run: |
           node scripts/qa/snap.mjs --base-url http://localhost:3001 \
-            --shard ${{ matrix.shard }}/2 --out capturas
+            --shard ${{ matrix.shard }}/4 --out capturas
 
       # Quitar la bandera del determinismo y confiar sería cambiar una garantía por una
       # suposición. Se vuelve a capturar un puñado de rutas contra el MISMO servidor y la misma
@@ -1383,7 +1383,7 @@ jobs:
           retention-days: 14
 
   capturas_rama:
-    name: Capturas de la rama (${{ matrix.shard }}/2)
+    name: Capturas de la rama (${{ matrix.shard }}/4)
     runs-on: ubuntu-24.04
     needs: [ci, toca_interfaz]
     # Un check SALTADO cuenta como cumplido en el ruleset, así que saltarlo no abre un agujero.
@@ -1391,7 +1391,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     env:
       SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
       EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
@@ -1507,7 +1507,7 @@ jobs:
           echo "::error::el servidor congelado no respondió en 120s"
           exit 1
 
-      - name: Capturar (shard ${{ matrix.shard }} de 2)
+      - name: Capturar (shard ${{ matrix.shard }} de 4)
         env:
           E2E_EMAIL: demo@ci.local
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
@@ -1516,7 +1516,7 @@ jobs:
           QA_CI: "1"
         run: |
           node scripts/qa/snap.mjs --base-url http://localhost:3001 \
-            --shard ${{ matrix.shard }}/2 --out capturas
+            --shard ${{ matrix.shard }}/4 --out capturas
 
       # Quitar la bandera del determinismo y confiar sería cambiar una garantía por una
       # suposición. Se vuelve a capturar un puñado de rutas contra el MISMO servidor y la misma
