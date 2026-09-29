@@ -15,6 +15,9 @@ export const indicatorCache = {
   set<T>(key: string, value: T, ttlSeconds: number): void {
     cache.set(key, value, ttlSeconds);
   },
+  getOrFetch<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
+    return cache.getOrFetch(key, ttlSeconds, fetcher);
+  },
 };
 
 /** TTL de lecturas de BD (segundos). Los indicadores se refrescan a diario. */

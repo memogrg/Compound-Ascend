@@ -143,3 +143,104 @@ describe("TtlCache · modo Redis (doble inyectado)", () => {
     expect(warn).toHaveBeenCalled();
   });
 });
+
+describe("TtlCache · getOrFetch", () => {
+  it("acierto en L2 (Redis) evita el fetcher y calienta L1", async () => {
+    const r = fakeRedis();
+    r.store.set("cache:mkt:price:AAPL", { value: { c: 100 }, expiresAt: Date.now() + 60_000 });
+    const c = new TtlCache("mkt", 100, r);
+    let fetched = 0;
+    const v = await c.getOrFetch("price:AAPL", 60, async () => {
+      fetched += 1;
+      return { c: 999 };
+    });
+    expect(v).toEqual({ c: 100 }); // vino de Redis
+    expect(fetched).toBe(0); // el fetcher NO corrió
+    expect(c.get<{ c: number }>("price:AAPL")).toEqual({ c: 100 }); // L1 caliente
+  });
+
+  it("acierto en L1 devuelve sin tocar Redis ni fetcher", async () => {
+    const r = fakeRedis();
+    const c = new TtlCache("mkt", 100, r);
+    c.set("k", "v", 60);
+    await c.whenIdle();
+    const getsBefore = r.calls.get;
+    let fetched = 0;
+    const v = await c.getOrFetch("k", 60, async () => {
+      fetched += 1;
+      return "otro";
+    });
+    expect(v).toBe("v");
+    expect(fetched).toBe(0);
+    expect(r.calls.get).toBe(getsBefore);
+  });
+
+  it("10 peticiones concurrentes → UNA sola llamada al fetcher (single-flight)", async () => {
+    const r = fakeRedis();
+    const c = new TtlCache("mkt", 100, r);
+    let fetched = 0;
+    const fetcher = async () => {
+      fetched += 1;
+      await new Promise((res) => setTimeout(res, 10));
+      return { c: 42 };
+    };
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () => c.getOrFetch("price:MISS", 60, fetcher)),
+    );
+    expect(fetched).toBe(1); // coalescido
+    expect(results.every((x) => (x as { c: number }).c === 42)).toBe(true);
+    expect(r.calls.get).toBe(1); // y una sola lectura a Redis
+    await c.whenIdle();
+    expect(r.calls.set).toBe(1); // y una sola escritura
+  });
+
+  it("tras resolver, un getOrFetch posterior sirve de L1 (sin fetcher)", async () => {
+    const r = fakeRedis();
+    const c = new TtlCache("mkt", 100, r);
+    let fetched = 0;
+    const fetcher = async () => {
+      fetched += 1;
+      return { c: 7 };
+    };
+    await c.getOrFetch("k", 60, fetcher);
+    await c.getOrFetch("k", 60, fetcher);
+    expect(fetched).toBe(1);
+  });
+
+  it("Redis caído → cae a memoria + fetcher sin romper, y registra", async () => {
+    const roto: RedisLike = {
+      get: async () => {
+        throw new Error("red caída");
+      },
+      set: async () => {
+        throw new Error("red caída");
+      },
+    };
+    const c = new TtlCache("mkt", 100, roto);
+    let fetched = 0;
+    const v = await c.getOrFetch("k", 60, async () => {
+      fetched += 1;
+      return { c: 5 };
+    });
+    expect(v).toEqual({ c: 5 });
+    expect(fetched).toBe(1); // el fetcher corrió pese al fallo de Redis
+    expect(c.get<{ c: number }>("k")).toEqual({ c: 5 }); // quedó en L1
+    await c.whenIdle();
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it("no cachea null (no envenena con misses)", async () => {
+    const r = fakeRedis();
+    const c = new TtlCache("mkt", 100, r);
+    let fetched = 0;
+    const fetcher = async () => {
+      fetched += 1;
+      return null;
+    };
+    expect(await c.getOrFetch("k", 60, fetcher)).toBeNull();
+    expect(await c.getOrFetch("k", 60, fetcher)).toBeNull();
+    expect(fetched).toBe(2); // volvió a intentar; no se cacheó el null
+    await c.whenIdle();
+    expect(r.calls.set).toBe(0);
+  });
+});

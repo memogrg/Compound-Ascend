@@ -84,6 +84,9 @@ export class TtlCache {
   private readonly memory: MemoryTTLCache;
   private readonly redis: RedisLike | null;
   private readonly pending = new Set<Promise<unknown>>();
+  // Single-flight por clave: peticiones concurrentes al mismo key comparten una promesa, así
+  // N misses simultáneos hacen UNA consulta a Redis + UNA llamada al fetcher.
+  private readonly inflight = new Map<string, Promise<unknown>>();
 
   constructor(
     private readonly namespace: string,
@@ -109,6 +112,51 @@ export class TtlCache {
   set<T>(key: string, value: T, ttlSeconds: number): void {
     this.memory.set(key, value, ttlSeconds);
     if (this.redis) this.track(this.writeToRedis(key, value, ttlSeconds));
+  }
+
+  /**
+   * memoria (L1) → Redis (L2) → fetcher, con single-flight por clave. Las peticiones
+   * concurrentes al mismo key comparten una sola promesa (una consulta a Redis y, si hace
+   * falta, una sola llamada al fetcher); al resolver escribe en ambas capas. No cachea
+   * null/undefined (preserva el "no cachear misses" de los llamadores).
+   */
+  async getOrFetch<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
+    const local = this.memory.get<T>(key);
+    if (local !== null) return local;
+
+    const existing = this.inflight.get(key);
+    if (existing) return existing as Promise<T>;
+
+    const flight = (async (): Promise<T> => {
+      // L2: Redis compartido entre instancias.
+      if (this.redis) {
+        try {
+          const entry = await this.redis.get<Entry<T>>(this.nsKey(key));
+          if (entry && entry.expiresAt > Date.now()) {
+            this.memory.setEntry(key, entry);
+            return entry.value;
+          }
+        } catch (error) {
+          logger.warn(`${this.namespace}: lectura de Redis falló (getOrFetch), voy al fetcher`, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+      // Origen real (proveedor / BD). Se escribe en ambas capas al resolver.
+      const value = await fetcher();
+      if (value != null) {
+        this.memory.set(key, value, ttlSeconds);
+        if (this.redis) this.track(this.writeToRedis(key, value, ttlSeconds));
+      }
+      return value;
+    })();
+
+    this.inflight.set(key, flight);
+    try {
+      return await flight;
+    } finally {
+      this.inflight.delete(key);
+    }
   }
 
   private async writeToRedis(key: string, value: unknown, ttlSeconds: number): Promise<void> {

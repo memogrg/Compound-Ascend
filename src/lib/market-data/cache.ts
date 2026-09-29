@@ -17,6 +17,9 @@ export const priceCache = {
   set<T>(key: string, value: T, ttlSeconds: number): void {
     cache.set(key, value, ttlSeconds);
   },
+  getOrFetch<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
+    return cache.getOrFetch(key, ttlSeconds, fetcher);
+  },
 };
 
 /** TTL por tipo de activo (segundos), según el documento técnico. */
