@@ -27,7 +27,7 @@
  *   node scripts/qa/sonda-determinismo.mjs --a <tanda1> --b <tanda2> [--tope 2]
  */
 import path from "node:path";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
@@ -139,6 +139,9 @@ if (distintas !== 0) {
     console.log(`  ${i.ruta}  ·  ${i.px} px  ·  delta ${i.maxDelta}  ·  ${i.imagenes.join(", ")}`);
 }
 
+// Por si `diff.mjs` no la dejó (no debería, pero esto ya falló una vez y el síntoma —ENOENT
+// en un job de 16 minutos— no vale lo que cuesta volver a verlo).
+await mkdir(outDiff, { recursive: true });
 await writeFile(
   path.join(outDiff, "inestables.json"),
   JSON.stringify(

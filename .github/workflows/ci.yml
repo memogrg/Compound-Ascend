@@ -268,14 +268,20 @@ jobs:
             esac
           done < <(supabase status -o env)
 
+          # `NO_COLOR` porque en CI vitest colorea: la línea del resumen sale como
+          # «ESC[2m      Tests ESC[22m …», y la guarda de abajo la buscaba por «^ *Tests».
+          # En mi Mac el pipe salía sin color, así que el fallo solo existía en CI — y el
+          # síntoma fue un rojo que decía «la suite no llegó a correr» debajo de la suite
+          # entera en verde. Se quita el color Y se limpian los escapes al leer: una guarda
+          # que depende de cómo venga coloreada la salida vuelve a fallar al primer cambio.
           set -o pipefail
-          npx vitest run tests/rls 2>&1 | tee /tmp/rls.log
+          NO_COLOR=1 npx vitest run tests/rls 2>&1 | tee /tmp/rls.log
 
       # Un `exit 0` de vitest no dice que la suite corriera: con las credenciales sin
       # exportar sale 0 con todo omitido. Esta guarda convierte ese silencio en rojo.
       - name: La suite de RLS corrió entera
         run: |
-          RESUMEN=$(grep -E '^ *Tests +[0-9]' /tmp/rls.log | tail -1)
+          RESUMEN=$(sed -E 's/\x1b\[[0-9;]*m//g' /tmp/rls.log | grep -E '^ *Tests +[0-9]' | tail -1)
           echo "$RESUMEN"
           if [ -z "$RESUMEN" ]; then
             echo "::error::vitest no imprimió el resumen de pruebas: la suite de RLS no llegó a correr."

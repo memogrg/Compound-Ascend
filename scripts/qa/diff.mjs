@@ -247,6 +247,11 @@ async function main() {
     process.exit(2);
   }
   const outDiff = args["out-diff"] ?? "qa-snapshots/diff";
+  // La carpeta se crea SIEMPRE, no solo cuando hay un PNG de diferencias que escribir.
+  // Cuando no cambia nada —el caso normal— no había ninguno, la carpeta no existía, y tanto
+  // `reporte.json` como el `inestables.json` de la sonda reventaban con ENOENT. O sea: el
+  // camino feliz era el único sin probar, y era el que fallaba.
+  await mkdir(outDiff, { recursive: true });
   const threshold = Number(args.threshold ?? 0);
   const maxDiffPixels = Number(args["max-diff-pixels"] ?? 0);
   // Criterio de DOS condiciones. El rasterizado de Chromium deja tiras inestables en los bordes:
