@@ -333,10 +333,16 @@ describe("la caché de imágenes del stack", () => {
     expect(DIRECTIVAS, "nadie llama a instanteCongelado() en los jobs de captura").not.toMatch(
       /capturas[\s\S]*?instanteCongelado\(\)/,
     );
+    // Y ninguno lo REDEFINE a nivel de job. Además de crear una segunda copia que puede
+    // separarse, `jobs.<id>.env` NO admite el contexto `env`: escribir ahí
+    // `QA_INSTANTE: \${{ env.QA_INSTANTE }}` impide que el workflow ARRANQUE —corrida con cero
+    // jobs y sin log— y el síntoma no se parece en nada a la causa. Lo heredan del workflow.
     for (const job of ["capturas_main", "capturas_rama", "e2e_a11y"]) {
       const bloque =
         DIRECTIVAS.slice(DIRECTIVAS.indexOf(`  ${job}:`)).split(/\n  [a-z0-9_]+:\n/)[0] ?? "";
-      expect(bloque, `${job}: usa el instante del workflow`).toContain("env.QA_INSTANTE");
+      const env = bloque.slice(bloque.indexOf("\n    env:"), bloque.indexOf("\n    steps:"));
+      expect(env, `${job}: no redefine QA_INSTANTE`).not.toContain("QA_INSTANTE:");
+      expect(bloque, `${job}: lo usa`).toContain("QA_INSTANTE");
     }
   });
 

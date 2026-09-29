@@ -985,9 +985,6 @@ jobs:
       # La auditoría abre un navegador, inicia sesión y recorre pantallas con datos. Fuera
       # quedan los cinco que nada de eso toca.
       EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
-      # El MISMO instante que usan las capturas visuales, ahora de verdad: se lee del `env` del
-      # workflow para que no haya dos copias que puedan separarse.
-      QA_INSTANTE: ${{ env.QA_INSTANTE }}
       # La cuenta demo que siembra `seed-demo-familia.mjs`. Se resuelve por email, nunca por id.
       # Es una cuenta SINTÉTICA, escrita acá a la vista: `.local` es un TLD reservado
       # (RFC 6762), así que no hay —ni puede haber— buzón detrás. Antes salía de la variable
