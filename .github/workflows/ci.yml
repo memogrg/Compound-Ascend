@@ -1344,6 +1344,28 @@ jobs:
           node scripts/qa/sonda-determinismo.mjs --a det-a --b det-b \
             --out-diff diff-determinismo
 
+      # Una guarda que bloquea y no deja ver qué vio se desactiva a la semana. Cuando la sonda
+      # reprueba, lo único que queda en el log es un conteo de píxeles («106 · delta 21»), y con
+      # eso no se puede decidir si es un número que anima, una fecha que se coló o una animación
+      # que `finalizarAnimaciones` no apaga. Las dos tandas y su página de comparación suben
+      # SOLO en el fallo: en verde no hay nada que mirar y serían 40 MB por corrida.
+      - name: Página de comparación de la sonda (solo si reprobó)
+        if: failure()
+        run: |
+          node scripts/qa/comparacion.mjs --a det-a --b det-b \
+            --diff diff-determinismo --out comparacion-determinismo \
+            --titulo "Sonda de determinismo · misma compilación, dos tandas"
+
+      - name: Subir la evidencia de la sonda (solo si reprobó)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonda-determinismo-${{ github.job }}-${{ matrix.shard }}
+          path: |
+            comparacion-determinismo
+            diff-determinismo
+          retention-days: 14
+
       - name: Subir las capturas como base
         uses: actions/upload-artifact@v4
         with:
@@ -1516,6 +1538,28 @@ jobs:
           done
           node scripts/qa/sonda-determinismo.mjs --a det-a --b det-b \
             --out-diff diff-determinismo
+
+      # Una guarda que bloquea y no deja ver qué vio se desactiva a la semana. Cuando la sonda
+      # reprueba, lo único que queda en el log es un conteo de píxeles («106 · delta 21»), y con
+      # eso no se puede decidir si es un número que anima, una fecha que se coló o una animación
+      # que `finalizarAnimaciones` no apaga. Las dos tandas y su página de comparación suben
+      # SOLO en el fallo: en verde no hay nada que mirar y serían 40 MB por corrida.
+      - name: Página de comparación de la sonda (solo si reprobó)
+        if: failure()
+        run: |
+          node scripts/qa/comparacion.mjs --a det-a --b det-b \
+            --diff diff-determinismo --out comparacion-determinismo \
+            --titulo "Sonda de determinismo · misma compilación, dos tandas"
+
+      - name: Subir la evidencia de la sonda (solo si reprobó)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonda-determinismo-${{ github.job }}-${{ matrix.shard }}
+          path: |
+            comparacion-determinismo
+            diff-determinismo
+          retention-days: 14
 
       # Evidencia del fallo de login: el mensaje de Playwright no dice cuál de las tres
       # condiciones —visible, habilitado, estable— es la que falta, y adivinarlo ya costó dos

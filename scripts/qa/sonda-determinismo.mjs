@@ -13,8 +13,8 @@
  *
  *   node scripts/qa/sonda-determinismo.mjs --a <tanda1> --b <tanda2>
  */
-import { readdir } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const args = {};
@@ -30,7 +30,12 @@ for (const k of ["a", "b"]) {
 const r = spawnSync(
   process.execPath,
   [
-    path.join(path.dirname(new URL(import.meta.url).pathname), "diff.mjs"),
+    // `fileURLToPath` y NO `new URL(...).pathname`: este repo vive en «Compound Ascend v1»,
+    // con espacios, y `pathname` los percent-codifica. La ruta salía
+    // «/Users/…/Compound%20Ascend%20v1/scripts/qa/diff.mjs», que no existe, así que `diff.mjs`
+    // no llegaba a correr NUNCA en local — y la sonda lo reportaba como «-1/6», o sea como si
+    // las pantallas fueran inestables. En CI no se veía: la ruta del runner no tiene espacios.
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "diff.mjs"),
     "--a",
     args.a,
     "--b",
@@ -49,15 +54,24 @@ const r = spawnSync(
   { encoding: "utf8" },
 );
 const salida = `${r.stdout ?? ""}${r.stderr ?? ""}`;
-const comunes = (
-  await readdir(path.join(args.a, "light", "1280").replace(/\/light\/1280$/, ""), {
-    recursive: true,
-  }).catch(() => [])
-).filter((f) => String(f).endsWith(".png")).length;
 
+// Si `diff.mjs` no dejó su línea de resumen, no comparó nada: puede ser que no arrancara
+// (ruta mal formada, módulo ausente) o que se negara a comparar (banderas de interfaz
+// distintas entre las dos tandas). Lo que NO se puede hacer es inventar un conteo: la versión
+// anterior caía a «-1» y lo imprimía como si fuera un veredicto —«sonda de determinismo:
+// -1/6»—, que se lee como «las pantallas son inestables» cuando lo que pasa es que la medida
+// no existe. Sin medida no hay veredicto: se sale en rojo diciendo eso.
 const m = /(\d+) comparadas · (\d+) con diferencias/.exec(salida);
-const total = m ? Number(m[1]) : comunes;
-const distintas = m ? Number(m[2]) : -1;
+if (!m) {
+  console.log(salida.trim());
+  console.error(
+    "::error::la sonda no pudo medir: `diff.mjs` no imprimió su resumen " +
+      `(salió ${r.status ?? "sin código"}). Arriba está su salida entera.`,
+  );
+  process.exit(1);
+}
+const total = Number(m[1]);
+const distintas = Number(m[2]);
 
 console.log(`sonda de determinismo: ${distintas}/${total}`);
 if (distintas !== 0) {
