@@ -441,6 +441,7 @@ async function main() {
   });
   const entries = [];
   let conTerminos = 0;
+  let esperasVencidas = 0;
 
   try {
     const storageState = await iniciarSesion(browser, baseUrl, email, password);
@@ -501,6 +502,9 @@ async function main() {
           const loadingResidual = await esperarSinCargando(page);
           // Y los esqueletos de gráfico, que NO dicen «Cargando…»: ver `esperarSinEsqueletos`.
           const esqueletoResidual = await esperarSinEsqueletos(page);
+          // Dos esperas por captura; el resumen del final las cuenta contra ese total.
+          if (loadingResidual) esperasVencidas++;
+          if (esqueletoResidual) esperasVencidas++;
           const termsModal = await hayModalTerminos(page);
           if (termsModal) conTerminos++;
 
@@ -567,6 +571,26 @@ async function main() {
   console.log(
     `\n${entries.length} capturas · manifest en ${path.join(String(out), "manifest.json")}`,
   );
+
+  // Dos esperas por captura (`esperarSinCargando` y `esperarSinEsqueletos`). El dato por captura
+  // ya viajaba en el manifiesto, pero saber cuántas vencieron exigía bajar el artefacto y sumar
+  // los booleanos a mano; el total va aquí, y el detalle solo cuando hay algo que mirar.
+  console.log(`esperas que vencieron el tope: ${esperasVencidas} de ${entries.length * 2}`);
+
+  if (esperasVencidas > 0) {
+    const vencidas = entries.filter((e) => e.loadingResidual || e.esqueletoResidual);
+    console.log(
+      `\n⚠️  ${esperasVencidas} espera(s) vencieron el tope de ${TIMEOUT_CARGANDO_MS} ms en ${vencidas.length} captura(s):\n` +
+        vencidas
+          .map(
+            (e) =>
+              `    ${e.theme}/${e.width} ${e.route}` +
+              `${e.loadingResidual ? " · Cargando… residual" : ""}` +
+              `${e.esqueletoResidual ? " · ESQUELETO residual" : ""}`,
+          )
+          .join("\n"),
+    );
+  }
 
   if (conTerminos > 0) {
     console.log(
