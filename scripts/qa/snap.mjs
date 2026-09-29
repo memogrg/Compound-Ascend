@@ -17,6 +17,7 @@
  */
 import { chromium } from "playwright";
 import { CABECERA_BANDERAS } from "./banderas.mjs";
+import { repartirEnShards } from "./shard.mjs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -169,7 +170,7 @@ function slug(routePath) {
  * ¿Quedó algún «Cargando…» VISIBLE? Medición del render tardío: la pantalla puede verse completa
  * y aun así tener un límite `dynamic({ssr:false})` sin hidratar. No se arregla acá — se registra.
  */
-async function esperarSinCargando(page) {
+async function esperarSinCargando(page, modoEspera) {
   try {
     await page.waitForFunction(
       () =>
@@ -182,7 +183,7 @@ async function esperarSinCargando(page) {
           return cs.visibility !== "hidden" && cs.display !== "none" && cs.opacity !== "0";
         }),
       undefined,
-      { timeout: TIMEOUT_CARGANDO_MS },
+      { timeout: TIMEOUT_CARGANDO_MS, ...(modoEspera ?? {}) },
     );
     return false;
   } catch {
@@ -204,7 +205,7 @@ async function esperarSinCargando(page) {
  * con su leyenda. El alto de la página era estable en las dos, así que esperar a que el alto se
  * asiente tampoco lo habría atrapado: hace falta la señal positiva de que el gráfico llegó.
  */
-async function esperarSinEsqueletos(page) {
+async function esperarSinEsqueletos(page, modoEspera) {
   try {
     await page.waitForFunction(
       () =>
@@ -215,7 +216,7 @@ async function esperarSinEsqueletos(page) {
           return cs.visibility !== "hidden" && cs.display !== "none" && cs.opacity !== "0";
         }),
       undefined,
-      { timeout: TIMEOUT_CARGANDO_MS },
+      { timeout: TIMEOUT_CARGANDO_MS, ...(modoEspera ?? {}) },
     );
     return false;
   } catch {
@@ -328,25 +329,92 @@ async function finalizarAnimaciones(page) {
   }
 }
 
-async function iniciarSesion(browser, baseUrl, email, password) {
-  const context = await browser.newContext();
+/**
+ * El login corre en un Chromium **sin banderas de determinismo**, y devuelve solo la sesión.
+ *
+ * Las banderas de captura —`--deterministic-mode` con `--disable-gpu`— dejan al navegador sin
+ * producir fotogramas por su cuenta, y eso rompe tres cosas a la vez en CI: Playwright nunca
+ * ve el botón «estable» (su comprobación se apoya en `requestAnimationFrame`),
+ * `page.screenshot()` se queda esperando un fotograma que no llega, y `page.content()` sí
+ * responde porque no necesita compositor. La evidencia del artefacto lo dijo sin margen:
+ * `visible=true · habilitado=true · caja={x:461, y:504.28125, …}` y ninguna captura.
+ *
+ * `tests/a11y/sesion.ts` hace este mismo login en CI y pasa, precisamente porque lanza un
+ * Chromium normal. Acá se hace igual: navegador propio, sesión, y se cierra. Las banderas se
+ * quedan donde hacen falta — en el navegador que CAPTURA.
+ */
+async function iniciarSesion(_browserSinUsar, baseUrl, email, password) {
+  const browser = await chromium.launch();
+  /**
+   * `reducedMotion: "reduce"`, igual que los contextos de captura de más abajo.
+   *
+   * No estaba, y era una inconsistencia del propio arnés: con la animación de entrada viva,
+   * Playwright exige que el botón esté «visible, enabled AND STABLE» y en un runner cargado
+   * el elemento sigue moviéndose entre fotogramas. En una máquina rápida la animación termina
+   * antes de que nadie mire, así que el fallo solo aparecía en CI — y el mensaje, «esperando
+   * el botón», mandaba a buscar el problema en la pantalla de login.
+   */
+  const context = await browser.newContext({ reducedMotion: "reduce" });
   const page = await context.newPage();
   await page.goto(new URL("/login", baseUrl).toString(), { waitUntil: "networkidle" });
   await page.getByLabel("Correo").fill(email);
   // #password y no getByLabel: el toggle de visibilidad también matchea "Contraseña".
   await page.locator("#password").fill(password);
+  /**
+   * Un solo clic, y una espera LARGA. El reintento vuelve a pulsar solo si el botón está otra
+   * vez en reposo.
+   *
+   * El bucle anterior —tres clics buscando el botón por su nombre— colgaba en CI y mentía
+   * sobre la causa. `SubmitButton` es `disabled={pending}` y **cambia su texto a «Un
+   * momento…»** mientras envía: si la primera navegación tarda más que el tope, el reintento
+   * busca un botón llamado «Iniciar sesión» que en ese instante no existe, y Playwright
+   * reporta «esperando el botón, visible y habilitado». Eso manda a mirar la pantalla de
+   * login, cuando el problema estaba en otro lado: el primer `/dashboard` con la base recién
+   * sembrada tarda bastante más de 20 s.
+   */
+  const boton = page.getByRole("button", { name: "Iniciar sesión" });
+
+  /**
+   * Si el clic no se puede dar, se guarda QUÉ se estaba viendo antes de morir.
+   *
+   * Dos diagnósticos seguidos fallaron por adivinar sobre un mensaje que solo dice «esperando
+   * el botón, visible, enabled y estable» — sin decir CUÁL de las tres condiciones falta.
+   * Una captura y el HTML del momento cuestan nada y cierran la discusión.
+   */
+  try {
+    await boton.click({ timeout: 30_000 });
+  } catch (e) {
+    const { writeFile } = await import("node:fs/promises");
+    await page.screenshot({ path: "qa-fallo-login.png", fullPage: true }).catch(() => {});
+    await writeFile("qa-fallo-login.html", await page.content()).catch(() => {});
+    const caja = await boton.boundingBox().catch(() => null);
+    console.error(
+      `login: no se pudo pulsar el botón. URL=${page.url()} · caja=${JSON.stringify(caja)} · ` +
+        `visible=${await boton.isVisible().catch(() => "?")} · habilitado=${await boton
+          .isEnabled()
+          .catch(() => "?")}`,
+    );
+    throw e;
+  }
   for (let intento = 0; intento < 3; intento++) {
-    await page.getByRole("button", { name: "Iniciar sesión" }).click();
     try {
-      await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
+      await page.waitForURL(/\/dashboard/, { timeout: 90_000 });
       break;
     } catch {
-      if (intento === 2) throw new Error("Login no navegó tras 3 intentos");
-      await page.waitForTimeout(1000);
+      if (intento === 2) {
+        throw new Error(
+          `Login no navegó a /dashboard tras 3 intentos (90 s cada uno). URL actual: ${page.url()}`,
+        );
+      }
+      // Solo se vuelve a pulsar si el formulario volvió a reposo; si sigue enviando, se espera.
+      if (await boton.isEnabled().catch(() => false)) await boton.click();
+      else await page.waitForTimeout(2000);
     }
   }
   const storageState = await context.storageState();
   await context.close();
+  // El navegador del login se cierra acá: solo existía para conseguir la sesión.
+  await browser.close();
   return storageState;
 }
 
@@ -415,7 +483,24 @@ async function main() {
           .filter(Boolean),
       )
     : null;
-  const rutas = soloRutas ? ROUTES.filter((r) => soloRutas.has(r.path)) : ROUTES;
+  const conFiltro = soloRutas ? ROUTES.filter((r) => soloRutas.has(r.path)) : ROUTES;
+
+  /**
+   * `--shard 1/2` captura la mitad del inventario. Es para CI: las 200 pantallas no caben en
+   * el tope de un job, y la alternativa —acotar por rutas— elegiría a mano lo que se mira.
+   *
+   * El reparto es determinista y por posición, así que la base y la rama capturan el MISMO
+   * conjunto en cada shard. Ver `shard.mjs`.
+   */
+  const rutas = (() => {
+    if (!args.shard) return conFiltro;
+    const m = /^(\d+)\s*\/\s*(\d+)$/.exec(String(args.shard));
+    if (!m) {
+      console.error(`--shard inválido: ${args.shard} (se espera N/M, p. ej. 1/2)`);
+      process.exit(2);
+    }
+    return repartirEnShards(conFiltro, Number(m[1]), Number(m[2]));
+  })();
   if (soloRutas) {
     const encontradas = rutas.map((r) => r.path);
     const faltan = [...soloRutas].filter((r) => !encontradas.includes(r));
@@ -430,18 +515,71 @@ async function main() {
   // Render determinista: sin esto, dos corridas idénticas difieren en ±1-2 niveles de color en los
   // bordes (antialiasing de texto y degradados). Son 200 px invisibles, pero rompen la comparación
   // estricta a umbral 0 — y bajar el umbral taparía cambios de color reales de 1-2 niveles.
-  const browser = await chromium.launch({
-    args: [
-      "--force-color-profile=srgb", // mismo perfil siempre, no el del monitor
-      "--disable-lcd-text", // antialiasing en gris, no subpíxel (el subpíxel varía)
-      "--font-render-hinting=none",
-      "--disable-gpu", // rasterizado por software: reproducible entre corridas
-      "--deterministic-mode",
-    ],
-  });
+  /**
+   * `--deterministic-mode` se cae en CI, y solo en CI.
+   *
+   * Esa bandera fija el reloj y el planificador del navegador, y en el runner deja de producir
+   * fotogramas: la comprobación «estable» de Playwright se apoya en `requestAnimationFrame`,
+   * `page.screenshot()` espera un fotograma que no llega y `page.content()` sí responde porque
+   * no necesita compositor. En la Mac la misma bandera SÍ avanza — medido, «rAF avanza: sí ·
+   * 34 ms» — y por eso el fallo era invisible en local.
+   *
+   * Las otras cuatro se quedan en los dos sitios: son las que de verdad fijan el RENDER (perfil
+   * de color, antialiasing en gris, sin hinting, rasterizado por software), y sin ellas dos
+   * corridas idénticas difieren en ±1-2 niveles en los bordes.
+   *
+   * Y el determinismo no se da por supuesto: con `QA_CI=1` el propio job vuelve a capturar 20
+   * rutas al final y compara las dos tandas. Si no da cero, falla.
+   */
+  const enCI = process.env.QA_CI === "1";
+  const banderas = [
+    "--force-color-profile=srgb", // mismo perfil siempre, no el del monitor
+    "--disable-lcd-text", // antialiasing en gris, no subpíxel (el subpíxel varía)
+    "--font-render-hinting=none",
+    "--disable-gpu", // rasterizado por software: reproducible entre corridas
+    ...(enCI ? [] : ["--deterministic-mode"]),
+  ];
+  if (enCI) console.log("QA_CI=1 · sin --deterministic-mode (no produce fotogramas en el runner)");
+  const browser = await chromium.launch({ args: banderas });
+  /**
+   * ¿Avanza `requestAnimationFrame` en ESTE navegador?
+   *
+   * No es curiosidad: `--deterministic-mode` con `--disable-gpu` puede dejarlo sin producir
+   * fotogramas, y de eso dependen la comprobación de estabilidad de Playwright, las capturas
+   * y cualquier `waitForFunction` que espere a que algo se asiente. Si no avanza hay que
+   * saberlo ANTES de las 200 pantallas, no deducirlo de un timeout a la mitad.
+   */
+  const rAF = await (async () => {
+    const p = await browser.newPage();
+    const t0 = Date.now();
+    const avanza = await p
+      .evaluate(
+        () =>
+          new Promise((res) => {
+            const t = setTimeout(() => res(false), 5000);
+            requestAnimationFrame(() => {
+              clearTimeout(t);
+              res(true);
+            });
+          }),
+      )
+      .catch(() => false);
+    const ms = Date.now() - t0;
+    await p.close();
+    return { avanza, ms };
+  })();
+  console.log(`rAF avanza: ${rAF.avanza ? "sí" : "NO"} · ${rAF.ms} ms`);
+  if (!rAF.avanza) {
+    console.log(
+      "  Sin fotogramas, las esperas por `waitForFunction` pasan a sondeo por intervalo:\n" +
+        "  su modo por defecto es `raf`, que acá no dispararía nunca y venceria el tope entero.",
+    );
+  }
+  const modoEspera = rAF.avanza ? undefined : { polling: 250 };
+
   const entries = [];
   let conTerminos = 0;
-  let esperasVencidas = 0;
+  let vencidos = 0;
 
   try {
     const storageState = await iniciarSesion(browser, baseUrl, email, password);
@@ -499,12 +637,11 @@ async function main() {
           await esperarFuentes(page);
           await finalizarAnimaciones(page);
           await enmascararNoDeterminista(page);
-          const loadingResidual = await esperarSinCargando(page);
+          const loadingResidual = await esperarSinCargando(page, modoEspera);
+          if (loadingResidual) vencidos++;
           // Y los esqueletos de gráfico, que NO dicen «Cargando…»: ver `esperarSinEsqueletos`.
-          const esqueletoResidual = await esperarSinEsqueletos(page);
-          // Dos esperas por captura; el resumen del final las cuenta contra ese total.
-          if (loadingResidual) esperasVencidas++;
-          if (esqueletoResidual) esperasVencidas++;
+          const esqueletoResidual = await esperarSinEsqueletos(page, modoEspera);
+          if (esqueletoResidual) vencidos++;
           const termsModal = await hayModalTerminos(page);
           if (termsModal) conTerminos++;
 
@@ -572,16 +709,17 @@ async function main() {
     `\n${entries.length} capturas · manifest en ${path.join(String(out), "manifest.json")}`,
   );
 
-  // Dos esperas por captura (`esperarSinCargando` y `esperarSinEsqueletos`). El dato por captura
-  // ya viajaba en el manifiesto, pero saber cuántas vencieron exigía bajar el artefacto y sumar
-  // los booleanos a mano; el total va aquí, y el detalle solo cuando hay algo que mirar.
-  console.log(`esperas que vencieron el tope: ${esperasVencidas} de ${entries.length * 2}`);
+  // Dos esperas por captura (`esperarSinCargando` y `esperarSinEsqueletos`), de ahí el `× 2`.
+  // `vencidos` ya se contaba, pero no tenía salida: el dato solo vivía en el manifiesto, y saber
+  // cuántas esperas vencieron exigía bajar el artefacto y sumar los booleanos a mano. El total va
+  // siempre; el detalle, solo cuando hay algo que mirar.
+  console.log(`esperas que vencieron el tope: ${vencidos} de ${entries.length * 2}`);
 
-  if (esperasVencidas > 0) {
-    const vencidas = entries.filter((e) => e.loadingResidual || e.esqueletoResidual);
+  if (vencidos > 0) {
+    const capturasVencidas = entries.filter((e) => e.loadingResidual || e.esqueletoResidual);
     console.log(
-      `\n⚠️  ${esperasVencidas} espera(s) vencieron el tope de ${TIMEOUT_CARGANDO_MS} ms en ${vencidas.length} captura(s):\n` +
-        vencidas
+      `\n⚠️  ${vencidos} espera(s) vencieron el tope de ${TIMEOUT_CARGANDO_MS} ms en ${capturasVencidas.length} captura(s):\n` +
+        capturasVencidas
           .map(
             (e) =>
               `    ${e.theme}/${e.width} ${e.route}` +
