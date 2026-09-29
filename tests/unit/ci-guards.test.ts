@@ -283,6 +283,23 @@ describe("la caché de imágenes del stack", () => {
     expect(bloque).toMatch(/--pattern "capturas-\$BASE-\*"/);
   });
 
+  it("todo job que compare PNG instala el navegador", () => {
+    // `diff.mjs` decodifica los PNG dentro de un Chromium. El job que compara no lo instalaba,
+    // y no se notó durante dos rondas porque siempre moría antes —resolviendo la base—, así que
+    // el paso de comparar nunca llegó a ejecutarse. El síntoma, cuando por fin llegó, fue
+    // «Executable doesn't exist at …/ms-playwright/…», que no se parece en nada a un problema
+    // de diff visual.
+    for (const job of ["diff_visual"]) {
+      const bloque =
+        DIRECTIVAS.slice(DIRECTIVAS.indexOf(`  ${job}:`)).split(/\n  [a-z0-9_]+:\n/)[0] ?? "";
+      expect(bloque, `${job}: corre diff.mjs`).toContain("scripts/qa/diff.mjs");
+      const iInstala = bloque.indexOf("playwright install");
+      const iCompara = bloque.indexOf("scripts/qa/diff.mjs");
+      expect(iInstala, `${job}: instala el navegador`).toBeGreaterThan(-1);
+      expect(iInstala, `${job}: y lo instala ANTES de comparar`).toBeLessThan(iCompara);
+    }
+  });
+
   it("las capturas se saltan cuando el PR no toca interfaz", () => {
     // Cuatro jobs de captura por un cambio en un README son 40 minutos de runner tirados, y
     // el ruido acostumbra a mirar los verdes sin leerlos.

@@ -1628,6 +1628,13 @@ jobs:
 
       - run: npm ci
 
+      # `diff.mjs` compara los PNG dentro de un Chromium —el canvas del navegador hace de
+      # decodificador, para no traer una librería de imágenes a un repo que ya trae un
+      # navegador entero—, así que este job necesita el binario. Faltaba desde que existe, y
+      # no se notó porque hasta ahora el job siempre moría antes, resolviendo la base.
+      - name: Navegador Playwright
+        run: npx playwright install --with-deps chromium
+
       - name: Bajar las capturas de la rama
         uses: actions/download-artifact@v4
         with:
