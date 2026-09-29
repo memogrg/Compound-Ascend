@@ -1819,6 +1819,26 @@ await ins(
 console.log("conversación del asesor sembrada:", CHAT.length, "mensajes");
 
 // ── perfil de la cuenta ───────────────────────────────────────────────────────
+//
+// El código de referido se FIJA, no se deja al DEFAULT de la columna.
+//
+// `profiles.referral_code` tiene `default public.gen_unique_referral_code()`, que es aleatorio:
+// cada siembra produce otro código y, con él, otro QR. Medido entre dos commits CONSECUTIVOS de
+// `main` que no tocan esa pantalla (`49d03542` y `516966ad`): `/configuracion` difería en 4059
+// píxeles, todos en la zona del QR y del código. Es decir, el diff visual reprobaba
+// `/configuracion` y `/m/perfil` en TODO PR, siempre, por algo que ningún PR había cambiado —
+// y una guarda que grita en cada corrida deja de leerse.
+//
+// El formato lo manda `gen_referral_code`: OCHO caracteres del alfabeto
+// `ABCDEFGHJKMNPQRSTUVWXYZ23456789`. No están la I, la L, la O, el 0 ni el 1, que es a propósito
+// (se confunden al leerlos en voz alta o al teclearlos desde un QR). Por eso estos códigos no
+// pueden ser «DEMOJOSE1» ni «DEMOMARTA»: llevan O, llevan 1 y miden nueve. `DEMUSER2` y
+// `DEMUSER3` caben en el alfabeto, miden ocho y no se parecen a nada generado al azar.
+//
+// La unicidad la garantiza `uq_profiles_referral_code`; estas dos filas son las únicas que las
+// usan, y el propio seeder borra y recrea las cuentas, así que no hay carrera con el DEFAULT.
+const CODIGO_REFERIDO = { jose: "DEMUSER2", marta: "DEMUSER3" };
+
 ok("profiles.jose")(
   await db
     .from("profiles")
@@ -1827,6 +1847,7 @@ ok("profiles.jose")(
       onboarding_completed: true,
       profile_completion: 100,
       plan: "max",
+      referral_code: CODIGO_REFERIDO.jose,
     })
     .eq("id", JOSE)
     .select("id"),
@@ -1839,6 +1860,7 @@ ok("profiles.marta")(
       onboarding_completed: true,
       profile_completion: 60,
       plan: "max",
+      referral_code: CODIGO_REFERIDO.marta,
     })
     .eq("id", MARTA)
     .select("id"),

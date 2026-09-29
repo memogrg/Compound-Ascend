@@ -71,7 +71,7 @@ const porImagen = new Map((reporte?.capturas ?? []).map((c) => [c.imagen, c]));
 const rango = (rel) => {
   const c = porImagen.get(rel);
   if (!c) return 2;
-  return c.reprobada ? 0 : c.excluida ? 2 : 1;
+  return c.reprobada ? 0 : c.inestable ? 3 : c.excluida ? 2 : 1;
 };
 /**
  * Manda el REPORTE, no los ficheros que haya en la carpeta. Una carpeta de diffs reusada
@@ -112,9 +112,11 @@ const filas = cambios
       ? ""
       : c.reprobada
         ? '<b class="mal">reprobada</b>'
-        : c.excluida
-          ? '<b class="ok">excluida del estricto</b>'
-          : '<b class="ok">bajo el umbral</b>';
+        : c.inestable
+          ? '<b class="avisa">INESTABLE · fuera del veredicto</b>'
+          : c.excluida
+            ? '<b class="ok">excluida del estricto</b>'
+            : '<b class="ok">bajo el umbral</b>';
     const cifras = c ? `${c.px} px · delta ${c.maxDelta}` : "";
     return `<section>
   <h2>/${ruta} <small>${tema} · ${ancho}px — ${etiqueta} <i>${cifras}</i></small></h2>
@@ -126,6 +128,52 @@ const filas = cambios
 </section>`;
   })
   .join("\n");
+
+/**
+ * Las rutas que la sonda marcó inestables, con LAS DOS TANDAS a la vista.
+ *
+ * Decirle a alguien «esta pantalla es inestable» y nada más no es accionable: hay que poder ver
+ * qué se mueve entre dos capturas de la MISMA compilación —un número que anima, una fecha que
+ * se coló, un gráfico que no terminó— para decidir si se arregla la pantalla o el arnés. Las
+ * imágenes las dejó `marcar-inestables.mjs` dentro del artefacto de la rama, bajo `_sonda/a|b`.
+ */
+const rutasInestables = reporte?.inestables ?? [];
+let seccionInestables = "";
+if (rutasInestables.length) {
+  const porRuta = new Map();
+  for (const rel of await pngsDe(path.join(args.b, "_sonda", "a"))) porRuta.set(rel, true);
+  for (const rel of porRuta.keys()) {
+    for (const lado of ["a", "b"]) {
+      const destino = path.join(args.out, "sonda", lado, rel);
+      await mkdir(path.dirname(destino), { recursive: true });
+      await cp(path.join(args.b, "_sonda", lado, rel), destino).catch(() => {});
+    }
+  }
+  const bloques = rutasInestables
+    .map((i) => {
+      const suyas = [...porRuta.keys()].filter(
+        (rel) => partes(rel).ruta === i.ruta.replace(/^\//, ""),
+      );
+      const pares = suyas
+        .map(
+          (rel) => `<div class="par dos">
+    <figure><figcaption>tanda A</figcaption><img loading="lazy" src="sonda/a/${rel}"></figure>
+    <figure><figcaption>tanda B</figcaption><img loading="lazy" src="sonda/b/${rel}"></figure>
+  </div>`,
+        )
+        .join("\n");
+      return `<section>
+  <h2>${i.ruta} <small><b class="avisa">INESTABLE</b> <i>hasta ${i.px} px · delta ${i.maxDelta} entre tandas</i></small></h2>
+  ${pares || "<p>Sin imágenes de las tandas en el artefacto.</p>"}
+</section>`;
+    })
+    .join("\n");
+  seccionInestables = `<h1 style="margin-top:40px">Rutas inestables (${rutasInestables.length})</h1>
+<p class="resumen">Estas dos capturas son de la <b>misma compilación</b> y el <b>mismo servidor</b>: lo que
+cambie entre ellas no lo cambió el PR. Quedan fuera del veredicto y se muestran para poder arreglar
+la causa —o el arnés—, no para ignorarlas.</p>
+${bloques}`;
+}
 
 const titulo = typeof args.titulo === "string" ? args.titulo : "Comparación visual";
 const html = `<!doctype html>
@@ -143,6 +191,8 @@ const html = `<!doctype html>
   h2 small { color: #666; font-weight: 400; }
   .mal { color: #b14844; }
   .ok { color: #32784a; }
+  .avisa { color: #8f6325; }
+  .par.dos { grid-template-columns: repeat(2, 1fr); }
   h2 i { color: #888; font-style: normal; }
   .par { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-items: start; }
   figure { margin: 0; }
@@ -155,6 +205,7 @@ const html = `<!doctype html>
   cambios.filter((r) => porImagen.get(r)?.reprobada).length
 } reprobada(s), primero. Las que no cambian no salen.</p>
 ${filas || "<p>Ninguna captura cambió.</p>"}
+${seccionInestables}
 </html>`;
 
 await writeFile(path.join(args.out, "comparacion.html"), html);
