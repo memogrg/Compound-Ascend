@@ -9,6 +9,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Browser } from "@playwright/test";
 
 import { ESTADO_SESION } from "./sesion";
+import { anioMes, congelarReloj } from "./reloj";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -48,6 +49,8 @@ async function abrir(
     ["ca-theme", tema] as [string, string],
   );
   const page = await ctx.newPage();
+  // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+  await congelarReloj(page);
   await page.goto("/dev/ui", { waitUntil: "networkidle", timeout: 60_000 });
   await page.waitForTimeout(800);
   await dentro(page).locator(".cal-grid").scrollIntoViewIfNeeded();
@@ -236,14 +239,16 @@ test("la serie termina en el mes en curso, no en el futuro", async ({ browser })
   expect(filas).toHaveLength(36);
 
   // La tabla rotula los meses como el eje ("sep 26"), así que se compara contra el mismo
-  // formato construido desde el reloj de la página —congelado en la captura, real en CI—
-  // en lugar de parsear la etiqueta.
-  const esperado = await page.evaluate(() => {
-    const d = new Date();
-    return new Intl.DateTimeFormat("es-CR", { month: "short", year: "2-digit" })
-      .format(new Date(d.getFullYear(), d.getMonth(), 1))
-      .replace(".", "");
-  });
+  // formato, construido desde el INSTANTE CONGELADO en lugar de parsear la etiqueta.
+  //
+  // Antes se leía el reloj de la página con `page.evaluate(() => new Date())`. Ahora ese reloj
+  // está congelado, así que daría lo mismo — pero se calcula acá igualmente: el spec no debería
+  // depender de que alguien se acuerde de congelar, y una excepción en la guarda es una puerta
+  // que la siguiente persona cruza sin leer el motivo.
+  const { anio, mes } = anioMes();
+  const esperado = new Intl.DateTimeFormat("es-CR", { month: "short", year: "2-digit" })
+    .format(new Date(Date.UTC(anio, mes - 1, 1, 12)))
+    .replace(".", "");
   const ultima = filas.at(-1)!.toLowerCase().replace(".", "");
   expect(ultima, `última fila "${ultima}" debería ser el mes en curso "${esperado}"`).toContain(
     esperado.toLowerCase().slice(0, 3),
