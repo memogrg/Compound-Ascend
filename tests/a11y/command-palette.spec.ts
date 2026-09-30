@@ -28,6 +28,7 @@ import { test, expect, type Browser, type Locator, type Page } from "@playwright
 
 import { apareceA, irA } from "./navegar";
 import { ESTADO_SESION } from "./sesion";
+import { congelarReloj } from "./reloj";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -62,6 +63,8 @@ let banderaEncendida = false;
 test.beforeAll(async ({ browser }) => {
   const ctx = await browser.newContext({ storageState: ESTADO_SESION });
   const page = await ctx.newPage();
+  // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+  await congelarReloj(page);
   await irA(page, RUTA);
   // El botón buscador del topbar v2 solo existe bajo bandera: es el detector más barato.
   // Se ESPERA un rato corto en vez de contar al instante: bajo bandera el botón es cliente
@@ -83,6 +86,8 @@ async function abrirPanel(browser: Browser, ruta: string = RUTA) {
     reducedMotion: "reduce",
   });
   const page = await ctx.newPage();
+  // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+  await congelarReloj(page);
   await irA(page, ruta, "button.tb2-search");
   return { ctx, page };
 }

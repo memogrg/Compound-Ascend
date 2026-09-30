@@ -10,6 +10,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Browser, type Locator, type Page } from "@playwright/test";
 
 import { ESTADO_SESION } from "./sesion";
+import { congelarReloj } from "./reloj";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const RUTA = "/dev/ui";
@@ -37,6 +38,8 @@ async function abrir(
     ["ca-theme", tema] as [string, string],
   );
   const page = await ctx.newPage();
+  // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+  await congelarReloj(page);
   await page.goto(RUTA, { waitUntil: "networkidle", timeout: 60_000 });
   await page.waitForTimeout(800);
   return { ctx, page };

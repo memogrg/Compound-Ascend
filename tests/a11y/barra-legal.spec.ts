@@ -13,6 +13,7 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
 import { ESTADO_SESION } from "./sesion";
+import { congelarReloj } from "./reloj";
 
 /** Alto máximo de la barra en móvil, SIN el área segura, que depende del aparato. */
 const ALTO_MAXIMO = 64;
@@ -28,6 +29,8 @@ const ALTO_MAXIMO = 64;
 test.beforeAll(async ({ browser }) => {
   const ctx = await browser.newContext({ storageState: ESTADO_SESION });
   const page = await ctx.newPage();
+  // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+  await congelarReloj(page);
   for (const ruta of ["/dashboard", "/m/gastos"]) {
     await page.goto(ruta, { waitUntil: "domcontentloaded", timeout: 120_000 }).catch(() => {});
   }
@@ -42,6 +45,8 @@ async function abrir(browser: Browser, ruta: string, ancho = 390) {
     reducedMotion: "reduce",
   });
   const page = await ctx.newPage();
+  // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+  await congelarReloj(page);
   await page.goto(ruta, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await page.locator("body").waitFor({ state: "visible", timeout: 30_000 });
   await page.waitForTimeout(1200);

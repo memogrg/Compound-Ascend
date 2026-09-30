@@ -21,6 +21,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { test } from "@playwright/test";
 
 import { ESTADO_SESION } from "./sesion";
+import { congelarReloj } from "./reloj";
 
 type Ruta = { path: string; auth: boolean; superficie?: string };
 
@@ -79,6 +80,8 @@ for (const ruta of ROUTES) {
         reducedMotion: "reduce",
       });
       const page = await ctx.newPage();
+      // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+      await congelarReloj(page);
       await page.goto(ruta.path, { waitUntil: "networkidle", timeout: 60_000 });
       await page.waitForTimeout(800);
 

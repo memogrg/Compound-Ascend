@@ -1406,6 +1406,16 @@ export interface Database {
         Args: { p_name?: string | null };
         Returns: string;
       };
+      increment_ai_usage: {
+        Args: {
+          p_user_id: string;
+          p_period: string;
+          p_tokens: number;
+          p_requests?: number;
+          p_cost?: number;
+        };
+        Returns: number;
+      };
       resolve_referral_code: {
         Args: { p_code: string };
         Returns: string | null;
