@@ -73,13 +73,27 @@ describe("specs de navegador · reloj congelado", () => {
     expect(culpables, `falta congelarReloj():\n${culpables.join("\n")}`).toEqual([]);
   });
 
+  it("el módulo del instante no usa `import.meta`", () => {
+    // Playwright transpila los specs a CommonJS. Un `import.meta` en la cadena de importaciones
+    // revienta con «Cannot use 'import.meta' outside a module» ANTES de ejecutar nada: los cuatro
+    // jobs de E2E murieron con «No tests found», que no se parece en nada a la causa. Medido:
+    // apuntando el helper a `snap.mjs`, `playwright test --list` da 0 tests en 0 ficheros; con
+    // `instante.mjs`, 225 en 16.
+    // Sin comentarios: lo que se prohíbe es el CÓDIGO. El propio módulo explica en su cabecera
+    // por qué no lo usa, y una guarda que castiga la explicación se gana que borren la explicación.
+    const src = sinComentarios(readFileSync(path.join(RAIZ, "scripts/qa/instante.mjs"), "utf8"));
+    expect(src, "`instante.mjs` lo importan los specs: no puede usar import.meta").not.toContain(
+      "import.meta",
+    );
+  });
+
   it("el instante sale del arnés, no de una copia", () => {
     // Dos implementaciones de «qué día es» se separan en cuanto una cambia, y la que cambia no
-    // es la que falla. El helper reusa `instanteCongelado` de `snap.mjs`, que es el mismo que
+    // es la que falla. El helper reusa `instanteCongelado` de `instante.mjs`, que es el mismo que
     // resuelve el servidor congelado y las capturas.
     const reloj = readFileSync(path.join(RAIZ, "tests/a11y/reloj.ts"), "utf8");
     expect(reloj).toContain("instanteCongelado");
-    expect(reloj).toContain("scripts/qa/snap.mjs");
+    expect(reloj).toContain("scripts/qa/instante.mjs");
     expect(reloj, "lee QA_INSTANTE y QA_FREEZE").toMatch(/QA_INSTANTE[\s\S]*QA_FREEZE/);
   });
 });

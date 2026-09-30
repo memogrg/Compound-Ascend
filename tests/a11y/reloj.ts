@@ -15,10 +15,12 @@
  * La regla, a partir de acá: **ningún spec de `tests/a11y` ni de `tests/e2e` lee el reloj real**.
  * El instante sale de `QA_INSTANTE` (el literal del workflow) o de `QA_FREEZE` (el que exporta
  * `qa:start`), y se resuelve con el MISMO helper que usa el arnés — no con una copia que pueda
- * separarse. Hay una guarda de unidad que lo comprueba.
+ * separarse. Vive en `scripts/qa/instante.mjs` y no en `snap.mjs` porque éste usa
+ * `import.meta`, y Playwright transpila los specs a CommonJS: importarlo reventaba los cuatro
+ * jobs de E2E con «Cannot use 'import.meta' outside a module», sin ejecutar un solo test. Hay una guarda de unidad que lo comprueba.
  */
 // @ts-expect-error — `.mjs` sin tipos: es el arnés de QA, no código de la app.
-import { instanteCongelado } from "../../scripts/qa/snap.mjs";
+import { instanteCongelado } from "../../scripts/qa/instante.mjs";
 
 /**
  * El instante con el que corren los specs.
