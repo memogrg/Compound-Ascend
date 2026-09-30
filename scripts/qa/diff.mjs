@@ -71,7 +71,15 @@ function parseArgs(argv) {
   return args;
 }
 
-/** Todos los .png bajo `dir`, con su ruta relativa (que es la identidad de la captura). */
+/**
+ * Todos los .png bajo `dir`, con su ruta relativa (que es la identidad de la captura).
+ *
+ * Menos `_sonda/`, que no son capturas de la corrida: son las dos tandas que la sonda de
+ * determinismo guardó de las rutas inestables, para poder verlas en `comparacion.html`. Viajan
+ * dentro del artefacto de la rama y no existen en el de la base, así que contarlas las dejaba
+ * como «solo en B» — y eso, por sí solo, ponía el diff en rojo. Un fichero de diagnóstico no
+ * puede hacer fallar el diagnóstico.
+ */
 async function listarPngs(dir) {
   const out = [];
   async function walk(actual) {
@@ -83,6 +91,7 @@ async function listarPngs(dir) {
     }
     for (const it of items) {
       const p = path.join(actual, it.name);
+      if (it.isDirectory() && it.name === "_sonda") continue;
       if (it.isDirectory()) await walk(p);
       else if (it.name.endsWith(".png")) out.push(path.relative(dir, p));
     }
@@ -190,12 +199,48 @@ async function compararEnPagina(page, aUri, bUri, threshold, ignorarDeltaBajo) {
 }
 
 /** El manifiesto de una corrida, o `null` si no se puede leer (una corrida vieja o a medias). */
-async function leerManifest(dir) {
+async function leerManifests(dir) {
+  let nombres = [];
   try {
-    return JSON.parse(await readFile(path.join(dir, "manifest.json"), "utf8"));
+    nombres = (await readdir(dir)).filter((f) => /^manifest.*\.json$/.test(f)).sort();
   } catch {
-    return null;
+    return [];
   }
+  const out = [];
+  for (const n of nombres) {
+    try {
+      out.push(JSON.parse(await readFile(path.join(dir, n), "utf8")));
+    } catch {
+      /* un manifiesto ilegible no puede tumbar la comparación; se ignora y se nota abajo */
+    }
+  }
+  return out;
+}
+
+/**
+ * Los manifiestos de una corrida, unidos en uno.
+ *
+ * Una corrida repartida en shards sube un artefacto por shard, y `download-artifact` con patrón
+ * los deja APLANADOS en la misma carpeta: los cuatro `manifest.json` se pisan y sobrevive uno
+ * solo. Los PNG no colisionan —cada shard captura rutas distintas— así que el estropicio no se
+ * ve: 200 capturas comparadas y el manifiesto de UN cuarto de ellas.
+ *
+ * Costó una corrida entenderlo: la sonda marcó `/mi-base-financiera` como inestable en el shard
+ * 2, el paso de marcado lo escribió en SU manifiesto, y el diff no se enteró porque leía el de
+ * otro shard. La ruta acabó reprobada, es decir: culpando al PR de lo que el propio arnés ya
+ * había medido que se movía solo.
+ *
+ * Por eso cada shard guarda `manifest-<N>.json` y esto los junta. `banderas` se toma del primero
+ * —todos los shards compilan el mismo build— y `entries` y `rutasInestables` se concatenan.
+ */
+async function leerManifest(dir) {
+  const todos = await leerManifests(dir);
+  if (!todos.length) return null;
+  return {
+    ...todos[0],
+    entries: todos.flatMap((m) => m.entries ?? []),
+    rutasInestables: todos.flatMap((m) => m.rutasInestables ?? []),
+  };
 }
 
 /**
@@ -205,6 +250,42 @@ async function leerManifest(dir) {
  * confundir «no lo sé» con «son distintas» haría imposible comparar contra cualquier base
  * antigua. Se avisa, en voz alta, y quien mira decide.
  */
+/**
+ * Se niega a comparar dos corridas congeladas en INSTANTES distintos.
+ *
+ * El arnés congela el reloj para que «el mes en curso» no cambie a mitad de una captura. Pero el
+ * instante se calculaba del reloj de pared en cada corrida, así que una base capturada ayer y una
+ * rama capturada hoy congelaban en días distintos — y entonces toda pantalla con fechas difiere.
+ *
+ * Medido: mismo PR, misma base (`516966ad`), dos corridas. La primera congeló en el mismo día que
+ * la base y dio 11 capturas distintas; la segunda congeló un día después y dio 30, con
+ * `/transacciones`, `/gastos` y `/empezar` sumándose. Ninguna de esas 19 la movió el PR: las movió
+ * el calendario. Un diff así no es un diff con ruido, es una comparación inválida — la misma
+ * categoría que comparar dos builds con banderas distintas, y por eso se trata igual: no se avisa,
+ * se niega.
+ */
+async function exigirMismoInstante(dirA, dirB) {
+  const [ma, mb] = await Promise.all([leerManifest(dirA), leerManifest(dirB)]);
+  const ia = ma?.fixedTime ?? null;
+  const ib = mb?.fixedTime ?? null;
+  if (ia == null || ib == null) {
+    console.log(
+      `\n  ⚠ Instante congelado desconocido en ${ia == null ? dirA : dirB}: ` +
+        `no se puede comprobar que las dos corridas miren el mismo día.`,
+    );
+    return;
+  }
+  if (ia === ib) return;
+  console.error(`\n  ✖ Las dos corridas se congelaron en instantes distintos.\n`);
+  console.error(`      ${dirA} = ${ia}\n      ${dirB} = ${ib}\n`);
+  console.error(
+    `    No se compara: con otro «hoy» cambian los meses, los rótulos de período y los\n` +
+      `    estados «en curso», y el diff diría que los movió el PR. Las dos corridas tienen que\n` +
+      `    usar el MISMO instante fijo (\`QA_INSTANTE\` en el workflow), no el reloj de pared.\n`,
+  );
+  process.exit(2);
+}
+
 async function exigirMismasBanderas(dirA, dirB) {
   const [ma, mb] = await Promise.all([leerManifest(dirA), leerManifest(dirB)]);
   const ba = ma?.banderas ?? null;
@@ -238,6 +319,11 @@ async function main() {
     process.exit(2);
   }
   const outDiff = args["out-diff"] ?? "qa-snapshots/diff";
+  // La carpeta se crea SIEMPRE, no solo cuando hay un PNG de diferencias que escribir.
+  // Cuando no cambia nada —el caso normal— no había ninguno, la carpeta no existía, y tanto
+  // `reporte.json` como el `inestables.json` de la sonda reventaban con ENOENT. O sea: el
+  // camino feliz era el único sin probar, y era el que fallaba.
+  await mkdir(outDiff, { recursive: true });
   const threshold = Number(args.threshold ?? 0);
   const maxDiffPixels = Number(args["max-diff-pixels"] ?? 0);
   // Criterio de DOS condiciones. El rasterizado de Chromium deja tiras inestables en los bordes:
@@ -275,6 +361,46 @@ async function main() {
   // medía nada: la navegación entera era otra. Comparar así no es un margen que haya que
   // ajustar, es una comparación inválida, y por eso esto no avisa: se niega.
   await exigirMismasBanderas(dirA, dirB);
+  await exigirMismoInstante(dirA, dirB);
+
+  /**
+   * Rutas que la sonda de determinismo marcó: no salen iguales dos veces seguidas contra la
+   * MISMA compilación, así que compararlas entre dos compilaciones distintas no mide nada. Se
+   * comparan igual y se reportan —el dato sigue siendo interesante—, pero NO entran al
+   * veredicto: culpar al PR de una pantalla que se mueve sola es exactamente el error que este
+   * job existe para no cometer.
+   *
+   * Se leen de los DOS manifiestos y se unen: si una ruta se volvió inestable en la rama, la
+   * base no lo sabe, y al revés.
+   */
+  const inestables = new Map();
+  for (const dir of [dirA, dirB]) {
+    const man = await leerManifest(dir);
+    for (const r of man?.rutasInestables ?? []) {
+      const previo = inestables.get(r.ruta);
+      inestables.set(r.ruta, {
+        ruta: r.ruta,
+        px: Math.max(previo?.px ?? 0, r.px ?? 0),
+        maxDelta: Math.max(previo?.maxDelta ?? 0, r.maxDelta ?? 0),
+      });
+    }
+  }
+
+  /**
+   * De la ruta a TODAS sus capturas (los dos temas y todos sus anchos).
+   *
+   * La sonda solo mira `light/1280`, pero una pantalla que se mueve sola se mueve en los seis
+   * combinados. Excluir solo la imagen que la sonda miró dejaría las otras cinco culpando al
+   * PR, que es el mismo error con menos ruido.
+   */
+  const imagenesInestables = new Set();
+  if (inestables.size) {
+    for (const dir of [dirA, dirB]) {
+      const man = await leerManifest(dir);
+      for (const e of man?.entries ?? [])
+        if (e.file && inestables.has(e.route)) imagenesInestables.add(e.file);
+    }
+  }
 
   const [pngsA, pngsB] = await Promise.all([listarPngs(dirA), listarPngs(dirB)]);
   const setB = new Set(pngsB);
@@ -309,6 +435,7 @@ async function main() {
         pct: r.totalPixels ? (r.diffPixels / r.totalPixels) * 100 : 0,
         sizeMismatch: Boolean(r.sizeMismatch),
         excluida: excluidos.has(slugDe(rel)),
+        inestable: imagenesInestables.has(rel),
       });
     }
   } finally {
@@ -323,14 +450,17 @@ async function main() {
   for (const f of filas.slice(0, 60)) {
     const nombre = f.imagen.length > 58 ? `…${f.imagen.slice(-57)}` : f.imagen.padEnd(58);
     const marca =
-      (f.sizeMismatch ? " (tamaño distinto)" : "") + (f.excluida ? " (excluida del estricto)" : "");
+      (f.sizeMismatch ? " (tamaño distinto)" : "") +
+      (f.excluida ? " (excluida del estricto)" : "") +
+      (f.inestable ? " (INESTABLE: fuera del veredicto)" : "");
     console.log(
       `${nombre} ${String(f.diffPixels).padStart(12)} ${f.pct.toFixed(4).padStart(8)} ${String(f.maxDelta).padStart(6)}${marca}`,
     );
   }
   if (filas.length > 60) console.log(`… y ${filas.length - 60} más`);
 
-  const estrictas = conDiff.filter((f) => !f.excluida);
+  const inestablesConDiff = conDiff.filter((f) => f.inestable);
+  const estrictas = conDiff.filter((f) => !f.excluida && !f.inestable);
   console.log(
     `\n${comunes.length} comparadas · ${conDiff.length} con diferencias · umbral ${threshold} · permitido hasta ${maxDiffPixels}px Y delta ${maxDelta}`,
   );
@@ -359,6 +489,19 @@ async function main() {
 
   // Una imagen falla si se pasa de CUALQUIERA de las dos: demasiados píxeles o un delta demasiado
   // grande. El ruido de rasterizado se queda corto en las dos; un cambio real se pasa en alguna.
+  if (inestables.size) {
+    console.log(
+      `\nrutas INESTABLES (${inestables.size}), fuera del veredicto — la sonda las vio cambiar ` +
+        `entre dos tandas de la MISMA compilación:`,
+    );
+    for (const i of inestables.values())
+      console.log(`  ${i.ruta}  ·  hasta ${i.px} px  ·  delta ${i.maxDelta} entre tandas`);
+    console.log(
+      `  ${inestablesConDiff.length} de sus capturas difieren también entre base y rama, y NO cuentan.`,
+    );
+    console.log("  Las dos tandas de cada una están en comparacion.html, para ver qué se mueve.");
+  }
+
   const reprobadas = estrictas.filter((f) => f.diffPixels > maxDiffPixels || f.maxDelta > maxDelta);
   if (reprobadas.length) {
     console.log(
@@ -408,6 +551,8 @@ async function main() {
           excluidos: [...excluidos],
         },
         parcial: parcial ?? null,
+        // Las lee `comparacion.mjs` para pintarles su propia sección con las dos tandas.
+        inestables: [...inestables.values()],
         soloA,
         soloB,
         capturas: conDiff.map((f) => ({
@@ -417,6 +562,7 @@ async function main() {
           maxDelta: f.maxDelta,
           ignorados: f.ignorados,
           excluida: Boolean(f.excluida),
+          inestable: Boolean(f.inestable),
           reprobada: reprobadasSet.has(f.imagen),
           tamañoDistinto: Boolean(f.sizeMismatch),
         })),
