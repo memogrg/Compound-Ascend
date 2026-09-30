@@ -662,6 +662,27 @@ async function main() {
     `\n${entries.length} capturas · manifest en ${path.join(String(out), "manifest.json")}`,
   );
 
+  // Dos esperas por captura (`esperarSinCargando` y `esperarSinEsqueletos`), de ahí el `× 2`.
+  // `vencidos` ya se contaba, pero no tenía salida: el dato solo vivía en el manifiesto, y saber
+  // cuántas esperas vencieron exigía bajar el artefacto y sumar los booleanos a mano. El total va
+  // siempre; el detalle, solo cuando hay algo que mirar.
+  console.log(`esperas que vencieron el tope: ${vencidos} de ${entries.length * 2}`);
+
+  if (vencidos > 0) {
+    const capturasVencidas = entries.filter((e) => e.loadingResidual || e.esqueletoResidual);
+    console.log(
+      `\n⚠️  ${vencidos} espera(s) vencieron el tope de ${TIMEOUT_CARGANDO_MS} ms en ${capturasVencidas.length} captura(s):\n` +
+        capturasVencidas
+          .map(
+            (e) =>
+              `    ${e.theme}/${e.width} ${e.route}` +
+              `${e.loadingResidual ? " · Cargando… residual" : ""}` +
+              `${e.esqueletoResidual ? " · ESQUELETO residual" : ""}`,
+          )
+          .join("\n"),
+    );
+  }
+
   if (conTerminos > 0) {
     console.log(
       `\n⚠️  El modal de Términos apareció en ${conTerminos} captura(s) y NO se aceptó (a propósito).\n` +
