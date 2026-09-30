@@ -58,3 +58,8 @@ qa-snapshots/
 # Sesión guardada por el globalSetup de Playwright: son cookies de un usuario real.
 .auth/
 .qa-servidor.json
+
+# Evidencia visual descargada de CI para revisar a mano (zips de `comparacion.html` con sus
+# carpetas `antes/`, `despues/` y `diff/`). Son megas de PNG con los datos de la cuenta demo, y
+# viven con el PR que se está mirando, no en el repo.
+_qa/
