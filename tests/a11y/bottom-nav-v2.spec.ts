@@ -12,6 +12,7 @@ import { test, expect, type Browser } from "@playwright/test";
 
 import { irA } from "./navegar";
 import { ESTADO_SESION } from "./sesion";
+import { congelarReloj } from "./reloj";
 
 async function abrir(browser: Browser, url = "/dashboard") {
   const ctx = await browser.newContext({
@@ -20,6 +21,8 @@ async function abrir(browser: Browser, url = "/dashboard") {
     reducedMotion: "reduce",
   });
   const page = await ctx.newPage();
+  // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+  await congelarReloj(page);
   // La barra ES lo que mide este spec: se espera ella, no un hueco en la red.
   await irA(page, url, ".bottom-nav");
   return { ctx, page };
