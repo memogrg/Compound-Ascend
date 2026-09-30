@@ -133,14 +133,30 @@ export const OPACIDAD = {
 } as const;
 
 /**
- * La animación de entrada de Recharts va APAGADA en todo el núcleo.
+ * Lo que el PRODUCTO quiere hoy: la animación de entrada de Recharts, apagada.
  *
  * No es una decisión de gusto: con `ResponsiveContainer` la animación se re-dispara en cada
- * medición y el gráfico «late» al redimensionar, y en las capturas de QA introduce un estado
- * intermedio que no es determinista. El movimiento que sí queremos —el del punto activo y el
- * tooltip— es CSS y se apaga solo con `prefers-reduced-motion` a través de los `--dur-*`.
+ * medición y el gráfico «late» al redimensionar. El movimiento que sí queremos —el del punto
+ * activo y el tooltip— es CSS y se apaga solo con `prefers-reduced-motion` vía los `--dur-*`.
  */
-export const ANIMACION_ACTIVA = false;
+const ANIMACION_DEL_PRODUCTO = false;
+
+/**
+ * Y lo que QA EXIGE: apagada, decida lo que decida el producto.
+ *
+ * `NEXT_PUBLIC_QA_SIN_ANIMACION=1` la fuerza a apagarse. Hoy no cambia nada —el producto ya la
+ * quiere apagada—, y decirlo es parte del punto: lo que la bandera compra no es un
+ * comportamiento nuevo, es que **no pueda dejar de ser cierto sin que las capturas se enteren**.
+ * Va en `BANDERAS_UI`, así que viaja en el manifiesto y `diff.mjs` se niega a comparar una base y
+ * una rama compiladas con distinto valor; y si algún día el producto quiere animar, las capturas
+ * siguen siendo deterministas sin que nadie tenga que acordarse.
+ *
+ * Es también la razón por la que los gráficos leen ESTA constante en vez de escribir `false` a
+ * mano: cuatro `false` repartidos son cuatro sitios donde alguien puede poner `true` sin que la
+ * bandera lo alcance.
+ */
+export const ANIMACION_ACTIVA =
+  process.env.NEXT_PUBLIC_QA_SIN_ANIMACION === "1" ? false : ANIMACION_DEL_PRODUCTO;
 
 /**
  * Alto que ocupa el tooltip anclado arriba en un puntero grueso, más su respiro.

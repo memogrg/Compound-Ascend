@@ -361,6 +361,19 @@ describe("la caché de imágenes del stack", () => {
     expect(bloque).toContain("CADUCADA(S)");
   });
 
+  it("las capturas compilan con la bandera que apaga la animación", () => {
+    // Y la bandera está en `BANDERAS_UI`, así que viaja en el manifiesto: si la base y la rama se
+    // compilaran con distinto valor, `diff.mjs` se niega en vez de comparar dos cosas que hoy se
+    // ven igual y mañana no. Compilar sin ella dejaría la garantía escrita en un comentario.
+    for (const job of ["capturas_main", "capturas_rama"]) {
+      const bloque =
+        DIRECTIVAS.slice(DIRECTIVAS.indexOf(`  ${job}:`)).split(/\n  [a-z0-9_]+:\n/)[0] ?? "";
+      expect(bloque, `${job}: compila con la bandera`).toMatch(
+        /NEXT_PUBLIC_QA_SIN_ANIMACION=1 node scripts\/dev\/con-env\.mjs npm run build/,
+      );
+    }
+  });
+
   it("las capturas se saltan cuando el PR no toca interfaz", () => {
     // Cuatro jobs de captura por un cambio en un README son 40 minutos de runner tirados, y
     // el ruido acostumbra a mirar los verdes sin leerlos.

@@ -14,6 +14,7 @@ import {
 import { formatMoney, formatAxisCompact } from "@/lib/format";
 import { niceEscala } from "./scale";
 import { ChartEmpty } from "./chart-empty";
+import { ANIMACION_ACTIVA } from "./core";
 
 export type AreaPoint = { date: string; value: number };
 
@@ -175,7 +176,7 @@ export function PerformanceChart({
               fill={`url(#${gradId})`}
               dot={false}
               activeDot={{ r: 3, fill: color }}
-              isAnimationActive={false}
+              isAnimationActive={ANIMACION_ACTIVA}
             />
             <Tooltip
               contentStyle={{

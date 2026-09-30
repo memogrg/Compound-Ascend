@@ -1302,8 +1302,13 @@ jobs:
         # reescribe lo que encuentra, así que ese default no puede ser lo que corra en CI.
         run: DEMO_ENV_FILE=.env.local DEMO_EMAIL_OVERRIDE=demo@ci.local node scripts/demo/seed-demo-familia.mjs
 
+      # `NEXT_PUBLIC_QA_SIN_ANIMACION=1` fuerza `ANIMACION_ACTIVA` a falso en el núcleo de
+      # gráficos. Hoy no cambia nada —el producto ya la quiere apagada—, y por eso está: lo que
+      # compra no es un comportamiento nuevo, es que no pueda dejar de ser cierto sin que estas
+      # capturas se enteren. Va en `BANDERAS_UI`, así que viaja en el manifiesto y el diff se
+      # niega a comparar una base y una rama compiladas con distinto valor.
       - name: Compilar con las banderas de producción
-        run: node scripts/dev/con-env.mjs npm run build
+        run: NEXT_PUBLIC_QA_SIN_ANIMACION=1 node scripts/dev/con-env.mjs npm run build
 
       - name: Navegador Playwright
         run: npx playwright install --with-deps chromium
@@ -1515,8 +1520,13 @@ jobs:
         # reescribe lo que encuentra, así que ese default no puede ser lo que corra en CI.
         run: DEMO_ENV_FILE=.env.local DEMO_EMAIL_OVERRIDE=demo@ci.local node scripts/demo/seed-demo-familia.mjs
 
+      # `NEXT_PUBLIC_QA_SIN_ANIMACION=1` fuerza `ANIMACION_ACTIVA` a falso en el núcleo de
+      # gráficos. Hoy no cambia nada —el producto ya la quiere apagada—, y por eso está: lo que
+      # compra no es un comportamiento nuevo, es que no pueda dejar de ser cierto sin que estas
+      # capturas se enteren. Va en `BANDERAS_UI`, así que viaja en el manifiesto y el diff se
+      # niega a comparar una base y una rama compiladas con distinto valor.
       - name: Compilar con las banderas de producción
-        run: node scripts/dev/con-env.mjs npm run build
+        run: NEXT_PUBLIC_QA_SIN_ANIMACION=1 node scripts/dev/con-env.mjs npm run build
 
       - name: Navegador Playwright
         run: npx playwright install --with-deps chromium
