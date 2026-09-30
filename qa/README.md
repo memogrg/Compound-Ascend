@@ -164,7 +164,7 @@ es que no se pueda hacer a la ligera.
       "ruta": "/configuracion",
       "tema": "light",
       "ancho": 1280,
-      "sha256_despues": "03d109c7b63f3e2db6f1357531c7a6eecf54f1efbca7357a4be0483d957b5f65"
+      "sha256_despues": "<los 64 hex que imprime shasum -a 256>"
     }
   ]
 }
