@@ -79,13 +79,75 @@ const rango = (rel) => {
  * 18 filas para 11 cambios. Si no hay reporte —una corrida vieja— se cae a los ficheros y se
  * dice en la página.
  */
-const cambios = (reporte ? reporte.capturas.map((c) => c.imagen) : pngs)
-  .filter((rel) => pngs.includes(rel))
-  .sort((x, y) => rango(x) - rango(y) || x.localeCompare(y));
+/**
+ * NO se filtra por «tiene PNG de diferencias».
+ *
+ * `diff.mjs` no escribe uno cuando las dos capturas miden distinto —no hay dónde restar—, y esta
+ * página las descartaba por eso. En la 2.7 eso significó mostrar **4 de 12**: las ocho que
+ * faltaban eran precisamente `/gastos` e `/ingresos` a 1280 y 390, o sea las que MÁS cambiaron
+ * (el marco nuevo es más alto). La revisión visual se quedaba sin ver justo lo que venía a ver.
+ *
+ * Ahora entran todas las del reporte, y a las de tamaño distinto se les fabrica el diff acá,
+ * rellenando la más corta hasta la altura de la otra.
+ */
+const cambios = (reporte ? reporte.capturas.map((c) => c.imagen) : pngs).sort(
+  (x, y) => rango(x) - rango(y) || x.localeCompare(y),
+);
 await mkdir(args.out, { recursive: true });
+
+/**
+ * El alto de un PNG sin decodificarlo: va en la cabecera IHDR, bytes 20-23 (big-endian).
+ *
+ * Se lee así y no con una librería porque lo único que hace falta es el número, y estas capturas
+ * llegan a 8500 px de alto: decodificar doscientas para leer un entero de cada una es pagar
+ * megabytes por nada.
+ */
+async function altoDe(fichero) {
+  try {
+    const b = await readFile(fichero);
+    return b.length > 24 ? b.readUInt32BE(20) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fabrica el diff de dos capturas con alturas distintas.
+ *
+ * Se comparan sobre el lienzo de la MAYOR: lo que solo existe en una de las dos queda marcado
+ * entero, que es exactamente lo que pasó —apareció o desapareció contenido—. Sin esto, la captura
+ * que más cambió era la única sin imagen de diferencias.
+ */
+async function diffRellenado(fa, fb, destino) {
+  const { PNG } = await import("pngjs");
+  const a = PNG.sync.read(await readFile(fa));
+  const b = PNG.sync.read(await readFile(fb));
+  const w = Math.max(a.width, b.width);
+  const h = Math.max(a.height, b.height);
+  const out = new PNG({ width: w, height: h });
+  const idx = (im, x, y) => (x < im.width && y < im.height ? (y * im.width + x) * 4 : -1);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const oa = idx(a, x, y);
+      const ob = idx(b, x, y);
+      const q = (y * w + x) * 4;
+      const distinto =
+        oa < 0 ||
+        ob < 0 ||
+        a.data[oa] !== b.data[ob] ||
+        a.data[oa + 1] !== b.data[ob + 1] ||
+        a.data[oa + 2] !== b.data[ob + 2];
+      out.data[q] = 255;
+      out.data[q + 1] = distinto ? 0 : 255;
+      out.data[q + 2] = distinto ? 0 : 255;
+      out.data[q + 3] = 255;
+    }
+  await writeFile(destino, PNG.sync.write(out));
+}
 
 // Las imágenes se COPIAN al artefacto: una página que apunta a rutas de la máquina de CI no
 // se ve en ningún lado después.
+const altos = new Map();
 for (const rel of cambios) {
   for (const [lado, origen] of [
     ["antes", args.a],
@@ -96,6 +158,15 @@ for (const rel of cambios) {
     await mkdir(path.dirname(destino), { recursive: true });
     await cp(path.join(origen, rel), destino).catch(() => {});
   }
+  const [ha, hb] = await Promise.all([
+    altoDe(path.join(args.a, rel)),
+    altoDe(path.join(args.b, rel)),
+  ]);
+  altos.set(rel, { antes: ha, despues: hb });
+  // Si no hay diff —tamaños distintos, `diff.mjs` no lo escribe— se fabrica acá.
+  const dDiff = path.join(args.out, "diff", rel);
+  if ((await altoDe(dDiff)) === null)
+    await diffRellenado(path.join(args.a, rel), path.join(args.b, rel), dDiff).catch(() => {});
 }
 
 /** `light/390/gastos.png` → tema, ancho y ruta legibles. */
@@ -119,9 +190,24 @@ const filas = cambios
             : c.excluida
               ? '<b class="ok">excluida del estricto</b>'
               : '<b class="ok">bajo el umbral</b>';
-    const cifras = c ? `${c.px} px · delta ${c.maxDelta}` : "";
+    // Un aviso de un vistazo: cuando los tamaños no coinciden, el conteo de píxeles de al
+    // lado no significa lo que parece.
+    const marcaTamano = c?.["tamañoDistinto"] ? ' <b class="avisa">tamaño distinto</b>' : "";
+    const h = altos.get(rel);
+    /**
+     * La diferencia de ALTURA, en píxeles y con su signo.
+     *
+     * Cuando dos capturas miden distinto, el conteo de píxeles deja de ser interpretable: el
+     * `2403840` de `/gastos` no dice «cambiaron 2,4 millones de píxeles», dice «la página creció y
+     * todo lo de abajo se corrió». El número que explica esa fila es cuánto creció.
+     */
+    const alturas =
+      h && h.antes != null && h.despues != null && h.antes !== h.despues
+        ? ` · alto ${h.antes} → ${h.despues} px (${h.despues > h.antes ? "+" : ""}${h.despues - h.antes})`
+        : "";
+    const cifras = c ? `${c.px} px · delta ${c.maxDelta}${alturas}` : alturas.replace(/^ · /, "");
     return `<section>
-  <h2>/${ruta} <small>${tema} · ${ancho}px — ${etiqueta} <i>${cifras}</i></small></h2>
+  <h2>/${ruta} <small>${tema} · ${ancho}px — ${etiqueta}${marcaTamano} <i>${cifras}</i></small></h2>
   <div class="par">
     <figure><figcaption>antes</figcaption><img loading="lazy" src="antes/${rel}"></figure>
     <figure><figcaption>después</figcaption><img loading="lazy" src="despues/${rel}"></figure>
