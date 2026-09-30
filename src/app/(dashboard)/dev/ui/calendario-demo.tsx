@@ -51,7 +51,6 @@ const HOY = PERIODO_ACTUAL;
 const ANIO = AHORA.year;
 const MES = AHORA.month;
 const DIA_REAL = Number(todayISOInTz("America/Costa_Rica").slice(8, 10));
-const FECHA_HOY = todayISOInTz("America/Costa_Rica");
 
 /**
  * Cuántos días del mes llevan gasto — y por qué NO son simplemente los transcurridos.
@@ -71,6 +70,15 @@ const FECHA_HOY = todayISOInTz("America/Costa_Rica");
  */
 const DIAS_DEL_MES = new Date(ANIO, MES, 0).getDate();
 const DIA_HOY = Math.min(DIA_REAL, DIAS_DEL_MES - 1);
+
+/**
+ * El «hoy» que ve el calendario, que es el CAPADO y no el real.
+ *
+ * `data-futuro` lo decide `c.fecha > hoy`, no si el día trae datos. Capar solo los días con gasto
+ * no alcanzaba: el 30 de septiembre, «hoy» seguía siendo el 30 y ningún día del mes queda después.
+ * Las dos cosas tienen que moverse juntas o el catálogo pierde el estado igual.
+ */
+const FECHA_HOY = `${HOY}-${String(DIA_HOY).padStart(2, "0")}`;
 const DIAS: DiaGasto[] = Array.from({ length: DIA_HOY }, (_, i) => i + 1).map((d) => {
   // Patrón realista: fines de semana caros, un día grande a mitad de mes, tres días sin gasto.
   const dow = diaDeLaSemana(ANIO, MES, d);

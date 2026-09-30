@@ -20,6 +20,21 @@ function diasConGasto(diaReal: number, diasDelMes: number): number {
   return Math.min(diaReal, diasDelMes - 1);
 }
 
+/**
+ * Cuántas celdas quedan marcadas como futuras.
+ *
+ * Lo que decide `data-futuro` es `fecha > hoy`, NO si el día trae datos. Capar solo los días con
+ * gasto y dejar el «hoy» real no arregla nada: el 30 de septiembre, «hoy» sigue siendo el 30 y
+ * ningún día del mes queda después. Lo comprobé por las malas — el primer arreglo tocó un solo
+ * eje y la corrida volvió a fallar con el mismo mensaje.
+ *
+ * Por eso la regla se prueba sobre el resultado que importa, y no sobre una de sus dos mitades.
+ */
+function celdasFuturas(diaReal: number, diasDelMes: number): number {
+  const hoy = diasConGasto(diaReal, diasDelMes); // el día que ve el calendario, capado
+  return diasDelMes - hoy;
+}
+
 describe("la demo del calendario siempre deja un día futuro", () => {
   it("a mitad de mes no cambia nada", () => {
     expect(diasConGasto(18, 30)).toBe(18);
@@ -34,12 +49,25 @@ describe("la demo del calendario siempre deja un día futuro", () => {
     expect(diasConGasto(29, 29)).toBe(28);
   });
 
-  it("en CUALQUIER día de CUALQUIER mes queda al menos uno futuro", () => {
+  it("en CUALQUIER día de CUALQUIER mes queda al menos una celda futura", () => {
     for (const diasDelMes of [28, 29, 30, 31])
       for (let dia = 1; dia <= diasDelMes; dia++)
         expect(
-          diasDelMes - diasConGasto(dia, diasDelMes),
+          celdasFuturas(dia, diasDelMes),
           `día ${dia} de un mes de ${diasDelMes}`,
         ).toBeGreaterThan(0);
+  });
+
+  it("el «hoy» del calendario se mueve con los días de gasto, no por su cuenta", () => {
+    // La mitad que me faltó la primera vez. Si `hoy` fuera el día real y los datos el capado, el
+    // último día del mes seguiría sin celdas futuras y el mensaje de CI sería idéntico.
+    const hoyReal = (dia: number) => dia;
+    for (const diasDelMes of [28, 30, 31])
+      expect(
+        diasDelMes - hoyReal(diasDelMes),
+        `con el «hoy» real, el día ${diasDelMes} no deja futuro`,
+      ).toBe(0);
+    for (const diasDelMes of [28, 30, 31])
+      expect(celdasFuturas(diasDelMes, diasDelMes), "con el capado, sí").toBeGreaterThan(0);
   });
 });
