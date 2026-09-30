@@ -13,6 +13,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Browser } from "@playwright/test";
 
 import { ESTADO_SESION } from "./sesion";
+import { congelarReloj } from "./reloj";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const RUTA = "/dev/ui";
@@ -57,6 +58,8 @@ async function abrir(browser: Browser, tema: "light" | "dark", ancho: number) {
     ["ca-theme", tema] as [string, string],
   );
   const page = await ctx.newPage();
+  // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+  await congelarReloj(page);
   await page.goto(RUTA, { waitUntil: "networkidle", timeout: 60_000 });
   await page.locator("#gr-linea").waitFor({ state: "attached", timeout: 30_000 });
   // Los gráficos son `dynamic({ssr:false})`: se espera a que el primero MONTE, no un tiempo fijo.

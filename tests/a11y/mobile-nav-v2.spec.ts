@@ -15,6 +15,7 @@ import { test, expect, type Browser } from "@playwright/test";
 
 import { apareceA, irA } from "./navegar";
 import { ESTADO_SESION } from "./sesion";
+import { congelarReloj } from "./reloj";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -39,6 +40,8 @@ let banderaEncendida = false;
 test.beforeAll(async ({ browser }) => {
   const ctx = await browser.newContext({ storageState: ESTADO_SESION });
   const page = await ctx.newPage();
+  // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+  await congelarReloj(page);
   await irA(page, "/m/gastos", ".m-shell");
   // `button.tb2-search` es del topbar de la WEB y no existe en el shell móvil: con esa
   // sonda estos cuatro casos se saltaban incluso con la bandera encendida — verde sin
@@ -63,6 +66,8 @@ async function abrirMovil(browser: Browser, ruta: string) {
     reducedMotion: "reduce",
   });
   const page = await ctx.newPage();
+  // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+  await congelarReloj(page);
   // `/m` (Inicio) no lleva pestañas de núcleo, así que el ancla común es el shell móvil.
   await irA(page, ruta, ".m-shell");
   return { ctx, page };

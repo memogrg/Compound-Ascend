@@ -12,6 +12,7 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
 import { ESTADO_SESION } from "./sesion";
+import { congelarReloj } from "./reloj";
 
 async function abrir(browser: Browser, ruta: string, ancho = 1280) {
   const ctx = await browser.newContext({
@@ -21,6 +22,8 @@ async function abrir(browser: Browser, ruta: string, ancho = 1280) {
     reducedMotion: "reduce",
   });
   const page = await ctx.newPage();
+  // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+  await congelarReloj(page);
   await page.goto(ruta, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await page.locator(".dl-fila, .dl-vacio").first().waitFor({ state: "visible", timeout: 60_000 });
   await page.waitForTimeout(1000);
@@ -56,6 +59,8 @@ test("el total de la tarjeta del panel es el PRESUPUESTO del mes, no el gasto", 
     viewport: { width: 1280, height: 1400 },
   });
   const p2 = await ctx2.newPage();
+  // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+  await congelarReloj(p2);
   await p2.goto("/mi-base-financiera", { waitUntil: "domcontentloaded", timeout: 60_000 });
   await p2.getByText("Gastos presup.", { exact: true }).first().waitFor({ timeout: 30_000 });
   await p2.waitForTimeout(1200);
