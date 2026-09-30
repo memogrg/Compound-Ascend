@@ -17,6 +17,7 @@ import {
   HistoricoGasto,
   describirGrafico,
   tablaDeDatos,
+  tablaHistoricoGasto,
   type PeriodoEnCurso,
 } from "@/components/charts/core";
 import {
@@ -549,44 +550,37 @@ export function IncomeExpenseSection({
             presupuesto: view.budgetByMonth?.[i]?.total ?? 0,
           }));
           return (
-            <ChartFrame
-              titulo="Histórico de gastos"
-              subtitulo="real vs presupuesto mensual"
-              estado={filas.length === 0 ? "vacio" : "datos"}
-              mensajeVacio="Todavía no hay meses cerrados que comparar."
-              alto={180}
-              descripcion={describirGrafico({
-                titulo: "Histórico de gastos",
-                serie: filas.map((f) => ({ x: f.label, y: f.real })),
-                formato: (v) => formatMoney(v, currency),
-              })}
-              tabla={tablaDeDatos(
-                filas.map((f) => ({ x: f.label, real: f.real, presupuesto: f.presupuesto })),
-                [
-                  {
-                    clave: "real",
-                    etiqueta: "Gasto real",
-                    color: "var(--chart-3)",
-                    marca: "barra",
-                  },
-                  {
-                    clave: "presupuesto",
-                    etiqueta: "Presupuesto",
-                    color: "var(--chart-axis)",
-                    marca: "linea",
-                  },
-                ],
-                (v) => formatMoney(v, currency),
-                "Mes",
-              )}
-            >
-              <HistoricoGasto
-                datos={filas}
-                moneda={currency}
-                enCurso={view.enCurso ?? null}
+            /* El marco del núcleo va DENTRO de la tarjeta del layout, igual que los paneles
+               vecinos: `ChartFrame` aporta el título, los cuatro estados de la misma altura y la
+               tabla accesible, pero no es la tarjeta. Sustituirlo por ella quitaba el `.card` que
+               da el fondo, el borde y el padding —medido: `/gastos` a 390 pasó de 4090 a 3967 px
+               de alto— y dejaba a los dos históricos desalineados con todo lo de al lado. */
+            <div className="card card-pad">
+              <ChartFrame
+                titulo="Histórico de gastos"
+                subtitulo="real vs presupuesto mensual"
+                estado={filas.length === 0 ? "vacio" : "datos"}
+                mensajeVacio="Todavía no hay meses cerrados que comparar."
                 alto={180}
-              />
-            </ChartFrame>
+                descripcion={describirGrafico({
+                  titulo: "Histórico de gastos",
+                  serie: filas.map((f) => ({ x: f.label, y: f.real })),
+                  formato: (v) => formatMoney(v, currency),
+                })}
+                /* La tabla la construye el módulo puro del histórico, no `tablaDeDatos`: lleva cinco
+                   columnas (con Diferencia y Ejecución), tono por celda y la nota del mes en curso a
+                   todo el ancho. `HistoricoGasto` la pintaba por su cuenta y quedaban DOS tablas de
+                   los mismos datos en esta misma tarjeta. */
+                tabla={tablaHistoricoGasto(filas, currency, view.enCurso ?? null)}
+              >
+                <HistoricoGasto
+                  datos={filas}
+                  moneda={currency}
+                  enCurso={view.enCurso ?? null}
+                  alto={180}
+                />
+              </ChartFrame>
+            </div>
           );
         })()}
         {/* El centro suma el RANGO, igual que los KPI de arriba — la Hipoteca a tres meses
@@ -724,33 +718,40 @@ function IncomeSection({ view }: { view: V2View }) {
       <SummaryStrip cards={summary} />
 
       <section className="cols-2">
-        <ChartFrame
-          titulo="Histórico de ingresos"
-          subtitulo="recibido por mes"
-          estado={incomeArea.length === 0 ? "vacio" : "datos"}
-          mensajeVacio="Todavía no hay ingresos registrados en este rango."
-          alto={160}
-          descripcion={describirGrafico({
-            titulo: "Histórico de ingresos",
-            serie: incomeArea.map((d) => ({ x: formatMonthShort(d.date), y: d.value })),
-            formato: (v) => formatMoney(v, currency),
-          })}
-          tabla={tablaDeDatos(
-            incomeArea.map((d) => ({ x: formatMonthShort(d.date), value: d.value })),
-            [{ clave: "value", etiqueta: "Ingreso", color: "var(--chart-1)", marca: "area" }],
-            (v) => formatMoney(v, currency),
-            "Mes",
-          )}
-        >
-          <PerformanceChart
-            data={incomeArea}
-            currency={currency}
-            tone="pos"
-            goalValue={Math.round(budgetIncome)}
-            height={160}
-            axes="full"
-          />
-        </ChartFrame>
+        {/* El marco del núcleo va DENTRO de la tarjeta del layout, igual que los paneles vecinos:
+        `ChartFrame` aporta el título, los cuatro estados de la misma altura y la tabla accesible,
+        pero no es la tarjeta. Sustituirlo por ella quitaba el `.card` que da el fondo, el borde y
+        el padding —medido: `/gastos` a 390 pasó de 4090 a 3967 px de alto— y dejaba a los dos
+        históricos desalineados con todo lo de al lado. */}
+        <div className="card card-pad">
+          <ChartFrame
+            titulo="Histórico de ingresos"
+            subtitulo="recibido por mes"
+            estado={incomeArea.length === 0 ? "vacio" : "datos"}
+            mensajeVacio="Todavía no hay ingresos registrados en este rango."
+            alto={160}
+            descripcion={describirGrafico({
+              titulo: "Histórico de ingresos",
+              serie: incomeArea.map((d) => ({ x: formatMonthShort(d.date), y: d.value })),
+              formato: (v) => formatMoney(v, currency),
+            })}
+            tabla={tablaDeDatos(
+              incomeArea.map((d) => ({ x: formatMonthShort(d.date), value: d.value })),
+              [{ clave: "value", etiqueta: "Ingreso", color: "var(--chart-1)", marca: "area" }],
+              (v) => formatMoney(v, currency),
+              "Mes",
+            )}
+          >
+            <PerformanceChart
+              data={incomeArea}
+              currency={currency}
+              tone="pos"
+              goalValue={Math.round(budgetIncome)}
+              height={160}
+              axes="full"
+            />
+          </ChartFrame>
+        </div>
         <DonutCard
           title="Composición por fuente"
           data={donutData(incomeByManualSource)}

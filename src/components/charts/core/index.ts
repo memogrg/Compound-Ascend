@@ -69,6 +69,9 @@ export {
   type PeriodoEnCurso,
 } from "./periodo-en-curso";
 export { HistoricoGasto, type PuntoHistorico } from "./historico-gasto";
+// La tabla del histórico la construye el módulo puro y la pinta el MARCO: el gráfico ya no
+// dibuja la suya, o habría dos tablas de los mismos datos en la misma tarjeta.
+export { tablaHistoricoGasto } from "./historico-columnas";
 
 export { CalendarioGasto, INSTRUCCIONES_TECLADO, type DiaGasto } from "./calendario-gasto";
 export {
