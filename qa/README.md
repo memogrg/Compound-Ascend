@@ -145,3 +145,48 @@ arnés corren igual.
 
 La base es el **merge-base**, no la punta de `main`: comparar contra una punta que ya avanzó
 mete en el diff los cambios de otros PR y el veredicto deja de ser sobre el tuyo.
+
+## Aprobación visual (`qa/visual-aprobado.json`)
+
+Un cambio visual **a propósito** —el correo de la cuenta demo, un color de sistema, un rediseño
+de tarjeta— hace que el diff visual repruebe, y hace bien: eso es exactamente lo que vino a
+detectar. Lo que faltaba era una forma de decir «esto lo miré y está bien» sin mergear en rojo.
+
+**El fichero solo se escribe con aprobación ESCRITA de Memo, y por captura.** No es un trámite:
+es el único punto del arnés donde una persona sustituye a la medida, y lo que lo mantiene honesto
+es que no se pueda hacer a la ligera.
+
+```json
+{
+  "pr": 899,
+  "capturas": [
+    {
+      "ruta": "/configuracion",
+      "tema": "light",
+      "ancho": 1280,
+      "sha256_despues": "<los 64 hex que imprime shasum -a 256>"
+    }
+  ]
+}
+```
+
+Tres cosas que hacen que no sea un sello de goma:
+
+1. **Se aprueba un PNG, no una ruta.** `sha256_despues` es el hash del fichero «después» exacto.
+   Si la pantalla vuelve a cambiar, el hash deja de coincidir y la aprobación **caduca sola**. No
+   hay forma de aprobar `/configuracion` «en general».
+2. **Se aprueba para UN PR.** `pr` tiene que coincidir con el que corre. Un fichero olvidado en la
+   rama no cubre el cambio siguiente.
+3. **Una aprobación que ya no corresponde a nada hace FALLAR**, no sobra en silencio. Si sobrara,
+   el fichero se llenaría de aprobaciones viejas y la siguiente persona no sabría cuáles siguen
+   vivas.
+
+En `push` a `main` el fichero **se ignora**: una base no se aprueba, se compara contra ella.
+
+El hash se saca del artefacto `comparacion-visual-pr<N>`, de la carpeta `despues/`:
+
+```bash
+shasum -a 256 despues/light/1280/configuracion.png
+```
+
+Y el fichero se borra en cuanto el PR se mergea: vive con el cambio que aprueba, no en el repo.

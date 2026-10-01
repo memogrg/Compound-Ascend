@@ -18,6 +18,7 @@ import {
 import { formatMoney, formatCompact } from "@/lib/format";
 import { niceEscala } from "./scale";
 import { ChartEmpty } from "./chart-empty";
+import { ANIMACION_ACTIVA } from "./core";
 
 export type LineSeries = { key: string; label: string; color: string; dashed?: boolean };
 
@@ -107,7 +108,7 @@ export function PremiumLineChart({
                 strokeDasharray={s.dashed ? "5 5" : undefined}
                 dot={false}
                 activeDot={{ r: 4 }}
-                isAnimationActive={false}
+                isAnimationActive={ANIMACION_ACTIVA}
               />
             ))}
           </LineChart>

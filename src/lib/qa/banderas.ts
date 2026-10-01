@@ -16,8 +16,16 @@
  * lo que invalida una comparación visual es que la pantalla sea otra, y eso lo deciden estas.
  */
 
-/** Las banderas que cambian lo que se ve. Añadir una nueva bandera de UI es añadirla aquí. */
-export const BANDERAS_UI = ["NEXT_PUBLIC_NAV_V2"] as const;
+/**
+ * Las banderas que cambian lo que se ve. Añadir una nueva bandera de UI es añadirla aquí.
+ *
+ * `NEXT_PUBLIC_QA_SIN_ANIMACION` no cambia hoy ninguna pantalla —la animación de Recharts ya va
+ * apagada en el núcleo—, y aun así entra: lo que se compara tiene que decir con qué garantías se
+ * compiló, no solo con qué aspecto. Si la base se capturó con la bandera y la rama sin ella, las
+ * dos podrían verse iguales hoy y dejar de serlo en cuanto el producto decida animar; el diff se
+ * negaría entonces, que es lo correcto, en vez de descubrirlo por un parpadeo.
+ */
+export const BANDERAS_UI = ["NEXT_PUBLIC_NAV_V2", "NEXT_PUBLIC_QA_SIN_ANIMACION"] as const;
 
 /** Cómo se llama la cabecera que las transporta. */
 export const CABECERA_BANDERAS = "x-cartera-banderas";

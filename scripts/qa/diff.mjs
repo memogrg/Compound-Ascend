@@ -19,6 +19,7 @@ import { diferenciasDeBanderas } from "./banderas.mjs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { cotejar, leerAprobacion, RUTA_APROBACION, sha256De } from "./aprobacion.mjs";
 
 /**
  * El conteo vive en `comparar-pixeles.mjs` para poder probarlo sin navegador, y se INYECTA
@@ -502,7 +503,54 @@ async function main() {
     console.log("  Las dos tandas de cada una están en comparacion.html, para ver qué se mueve.");
   }
 
-  const reprobadas = estrictas.filter((f) => f.diffPixels > maxDiffPixels || f.maxDelta > maxDelta);
+  const reprobadasCrudas = estrictas.filter(
+    (f) => f.diffPixels > maxDiffPixels || f.maxDelta > maxDelta,
+  );
+
+  /**
+   * Lo que Memo aprobó a mano para ESTE PR, si hay algo.
+   *
+   * Un cambio visual a propósito —el correo de la cuenta demo, un color de sistema— no tenía
+   * forma de pasar: el job solo sabe decir que no, y el único camino era mergear en rojo. Un job
+   * que solo sabe decir que no acaba ignorándose.
+   *
+   * No es un sello de goma, por tres razones que valen más que el mecanismo: se aprueba un PNG
+   * concreto por su sha256 (si la pantalla vuelve a cambiar, la aprobación caduca sola), se
+   * aprueba para UN PR (un fichero olvidado no cubre el cambio siguiente), y una aprobación que
+   * ya no corresponde a nada hace FALLAR en vez de sobrar en silencio.
+   *
+   * Sin `--pr` no se lee nada: en `main` no hay nada que aprobar, se compara contra ella.
+   */
+  const prActual = args.pr ? Number(args.pr) : null;
+  const aprobacion = prActual ? await leerAprobacion(".") : null;
+  const hashes = new Map();
+  for (const f of reprobadasCrudas) hashes.set(f.imagen, await sha256De(path.join(dirB, f.imagen)));
+  const { aprobadas, caducadas, prOk } = cotejar({
+    reprobadas: reprobadasCrudas.map((f) => f.imagen),
+    aprobacion,
+    hashes,
+    pr: prActual,
+  });
+  const aprobadasSet = new Set(aprobadas);
+  const reprobadas = reprobadasCrudas.filter((f) => !aprobadasSet.has(f.imagen));
+
+  if (aprobacion && !prOk)
+    console.log(
+      `\n⚠ ${RUTA_APROBACION} está escrito para el PR ${aprobacion.pr} y este es el ${prActual}: ` +
+        "no se aplica ninguna aprobación.",
+    );
+  if (aprobadas.length) {
+    console.log(`\naprobadas a mano (${aprobadas.length}), fuera del veredicto:`);
+    for (const img of aprobadas)
+      console.log(`  ${img}  ·  sha256 ${hashes.get(img)?.slice(0, 12)}…`);
+  }
+  if (caducadas.length) {
+    console.log(`\naprobaciones CADUCADAS (${caducadas.length}) — hacen fallar:`);
+    for (const c of caducadas) console.log(`  ${c.imagen}  ·  ${c.motivo}`);
+    console.log(
+      "  Una aprobación que ya no corresponde a lo que se ve es una copiada de otro cambio.",
+    );
+  }
   if (reprobadas.length) {
     console.log(
       `reprobadas (px > ${maxDiffPixels} o delta > ${maxDelta}): ${reprobadas.map((f) => f.imagen).join(", ")}`,
@@ -527,7 +575,12 @@ async function main() {
     );
   }
 
-  const falla = reprobadas.length > 0 || soloA.length > 0 || soloB.length > 0 || Boolean(parcial);
+  const falla =
+    reprobadas.length > 0 ||
+    caducadas.length > 0 ||
+    soloA.length > 0 ||
+    soloB.length > 0 ||
+    Boolean(parcial);
 
   /**
    * El reporte en JSON, junto a los PNG. Lo leen dos cosas: la página de comparación —que sin
@@ -553,6 +606,9 @@ async function main() {
         parcial: parcial ?? null,
         // Las lee `comparacion.mjs` para pintarles su propia sección con las dos tandas.
         inestables: [...inestables.values()],
+        // Las lee `comparacion.mjs` para pintarlas aparte y decir con qué hash se aprobaron.
+        aprobadas: aprobadas.map((img) => ({ imagen: img, sha256: hashes.get(img) ?? null })),
+        caducadas,
         soloA,
         soloB,
         capturas: conDiff.map((f) => ({
@@ -563,6 +619,7 @@ async function main() {
           ignorados: f.ignorados,
           excluida: Boolean(f.excluida),
           inestable: Boolean(f.inestable),
+          aprobada: aprobadasSet.has(f.imagen),
           reprobada: reprobadasSet.has(f.imagen),
           tamañoDistinto: Boolean(f.sizeMismatch),
         })),
