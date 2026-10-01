@@ -20,6 +20,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Browser, type Page } from "@playwright/test";
 
 import { ESTADO_SESION } from "./sesion";
+import { congelarReloj } from "./reloj";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const RUTA = "/dev/ui";
@@ -35,6 +36,8 @@ async function abrir(browser: Browser, movimiento = true, ancho = 1280) {
     reducedMotion: movimiento ? "no-preference" : "reduce",
   });
   const page = await ctx.newPage();
+  // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+  await congelarReloj(page);
   const avisos: string[] = [];
   // La hidratación se queja por consola, no por excepción: si no se escucha, no se entera nadie.
   page.on("console", (m) => {
