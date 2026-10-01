@@ -125,7 +125,11 @@ test("el mes a medias dice lo que QUEDA, sin signo y sin verde", async ({ browse
   // gastaste lo que te toca». Los días salen del servidor: con el reloj congelado, 12.
   const { ctx, page } = await abrir(browser, "/gastos?range=3m");
   const tarjeta = await tarjetaHistorico(page);
-  await tarjeta.locator(".cf-datos-abrir").click();
+  // «Ver tabla», del MARCO. Antes era «Ver los datos» (`.cf-datos-abrir`), el `<details>` que
+  // el propio gráfico pintaba: la decisión 42 consolida las dos tablas en una, la del marco, y
+  // con la tabla duplicada se va su botón. No hay forma de quitar una de las dos tablas y dejar
+  // intactos los dos localizadores.
+  await tarjeta.locator(".cf-btn-tabla").click();
   await page.waitForTimeout(300);
 
   const celda = tarjeta.locator(".cf-tabla-avance");
@@ -137,7 +141,7 @@ test("el mes a medias dice lo que QUEDA, sin signo y sin verde", async ({ browse
   expect(texto, "no lleva diferencia con signo").not.toMatch(/^[+−-]/);
 
   // Y el mismo criterio en el tooltip del último mes.
-  await tarjeta.locator(".cf-datos-abrir").click();
+  await tarjeta.locator(".cf-btn-tabla").click();
   const filas = await leerTooltips(page, tarjeta);
   const ultimo = filas[filas.length - 1]!;
   expect(ultimo, `tooltip: ${ultimo}`).toMatch(/Te quedan|Excedido por/);
@@ -298,7 +302,7 @@ test("el tooltip da la diferencia y el % de ejecución", async ({ browser }) => 
 test("la tabla de datos trae los cuatro números de cada mes, y cuadran", async ({ browser }) => {
   const { ctx, page } = await abrir(browser, "/gastos?range=3m");
   const tarjeta = await tarjetaHistorico(page);
-  await tarjeta.locator(".cf-datos-abrir").click();
+  await tarjeta.locator(".cf-btn-tabla").click();
   await page.waitForTimeout(300);
 
   // `:not(.cf-tabla-nota)`: el mes abierto añade una fila de nota a todo el ancho, que no
@@ -356,7 +360,7 @@ for (const [rango, esperado] of [
 test("axe no encuentra nada nuevo en la tarjeta, ni con la tabla abierta", async ({ browser }) => {
   const { ctx, page } = await abrir(browser, "/gastos?range=3m");
   const tarjeta = await tarjetaHistorico(page);
-  await tarjeta.locator(".cf-datos-abrir").click();
+  await tarjeta.locator(".cf-btn-tabla").click();
   await page.waitForTimeout(300);
   const r = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   // La línea base de `/gastos` ya reporta contraste; el portón es de INCLUSIÓN.
