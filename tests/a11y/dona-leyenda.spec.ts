@@ -8,6 +8,7 @@
 import { expect, test, type Browser, type Locator } from "@playwright/test";
 
 import { ESTADO_SESION } from "./sesion";
+import { congelarReloj } from "./reloj";
 
 /** Las rutas con tarjeta de dona. `/patrimonio` lleva tres: portafolio y las dos de asignación. */
 const RUTAS = ["/dashboard", "/gastos", "/mi-rich-life", "/patrimonio"] as const;
@@ -20,6 +21,8 @@ async function abrir(browser: Browser, ruta: string, ancho: number) {
     reducedMotion: "reduce",
   });
   const page = await ctx.newPage();
+  // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+  await congelarReloj(page);
   await page.goto(ruta, { waitUntil: "domcontentloaded", timeout: 60_000 });
   // Se espera el ELEMENTO, no un hueco en la red: la dona es `dynamic({ssr:false})` y hasta
   // que carga hay un esqueleto sin nada. (Cuando entre el ayudante compartido de
