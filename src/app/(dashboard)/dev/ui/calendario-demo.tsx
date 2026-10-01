@@ -50,8 +50,35 @@ const PERIODO_ACTUAL = `${AHORA.year}-${String(AHORA.month).padStart(2, "0")}`;
 const HOY = PERIODO_ACTUAL;
 const ANIO = AHORA.year;
 const MES = AHORA.month;
-const DIA_HOY = Number(todayISOInTz("America/Costa_Rica").slice(8, 10));
-const FECHA_HOY = todayISOInTz("America/Costa_Rica");
+const DIA_REAL = Number(todayISOInTz("America/Costa_Rica").slice(8, 10));
+
+/**
+ * Cuántos días del mes llevan gasto — y por qué NO son simplemente los transcurridos.
+ *
+ * La demo enseña tres estados de celda: con gasto, sin gasto y **futuro**. El último día del mes
+ * no hay ningún día futuro, así que ese estado desaparecía y `charts-calendario.spec.ts` fallaba
+ * con «esperaba > 0 celdas `data-futuro`, recibió 0» — una vez al mes, el día 30 o 31, sin que
+ * nadie hubiera tocado nada. Pasó el 30-sep-2026.
+ *
+ * El arreglo no es aflojar el spec: el estado «futuro» es justo lo que esta pantalla viene a
+ * enseñar, y un catálogo que no lo muestra está roto aunque nadie proteste. Se reserva SIEMPRE el
+ * último día del mes como futuro.
+ *
+ * (El comentario de más abajo dice que el mes y el día salen del reloj «congelado en la captura».
+ * No es cierto: nada en la app lee `QA_FREEZE`, el congelado es del sembrador y del servidor de
+ * QA. Por eso esta pantalla depende del día real, y por eso necesita este tope.)
+ */
+const DIAS_DEL_MES = new Date(ANIO, MES, 0).getDate();
+const DIA_HOY = Math.min(DIA_REAL, DIAS_DEL_MES - 1);
+
+/**
+ * El «hoy» que ve el calendario, que es el CAPADO y no el real.
+ *
+ * `data-futuro` lo decide `c.fecha > hoy`, no si el día trae datos. Capar solo los días con gasto
+ * no alcanzaba: el 30 de septiembre, «hoy» seguía siendo el 30 y ningún día del mes queda después.
+ * Las dos cosas tienen que moverse juntas o el catálogo pierde el estado igual.
+ */
+const FECHA_HOY = `${HOY}-${String(DIA_HOY).padStart(2, "0")}`;
 const DIAS: DiaGasto[] = Array.from({ length: DIA_HOY }, (_, i) => i + 1).map((d) => {
   // Patrón realista: fines de semana caros, un día grande a mitad de mes, tres días sin gasto.
   const dow = diaDeLaSemana(ANIO, MES, d);

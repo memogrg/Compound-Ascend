@@ -1302,8 +1302,13 @@ jobs:
         # reescribe lo que encuentra, así que ese default no puede ser lo que corra en CI.
         run: DEMO_ENV_FILE=.env.local DEMO_EMAIL_OVERRIDE=demo@ci.local node scripts/demo/seed-demo-familia.mjs
 
+      # `NEXT_PUBLIC_QA_SIN_ANIMACION=1` fuerza `ANIMACION_ACTIVA` a falso en el núcleo de
+      # gráficos. Hoy no cambia nada —el producto ya la quiere apagada—, y por eso está: lo que
+      # compra no es un comportamiento nuevo, es que no pueda dejar de ser cierto sin que estas
+      # capturas se enteren. Va en `BANDERAS_UI`, así que viaja en el manifiesto y el diff se
+      # niega a comparar una base y una rama compiladas con distinto valor.
       - name: Compilar con las banderas de producción
-        run: node scripts/dev/con-env.mjs npm run build
+        run: NEXT_PUBLIC_QA_SIN_ANIMACION=1 node scripts/dev/con-env.mjs npm run build
 
       - name: Navegador Playwright
         run: npx playwright install --with-deps chromium
@@ -1515,8 +1520,13 @@ jobs:
         # reescribe lo que encuentra, así que ese default no puede ser lo que corra en CI.
         run: DEMO_ENV_FILE=.env.local DEMO_EMAIL_OVERRIDE=demo@ci.local node scripts/demo/seed-demo-familia.mjs
 
+      # `NEXT_PUBLIC_QA_SIN_ANIMACION=1` fuerza `ANIMACION_ACTIVA` a falso en el núcleo de
+      # gráficos. Hoy no cambia nada —el producto ya la quiere apagada—, y por eso está: lo que
+      # compra no es un comportamiento nuevo, es que no pueda dejar de ser cierto sin que estas
+      # capturas se enteren. Va en `BANDERAS_UI`, así que viaja en el manifiesto y el diff se
+      # niega a comparar una base y una rama compiladas con distinto valor.
       - name: Compilar con las banderas de producción
-        run: node scripts/dev/con-env.mjs npm run build
+        run: NEXT_PUBLIC_QA_SIN_ANIMACION=1 node scripts/dev/con-env.mjs npm run build
 
       - name: Navegador Playwright
         run: npx playwright install --with-deps chromium
@@ -1731,7 +1741,11 @@ jobs:
       - name: Comparar
         run: |
           set -o pipefail
+          # `--pr` es lo que habilita leer `qa/visual-aprobado.json`. El job solo corre en
+          # pull_request, pero el número va explícito: sin él el fichero se ignora, y ese es el
+          # comportamiento correcto en `main` —una base no se aprueba, se compara contra ella—.
           node scripts/qa/diff.mjs --a base --b rama --out-diff diffs \
+            --pr ${{ github.event.number }} \
             --exclude home,dev_ui --max-diff-pixels 60 --max-delta 2 --ignore-delta-below 5 \
             | tee diff.log || echo "DIFF_FALLA=1" >> "$GITHUB_ENV"
 
@@ -1759,10 +1773,26 @@ jobs:
                 console.log("\n| captura | px | delta |");
                 console.log("|---|---|---|");
                 for (const c of rep) console.log(`| \`${c.imagen}\` | ${c.px} | ${c.maxDelta} |`);
-              } else console.log("\nNinguna pantalla de producción se movió.");
+              } else console.log((r.aprobadas ?? []).length ? "\nNinguna pantalla se movió sin aprobación." : "\nNinguna pantalla de producción se movió.");
               // Aparte y nombradas: no cuentan para el veredicto, pero esconderlas sería
               // presentar como «0 cambios» un diff que no miró esas pantallas.
               const ines = r.inestables ?? [];
+              // Las aprobadas se nombran en el resumen del PR, no solo en la página. Un
+              // «0 reprobadas» sin decir que hubo aprobaciones es una media verdad.
+              const apr = r.aprobadas ?? [];
+              if (apr.length) {
+                console.log(`\n### ${apr.length} captura(s) APROBADAS a mano`);
+                console.log("\nCambiaron a propósito y quedan fuera del veredicto. La aprobación va atada al");
+                console.log("sha256 del PNG «después»: si la pantalla se vuelve a mover, caduca sola.");
+                console.log("\n| captura | sha256 |");
+                console.log("|---|---|");
+                for (const a of apr) console.log(`| \`${a.imagen}\` | \`${(a.sha256||"").slice(0,16)}…\` |`);
+              }
+              const cad = r.caducadas ?? [];
+              if (cad.length) {
+                console.log(`\n### ${cad.length} aprobación(es) CADUCADA(S) — hacen fallar`);
+                for (const c of cad) console.log(`- \`${c.imagen}\` — ${c.motivo}`);
+              }
               if (ines.length) {
                 console.log(`\n### ${ines.length} ruta(s) INESTABLE(S), fuera del veredicto`);
                 console.log("\nLa sonda las vio cambiar entre dos tandas de la **misma** compilación,");

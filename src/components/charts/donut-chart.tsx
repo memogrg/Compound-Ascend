@@ -2,6 +2,7 @@
 
 import { PieChart, Pie, Cell } from "recharts";
 import { DonutCenter } from "./donut-center";
+import { ANIMACION_ACTIVA } from "./core";
 
 export type DonutDatum = { name: string; value: number; color: string };
 
@@ -61,7 +62,7 @@ export function DonutChart({
           strokeWidth={2}
           startAngle={90}
           endAngle={-270}
-          isAnimationActive={false}
+          isAnimationActive={ANIMACION_ACTIVA}
         >
           {safe.map((d, i) => (
             <Cell key={i} fill={d.color} />

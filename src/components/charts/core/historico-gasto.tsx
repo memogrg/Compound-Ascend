@@ -54,7 +54,7 @@ import {
 } from "./historico-columnas";
 import { rotuloParcial, type PeriodoEnCurso } from "./periodo-en-curso";
 import { anchoDeBarra, useAncho } from "./use-ancho";
-import { BARRA, EJE, OPACIDAD, REJILLA } from "./theme";
+import { ANIMACION_ACTIVA, BARRA, EJE, OPACIDAD, REJILLA } from "./theme";
 
 export type { PuntoHistorico };
 
@@ -329,14 +329,14 @@ export function HistoricoGasto({
             dataKey="real"
             barSize={anchoColumna > 0 ? anchoColumna : undefined}
             shape={<ColumnaGasto />}
-            isAnimationActive={false}
+            isAnimationActive={ANIMACION_ACTIVA}
           />
           <Bar
             dataKey="presupuesto"
             xAxisId="marca"
             barSize={anchoDeMarca > 0 ? anchoDeMarca : undefined}
             shape={<MarcaPresupuesto />}
-            isAnimationActive={false}
+            isAnimationActive={ANIMACION_ACTIVA}
           />
         </ComposedChart>
       </ResponsiveContainer>
