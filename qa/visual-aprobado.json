@@ -1,0 +1,77 @@
+{
+  "pr": 901,
+  "capturas": [
+    {
+      "ruta": "/gastos",
+      "tema": "dark",
+      "ancho": 1280,
+      "sha256_despues": "74df44a2933ad913d2c923cea02b4e56b124b9db8f95c1cb056a0fb4f262c464"
+    },
+    {
+      "ruta": "/ingresos",
+      "tema": "dark",
+      "ancho": 1280,
+      "sha256_despues": "10348dc4ac4f4b7171f1861314034cf0f9dcd8c2a1b87d8d49b11093b06edd8c"
+    },
+    {
+      "ruta": "/gastos",
+      "tema": "dark",
+      "ancho": 390,
+      "sha256_despues": "43bbb16e4b08738d0f9880107ec73a15aca8d9c646752efc101b97f5ee7b0ffd"
+    },
+    {
+      "ruta": "/ingresos",
+      "tema": "dark",
+      "ancho": 390,
+      "sha256_despues": "956232cf18525f9bb1e8ac60a4c06856f0642dc733e444c30a44193541dde079"
+    },
+    {
+      "ruta": "/gastos",
+      "tema": "dark",
+      "ancho": 768,
+      "sha256_despues": "bbb1bd984e0f62cabd4a5e2c38ec9eb006846637723e714f061ecac7e79d688f"
+    },
+    {
+      "ruta": "/ingresos",
+      "tema": "dark",
+      "ancho": 768,
+      "sha256_despues": "7eb01d7bfa2d9c3529e710c3998e167ff82bfa1e1b3ee3fdffeec74a875cb80c"
+    },
+    {
+      "ruta": "/gastos",
+      "tema": "light",
+      "ancho": 1280,
+      "sha256_despues": "eb6786a751770684e6213d7d26912faf92a730f7b717004ce81f61e79cfb0263"
+    },
+    {
+      "ruta": "/ingresos",
+      "tema": "light",
+      "ancho": 1280,
+      "sha256_despues": "b1196356ff03e16345034cd46a5c9fe4d0bdcad48c294b612e661c3a0624ecf3"
+    },
+    {
+      "ruta": "/gastos",
+      "tema": "light",
+      "ancho": 390,
+      "sha256_despues": "fe0615af461f4ca43c890ee1f9418b066fa3227d208e871ab52db941bf557239"
+    },
+    {
+      "ruta": "/ingresos",
+      "tema": "light",
+      "ancho": 390,
+      "sha256_despues": "64a02b3fae510d31200363d60719d066759e69561f9c4a86de6a8db5999dbcb0"
+    },
+    {
+      "ruta": "/gastos",
+      "tema": "light",
+      "ancho": 768,
+      "sha256_despues": "20bd10c187ec1d81634bf85f86eb17b54ba725d5a936b88e6699c386d0ba2511"
+    },
+    {
+      "ruta": "/ingresos",
+      "tema": "light",
+      "ancho": 768,
+      "sha256_despues": "313ffdff3d9fd0b4723e91cc3fd992e95a56b67487373bed79fab8755fc0e7d2"
+    }
+  ]
+}
