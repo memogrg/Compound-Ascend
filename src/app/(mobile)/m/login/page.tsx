@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PieLegal } from "@/components/legal/pie-legal";
 import { MobileLoginForm } from "../components/mobile-login-form";
 import { MobileGoogleButton } from "../components/mobile-google-button";
+import { MobileAppleButton } from "../components/mobile-apple-button";
 
 /**
  * Login del móvil (/m/login), rediseño premium (data-screen="login" del diseño).
@@ -58,6 +59,10 @@ export default function MobileLogin() {
         </p>
       </div>
 
+      {/* Apple va ARRIBA de Google: es lo que piden las HIG cuando conviven, y además solo
+          aparece en iOS, donde es el login que Apple espera ver primero. En web y en Android
+          el componente devuelve null y el bloque queda igual que antes. */}
+      <MobileAppleButton />
       {/* Continuar con Google: native-aware (flujo nativo en la app, fallback web en navegador) */}
       <MobileGoogleButton />
 

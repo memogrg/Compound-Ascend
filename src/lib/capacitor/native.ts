@@ -40,17 +40,33 @@ type CapacitorBrowserPlugin = {
   close(): Promise<void>;
 };
 
-/** Subconjunto de @capgo/capacitor-social-login que consumimos (login Google nativo por idToken).
- *  El plugin vive en el shell nativo (mobile-shell); aquí solo tipamos el puente. */
+/** Subconjunto de @capgo/capacitor-social-login que consumimos (login Google y Apple nativos
+ *  por idToken). El plugin vive en el shell nativo (mobile-shell); aquí solo tipamos el puente. */
 type SocialLoginPlugin = {
   initialize(options: {
     google?: { iOSClientId?: string; webClientId?: string; mode?: "online" | "offline" };
+    /** En iOS `redirectUrl: ""` evita el redirect y `clientId` no hace falta: usa el bundle id.
+     *  `useProperTokenExchange` no se toca —el idToken viene igual en los dos modos y es lo
+     *  único que canjeamos con Supabase—. */
+    apple?: { clientId?: string; redirectUrl?: string; useProperTokenExchange?: boolean };
   }): Promise<void>;
   login(options: {
-    provider: "google";
-    options: { nonce?: string };
-  }): Promise<{ provider: string; result: { idToken?: string | null } }>;
-  logout(options: { provider: "google" }): Promise<void>;
+    provider: "google" | "apple";
+    options?: { nonce?: string; scopes?: string[] };
+  }): Promise<{
+    provider: string;
+    result: {
+      idToken?: string | null;
+      /** Apple manda el nombre SOLO en el primer login de cada Apple ID. Google no lo manda
+       *  por esta vía. Opcional en el tipo porque depende del proveedor. */
+      profile?: {
+        email?: string | null;
+        givenName?: string | null;
+        familyName?: string | null;
+      };
+    };
+  }>;
+  logout(options: { provider: "google" | "apple" }): Promise<void>;
 };
 
 /** Subconjunto de @capacitor/splash-screen: solo hide() (la intro web toma el relevo). */
