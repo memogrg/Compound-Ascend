@@ -232,7 +232,12 @@ async function leerManifests(dir) {
  * había medido que se movía solo.
  *
  * Por eso cada shard guarda `manifest-<N>.json` y esto los junta. `banderas` se toma del primero
- * —todos los shards compilan el mismo build— y `entries` y `rutasInestables` se concatenan.
+ * —todos los shards compilan el mismo build— y `entries` e `imagenesInestables` se concatenan.
+ *
+ * El nombre del campo importa: al pasar el marcado de ruta a imagen me dejé aquí el viejo
+ * (`rutasInestables`), así que `{...todos[0]}` solo arrastraba el del PRIMER manifiesto y la marca
+ * de cualquier otro shard se perdía. Medido: la sonda marcó `light/768/mi-base-financiera.png`
+ * en el shard 2 y el diff la reprobó igual, porque leyó el campo que ya nadie escribe.
  */
 async function leerManifest(dir) {
   const todos = await leerManifests(dir);
@@ -240,7 +245,7 @@ async function leerManifest(dir) {
   return {
     ...todos[0],
     entries: todos.flatMap((m) => m.entries ?? []),
-    rutasInestables: todos.flatMap((m) => m.rutasInestables ?? []),
+    imagenesInestables: todos.flatMap((m) => m.imagenesInestables ?? []),
   };
 }
 
