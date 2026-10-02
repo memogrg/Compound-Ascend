@@ -40,8 +40,8 @@ describe("aprobación visual", () => {
     });
   });
 
-  it("una captura aprobada con su hash exacto sale del veredicto", () => {
-    const r = cotejar({
+  it("una captura aprobada con su hash exacto sale del veredicto", async () => {
+    const r = await cotejar({
       reprobadas: [IMG],
       aprobacion: aprobacionDe(899, [entrada("/configuracion", "light", 1280, HASH)]),
       hashes: new Map([[IMG, HASH]]),
@@ -52,10 +52,10 @@ describe("aprobación visual", () => {
     expect(r.caducadas).toEqual([]);
   });
 
-  it("si el PNG cambió, la aprobación CADUCA y no vale", () => {
+  it("si el PNG cambió, la aprobación CADUCA y no vale", async () => {
     // Es la razón de ser del hash: aprobar «esta pantalla» y no «esta imagen» dejaría cubierto
     // cualquier cambio futuro de esa ruta sin que nadie lo volviera a mirar.
-    const r = cotejar({
+    const r = await cotejar({
       reprobadas: [IMG],
       aprobacion: aprobacionDe(899, [entrada("/configuracion", "light", 1280, HASH)]),
       hashes: new Map([[IMG, HASH2]]),
@@ -66,8 +66,8 @@ describe("aprobación visual", () => {
     expect(r.caducadas).toEqual([{ imagen: IMG, motivo: "el hash no coincide" }]);
   });
 
-  it("una aprobación de OTRO PR no vale", () => {
-    const r = cotejar({
+  it("una aprobación de OTRO PR no vale", async () => {
+    const r = await cotejar({
       reprobadas: [IMG],
       aprobacion: aprobacionDe(883, [entrada("/configuracion", "light", 1280, HASH)]),
       hashes: new Map([[IMG, HASH]]),
@@ -77,10 +77,10 @@ describe("aprobación visual", () => {
     expect(r.sinAprobar).toEqual([IMG]);
   });
 
-  it("una aprobación que ya no corresponde a nada hace fallar, no se ignora", () => {
+  it("una aprobación que ya no corresponde a nada hace fallar, no se ignora", async () => {
     // Si sobrara en silencio, el fichero se llenaría de aprobaciones viejas y la siguiente
     // persona no sabría cuáles siguen vivas.
-    const r = cotejar({
+    const r = await cotejar({
       reprobadas: [],
       aprobacion: aprobacionDe(899, [entrada("/configuracion", "light", 1280, HASH)]),
       hashes: new Map(),
@@ -90,8 +90,8 @@ describe("aprobación visual", () => {
     expect(r.caducadas).toEqual([{ imagen: IMG, motivo: "ya no se reprueba" }]);
   });
 
-  it("sin fichero de aprobación, todo lo reprobado sigue reprobado", () => {
-    const r = cotejar({
+  it("sin fichero de aprobación, todo lo reprobado sigue reprobado", async () => {
+    const r = await cotejar({
       reprobadas: [IMG, IMG2],
       aprobacion: null,
       hashes: new Map([
@@ -104,8 +104,8 @@ describe("aprobación visual", () => {
     expect(r.aprobadas).toEqual([]);
   });
 
-  it("aprobar una y dejar otra sin aprobar no aprueba las dos", () => {
-    const r = cotejar({
+  it("aprobar una y dejar otra sin aprobar no aprueba las dos", async () => {
+    const r = await cotejar({
       reprobadas: [IMG, IMG2],
       aprobacion: aprobacionDe(899, [entrada("/configuracion", "light", 1280, HASH)]),
       hashes: new Map([
