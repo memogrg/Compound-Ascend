@@ -13,6 +13,7 @@ import { test, expect, type Browser } from "@playwright/test";
 import { irA } from "./navegar";
 import { ESTADO_SESION } from "./sesion";
 import { congelarReloj } from "./reloj";
+import { esperarNavV2 } from "./nav-v2";
 
 async function abrir(browser: Browser, url = "/dashboard") {
   const ctx = await browser.newContext({
@@ -29,25 +30,19 @@ async function abrir(browser: Browser, url = "/dashboard") {
 }
 
 /**
- * Con la bandera apagada la barra tiene seis ítems; con ella, cinco.
+ * ¿Está encendida la bandera? La decisión vive en `nav-v2.ts`, aparte y pura.
  *
- * La cuenta se lee cuando la barra terminó de montar. Leerla antes devuelve 0, el caso se salta
- * diciendo «NAV_V2 apagada» —que es mentira— y encima el guardián de CI convierte esa mentira en
- * «la bandera no llegó al build» y tumba el job entero. Pasó: cinco casos de ESTE archivo
- * pasaron con la bandera encendida y el sexto —el único que abre `/dashboard?period=2026-08`, la
- * carga más pesada— se saltó por haber contado demasiado pronto.
+ * Está fuera porque se ha equivocado tres veces y el síntoma siempre fue el mismo y engañoso: un
+ * caso se auto-saltaba diciendo «NAV_V2 apagada» —mentira— y el guardián de CI convertía esa
+ * mentira en «la bandera no llegó al build», tumbando el job con sus 23 tests en verde.
  *
- * `expect.poll` y no un `waitForSelector` del primer ítem: lo que hay que esperar es que la
- * CUENTA se estabilice, no que exista uno.
+ * La última vez: durante la hidratación en streaming conviven el fallback de `Suspense` y el
+ * contenido ya resuelto, así que `.bottom-nav .bn-item` llega a contar DIEZ. Diez cumplía el
+ * `>= 5` de la versión anterior y no es 5, así que concluía «apagada». Ahora se espera una barra
+ * COMPLETA y ÚNICA, y el timeout dice qué esperó y cuánto.
  */
 async function v2Encendida(page: import("@playwright/test").Page): Promise<boolean> {
-  const items = page.locator(".bottom-nav .bn-item");
-  // Se espera a una barra COMPLETA, y las únicas completas son 5 (bandera encendida) o 6
-  // (apagada). Esperar a `> 0` no bastaba —fue el primer arreglo— porque atrapa un montaje a
-  // medias: con tres ítems ya pintados la sonda concluía «apagada», el caso se saltaba y el
-  // guardián de CI tumbaba el job. Volvió a pasar en «nadie se pinta encima de la barra».
-  await expect.poll(() => items.count(), { timeout: 15_000 }).toBeGreaterThanOrEqual(5);
-  return (await items.count()) === 5;
+  return esperarNavV2(page);
 }
 
 test("cinco núcleos, y el de la ruta marcado", async ({ browser }) => {
