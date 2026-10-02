@@ -24,16 +24,16 @@ const EMAIL_ALLOW = new Set([
 // ── literales con forma de clave ─────────────────────────────────────────────────
 const LONG_LITERAL = /['"`]([A-Za-z0-9]{32,})['"`]/g;
 // Carpetas permitidas para literales largos: dependencias, lockfiles y capturas de QA.
-const LITERAL_SKIP_DIRS = new Set([
-  "node_modules",
-  ".git",
-  ".next",
-  "dist",
-  "build",
-  "coverage",
-]);
+const LITERAL_SKIP_DIRS = new Set(["node_modules", ".git", ".next", "dist", "build", "coverage"]);
 const LITERAL_SKIP_FILE = (rel: string) =>
-  basename(rel) === "package-lock.json" || rel.includes("qa-snapshots");
+  basename(rel) === "package-lock.json" ||
+  rel.includes("qa-snapshots") ||
+  // La aprobación visual es, ENTERA, una lista de sha256 de PNG: ese es su contenido, no un
+  // descuido. Un hash de una captura pública no es una credencial —no abre nada, y se puede
+  // recalcular desde el artefacto—, así que la regla de «32+ alfanuméricos» no dice nada útil
+  // sobre este fichero. Se salta por ruta exacta y no por carpeta: `qa/` guarda también el
+  // README y los inventarios, donde un literal largo sí merecería una pregunta.
+  rel === "qa/visual-aprobado.json";
 // Identificadores y vectores de prueba (no secretos) que la regex de 32+ captura de refilón.
 const LITERAL_ALLOW = new Set([
   // Identificadores de código (nombres de acciones/funciones) de 32+ letras, no secretos.
