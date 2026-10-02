@@ -63,14 +63,27 @@ const r = spawnSync(
     args.b,
     "--out-diff",
     args["out-diff"] ?? "diff-determinismo",
-    // Umbral CERO y sin filtro de antialiasing: acá no se tolera nada, porque es la MISMA
-    // compilación contra el MISMO servidor. Cualquier píxel distinto es inestabilidad.
+    // El MISMO criterio que usa el veredicto, y no cero. Es un cambio de la ronda 24 y conviene
+    // entender por qué no es aflojar nada:
+    //
+    // La sonda existe para que el diff no le eche a un PR una diferencia que la pantalla se hace
+    // sola. Una imagen que difiere de sí misma POR DEBAJO de la tolerancia del veredicto no puede
+    // producir ese falso positivo —el diff tampoco la reprobaría—, así que marcarla «inestable»
+    // no protege de nada y sí hace daño: la saca de la comparación, que es exactamente dejar de
+    // mirar una pantalla que sí se podía comparar.
+    //
+    // Con el umbral en cero y ~50 imágenes por shard, el ruido de antialiasing supera el tope
+    // solo por el número. Medido en el shard 3: tres imágenes con delta **1** —34 px, 8 px y
+    // 7 px—, un tono de diferencia. Con 20 imágenes en una sola combinación eso no aparecía.
+    //
+    // Lo que sigue cazando es lo que importa: `/mi-base-financiera` parpadea a 106 px con
+    // delta 21, muy por encima de esto.
     "--max-diff-pixels",
-    "0",
+    String(args["max-diff-pixels"] ?? 60),
     "--max-delta",
-    "0",
+    String(args["max-delta"] ?? 2),
     "--ignore-delta-below",
-    "0",
+    String(args["ignore-delta-below"] ?? 5),
   ],
   { encoding: "utf8" },
 );
@@ -152,7 +165,9 @@ if (distintas !== 0) {
   const slugDe = (img) => path.basename(img, ".png");
 
   inestables = (reporte?.capturas ?? [])
-    .filter((c) => c.px > 0 && !excluidos.has(slugDe(c.imagen)))
+    // `reprobada` y no `px > 0`: la pregunta es «¿esta imagen puede producir un falso positivo
+    // en el veredicto?», y eso lo responde el mismo criterio del veredicto.
+    .filter((c) => c.reprobada && !excluidos.has(slugDe(c.imagen)))
     .map((c) => ({
       imagen: c.imagen,
       ruta: mapa.get(c.imagen) ?? `?${path.basename(c.imagen, ".png")}`,
