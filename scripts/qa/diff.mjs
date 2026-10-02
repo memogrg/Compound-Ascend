@@ -250,7 +250,12 @@ async function leerManifests(dir) {
  * había medido que se movía solo.
  *
  * Por eso cada shard guarda `manifest-<N>.json` y esto los junta. `banderas` se toma del primero
- * —todos los shards compilan el mismo build— y `entries` y `rutasInestables` se concatenan.
+ * —todos los shards compilan el mismo build— y `entries` e `imagenesInestables` se concatenan.
+ *
+ * El nombre del campo importa: al pasar el marcado de ruta a imagen me dejé aquí el viejo
+ * (`rutasInestables`), así que `{...todos[0]}` solo arrastraba el del PRIMER manifiesto y la marca
+ * de cualquier otro shard se perdía. Medido: la sonda marcó `light/768/mi-base-financiera.png`
+ * en el shard 2 y el diff la reprobó igual, porque leyó el campo que ya nadie escribe.
  */
 async function leerManifest(dir) {
   const todos = await leerManifests(dir);
@@ -258,7 +263,7 @@ async function leerManifest(dir) {
   return {
     ...todos[0],
     entries: todos.flatMap((m) => m.entries ?? []),
-    rutasInestables: todos.flatMap((m) => m.rutasInestables ?? []),
+    imagenesInestables: todos.flatMap((m) => m.imagenesInestables ?? []),
   };
 }
 
@@ -395,9 +400,10 @@ async function main() {
   const inestables = new Map();
   for (const dir of [dirA, dirB]) {
     const man = await leerManifest(dir);
-    for (const r of man?.rutasInestables ?? []) {
-      const previo = inestables.get(r.ruta);
-      inestables.set(r.ruta, {
+    for (const r of man?.imagenesInestables ?? []) {
+      const previo = inestables.get(r.imagen);
+      inestables.set(r.imagen, {
+        imagen: r.imagen,
         ruta: r.ruta,
         px: Math.max(previo?.px ?? 0, r.px ?? 0),
         maxDelta: Math.max(previo?.maxDelta ?? 0, r.maxDelta ?? 0),
@@ -412,14 +418,14 @@ async function main() {
    * combinados. Excluir solo la imagen que la sonda miró dejaría las otras cinco culpando al
    * PR, que es el mismo error con menos ruido.
    */
-  const imagenesInestables = new Set();
-  if (inestables.size) {
-    for (const dir of [dirA, dirB]) {
-      const man = await leerManifest(dir);
-      for (const e of man?.entries ?? [])
-        if (e.file && inestables.has(e.route)) imagenesInestables.add(e.file);
-    }
-  }
+  /**
+   * La marca es por IMAGEN, no por ruta.
+   *
+   * Antes se marcaba la ruta y se excluían sus seis capturas. Pero una pantalla puede ser estable
+   * a 1280 e inestable a 768 —medido en `/mi-base-financiera`—, y sacar del veredicto cinco
+   * capturas que sí se podían comparar es dejar de mirar lo que este job existe para mirar.
+   */
+  const imagenesInestables = new Set(inestables.keys());
 
   const [pngsA, pngsB] = await Promise.all([listarPngs(dirA), listarPngs(dirB)]);
   const setB = new Set(pngsB);
@@ -510,15 +516,15 @@ async function main() {
   // grande. El ruido de rasterizado se queda corto en las dos; un cambio real se pasa en alguna.
   if (inestables.size) {
     console.log(
-      `\nrutas INESTABLES (${inestables.size}), fuera del veredicto — la sonda las vio cambiar ` +
-        `entre dos tandas de la MISMA compilación:`,
+      `\nimágenes INESTABLES (${inestables.size}), fuera del veredicto — la sonda las vio cambiar ` +
+        `entre dos pasadas de la MISMA compilación:`,
     );
     for (const i of inestables.values())
-      console.log(`  ${i.ruta}  ·  hasta ${i.px} px  ·  delta ${i.maxDelta} entre tandas`);
+      console.log(`  ${i.imagen}  ·  ${i.px} px  ·  delta ${i.maxDelta} entre pasadas`);
     console.log(
-      `  ${inestablesConDiff.length} de sus capturas difieren también entre base y rama, y NO cuentan.`,
+      `  ${inestablesConDiff.length} de ellas difieren también entre base y rama, y NO cuentan.`,
     );
-    console.log("  Las dos tandas de cada una están en comparacion.html, para ver qué se mueve.");
+    console.log("  Las dos pasadas de cada una están en comparacion.html, para ver qué se mueve.");
   }
 
   // El criterio sale de `veredicto.mjs` y no se escribe acá: la aprobación por tolerancia lo

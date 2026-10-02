@@ -247,39 +247,34 @@ const filas = cambios
  * se coló, un gráfico que no terminó— para decidir si se arregla la pantalla o el arnés. Las
  * imágenes las dejó `marcar-inestables.mjs` dentro del artefacto de la rama, bajo `_sonda/a|b`.
  */
-const rutasInestables = reporte?.inestables ?? [];
+const imagenesInestables = reporte?.inestables ?? [];
 let seccionInestables = "";
-if (rutasInestables.length) {
-  const porRuta = new Map();
-  for (const rel of await pngsDe(path.join(args.b, "_sonda", "a"))) porRuta.set(rel, true);
-  for (const rel of porRuta.keys()) {
+if (imagenesInestables.length) {
+  // Las dos pasadas de cada imagen, copiadas al artefacto. El marcado es por IMAGEN —una pantalla
+  // puede ser estable a 1280 e inestable a 768—, así que cada bloque es un par a/b concreto y no
+  // «todas las capturas de esta ruta».
+  for (const i of imagenesInestables) {
     for (const lado of ["a", "b"]) {
-      const destino = path.join(args.out, "sonda", lado, rel);
+      const destino = path.join(args.out, "sonda", lado, i.imagen);
       await mkdir(path.dirname(destino), { recursive: true });
-      await cp(path.join(args.b, "_sonda", lado, rel), destino).catch(() => {});
+      await cp(path.join(args.b, "_sonda", lado, i.imagen), destino).catch(() => {});
     }
   }
-  const bloques = rutasInestables
+  const bloques = imagenesInestables
     .map((i) => {
-      const suyas = [...porRuta.keys()].filter(
-        (rel) => partes(rel).ruta === i.ruta.replace(/^\//, ""),
-      );
-      const pares = suyas
-        .map(
-          (rel) => `<div class="par dos">
-    <figure><figcaption>tanda A</figcaption><img loading="lazy" src="sonda/a/${rel}"></figure>
-    <figure><figcaption>tanda B</figcaption><img loading="lazy" src="sonda/b/${rel}"></figure>
-  </div>`,
-        )
-        .join("\n");
+      const { tema, ancho } = partes(i.imagen);
       return `<section>
-  <h2>${i.ruta} <small><b class="avisa">INESTABLE</b> <i>hasta ${i.px} px · delta ${i.maxDelta} entre tandas</i></small></h2>
-  ${pares || "<p>Sin imágenes de las tandas en el artefacto.</p>"}
+  <h2>${i.ruta} <small>${tema} · ${ancho}px — <b class="avisa">INESTABLE</b>
+    <i>${i.px} px · delta ${i.maxDelta} entre pasadas</i></small></h2>
+  <div class="par dos">
+    <figure><figcaption>pasada A</figcaption><img loading="lazy" src="sonda/a/${i.imagen}"></figure>
+    <figure><figcaption>pasada B</figcaption><img loading="lazy" src="sonda/b/${i.imagen}"></figure>
+  </div>
 </section>`;
     })
     .join("\n");
-  seccionInestables = `<h1 style="margin-top:40px">Rutas inestables (${rutasInestables.length})</h1>
-<p class="resumen">Estas dos capturas son de la <b>misma compilación</b> y el <b>mismo servidor</b>: lo que
+  seccionInestables = `<h1 style="margin-top:40px">Capturas inestables (${imagenesInestables.length})</h1>
+<p class="resumen">Estas dos imágenes son de la <b>misma compilación</b> y el <b>mismo servidor</b>: lo que
 cambie entre ellas no lo cambió el PR. Quedan fuera del veredicto y se muestran para poder arreglar
 la causa —o el arnés—, no para ignorarlas.</p>
 ${bloques}`;
