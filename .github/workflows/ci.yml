@@ -1761,11 +1761,15 @@ jobs:
             echo "::notice::qa/visual-aprobado.json no anota \`corrida\`: las aprobaciones valdrán solo por hash."
             exit 0
           fi
-          mkdir -p aprobadas
+          # La carpeta se crea DESPUÉS de bajar, no antes. Crearla antes y dejarla vacía hacía
+          # que el diff dijera «esa captura no está en el artefacto» cuando la verdad es que no
+          # había artefacto ninguno, y distinguir esos dos motivos es justo el punto: uno manda a
+          # reaprobar y el otro a volver a aprobar con una corrida viva.
           if ! gh run download "$RID" --pattern "capturas-*" --dir /tmp/aprobadas-art; then
-            echo "::notice::la corrida $RID ya no tiene capturas (artefacto caducado, 7 días, o corrida borrada): las aprobaciones que necesiten mirarse caducarán diciéndolo."
+            echo "::notice::la corrida $RID ya no tiene capturas (artefacto caducado o corrida borrada): las aprobaciones que necesiten mirarse caducarán diciéndolo."
             exit 0
           fi
+          mkdir -p aprobadas
           find /tmp/aprobadas-art -mindepth 1 -maxdepth 1 -type d -exec cp -a {}/. aprobadas/ \;
           echo "::notice::capturas de la corrida aprobada $RID: $(find aprobadas -name '*.png' | wc -l) PNG"
 
