@@ -50,8 +50,41 @@ const PERIODO_ACTUAL = `${AHORA.year}-${String(AHORA.month).padStart(2, "0")}`;
 const HOY = PERIODO_ACTUAL;
 const ANIO = AHORA.year;
 const MES = AHORA.month;
-const DIA_HOY = Number(todayISOInTz("America/Costa_Rica").slice(8, 10));
-const FECHA_HOY = todayISOInTz("America/Costa_Rica");
+const DIA_REAL = Number(todayISOInTz("America/Costa_Rica").slice(8, 10));
+
+/**
+ * Cuántos días del mes llevan gasto — y por qué NO son simplemente los transcurridos.
+ *
+ * La demo enseña tres estados de celda: con gasto, sin gasto y **futuro**. El último día del mes
+ * no hay ningún día futuro, así que ese estado desaparecía y `charts-calendario.spec.ts` fallaba
+ * con «esperaba > 0 celdas `data-futuro`, recibió 0» — una vez al mes, el día 30 o 31, sin que
+ * nadie hubiera tocado nada. Pasó el 30-sep-2026.
+ *
+ * El arreglo no fue aflojar el spec: el estado «futuro» es justo lo que esta pantalla viene a
+ * enseñar, y un catálogo que no lo muestra está roto aunque nadie proteste. Se reserva SIEMPRE el
+ * último día del mes como futuro.
+ *
+ * **El tope ya no existe para que un spec pase.** Eso lo arregló #905: los specs congelan el reloj
+ * del navegador en `QA_INSTANTE`, así que la suite ve siempre un día de mitad de mes y le daría
+ * igual este tope. Existe por el catálogo: una persona que lo abra el 30 o el 31 tiene que poder
+ * ver los tres estados, igual que cualquier otro día. Esa es la razón que queda, y es suficiente.
+ *
+ * (Una versión anterior de este comentario decía que «nada en la app lee `QA_FREEZE`». Era
+ * engañoso: el preload `scripts/qa/server-freeze.js` parchea `Date` en el proceso del servidor,
+ * así que el servidor SÍ corre congelado. Lo que no llegaba al navegador era el congelado, y eso
+ * es lo que #905 cerró.)
+ */
+const DIAS_DEL_MES = new Date(ANIO, MES, 0).getDate();
+const DIA_HOY = Math.min(DIA_REAL, DIAS_DEL_MES - 1);
+
+/**
+ * El «hoy» que ve el calendario, que es el CAPADO y no el real.
+ *
+ * `data-futuro` lo decide `c.fecha > hoy`, no si el día trae datos. Capar solo los días con gasto
+ * no alcanzaba: el 30 de septiembre, «hoy» seguía siendo el 30 y ningún día del mes queda después.
+ * Las dos cosas tienen que moverse juntas o el catálogo pierde el estado igual.
+ */
+const FECHA_HOY = `${HOY}-${String(DIA_HOY).padStart(2, "0")}`;
 const DIAS: DiaGasto[] = Array.from({ length: DIA_HOY }, (_, i) => i + 1).map((d) => {
   // Patrón realista: fines de semana caros, un día grande a mitad de mes, tres días sin gasto.
   const dow = diaDeLaSemana(ANIO, MES, d);

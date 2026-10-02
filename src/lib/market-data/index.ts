@@ -85,21 +85,27 @@ export async function getMarketPrice(
 
   const ttl = assetType === "crypto" ? TTL.crypto : TTL.stock;
   const cacheKey = `price:${assetType}:${symbol}`;
-  const cached = priceCache.get<Quote>(cacheKey);
-  if (cached) return { ...cached, symbol, assetType, cached: true };
+  // L1 síncrono para distinguir "precio en vivo" de cacheado (flag `cached`).
+  const hit = priceCache.get<Quote>(cacheKey);
+  if (hit) return { ...hit, symbol, assetType, cached: true };
 
+  // Miss: L2 (Redis compartido) → cadena de proveedores, con single-flight por símbolo. Si otra
+  // instancia ya lo trajo, esto no vuelve a pegarle al proveedor.
   const chain = assetType === "crypto" ? CRYPTO_CHAIN : STOCK_CHAIN;
-  for (const provider of chain) {
-    const quote = await provider(symbol);
-    if (quote) {
-      priceCache.set(cacheKey, quote, ttl);
-      // Persiste en BD para historial y acceso offline (fire-and-forget).
-      persistMarketPrice(symbol, assetType, quote.price, quote.currency, quote.provider);
-      return { ...quote, symbol, assetType, cached: false };
+  const quote = await priceCache.getOrFetch<Quote | null>(cacheKey, ttl, async () => {
+    for (const provider of chain) {
+      const q = await provider(symbol);
+      if (q) {
+        // Persiste en BD para historial y acceso offline (fire-and-forget).
+        persistMarketPrice(symbol, assetType, q.price, q.currency, q.provider);
+        return q;
+      }
     }
-  }
-  logProviderMiss(symbol, assetType);
-  return null;
+    logProviderMiss(symbol, assetType);
+    return null;
+  });
+  if (!quote) return null;
+  return { ...quote, symbol, assetType, cached: false };
 }
 
 /**
@@ -210,12 +216,7 @@ export async function searchSymbols(query: string): Promise<SymbolResult[]> {
   const q = query.trim();
   if (q.length < 1 || q.length > 40) return [];
   const cacheKey = `search:${q.toLowerCase()}`;
-  const cached = priceCache.get<SymbolResult[]>(cacheKey);
-  if (cached) return cached;
-
-  const results = await searchFinnhub(q);
-  priceCache.set(cacheKey, results, TTL.search);
-  return results;
+  return priceCache.getOrFetch<SymbolResult[]>(cacheKey, TTL.search, () => searchFinnhub(q));
 }
 
 async function searchFinnhub(q: string): Promise<SymbolResult[]> {
