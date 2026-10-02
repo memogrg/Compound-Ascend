@@ -175,6 +175,26 @@ function partes(rel) {
   return { tema, ancho, ruta: archivo.replace(/\.png$/, "").replace(/_/g, "/") };
 }
 
+/**
+ * Cuáles de las aprobadas lo están por TOLERANCIA y no por hash.
+ *
+ * Importa decirlo: «aprobada» por hash significa que el PNG es el mismo byte a byte; por
+ * tolerancia significa que es OTRO PNG y que se miró contra el aprobado con el criterio del
+ * veredicto. Lo segundo es una afirmación más débil, y la página no puede presentar las dos con
+ * la misma etiqueta sin mentir un poco.
+ */
+const escaparHtml = (t) =>
+  String(t).replace(
+    /[&<>"]/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c,
+  );
+
+const porTolerancia = new Map(
+  (reporte?.aprobadas ?? [])
+    .filter((a) => a?.porTolerancia)
+    .map((a) => [a.imagen, a.detalle ?? "dentro de tolerancia"]),
+);
+
 const filas = cambios
   .map((rel) => {
     const { tema, ancho, ruta } = partes(rel);
@@ -184,7 +204,9 @@ const filas = cambios
       : c.reprobada
         ? '<b class="mal">reprobada</b>'
         : c.aprobada
-          ? '<b class="avisa">APROBADA a mano</b>'
+          ? porTolerancia.has(rel)
+            ? `<b class="avisa">APROBADA por tolerancia</b> <span class="tenue">${escaparHtml(porTolerancia.get(rel) ?? "")}</span>`
+            : '<b class="avisa">APROBADA a mano</b> <span class="tenue">hash idéntico</span>'
           : c.inestable
             ? '<b class="avisa">INESTABLE · fuera del veredicto</b>'
             : c.excluida
@@ -271,10 +293,13 @@ ${bloques}`;
  * mitad de la lista es como no decirlo.
  */
 const nAprobadas = (reporte?.aprobadas ?? []).length;
+const nTolerancia = porTolerancia.size;
 const avisoAprobadas = nAprobadas
-  ? `<p class="resumen"><b class="avisa">${nAprobadas} captura(s) aprobadas a mano</b> para este PR:
-cambiaron a propósito y quedan fuera del veredicto. La aprobación va atada al sha256 del PNG
-«después», así que si la pantalla vuelve a moverse caduca sola.</p>`
+  ? `<p class="resumen"><b class="avisa">${nAprobadas} captura(s) aprobadas a mano</b> para este PR
+(${nAprobadas - nTolerancia} por hash, ${nTolerancia} por tolerancia): cambiaron a propósito y
+quedan fuera del veredicto. La aprobación va atada al PNG «después» de una corrida concreta: si es
+idéntico, vale por hash; si no, se compara contra el aprobado con el criterio del veredicto y vale
+por tolerancia. Si la pantalla se mueve de verdad, caduca sola.</p>`
   : "";
 
 const titulo = typeof args.titulo === "string" ? args.titulo : "Comparación visual";
@@ -294,6 +319,7 @@ const html = `<!doctype html>
   .mal { color: #b14844; }
   .ok { color: #32784a; }
   .avisa { color: #8f6325; }
+  .tenue { color: #6b7280; font-weight: 400; }
   .par.dos { grid-template-columns: repeat(2, 1fr); }
   h2 i { color: #888; font-style: normal; }
   .par { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-items: start; }

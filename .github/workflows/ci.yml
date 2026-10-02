@@ -1738,14 +1738,49 @@ jobs:
           find /tmp/base-art -mindepth 1 -maxdepth 1 -type d -exec cp -a {}/. base/ \;
           echo "hay=si" >> "$GITHUB_OUTPUT"
 
+      # ── Las capturas de la corrida de la que salieron los hashes aprobados (decisión 52) ──
+      #
+      # El sha256 es byte a byte y las capturas NO son byte a byte reproducibles: medido en la
+      # corrida 37038208517, de 12 aprobadas casaron 11 y falló una (`light/390/ingresos.png`)
+      # entre dos corridas cuyo único cambio era el propio fichero de aprobación. Con estas
+      # capturas en la mano, un PNG distinto pero dentro de tolerancia sigue valiendo.
+      #
+      # Este paso NO puede tumbar el job: si el artefacto caducó o la corrida se borró, la
+      # carpeta se queda vacía y `diff.mjs` caduca esas aprobaciones DICIENDO que no pudo
+      # mirarlas. Fallar acá convertiría «no pude comprobarlo» en «el PR rompió algo».
+      #
+      # Mismo camino y mismo token que el paso de la base: `gh run download`. El repo es público,
+      # así que el `GITHUB_TOKEN` lee artefactos sin pedir permisos nuevos en el workflow.
+      - name: Bajar las capturas de la corrida aprobada
+        if: hashFiles('qa/visual-aprobado.json') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RID=$(node -e "const a=require('./qa/visual-aprobado.json'); process.stdout.write(String(a.corrida ?? ''))")
+          if [ -z "$RID" ]; then
+            echo "::notice::qa/visual-aprobado.json no anota \`corrida\`: las aprobaciones valdrán solo por hash."
+            exit 0
+          fi
+          mkdir -p aprobadas
+          if ! gh run download "$RID" --pattern "capturas-*" --dir /tmp/aprobadas-art; then
+            echo "::notice::la corrida $RID ya no tiene capturas (artefacto caducado, 7 días, o corrida borrada): las aprobaciones que necesiten mirarse caducarán diciéndolo."
+            exit 0
+          fi
+          find /tmp/aprobadas-art -mindepth 1 -maxdepth 1 -type d -exec cp -a {}/. aprobadas/ \;
+          echo "::notice::capturas de la corrida aprobada $RID: $(find aprobadas -name '*.png' | wc -l) PNG"
+
       - name: Comparar
         run: |
           set -o pipefail
           # `--pr` es lo que habilita leer `qa/visual-aprobado.json`. El job solo corre en
           # pull_request, pero el número va explícito: sin él el fichero se ignora, y ese es el
           # comportamiento correcto en `main` —una base no se aprueba, se compara contra ella—.
+          #
+          # `--aprobadas` es la carpeta del paso anterior. Se pasa SIEMPRE, también cuando está
+          # vacía: así `diff.mjs` puede distinguir «no había con qué comparar» de «nadie me pidió
+          # comparar», que piden cosas distintas a quien lee el motivo.
           node scripts/qa/diff.mjs --a base --b rama --out-diff diffs \
-            --pr ${{ github.event.number }} \
+            --pr ${{ github.event.number }} --aprobadas aprobadas \
             --exclude home,dev_ui --max-diff-pixels 60 --max-delta 2 --ignore-delta-below 5 \
             | tee diff.log || echo "DIFF_FALLA=1" >> "$GITHUB_ENV"
 
@@ -1781,12 +1816,14 @@ jobs:
               // «0 reprobadas» sin decir que hubo aprobaciones es una media verdad.
               const apr = r.aprobadas ?? [];
               if (apr.length) {
-                console.log(`\n### ${apr.length} captura(s) APROBADAS a mano`);
-                console.log("\nCambiaron a propósito y quedan fuera del veredicto. La aprobación va atada al");
-                console.log("sha256 del PNG «después»: si la pantalla se vuelve a mover, caduca sola.");
-                console.log("\n| captura | sha256 |");
-                console.log("|---|---|");
-                for (const a of apr) console.log(`| \`${a.imagen}\` | \`${(a.sha256||"").slice(0,16)}…\` |`);
+                const tol = apr.filter(a => a.porTolerancia);
+                console.log(`\n### ${apr.length} captura(s) APROBADAS a mano — ${apr.length - tol.length} por hash, ${tol.length} por tolerancia`);
+                console.log("\nCambiaron a propósito y quedan fuera del veredicto. La aprobación va atada al PNG");
+                console.log("«después» de una corrida concreta: si es idéntico vale por hash, y si no, se compara");
+                console.log("contra el aprobado con el criterio del veredicto. Si la pantalla se mueve, caduca sola.");
+                console.log("\n| captura | vale por | medida |");
+                console.log("|---|---|---|");
+                for (const a of apr) console.log(`| \`${a.imagen}\` | ${a.porTolerancia ? "tolerancia" : "hash"} | ${a.porTolerancia ? a.detalle : "\`" + (a.sha256||"").slice(0,16) + "…\`"} |`);
               }
               const cad = r.caducadas ?? [];
               if (cad.length) {
