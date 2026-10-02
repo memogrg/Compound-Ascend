@@ -7,8 +7,15 @@
  * garantía por una suposición; esto la vuelve a demostrar donde importa, en el mismo job y
  * sobre las mismas pantallas.
  *
- * Veinte rutas fijas, un tema y un ancho: suficiente para cazar antialiasing inestable sin
- * pagar otras 200 capturas.
+ * Compara las DOS pasadas que hace el job de capturas sobre las MISMAS rutas y las MISMAS seis
+ * combinaciones (2 temas × 3 anchos). Antes miraba una lista aparte de 20 rutas en `light/1280`,
+ * y eso dejaba un agujero que costó un PR ajeno: `/mi-base-financiera` parpadeó en `light/768`,
+ * la sonda dio 0/20 porque ese ancho no lo miraba, la imagen nunca se marcó inestable, y su
+ * diferencia aterrizó como reprobada a nombre del PR de postcss (#892), que no había tocado nada.
+ *
+ * Lo que detecta y lo que se compara ahora son el MISMO conjunto. Y sale más barato de lo que
+ * parece: la segunda pasada son ~50 capturas por shard contra las ~40 de la sonda vieja — +10,
+ * un 11 %, porque la lista aparte tenía su propio coste.
  *
  * Qué hace con lo que encuentra, y por qué cambió: al principio CUALQUIER ruta inestable
  * tumbaba el job. Eso confunde dos cosas distintas —«esta pantalla no se puede medir» y «el
@@ -116,27 +123,27 @@ if (distintas !== 0) {
     await readFile(path.join(outDiff, "reporte.json"), "utf8").catch(() => "null"),
   );
   const mapa = await rutasPorImagen(args.a);
-  const conDiff = (reporte?.capturas ?? []).filter((c) => c.px > 0);
 
-  // Se cuenta por RUTA, no por imagen. La sonda captura un tema y un ancho, así que hoy es lo
-  // mismo; pero el tope habla de «rutas inestables», y si algún día la sonda mirara dos anchos,
-  // una sola pantalla rara gastaría el tope entero y tumbaría el job por parecer tres.
-  const porRuta = new Map();
-  for (const c of conDiff) {
-    const ruta = mapa.get(c.imagen) ?? `?${path.basename(c.imagen, ".png")}`;
-    const previo = porRuta.get(ruta);
-    porRuta.set(ruta, {
-      ruta,
-      imagenes: [...(previo?.imagenes ?? []), c.imagen],
-      px: Math.max(previo?.px ?? 0, c.px),
-      maxDelta: Math.max(previo?.maxDelta ?? 0, c.maxDelta),
-    });
-  }
-  inestables = [...porRuta.values()].sort((x, y) => y.px - x.px);
+  /**
+   * Se marca por IMAGEN, no por ruta.
+   *
+   * Una pantalla puede ser estable a 1280 e inestable a 768 —medido en `/mi-base-financiera`—, y
+   * sacar del veredicto las seis capturas de una ruta porque una parpadeó es dejar de mirar cinco
+   * que sí se podían comparar. Lo que no se puede comparar es la imagen concreta.
+   */
+  inestables = (reporte?.capturas ?? [])
+    .filter((c) => c.px > 0)
+    .map((c) => ({
+      imagen: c.imagen,
+      ruta: mapa.get(c.imagen) ?? `?${path.basename(c.imagen, ".png")}`,
+      px: c.px,
+      maxDelta: c.maxDelta,
+    }))
+    .sort((x, y) => y.px - x.px);
 
-  console.log("\nrutas inestables (difieren entre dos tandas de la MISMA compilación):");
+  console.log("\nimágenes inestables (difieren entre dos pasadas de la MISMA compilación):");
   for (const i of inestables)
-    console.log(`  ${i.ruta}  ·  ${i.px} px  ·  delta ${i.maxDelta}  ·  ${i.imagenes.join(", ")}`);
+    console.log(`  ${i.imagen}  ·  ${i.ruta}  ·  ${i.px} px  ·  delta ${i.maxDelta}`);
 }
 
 // Por si `diff.mjs` no la dejó (no debería, pero esto ya falló una vez y el síntoma —ENOENT
@@ -153,15 +160,15 @@ await writeFile(
 
 if (inestables.length > tope) {
   console.error(
-    `::error::${inestables.length} rutas inestables, más del tope de ${tope}. ` +
-      "Una pantalla rara se nombra y se sigue; esto ya es el arnés perdiendo repetibilidad, " +
+    `::error::${inestables.length} imágenes inestables, más del tope de ${tope}. ` +
+      "Una captura rara se nombra y se sigue; esto ya es el arnés perdiendo repetibilidad, " +
       "y entonces las capturas no sirven como evidencia. No se ajusta el umbral.",
   );
   process.exit(1);
 }
 if (inestables.length > 0) {
   console.log(
-    `\n⚠ ${inestables.length} ruta(s) inestable(s), dentro del tope de ${tope}: quedan FUERA del ` +
+    `\n⚠ ${inestables.length} imagen(es) inestable(s), dentro del tope de ${tope}: quedan FUERA del ` +
       "veredicto del diff visual y se listan aparte, con sus dos tandas, en comparacion.html.",
   );
 }

@@ -1338,30 +1338,25 @@ jobs:
       # suposición. Se vuelve a capturar un puñado de rutas contra el MISMO servidor y la misma
       # compilación, con umbral CERO y sin filtro de antialiasing: cualquier píxel distinto es
       # inestabilidad, y entonces las capturas no sirven como evidencia.
-      - name: Sonda de determinismo (20 rutas, dos veces)
+      # La MISMA pasada otra vez: mismas rutas, mismas seis combinaciones. Antes era una lista
+      # aparte de 20 rutas en `light/1280`, y ese agujero costó un PR ajeno —`/mi-base-financiera`
+      # parpadeó en `light/768`, la sonda dio 0/20 porque ese ancho no lo miraba, y la diferencia
+      # aterrizó como reprobada a nombre del PR de postcss (#892), que no había tocado nada—.
+      #
+      # Lo que se detecta y lo que se compara son ahora el mismo conjunto. Y cuesta POCO: ~50
+      # capturas por shard contra las ~40 de la lista vieja, +11 %.
+      - name: Segunda pasada (las mismas rutas y combinaciones)
         env:
           E2E_EMAIL: demo@ci.local
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           QA_CI: "1"
         run: |
-          # Veinte rutas fijas, UN tema y UN ancho: 20 capturas por tanda. Con los seis
-          # combinados serían 120 y la sonda costaría más que lo que vigila.
-          #
-          # Fuera `home` y `dev_ui`, las mismas que excluye el criterio estricto. No es aflojar
-          # el umbral: la landing anima su gráfica de doce meses EN BUCLE a propósito, así que
-          # dos capturas suyas nunca son idénticas —medido: 230 px con delta 2— y una sonda que
-          # falla siempre por una animación intencionada se desactiva a la semana. Las otras 19
-          # dieron 0 px de diferencia, que es lo que esta sonda viene a comprobar.
-          RUTAS=$(node -e "
-            const r = require('./scripts/qa/routes.json');
-            const fuera = new Set(['/', '/dev/ui']);
-            console.log(r.filter(x => !fuera.has(x.path)).slice(0, 20).map(x => x.path).join(','));
-          ")
-          for TANDA in det-a det-b; do
-            node scripts/qa/snap.mjs --base-url http://localhost:3001 \
-              --rutas "$RUTAS" --theme light --widths 1280 --out "$TANDA"
-          done
-          node scripts/qa/sonda-determinismo.mjs --a det-a --b det-b \
+          node scripts/qa/snap.mjs --base-url http://localhost:3001 \
+            --shard ${{ matrix.shard }}/4 --out capturas-b
+
+      - name: Sonda de determinismo (las dos pasadas, por imagen)
+        run: |
+          node scripts/qa/sonda-determinismo.mjs --a capturas --b capturas-b \
             --out-diff diff-determinismo --tope 2
 
       # Lo que la sonda descubrió tiene que VIAJAR: los dos jobs no comparten disco, y lo único
@@ -1371,7 +1366,7 @@ jobs:
       - name: Marcar las rutas inestables en el manifiesto
         run: |
           node scripts/qa/marcar-inestables.mjs --capturas capturas \
-            --inestables diff-determinismo/inestables.json --tanda-a det-a --tanda-b det-b
+            --inestables diff-determinismo/inestables.json --tanda-a capturas --tanda-b capturas-b
 
           # Cada shard guarda SU manifiesto con su número. `download-artifact` con patrón deja
           # los artefactos aplanados en la misma carpeta, así que cuatro `manifest.json` se
@@ -1388,7 +1383,7 @@ jobs:
       - name: Página de comparación de la sonda (solo si reprobó)
         if: failure()
         run: |
-          node scripts/qa/comparacion.mjs --a det-a --b det-b \
+          node scripts/qa/comparacion.mjs --a capturas --b capturas-b \
             --diff diff-determinismo --out comparacion-determinismo \
             --titulo "Sonda de determinismo · misma compilación, dos tandas"
 
@@ -1556,30 +1551,25 @@ jobs:
       # suposición. Se vuelve a capturar un puñado de rutas contra el MISMO servidor y la misma
       # compilación, con umbral CERO y sin filtro de antialiasing: cualquier píxel distinto es
       # inestabilidad, y entonces las capturas no sirven como evidencia.
-      - name: Sonda de determinismo (20 rutas, dos veces)
+      # La MISMA pasada otra vez: mismas rutas, mismas seis combinaciones. Antes era una lista
+      # aparte de 20 rutas en `light/1280`, y ese agujero costó un PR ajeno —`/mi-base-financiera`
+      # parpadeó en `light/768`, la sonda dio 0/20 porque ese ancho no lo miraba, y la diferencia
+      # aterrizó como reprobada a nombre del PR de postcss (#892), que no había tocado nada—.
+      #
+      # Lo que se detecta y lo que se compara son ahora el mismo conjunto. Y cuesta POCO: ~50
+      # capturas por shard contra las ~40 de la lista vieja, +11 %.
+      - name: Segunda pasada (las mismas rutas y combinaciones)
         env:
           E2E_EMAIL: demo@ci.local
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           QA_CI: "1"
         run: |
-          # Veinte rutas fijas, UN tema y UN ancho: 20 capturas por tanda. Con los seis
-          # combinados serían 120 y la sonda costaría más que lo que vigila.
-          #
-          # Fuera `home` y `dev_ui`, las mismas que excluye el criterio estricto. No es aflojar
-          # el umbral: la landing anima su gráfica de doce meses EN BUCLE a propósito, así que
-          # dos capturas suyas nunca son idénticas —medido: 230 px con delta 2— y una sonda que
-          # falla siempre por una animación intencionada se desactiva a la semana. Las otras 19
-          # dieron 0 px de diferencia, que es lo que esta sonda viene a comprobar.
-          RUTAS=$(node -e "
-            const r = require('./scripts/qa/routes.json');
-            const fuera = new Set(['/', '/dev/ui']);
-            console.log(r.filter(x => !fuera.has(x.path)).slice(0, 20).map(x => x.path).join(','));
-          ")
-          for TANDA in det-a det-b; do
-            node scripts/qa/snap.mjs --base-url http://localhost:3001 \
-              --rutas "$RUTAS" --theme light --widths 1280 --out "$TANDA"
-          done
-          node scripts/qa/sonda-determinismo.mjs --a det-a --b det-b \
+          node scripts/qa/snap.mjs --base-url http://localhost:3001 \
+            --shard ${{ matrix.shard }}/4 --out capturas-b
+
+      - name: Sonda de determinismo (las dos pasadas, por imagen)
+        run: |
+          node scripts/qa/sonda-determinismo.mjs --a capturas --b capturas-b \
             --out-diff diff-determinismo --tope 2
 
       # Lo que la sonda descubrió tiene que VIAJAR: los dos jobs no comparten disco, y lo único
@@ -1589,7 +1579,7 @@ jobs:
       - name: Marcar las rutas inestables en el manifiesto
         run: |
           node scripts/qa/marcar-inestables.mjs --capturas capturas \
-            --inestables diff-determinismo/inestables.json --tanda-a det-a --tanda-b det-b
+            --inestables diff-determinismo/inestables.json --tanda-a capturas --tanda-b capturas-b
 
           # Cada shard guarda SU manifiesto con su número. `download-artifact` con patrón deja
           # los artefactos aplanados en la misma carpeta, así que cuatro `manifest.json` se
@@ -1606,7 +1596,7 @@ jobs:
       - name: Página de comparación de la sonda (solo si reprobó)
         if: failure()
         run: |
-          node scripts/qa/comparacion.mjs --a det-a --b det-b \
+          node scripts/qa/comparacion.mjs --a capturas --b capturas-b \
             --diff diff-determinismo --out comparacion-determinismo \
             --titulo "Sonda de determinismo · misma compilación, dos tandas"
 
