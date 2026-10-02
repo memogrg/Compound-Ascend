@@ -31,7 +31,7 @@
  * NO se ajustan los umbrales del diff: siguen en cero. Una ruta inestable no es una ruta que
  * se compara con más manga ancha, es una ruta que NO se compara y se dice.
  *
- *   node scripts/qa/sonda-determinismo.mjs --a <tanda1> --b <tanda2> [--tope 2]
+ *   node scripts/qa/sonda-determinismo.mjs --a <tanda1> --b <tanda2> [--tope 2] [--excluir home,dev_ui]
  */
 import path from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -131,8 +131,28 @@ if (distintas !== 0) {
    * sacar del veredicto las seis capturas de una ruta porque una parpadeó es dejar de mirar cinco
    * que sí se podían comparar. Lo que no se puede comparar es la imagen concreta.
    */
+  /**
+   * Las mismas que el diff excluye de su veredicto estricto, fuera también de aquí.
+   *
+   * `home` es la landing, que anima su gráfica de doce meses EN BUCLE a propósito: dos capturas
+   * suyas nunca son idénticas. Medido en la primera corrida de esta sonda ampliada: **6 de las 7
+   * inestables del shard 4 eran `home`**, en los seis combinados, con 99 a 252 px. La sonda vieja
+   * no lo veía porque excluía esa ruta de su lista; al mirar todo, la landing se come el tope
+   * entera y tumba el job por una animación que se quiere.
+   *
+   * No es aflojar el umbral: estas rutas ya estaban fuera del veredicto del diff (`--exclude`).
+   * Contarlas acá sería exigirle determinismo a lo único que por diseño no lo tiene.
+   */
+  const excluidos = new Set(
+    String(args.excluir ?? "")
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean),
+  );
+  const slugDe = (img) => path.basename(img, ".png");
+
   inestables = (reporte?.capturas ?? [])
-    .filter((c) => c.px > 0)
+    .filter((c) => c.px > 0 && !excluidos.has(slugDe(c.imagen)))
     .map((c) => ({
       imagen: c.imagen,
       ruta: mapa.get(c.imagen) ?? `?${path.basename(c.imagen, ".png")}`,

@@ -281,6 +281,13 @@ describe("la caché de imágenes del stack", () => {
         /sonda[\s\S]{0,400}--theme light --widths 1280/,
       );
       expect(bloque).toMatch(/sonda-determinismo\.mjs --a capturas --b capturas-b/);
+      // Y excluye las MISMAS rutas que el diff saca de su veredicto estricto. `home` es la
+      // landing, que anima su gráfica en bucle a propósito: medido, 6 de las 7 inestables del
+      // shard 4 eran `home` en los seis combinados (99-252 px). Sin esta exclusión la landing se
+      // come el tope entera y tumba el job por una animación que se quiere.
+      expect(bloque, `${job}: la sonda excluye lo que el diff ya excluye`).toMatch(
+        /--excluir home,dev_ui/,
+      );
     }
   });
 

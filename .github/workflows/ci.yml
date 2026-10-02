@@ -1357,7 +1357,7 @@ jobs:
       - name: Sonda de determinismo (las dos pasadas, por imagen)
         run: |
           node scripts/qa/sonda-determinismo.mjs --a capturas --b capturas-b \
-            --out-diff diff-determinismo --tope 2
+            --out-diff diff-determinismo --tope 2 --excluir home,dev_ui
 
       # Lo que la sonda descubrió tiene que VIAJAR: los dos jobs no comparten disco, y lo único
       # que llega al diff visual es este artefacto. Sin este paso, el diff no sabría qué rutas
@@ -1570,7 +1570,7 @@ jobs:
       - name: Sonda de determinismo (las dos pasadas, por imagen)
         run: |
           node scripts/qa/sonda-determinismo.mjs --a capturas --b capturas-b \
-            --out-diff diff-determinismo --tope 2
+            --out-diff diff-determinismo --tope 2 --excluir home,dev_ui
 
       # Lo que la sonda descubrió tiene que VIAJAR: los dos jobs no comparten disco, y lo único
       # que llega al diff visual es este artefacto. Sin este paso, el diff no sabría qué rutas
