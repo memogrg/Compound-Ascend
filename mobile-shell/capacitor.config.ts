@@ -16,8 +16,11 @@ import { KeyboardResize } from '@capacitor/keyboard';
  *  - CAP_SERVER_URL=<url>     → esa URL (dev con live-reload contra Next.js en la LAN,
  *                               p. ej. http://10.0.2.2:3000/m en el emulador de Android).
  *  - CAP_BUNDLED=1            → modo bundled, SOLO si se pide explícitamente. Y lo que
- *                               se empaqueta ya no es el prototipo, sino una página de
- *                               diagnóstico imposible de confundir con la app (ver www/).
+ *                               se empaqueta ya no es el prototipo, sino la pantalla
+ *                               «Sin conexión» (ver www/).
+ *
+ * Esa misma pantalla es el `errorPath` del modo servidor: lo único que se puede mostrar
+ * cuando la app no carga es lo que ya viaja dentro del binario.
  */
 const PROD_URL = 'https://carteraplus.vercel.app/m';
 const bundled = process.env.CAP_BUNDLED === '1';
@@ -26,7 +29,7 @@ const serverUrl = process.env.CAP_SERVER_URL?.trim() || PROD_URL;
 const config: CapacitorConfig = {
   appId: 'com.compoundascend.cartera',
   appName: 'CARTERA+',
-  // webDir: solo la página de diagnóstico. Es el contenido que viaja dentro del binario
+  // webDir: solo la pantalla «Sin conexión». Es el contenido que viaja dentro del binario
   // y únicamente se ve si algo va mal (o en modo bundled explícito).
   webDir: 'www',
   backgroundColor: '#F1EFE8',
@@ -37,6 +40,10 @@ const config: CapacitorConfig = {
           url: serverUrl,
           // cleartext=true permite http en LAN (dev). En https es inofensivo.
           cleartext: serverUrl.startsWith('http://'),
+          // Página local que el WebView muestra si no logra cargar server.url (sin red,
+          // DNS caído, servidor abajo). Sin esto iOS muestra blanco y Android la página
+          // de error de Chrome — rechazo App Store 2.1.
+          errorPath: 'index.html',
         },
       }),
   android: {
