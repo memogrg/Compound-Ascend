@@ -7,8 +7,15 @@
  * garantía por una suposición; esto la vuelve a demostrar donde importa, en el mismo job y
  * sobre las mismas pantallas.
  *
- * Veinte rutas fijas, un tema y un ancho: suficiente para cazar antialiasing inestable sin
- * pagar otras 200 capturas.
+ * Compara las DOS pasadas que hace el job de capturas sobre las MISMAS rutas y las MISMAS seis
+ * combinaciones (2 temas × 3 anchos). Antes miraba una lista aparte de 20 rutas en `light/1280`,
+ * y eso dejaba un agujero que costó un PR ajeno: `/mi-base-financiera` parpadeó en `light/768`,
+ * la sonda dio 0/20 porque ese ancho no lo miraba, la imagen nunca se marcó inestable, y su
+ * diferencia aterrizó como reprobada a nombre del PR de postcss (#892), que no había tocado nada.
+ *
+ * Lo que detecta y lo que se compara ahora son el MISMO conjunto. Y sale más barato de lo que
+ * parece: la segunda pasada son ~50 capturas por shard contra las ~40 de la sonda vieja — +10,
+ * un 11 %, porque la lista aparte tenía su propio coste.
  *
  * Qué hace con lo que encuentra, y por qué cambió: al principio CUALQUIER ruta inestable
  * tumbaba el job. Eso confunde dos cosas distintas —«esta pantalla no se puede medir» y «el
@@ -24,7 +31,7 @@
  * NO se ajustan los umbrales del diff: siguen en cero. Una ruta inestable no es una ruta que
  * se compara con más manga ancha, es una ruta que NO se compara y se dice.
  *
- *   node scripts/qa/sonda-determinismo.mjs --a <tanda1> --b <tanda2> [--tope 2]
+ *   node scripts/qa/sonda-determinismo.mjs --a <tanda1> --b <tanda2> [--tope 2] [--excluir home,dev_ui]
  */
 import path from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -56,14 +63,27 @@ const r = spawnSync(
     args.b,
     "--out-diff",
     args["out-diff"] ?? "diff-determinismo",
-    // Umbral CERO y sin filtro de antialiasing: acá no se tolera nada, porque es la MISMA
-    // compilación contra el MISMO servidor. Cualquier píxel distinto es inestabilidad.
+    // El MISMO criterio que usa el veredicto, y no cero. Es un cambio de la ronda 24 y conviene
+    // entender por qué no es aflojar nada:
+    //
+    // La sonda existe para que el diff no le eche a un PR una diferencia que la pantalla se hace
+    // sola. Una imagen que difiere de sí misma POR DEBAJO de la tolerancia del veredicto no puede
+    // producir ese falso positivo —el diff tampoco la reprobaría—, así que marcarla «inestable»
+    // no protege de nada y sí hace daño: la saca de la comparación, que es exactamente dejar de
+    // mirar una pantalla que sí se podía comparar.
+    //
+    // Con el umbral en cero y ~50 imágenes por shard, el ruido de antialiasing supera el tope
+    // solo por el número. Medido en el shard 3: tres imágenes con delta **1** —34 px, 8 px y
+    // 7 px—, un tono de diferencia. Con 20 imágenes en una sola combinación eso no aparecía.
+    //
+    // Lo que sigue cazando es lo que importa: `/mi-base-financiera` parpadea a 106 px con
+    // delta 21, muy por encima de esto.
     "--max-diff-pixels",
-    "0",
+    String(args["max-diff-pixels"] ?? 60),
     "--max-delta",
-    "0",
+    String(args["max-delta"] ?? 2),
     "--ignore-delta-below",
-    "0",
+    String(args["ignore-delta-below"] ?? 5),
   ],
   { encoding: "utf8" },
 );
@@ -116,27 +136,49 @@ if (distintas !== 0) {
     await readFile(path.join(outDiff, "reporte.json"), "utf8").catch(() => "null"),
   );
   const mapa = await rutasPorImagen(args.a);
-  const conDiff = (reporte?.capturas ?? []).filter((c) => c.px > 0);
 
-  // Se cuenta por RUTA, no por imagen. La sonda captura un tema y un ancho, así que hoy es lo
-  // mismo; pero el tope habla de «rutas inestables», y si algún día la sonda mirara dos anchos,
-  // una sola pantalla rara gastaría el tope entero y tumbaría el job por parecer tres.
-  const porRuta = new Map();
-  for (const c of conDiff) {
-    const ruta = mapa.get(c.imagen) ?? `?${path.basename(c.imagen, ".png")}`;
-    const previo = porRuta.get(ruta);
-    porRuta.set(ruta, {
-      ruta,
-      imagenes: [...(previo?.imagenes ?? []), c.imagen],
-      px: Math.max(previo?.px ?? 0, c.px),
-      maxDelta: Math.max(previo?.maxDelta ?? 0, c.maxDelta),
-    });
-  }
-  inestables = [...porRuta.values()].sort((x, y) => y.px - x.px);
+  /**
+   * Se marca por IMAGEN, no por ruta.
+   *
+   * Una pantalla puede ser estable a 1280 e inestable a 768 —medido en `/mi-base-financiera`—, y
+   * sacar del veredicto las seis capturas de una ruta porque una parpadeó es dejar de mirar cinco
+   * que sí se podían comparar. Lo que no se puede comparar es la imagen concreta.
+   */
+  /**
+   * Las mismas que el diff excluye de su veredicto estricto, fuera también de aquí.
+   *
+   * `home` es la landing, que anima su gráfica de doce meses EN BUCLE a propósito: dos capturas
+   * suyas nunca son idénticas. Medido en la primera corrida de esta sonda ampliada: **6 de las 7
+   * inestables del shard 4 eran `home`**, en los seis combinados, con 99 a 252 px. La sonda vieja
+   * no lo veía porque excluía esa ruta de su lista; al mirar todo, la landing se come el tope
+   * entera y tumba el job por una animación que se quiere.
+   *
+   * No es aflojar el umbral: estas rutas ya estaban fuera del veredicto del diff (`--exclude`).
+   * Contarlas acá sería exigirle determinismo a lo único que por diseño no lo tiene.
+   */
+  const excluidos = new Set(
+    String(args.excluir ?? "")
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean),
+  );
+  const slugDe = (img) => path.basename(img, ".png");
 
-  console.log("\nrutas inestables (difieren entre dos tandas de la MISMA compilación):");
+  inestables = (reporte?.capturas ?? [])
+    // `reprobada` y no `px > 0`: la pregunta es «¿esta imagen puede producir un falso positivo
+    // en el veredicto?», y eso lo responde el mismo criterio del veredicto.
+    .filter((c) => c.reprobada && !excluidos.has(slugDe(c.imagen)))
+    .map((c) => ({
+      imagen: c.imagen,
+      ruta: mapa.get(c.imagen) ?? `?${path.basename(c.imagen, ".png")}`,
+      px: c.px,
+      maxDelta: c.maxDelta,
+    }))
+    .sort((x, y) => y.px - x.px);
+
+  console.log("\nimágenes inestables (difieren entre dos pasadas de la MISMA compilación):");
   for (const i of inestables)
-    console.log(`  ${i.ruta}  ·  ${i.px} px  ·  delta ${i.maxDelta}  ·  ${i.imagenes.join(", ")}`);
+    console.log(`  ${i.imagen}  ·  ${i.ruta}  ·  ${i.px} px  ·  delta ${i.maxDelta}`);
 }
 
 // Por si `diff.mjs` no la dejó (no debería, pero esto ya falló una vez y el síntoma —ENOENT
@@ -153,15 +195,15 @@ await writeFile(
 
 if (inestables.length > tope) {
   console.error(
-    `::error::${inestables.length} rutas inestables, más del tope de ${tope}. ` +
-      "Una pantalla rara se nombra y se sigue; esto ya es el arnés perdiendo repetibilidad, " +
+    `::error::${inestables.length} imágenes inestables, más del tope de ${tope}. ` +
+      "Una captura rara se nombra y se sigue; esto ya es el arnés perdiendo repetibilidad, " +
       "y entonces las capturas no sirven como evidencia. No se ajusta el umbral.",
   );
   process.exit(1);
 }
 if (inestables.length > 0) {
   console.log(
-    `\n⚠ ${inestables.length} ruta(s) inestable(s), dentro del tope de ${tope}: quedan FUERA del ` +
+    `\n⚠ ${inestables.length} imagen(es) inestable(s), dentro del tope de ${tope}: quedan FUERA del ` +
       "veredicto del diff visual y se listan aparte, con sus dos tandas, en comparacion.html.",
   );
 }
