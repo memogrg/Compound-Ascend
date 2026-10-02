@@ -15,6 +15,7 @@ import { PremiumLineChart, PerformanceChart } from "@/components/charts/lazy";
 import {
   ChartFrame,
   HistoricoGasto,
+  LeyendaHistoricoGasto,
   describirGrafico,
   tablaDeDatos,
   tablaHistoricoGasto,
@@ -572,6 +573,11 @@ export function IncomeExpenseSection({
                    todo el ancho. `HistoricoGasto` la pintaba por su cuenta y quedaban DOS tablas de
                    los mismos datos en esta misma tarjeta. */
                 tabla={tablaHistoricoGasto(filas, currency, view.enCurso ?? null)}
+                /* Por el SLOT del marco, no dentro del gráfico: los children van en `.cf-lienzo`,
+                   que tiene altura FIJA, y la leyenda se salía de la tarjeta — a 1280 «Parcial»
+                   caía fuera; a 768 y 390 la segunda fila y la nota quedaban tapadas por la
+                   tarjeta de abajo. */
+                leyenda={<LeyendaHistoricoGasto datos={filas} enCurso={view.enCurso ?? null} />}
               >
                 <HistoricoGasto
                   datos={filas}

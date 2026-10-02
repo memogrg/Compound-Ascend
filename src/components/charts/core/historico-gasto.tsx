@@ -242,9 +242,6 @@ export function HistoricoGasto({
   const banda = filas.length > 0 ? anchoTrazado / filas.length : 0;
   const anchoColumna = anchoDeBarra(anchoTrazado, filas.length, 1);
   const anchoDeMarca = anchoMarca(anchoColumna, banda);
-  const rotulo = rotuloParcial(enCurso);
-  const hayParcial = filas.some((f) => f.parcial);
-  const hayExceso = filas.some((f) => partesColumna(f.real, f.presupuesto).exceso > 0);
 
   return (
     <div ref={ref}>
@@ -341,10 +338,52 @@ export function HistoricoGasto({
         </ComposedChart>
       </ResponsiveContainer>
 
+      {/* La leyenda y el rótulo del mes en curso los pinta el MARCO, por su slot `leyenda`.
+          Vivían acá dentro, y los children del marco van en `.cf-lienzo`, que tiene ALTURA
+          FIJA (`alto + reservaSuperior`): a 1280 «Parcial» caía fuera de la tarjeta y a 768 y
+          390 la segunda fila de la leyenda y la nota quedaban tapadas por la tarjeta de
+          abajo. Un gráfico no puede decidir cuánto mide lo que va DEBAJO del lienzo. */}
+
+      {/* La tabla la pinta el MARCO (`ChartFrame`), con las filas que construye
+          `tablaHistoricoGasto`. Este gráfico la pintaba por su cuenta dentro de un
+          `<details>` propio; cuando pasó a vivir en un marco —que exige su tabla— quedaron
+          DOS tablas de los mismos datos en la misma tarjeta. */}
+    </div>
+  );
+}
+
+/**
+ * La leyenda del histórico y el rótulo del mes en curso, para el slot `leyenda` del MARCO.
+ *
+ * Están fuera del gráfico por una razón de layout, no de gusto: los children de `ChartFrame` van
+ * dentro de `.cf-lienzo`, que tiene ALTURA FIJA (`alto + reservaSuperior`). Todo lo que el
+ * gráfico pintara debajo del trazado se salía de esa caja — a 1280 «Parcial» caía fuera de la
+ * tarjeta, y a 768 y 390 la segunda fila de la leyenda y la nota quedaban tapadas por la tarjeta
+ * siguiente. Un componente de gráfico no puede decidir cuánto mide lo que va debajo del lienzo;
+ * el marco sí.
+ *
+ * Recibe los mismos datos que el gráfico y recalcula `hayExceso` y `hayParcial` con la MISMA
+ * lógica: nombrar en la leyenda un tramo que no está dibujado manda a buscar en el gráfico una
+ * cosa que no existe.
+ */
+export function LeyendaHistoricoGasto({
+  datos,
+  enCurso,
+}: {
+  datos: readonly PuntoHistorico[];
+  enCurso?: PeriodoEnCurso | null;
+}) {
+  const filas = filasHistorico(datos, enCurso);
+  const rotulo = rotuloParcial(enCurso);
+  const hayParcial = filas.some((f) => f.parcial);
+  const hayExceso = filas.some((f) => partesColumna(f.real, f.presupuesto).exceso > 0);
+
+  return (
+    <>
       {/* La leyenda es DOM y no la de Recharts: hay tres cosas que nombrar y una de ellas
-          —«Parcial»— no es una serie sino un estado de la última columna. Reutiliza
-          `.cf-leyenda` y `.cf-swatch` del núcleo: el swatch imita la marca, bloque para la
-          columna y línea para el presupuesto. */}
+        —«Parcial»— no es una serie sino un estado de la última columna. Reutiliza
+        `.cf-leyenda` y `.cf-swatch` del núcleo: el swatch imita la marca, bloque para la
+        columna y línea para el presupuesto. */}
       <ul className="cf-leyenda cf-leyenda-fija">
         <li className="cf-leyenda-item">
           <span
@@ -355,7 +394,7 @@ export function HistoricoGasto({
           Gasto del mes
         </li>
         {/* Solo si algún mes se pasó. Nombrar un tramo que no está dibujado manda a buscar
-            en el gráfico una cosa que no existe. */}
+          en el gráfico una cosa que no existe. */}
         {hayExceso ? (
           <li className="cf-leyenda-item">
             <span
@@ -375,7 +414,7 @@ export function HistoricoGasto({
           Presupuesto del mes
         </li>
         {/* Solo si hay un mes a medias: una entrada de leyenda para algo que no está
-            dibujado manda a buscar en el gráfico una cosa que no existe. */}
+          dibujado manda a buscar en el gráfico una cosa que no existe. */}
         {hayParcial ? (
           <li className="cf-leyenda-item">
             <span className="cf-swatch cf-swatch-bloque cf-swatch-parcial" aria-hidden="true" />
@@ -389,11 +428,6 @@ export function HistoricoGasto({
           {rotulo}
         </p>
       ) : null}
-
-      {/* La tabla la pinta el MARCO (`ChartFrame`), con las filas que construye
-          `tablaHistoricoGasto`. Este gráfico la pintaba por su cuenta dentro de un
-          `<details>` propio; cuando pasó a vivir en un marco —que exige su tabla— quedaron
-          DOS tablas de los mismos datos en la misma tarjeta. */}
-    </div>
+    </>
   );
 }

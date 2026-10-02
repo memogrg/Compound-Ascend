@@ -19,6 +19,7 @@ import {
   ChartFrame,
   EJE,
   HistoricoGasto,
+  LeyendaHistoricoGasto,
   TRAZO,
   describirGrafico,
   tablaDeDatos,
@@ -88,6 +89,27 @@ const DIAS_CAL = Array.from({ length: 18 }, (_, i) => ({
   fecha: `2026-06-${String(i + 1).padStart(2, "0")}`,
   monto: [0, 12_000, 4_500, 38_000, 0, 21_000, 6_000][i % 7] ?? 0,
 }));
+
+/**
+ * El histórico CON su leyenda, que es como se ve en producción.
+ *
+ * La leyenda y el rótulo del mes en curso salieron del gráfico (decisión 48): van por el slot
+ * `leyenda` de `ChartFrame`, porque los children del marco viven en `.cf-lienzo`, que tiene
+ * altura fija, y todo lo que el gráfico pintara debajo del trazado se salía de la tarjeta.
+ *
+ * Acá no hay marco —el catálogo enseña ESTADOS del gráfico, cada uno en su celda—, así que se
+ * emparejan a mano. Si no, el catálogo mostraría un gráfico sin leyenda y nadie podría revisar
+ * la leyenda, que es justo una de las cosas que cambian con los datos (`Exceso` y `Parcial` solo
+ * aparecen cuando los hay).
+ */
+function HistoricoConLeyenda(props: React.ComponentProps<typeof HistoricoGasto>) {
+  return (
+    <>
+      <HistoricoGasto {...props} />
+      <LeyendaHistoricoGasto datos={props.datos} enCurso={props.enCurso} />
+    </>
+  );
+}
 
 /** Los cuatro estados de la CONSULTA, que `ChartFrame` resuelve solo. */
 const ESTADOS_CONSULTA: readonly { nombre: string; estado: EstadoGrafico }[] = [
@@ -435,10 +457,10 @@ export function GraficosEstadosDemo() {
         spec="La columna se parte: dentro del presupuesto en el tono claro de la rampa, el exceso en el pleno. El mes en curso lleva contorno discontinuo y su mensaje dice cuánto queda por día. El tono no es el único canal: el contorno y el texto lo dicen también."
       >
         <Estado nombre="con datos">
-          <HistoricoGasto datos={COLUMNAS} moneda={MONEDA} alto={150} />
+          <HistoricoConLeyenda datos={COLUMNAS} moneda={MONEDA} alto={150} />
         </Estado>
         <Estado nombre="vacío">
-          <HistoricoGasto datos={[]} moneda={MONEDA} alto={150} />
+          <HistoricoConLeyenda datos={[]} moneda={MONEDA} alto={150} />
         </Estado>
         <Estado nombre="cargando">
           <div className="skel" style={{ height: 150, width: "100%", borderRadius: 10 }} />
@@ -447,14 +469,14 @@ export function GraficosEstadosDemo() {
           <p className="du-vacio">No se pudo cargar el histórico.</p>
         </Estado>
         <Estado nombre="negativos">
-          <HistoricoGasto
+          <HistoricoConLeyenda
             datos={COLUMNAS.map((c) => ({ ...c, real: -c.real }))}
             moneda={MONEDA}
             alto={150}
           />
         </Estado>
         <Estado nombre="miles de millones">
-          <HistoricoGasto
+          <HistoricoConLeyenda
             datos={COLUMNAS.map((c) => ({
               ...c,
               real: c.real * 12_000,
@@ -465,10 +487,10 @@ export function GraficosEstadosDemo() {
           />
         </Estado>
         <Estado nombre="rótulo largo">
-          <HistoricoGasto datos={COLUMNAS} moneda={MONEDA} alto={150} />
+          <HistoricoConLeyenda datos={COLUMNAS} moneda={MONEDA} alto={150} />
         </Estado>
         <Estado nombre="período en curso">
-          <HistoricoGasto
+          <HistoricoConLeyenda
             datos={COLUMNAS}
             moneda={MONEDA}
             alto={150}
