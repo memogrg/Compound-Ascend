@@ -11,15 +11,22 @@
  *   node scripts/qa/diff.mjs --a … --b … --threshold 8 --max-diff-pixels 50
  *   node scripts/qa/diff.mjs --a … --b … --exclude home,asistente
  *   node scripts/qa/diff.mjs --a … --b … --exclude home --max-diff-pixels 60 --max-delta 2
+ *   node scripts/qa/diff.mjs --a … --b … --pr 901 --aprobadas aprobadas
+ *
+ * `--aprobadas` es la carpeta con las capturas de la corrida de la que salieron los hashes de
+ * `qa/visual-aprobado.json`. Sin ella, una aprobación solo vale si el PNG es idéntico byte a
+ * byte; con ella, un PNG distinto pero dentro de tolerancia sigue valiendo y se dice que fue por
+ * tolerancia (decisión 52 — los PNG no son byte a byte reproducibles).
  */
 import { chromium } from "playwright";
 // El inventario, para saber si lo que se comparó es todo o un trozo.
 import { ROUTES, anchosDe } from "./snap.mjs";
 import { diferenciasDeBanderas } from "./banderas.mjs";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { cotejar, leerAprobacion, RUTA_APROBACION, sha256De } from "./aprobacion.mjs";
+import { describirMedida, describirTopes, reprueba } from "./veredicto.mjs";
 
 /**
  * El conteo vive en `comparar-pixeles.mjs` para poder probarlo sin navegador, y se INYECTA
@@ -99,6 +106,17 @@ async function listarPngs(dir) {
   }
   await walk(dir);
   return out.sort();
+}
+
+/** ¿Hay algo en esa ruta? `null`/vacío cuentan como que no, para no tener que preguntarlo dos veces. */
+async function existe(ruta) {
+  if (!ruta) return false;
+  try {
+    await stat(ruta);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function dataUri(file) {
@@ -232,7 +250,12 @@ async function leerManifests(dir) {
  * había medido que se movía solo.
  *
  * Por eso cada shard guarda `manifest-<N>.json` y esto los junta. `banderas` se toma del primero
- * —todos los shards compilan el mismo build— y `entries` y `rutasInestables` se concatenan.
+ * —todos los shards compilan el mismo build— y `entries` e `imagenesInestables` se concatenan.
+ *
+ * El nombre del campo importa: al pasar el marcado de ruta a imagen me dejé aquí el viejo
+ * (`rutasInestables`), así que `{...todos[0]}` solo arrastraba el del PRIMER manifiesto y la marca
+ * de cualquier otro shard se perdía. Medido: la sonda marcó `light/768/mi-base-financiera.png`
+ * en el shard 2 y el diff la reprobó igual, porque leyó el campo que ya nadie escribe.
  */
 async function leerManifest(dir) {
   const todos = await leerManifests(dir);
@@ -240,7 +263,7 @@ async function leerManifest(dir) {
   return {
     ...todos[0],
     entries: todos.flatMap((m) => m.entries ?? []),
-    rutasInestables: todos.flatMap((m) => m.rutasInestables ?? []),
+    imagenesInestables: todos.flatMap((m) => m.imagenesInestables ?? []),
   };
 }
 
@@ -377,9 +400,10 @@ async function main() {
   const inestables = new Map();
   for (const dir of [dirA, dirB]) {
     const man = await leerManifest(dir);
-    for (const r of man?.rutasInestables ?? []) {
-      const previo = inestables.get(r.ruta);
-      inestables.set(r.ruta, {
+    for (const r of man?.imagenesInestables ?? []) {
+      const previo = inestables.get(r.imagen);
+      inestables.set(r.imagen, {
+        imagen: r.imagen,
         ruta: r.ruta,
         px: Math.max(previo?.px ?? 0, r.px ?? 0),
         maxDelta: Math.max(previo?.maxDelta ?? 0, r.maxDelta ?? 0),
@@ -394,14 +418,14 @@ async function main() {
    * combinados. Excluir solo la imagen que la sonda miró dejaría las otras cinco culpando al
    * PR, que es el mismo error con menos ruido.
    */
-  const imagenesInestables = new Set();
-  if (inestables.size) {
-    for (const dir of [dirA, dirB]) {
-      const man = await leerManifest(dir);
-      for (const e of man?.entries ?? [])
-        if (e.file && inestables.has(e.route)) imagenesInestables.add(e.file);
-    }
-  }
+  /**
+   * La marca es por IMAGEN, no por ruta.
+   *
+   * Antes se marcaba la ruta y se excluían sus seis capturas. Pero una pantalla puede ser estable
+   * a 1280 e inestable a 768 —medido en `/mi-base-financiera`—, y sacar del veredicto cinco
+   * capturas que sí se podían comparar es dejar de mirar lo que este job existe para mirar.
+   */
+  const imagenesInestables = new Set(inestables.keys());
 
   const [pngsA, pngsB] = await Promise.all([listarPngs(dirA), listarPngs(dirB)]);
   const setB = new Set(pngsB);
@@ -492,20 +516,21 @@ async function main() {
   // grande. El ruido de rasterizado se queda corto en las dos; un cambio real se pasa en alguna.
   if (inestables.size) {
     console.log(
-      `\nrutas INESTABLES (${inestables.size}), fuera del veredicto — la sonda las vio cambiar ` +
-        `entre dos tandas de la MISMA compilación:`,
+      `\nimágenes INESTABLES (${inestables.size}), fuera del veredicto — la sonda las vio cambiar ` +
+        `entre dos pasadas de la MISMA compilación:`,
     );
     for (const i of inestables.values())
-      console.log(`  ${i.ruta}  ·  hasta ${i.px} px  ·  delta ${i.maxDelta} entre tandas`);
+      console.log(`  ${i.imagen}  ·  ${i.px} px  ·  delta ${i.maxDelta} entre pasadas`);
     console.log(
-      `  ${inestablesConDiff.length} de sus capturas difieren también entre base y rama, y NO cuentan.`,
+      `  ${inestablesConDiff.length} de ellas difieren también entre base y rama, y NO cuentan.`,
     );
-    console.log("  Las dos tandas de cada una están en comparacion.html, para ver qué se mueve.");
+    console.log("  Las dos pasadas de cada una están en comparacion.html, para ver qué se mueve.");
   }
 
-  const reprobadasCrudas = estrictas.filter(
-    (f) => f.diffPixels > maxDiffPixels || f.maxDelta > maxDelta,
-  );
+  // El criterio sale de `veredicto.mjs` y no se escribe acá: la aprobación por tolerancia lo
+  // necesita idéntico unas líneas más abajo, y dos copias de un criterio son dos criterios.
+  const topes = { maxDiffPixels, maxDelta };
+  const reprobadasCrudas = estrictas.filter((f) => reprueba(f, topes));
 
   /**
    * Lo que Memo aprobó a mano para ESTE PR, si hay algo.
@@ -525,12 +550,66 @@ async function main() {
   const aprobacion = prActual ? await leerAprobacion(".") : null;
   const hashes = new Map();
   for (const f of reprobadasCrudas) hashes.set(f.imagen, await sha256De(path.join(dirB, f.imagen)));
-  const { aprobadas, caducadas, prOk } = cotejar({
-    reprobadas: reprobadasCrudas.map((f) => f.imagen),
-    aprobacion,
-    hashes,
-    pr: prActual,
-  });
+
+  /**
+   * Las capturas tal como quedaron en la corrida de la que salieron los hashes aprobados.
+   *
+   * Las baja el job, con el mismo camino que ya baja la base de `main` —`gh run download`, el
+   * mismo token—, y acá solo se leen. Si no está (artefacto caducado, corrida borrada, descarga
+   * fallida), la carpeta no existe y cada aprobación que necesitaba mirarse caduca DICIENDO que
+   * no se pudo mirar, que es distinto de «la pantalla cambió».
+   *
+   * Sin `--aprobadas` no se compara nada y el hash vuelve a ser la única vía: así se comporta una
+   * corrida local, y así se comportaba todo antes de la decisión 52.
+   */
+  const dirAprobadas = args.aprobadas ?? null;
+  let sesionTolerancia = null;
+  const paginaTolerancia = async () => {
+    if (!sesionTolerancia) {
+      const nav = await chromium.launch();
+      const pg = await nav.newPage();
+      await pg.goto("about:blank");
+      await pg.addScriptTag({ content: FUENTE_CONTEO });
+      sesionTolerancia = { nav, pg };
+    }
+    return sesionTolerancia.pg;
+  };
+  const compararConAprobada = async (img) => {
+    if (!(await existe(dirAprobadas)))
+      return {
+        estado: "sin-artefacto",
+        detalle: `no se bajaron las capturas de la corrida aprobada (falta la carpeta ${dirAprobadas})`,
+      };
+    const aprobada = path.join(dirAprobadas, img);
+    if (!(await existe(aprobada))) return { estado: "sin-imagen" };
+    const pg = await paginaTolerancia();
+    const [uriAprobada, uriActual] = await Promise.all([
+      dataUri(aprobada),
+      dataUri(path.join(dirB, img)),
+    ]);
+    const m = await compararEnPagina(pg, uriAprobada, uriActual, threshold, ignorarDeltaBajo);
+    // El MISMO criterio del veredicto, importado de `veredicto.mjs`. Si la imagen aprobada y la
+    // de ahora difieren menos de lo que haría reprobar a cualquier otra, es la misma pantalla.
+    return {
+      estado: reprueba(m, topes) ? "fuera" : "dentro",
+      detalle: `${describirMedida(m)} contra la aprobada (permitido ${describirTopes(topes)})`,
+    };
+  };
+
+  let cotejo;
+  try {
+    cotejo = await cotejar({
+      reprobadas: reprobadasCrudas.map((f) => f.imagen),
+      aprobacion,
+      hashes,
+      pr: prActual,
+      compararConAprobada: dirAprobadas ? compararConAprobada : undefined,
+    });
+  } finally {
+    if (sesionTolerancia) await sesionTolerancia.nav.close();
+  }
+  const { aprobadas, caducadas, porTolerancia, prOk } = cotejo;
+  const porToleranciaPorImagen = new Map(porTolerancia.map((t) => [t.imagen, t.detalle]));
   const aprobadasSet = new Set(aprobadas);
   const reprobadas = reprobadasCrudas.filter((f) => !aprobadasSet.has(f.imagen));
 
@@ -540,9 +619,19 @@ async function main() {
         "no se aplica ninguna aprobación.",
     );
   if (aprobadas.length) {
-    console.log(`\naprobadas a mano (${aprobadas.length}), fuera del veredicto:`);
-    for (const img of aprobadas)
-      console.log(`  ${img}  ·  sha256 ${hashes.get(img)?.slice(0, 12)}…`);
+    const t = porTolerancia.length;
+    console.log(
+      `\naprobadas a mano (${aprobadas.length}), fuera del veredicto` +
+        `${t ? ` — ${aprobadas.length - t} por hash y ${t} por tolerancia` : ""}:`,
+    );
+    for (const img of aprobadas) {
+      const tol = porToleranciaPorImagen.get(img);
+      console.log(
+        tol
+          ? `  ${img}  ·  por tolerancia: ${tol}`
+          : `  ${img}  ·  sha256 ${hashes.get(img)?.slice(0, 12)}…`,
+      );
+    }
   }
   if (caducadas.length) {
     console.log(`\naprobaciones CADUCADAS (${caducadas.length}) — hacen fallar:`);
@@ -606,8 +695,14 @@ async function main() {
         parcial: parcial ?? null,
         // Las lee `comparacion.mjs` para pintarles su propia sección con las dos tandas.
         inestables: [...inestables.values()],
-        // Las lee `comparacion.mjs` para pintarlas aparte y decir con qué hash se aprobaron.
-        aprobadas: aprobadas.map((img) => ({ imagen: img, sha256: hashes.get(img) ?? null })),
+        // Las lee `comparacion.mjs` para pintarlas aparte y decir POR QUÉ están aprobadas: por
+        // hash (el PNG es idéntico al que se aprobó) o por tolerancia (otro PNG, misma pantalla).
+        aprobadas: aprobadas.map((img) => ({
+          imagen: img,
+          sha256: hashes.get(img) ?? null,
+          porTolerancia: porToleranciaPorImagen.has(img),
+          detalle: porToleranciaPorImagen.get(img) ?? null,
+        })),
         caducadas,
         soloA,
         soloB,

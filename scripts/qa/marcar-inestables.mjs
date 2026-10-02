@@ -48,7 +48,15 @@ if (!datos) {
 const inestables = datos.inestables ?? [];
 const fManifest = path.join(dirCapturas, "manifest.json");
 const manifest = JSON.parse(await readFile(fManifest, "utf8"));
-manifest.rutasInestables = inestables.map((i) => ({
+/**
+ * Por IMAGEN, no por ruta.
+ *
+ * Una pantalla puede ser estable a 1280 e inestable a 768. Sacar del veredicto las seis capturas
+ * de una ruta porque una parpadeó es dejar de mirar cinco que sí se podían comparar — y el diff
+ * visual existe precisamente para mirar.
+ */
+manifest.imagenesInestables = inestables.map((i) => ({
+  imagen: i.imagen,
   ruta: i.ruta,
   px: i.px,
   maxDelta: i.maxDelta,
@@ -62,21 +70,19 @@ for (const [etiqueta, dir] of [
   ["b", args["tanda-b"] ?? "det-b"],
 ]) {
   for (const i of inestables) {
-    for (const img of i.imagenes ?? []) {
-      const destino = path.join(dirCapturas, "_sonda", etiqueta, img);
-      await mkdir(path.dirname(destino), { recursive: true });
-      try {
-        await copyFile(path.join(dir, img), destino);
-        copiadas++;
-      } catch {
-        // La imagen puede no existir si la sonda y la tanda no coinciden; se dice al final.
-      }
+    const destino = path.join(dirCapturas, "_sonda", etiqueta, i.imagen);
+    await mkdir(path.dirname(destino), { recursive: true });
+    try {
+      await copyFile(path.join(dir, i.imagen), destino);
+      copiadas++;
+    } catch {
+      // La imagen puede no existir si las dos pasadas no coinciden; se dice al final.
     }
   }
 }
 
 console.log(
-  `marcadas ${inestables.length} ruta(s) inestable(s) en ${fManifest}` +
-    (inestables.length ? ` (${inestables.map((i) => i.ruta).join(", ")})` : "") +
+  `marcadas ${inestables.length} imagen(es) inestable(s) en ${fManifest}` +
+    (inestables.length ? ` (${inestables.map((i) => i.imagen).join(", ")})` : "") +
     ` · ${copiadas} imagen(es) de las dos tandas copiadas a ${dirCapturas}/_sonda/`,
 );

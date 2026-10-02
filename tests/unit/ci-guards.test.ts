@@ -256,9 +256,38 @@ describe("la caché de imágenes del stack", () => {
         Number(m[1]),
       );
       const nombre = /name: Capturas de [^\n]*?\/(\d+)\)/.exec(bloque)?.[1];
-      expect(usos.length, `${job}: un --shard`).toBe(1);
-      expect(usos[0], `${job}: --shard /N contra matriz de ${matriz}`).toBe(matriz);
+      // Dos usos, no uno: la primera pasada y la segunda (la sonda). Los DOS tienen que decir
+      // el mismo /N que la matriz — si la segunda repartiera distinto, compararía una pantalla
+      // contra otra y marcaría inestable todo lo que no coincide.
+      expect(usos.length, `${job}: --shard en la primera pasada y en la segunda`).toBe(2);
+      for (const u of usos) expect(u, `${job}: --shard /N contra matriz de ${matriz}`).toBe(matriz);
       expect(Number(nombre), `${job}: el nombre dice /N`).toBe(matriz);
+    }
+  });
+
+  it("la sonda compara las MISMAS combinaciones que el diff", () => {
+    // La sonda miraba una lista aparte de 20 rutas en `light/1280` mientras el diff comparaba las
+    // seis combinaciones. El agujero costó un PR ajeno: `/mi-base-financiera` parpadeó en
+    // `light/768`, la sonda dio 0/20 porque ese ancho no lo miraba, y la diferencia aterrizó como
+    // reprobada a nombre del PR de postcss (#892). Lo que se detecta y lo que se compara tienen
+    // que ser el mismo conjunto.
+    for (const job of ["capturas_main", "capturas_rama"]) {
+      const bloque =
+        DIRECTIVAS.slice(DIRECTIVAS.indexOf(`  ${job}:`)).split(/\n  [a-z0-9_]+:\n/)[0] ?? "";
+      // La segunda pasada usa el MISMO `--shard`, sin `--rutas`, `--theme` ni `--widths`.
+      const segunda = /--shard \$\{\{ matrix\.shard \}\}\/4 --out capturas-b/.test(bloque);
+      expect(segunda, `${job}: segunda pasada sobre las mismas rutas`).toBe(true);
+      expect(bloque, `${job}: la sonda ya no recorta por tema ni ancho`).not.toMatch(
+        /sonda[\s\S]{0,400}--theme light --widths 1280/,
+      );
+      expect(bloque).toMatch(/sonda-determinismo\.mjs --a capturas --b capturas-b/);
+      // Y excluye las MISMAS rutas que el diff saca de su veredicto estricto. `home` es la
+      // landing, que anima su gráfica en bucle a propósito: medido, 6 de las 7 inestables del
+      // shard 4 eran `home` en los seis combinados (99-252 px). Sin esta exclusión la landing se
+      // come el tope entera y tumba el job por una animación que se quiere.
+      expect(bloque, `${job}: la sonda excluye lo que el diff ya excluye`).toMatch(
+        /--excluir home,dev_ui/,
+      );
     }
   });
 

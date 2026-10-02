@@ -113,9 +113,43 @@ async function abrirPaleta(page: Page) {
     // que venía a evitar.
     if (await apareceA(page, '[role="combobox"][aria-label="Buscar o ir a…"]', 2_000)) break;
   }
-  await expect(combobox(page)).toBeVisible();
-  await expect(page.getByRole("listbox", { name: "Resultados" })).toBeVisible();
-  await expect(opciones(page).first()).toBeVisible();
+  // Con mensaje, los tres: un «element(s) not found» pelado sobre un `option` costó una
+  // tarde de buscar el selector roto que no había. Que el fallo diga QUÉ se esperaba.
+  await expect(
+    combobox(page),
+    "la paleta no abrió tras tres Control+k (6 s): el atajo es un listener de efecto, así que o la pantalla no hidrató o la bandera no llegó al build",
+  ).toBeVisible();
+  await expect(
+    page.getByRole("listbox", { name: "Resultados" }),
+    "la paleta abrió pero su listbox «Resultados» no está",
+  ).toBeVisible();
+  await expect(
+    opciones(page).first(),
+    "el listbox «Resultados» está vacío: sin ninguna opción no hay nada que medir",
+  ).toBeVisible();
+}
+
+/**
+ * No vuelve hasta que la pantalla de abajo terminó de llegar.
+ *
+ * `irA` espera `load` y el botón del topbar, y eso NO alcanza: el botón se renderiza en el
+ * servidor (`AppShell` es cliente, pero Next lo pre-renderiza), así que está visible bastante
+ * antes de que la pantalla esté puesta. En `/dashboard` llegan tarde dos olas:
+ *
+ *  1. el cuerpo del panel, que cuelga de un `<Suspense fallback={<DashboardSkeleton/>}>`;
+ *  2. los charts, que son `dynamic(..., { ssr: false, loading: <ChartSkeleton/> })` y por
+ *     tanto ni existen hasta que el cliente hidrata.
+ *
+ * Las dos se anuncian con la misma clase `.skel`, que es justo lo que se espera a que se
+ * vacíe. Llamar a esto ANTES de hidratar no serviría —sin hidratar no hay esqueleto de
+ * chart que esperar—, así que el orden importa: primero se cruza la puerta de la paleta
+ * (que exige hidratación), después esto.
+ */
+async function esperarPantallaAsentada(page: Page) {
+  await expect(
+    page.locator(".skel"),
+    "la pantalla no se asentó: sigue habiendo esqueletos (el cuerpo del panel o un chart diferido)",
+  ).toHaveCount(0, { timeout: 30_000 });
 }
 
 /** Nodos por impacto, aplanados: una regla puede afectar decenas de elementos. */
@@ -143,11 +177,27 @@ const opciones = (page: Page) =>
 test("abierta y filtrando, la paleta no agrega violaciones", async ({ browser }) => {
   const { ctx, page } = await abrirPanel(browser);
 
-  // Medición CERRADA: la referencia contra la que se compara el estado abierto.
+  // ── La referencia se mide DESPUÉS de cruzar la misma puerta que el sujeto ────────────
+  //
+  // Medirla «al llegar» hacía que el portón acusara al lado equivocado. Medido: en los
+  // verdes el propio `console.log` de abajo imprime «cerrada 3 nodos → abierta 3», y la
+  // corrida 37031574206 falló con `Expected <= 1 / Received 3`, es decir que la CERRADA
+  // leyó 1. El sujeto valía 3 en los dos casos: lo que se movió fue la referencia, tomada
+  // sobre una pantalla a medio poner. Y como la aserción es «abierta ≤ cerrada», el fallo
+  // se lee como «la paleta agrega 2 nodos», que es un diagnóstico invertido.
+  //
+  // Así que la referencia cruza la puerta entera: abrir la paleta —que exige hidratación,
+  // porque su atajo es un listener de efecto—, cerrarla, y esperar a que no queden
+  // esqueletos. Solo entonces mide. Las dos mediciones ven la misma pantalla, que es lo
+  // único que hace justa la comparación.
+  await abrirPaleta(page);
+  await page.keyboard.press("Escape");
+  await expect(combobox(page), "la paleta no se cerró con Escape").toHaveCount(0);
+  await esperarPantallaAsentada(page);
+
   const cerrada = await new AxeBuilder({ page }).withTags(TAGS).analyze();
 
-  await page.keyboard.press("Control+k");
-  await expect(combobox(page)).toBeVisible();
+  await abrirPaleta(page);
 
   // La cabecera del modal se disuelve por CSS (`display: contents`) para quitar la franja
   // vacía. El título sigue en el DOM, oculto a la vista, y tiene que seguir siendo el
@@ -194,11 +244,21 @@ test("abierta y filtrando, la paleta no agrega violaciones", async ({ browser })
 test("sin resultados, el estado vacío tampoco rompe nada", async ({ browser }) => {
   const { ctx, page } = await abrirPanel(browser);
 
-  await page.keyboard.press("Control+k");
+  // `abrirPaleta` y no una pulsación suelta. Medido: la corrida 37045202944 agotó el tope
+  // del spec —«Test timeout of 120000ms exceeded», 2,0 min— y el volcado de la página al
+  // morir muestra el panel entero puesto, el botón «Buscar o ir a… (Ctrl K)» en su sitio y
+  // NINGÚN diálogo de paleta. O sea: la pulsación se perdió por llegar antes de hidratar, y
+  // el `fill` siguiente se quedó esperando un combobox que no iba a existir. Ese `fill` no
+  // tiene tope propio (`actionTimeout` no está puesto), así que el único que lo paraba era
+  // el del test: dos minutos para decir «no encontré un selector», sin decir qué esperaba.
+  await abrirPaleta(page);
   await combobox(page).fill("xyzzy");
   // Sin resultados NO hay listbox: el combobox queda sin `aria-controls` apuntando a nada
   // sería el error fácil acá, y axe lo cazaría.
-  await expect(page.getByRole("listbox")).toHaveCount(0);
+  await expect(
+    page.getByRole("listbox"),
+    "«xyzzy» no da resultados, así que no debería quedar ningún listbox",
+  ).toHaveCount(0);
 
   const r = await new AxeBuilder({ page }).withTags(TAGS).include(DIALOGO).analyze();
   expect(r.violations.map((v) => v.id)).toEqual([]);
@@ -276,12 +336,18 @@ test("si la persona estaba en un campo, Escape la devuelve A SU CAMPO", async ({
   await campo.click();
   await expect(campo).toBeFocused();
 
-  await page.keyboard.press("Control+k");
+  // Por el helper, igual que el resto: el foco en el campo no prueba que la pantalla haya
+  // hidratado —enfocar un `input` es cosa del navegador, no de React—, así que una pulsación
+  // suelta acá corre la misma carrera que tumbó al :194.
+  await abrirPaleta(page);
   await expect(combobox(page)).toBeFocused();
 
   await page.keyboard.press("Escape");
   await expect(combobox(page)).toHaveCount(0);
-  await expect(campo).toBeFocused();
+  await expect(
+    campo,
+    "Escape devolvió el foco al botón del topbar en vez de al campo",
+  ).toBeFocused();
   // Y el botón del topbar NO se quedó con el foco.
   await expect(page.locator("button.tb2-search")).not.toBeFocused();
 

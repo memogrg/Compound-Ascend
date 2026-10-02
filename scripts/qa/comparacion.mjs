@@ -175,6 +175,26 @@ function partes(rel) {
   return { tema, ancho, ruta: archivo.replace(/\.png$/, "").replace(/_/g, "/") };
 }
 
+/**
+ * Cuáles de las aprobadas lo están por TOLERANCIA y no por hash.
+ *
+ * Importa decirlo: «aprobada» por hash significa que el PNG es el mismo byte a byte; por
+ * tolerancia significa que es OTRO PNG y que se miró contra el aprobado con el criterio del
+ * veredicto. Lo segundo es una afirmación más débil, y la página no puede presentar las dos con
+ * la misma etiqueta sin mentir un poco.
+ */
+const escaparHtml = (t) =>
+  String(t).replace(
+    /[&<>"]/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c,
+  );
+
+const porTolerancia = new Map(
+  (reporte?.aprobadas ?? [])
+    .filter((a) => a?.porTolerancia)
+    .map((a) => [a.imagen, a.detalle ?? "dentro de tolerancia"]),
+);
+
 const filas = cambios
   .map((rel) => {
     const { tema, ancho, ruta } = partes(rel);
@@ -184,7 +204,9 @@ const filas = cambios
       : c.reprobada
         ? '<b class="mal">reprobada</b>'
         : c.aprobada
-          ? '<b class="avisa">APROBADA a mano</b>'
+          ? porTolerancia.has(rel)
+            ? `<b class="avisa">APROBADA por tolerancia</b> <span class="tenue">${escaparHtml(porTolerancia.get(rel) ?? "")}</span>`
+            : '<b class="avisa">APROBADA a mano</b> <span class="tenue">hash idéntico</span>'
           : c.inestable
             ? '<b class="avisa">INESTABLE · fuera del veredicto</b>'
             : c.excluida
@@ -225,39 +247,34 @@ const filas = cambios
  * se coló, un gráfico que no terminó— para decidir si se arregla la pantalla o el arnés. Las
  * imágenes las dejó `marcar-inestables.mjs` dentro del artefacto de la rama, bajo `_sonda/a|b`.
  */
-const rutasInestables = reporte?.inestables ?? [];
+const imagenesInestables = reporte?.inestables ?? [];
 let seccionInestables = "";
-if (rutasInestables.length) {
-  const porRuta = new Map();
-  for (const rel of await pngsDe(path.join(args.b, "_sonda", "a"))) porRuta.set(rel, true);
-  for (const rel of porRuta.keys()) {
+if (imagenesInestables.length) {
+  // Las dos pasadas de cada imagen, copiadas al artefacto. El marcado es por IMAGEN —una pantalla
+  // puede ser estable a 1280 e inestable a 768—, así que cada bloque es un par a/b concreto y no
+  // «todas las capturas de esta ruta».
+  for (const i of imagenesInestables) {
     for (const lado of ["a", "b"]) {
-      const destino = path.join(args.out, "sonda", lado, rel);
+      const destino = path.join(args.out, "sonda", lado, i.imagen);
       await mkdir(path.dirname(destino), { recursive: true });
-      await cp(path.join(args.b, "_sonda", lado, rel), destino).catch(() => {});
+      await cp(path.join(args.b, "_sonda", lado, i.imagen), destino).catch(() => {});
     }
   }
-  const bloques = rutasInestables
+  const bloques = imagenesInestables
     .map((i) => {
-      const suyas = [...porRuta.keys()].filter(
-        (rel) => partes(rel).ruta === i.ruta.replace(/^\//, ""),
-      );
-      const pares = suyas
-        .map(
-          (rel) => `<div class="par dos">
-    <figure><figcaption>tanda A</figcaption><img loading="lazy" src="sonda/a/${rel}"></figure>
-    <figure><figcaption>tanda B</figcaption><img loading="lazy" src="sonda/b/${rel}"></figure>
-  </div>`,
-        )
-        .join("\n");
+      const { tema, ancho } = partes(i.imagen);
       return `<section>
-  <h2>${i.ruta} <small><b class="avisa">INESTABLE</b> <i>hasta ${i.px} px · delta ${i.maxDelta} entre tandas</i></small></h2>
-  ${pares || "<p>Sin imágenes de las tandas en el artefacto.</p>"}
+  <h2>${i.ruta} <small>${tema} · ${ancho}px — <b class="avisa">INESTABLE</b>
+    <i>${i.px} px · delta ${i.maxDelta} entre pasadas</i></small></h2>
+  <div class="par dos">
+    <figure><figcaption>pasada A</figcaption><img loading="lazy" src="sonda/a/${i.imagen}"></figure>
+    <figure><figcaption>pasada B</figcaption><img loading="lazy" src="sonda/b/${i.imagen}"></figure>
+  </div>
 </section>`;
     })
     .join("\n");
-  seccionInestables = `<h1 style="margin-top:40px">Rutas inestables (${rutasInestables.length})</h1>
-<p class="resumen">Estas dos capturas son de la <b>misma compilación</b> y el <b>mismo servidor</b>: lo que
+  seccionInestables = `<h1 style="margin-top:40px">Capturas inestables (${imagenesInestables.length})</h1>
+<p class="resumen">Estas dos imágenes son de la <b>misma compilación</b> y el <b>mismo servidor</b>: lo que
 cambie entre ellas no lo cambió el PR. Quedan fuera del veredicto y se muestran para poder arreglar
 la causa —o el arnés—, no para ignorarlas.</p>
 ${bloques}`;
@@ -271,10 +288,13 @@ ${bloques}`;
  * mitad de la lista es como no decirlo.
  */
 const nAprobadas = (reporte?.aprobadas ?? []).length;
+const nTolerancia = porTolerancia.size;
 const avisoAprobadas = nAprobadas
-  ? `<p class="resumen"><b class="avisa">${nAprobadas} captura(s) aprobadas a mano</b> para este PR:
-cambiaron a propósito y quedan fuera del veredicto. La aprobación va atada al sha256 del PNG
-«después», así que si la pantalla vuelve a moverse caduca sola.</p>`
+  ? `<p class="resumen"><b class="avisa">${nAprobadas} captura(s) aprobadas a mano</b> para este PR
+(${nAprobadas - nTolerancia} por hash, ${nTolerancia} por tolerancia): cambiaron a propósito y
+quedan fuera del veredicto. La aprobación va atada al PNG «después» de una corrida concreta: si es
+idéntico, vale por hash; si no, se compara contra el aprobado con el criterio del veredicto y vale
+por tolerancia. Si la pantalla se mueve de verdad, caduca sola.</p>`
   : "";
 
 const titulo = typeof args.titulo === "string" ? args.titulo : "Comparación visual";
@@ -294,6 +314,7 @@ const html = `<!doctype html>
   .mal { color: #b14844; }
   .ok { color: #32784a; }
   .avisa { color: #8f6325; }
+  .tenue { color: #6b7280; font-weight: 400; }
   .par.dos { grid-template-columns: repeat(2, 1fr); }
   h2 i { color: #888; font-style: normal; }
   .par { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-items: start; }
