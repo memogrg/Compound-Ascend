@@ -60,13 +60,19 @@ const DIA_REAL = Number(todayISOInTz("America/Costa_Rica").slice(8, 10));
  * con «esperaba > 0 celdas `data-futuro`, recibió 0» — una vez al mes, el día 30 o 31, sin que
  * nadie hubiera tocado nada. Pasó el 30-sep-2026.
  *
- * El arreglo no es aflojar el spec: el estado «futuro» es justo lo que esta pantalla viene a
+ * El arreglo no fue aflojar el spec: el estado «futuro» es justo lo que esta pantalla viene a
  * enseñar, y un catálogo que no lo muestra está roto aunque nadie proteste. Se reserva SIEMPRE el
  * último día del mes como futuro.
  *
- * (El comentario de más abajo dice que el mes y el día salen del reloj «congelado en la captura».
- * No es cierto: nada en la app lee `QA_FREEZE`, el congelado es del sembrador y del servidor de
- * QA. Por eso esta pantalla depende del día real, y por eso necesita este tope.)
+ * **El tope ya no existe para que un spec pase.** Eso lo arregló #905: los specs congelan el reloj
+ * del navegador en `QA_INSTANTE`, así que la suite ve siempre un día de mitad de mes y le daría
+ * igual este tope. Existe por el catálogo: una persona que lo abra el 30 o el 31 tiene que poder
+ * ver los tres estados, igual que cualquier otro día. Esa es la razón que queda, y es suficiente.
+ *
+ * (Una versión anterior de este comentario decía que «nada en la app lee `QA_FREEZE`». Era
+ * engañoso: el preload `scripts/qa/server-freeze.js` parchea `Date` en el proceso del servidor,
+ * así que el servidor SÍ corre congelado. Lo que no llegaba al navegador era el congelado, y eso
+ * es lo que #905 cerró.)
  */
 const DIAS_DEL_MES = new Date(ANIO, MES, 0).getDate();
 const DIA_HOY = Math.min(DIA_REAL, DIAS_DEL_MES - 1);
