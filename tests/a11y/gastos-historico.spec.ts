@@ -125,7 +125,11 @@ test("el mes a medias dice lo que QUEDA, sin signo y sin verde", async ({ browse
   // gastaste lo que te toca». Los días salen del servidor: con el reloj congelado, 12.
   const { ctx, page } = await abrir(browser, "/gastos?range=3m");
   const tarjeta = await tarjetaHistorico(page);
-  await tarjeta.locator(".cf-datos-abrir").click();
+  // «Ver tabla», del MARCO. Antes era «Ver los datos» (`.cf-datos-abrir`), el `<details>` que
+  // el propio gráfico pintaba: la decisión 42 consolida las dos tablas en una, la del marco, y
+  // con la tabla duplicada se va su botón. No hay forma de quitar una de las dos tablas y dejar
+  // intactos los dos localizadores.
+  await tarjeta.locator(".cf-btn-tabla").click();
   await page.waitForTimeout(300);
 
   const celda = tarjeta.locator(".cf-tabla-avance");
@@ -137,7 +141,7 @@ test("el mes a medias dice lo que QUEDA, sin signo y sin verde", async ({ browse
   expect(texto, "no lleva diferencia con signo").not.toMatch(/^[+−-]/);
 
   // Y el mismo criterio en el tooltip del último mes.
-  await tarjeta.locator(".cf-datos-abrir").click();
+  await tarjeta.locator(".cf-btn-tabla").click();
   const filas = await leerTooltips(page, tarjeta);
   const ultimo = filas[filas.length - 1]!;
   expect(ultimo, `tooltip: ${ultimo}`).toMatch(/Te quedan|Excedido por/);
@@ -298,7 +302,7 @@ test("el tooltip da la diferencia y el % de ejecución", async ({ browser }) => 
 test("la tabla de datos trae los cuatro números de cada mes, y cuadran", async ({ browser }) => {
   const { ctx, page } = await abrir(browser, "/gastos?range=3m");
   const tarjeta = await tarjetaHistorico(page);
-  await tarjeta.locator(".cf-datos-abrir").click();
+  await tarjeta.locator(".cf-btn-tabla").click();
   await page.waitForTimeout(300);
 
   // `:not(.cf-tabla-nota)`: el mes abierto añade una fila de nota a todo el ancho, que no
@@ -356,7 +360,7 @@ for (const [rango, esperado] of [
 test("axe no encuentra nada nuevo en la tarjeta, ni con la tabla abierta", async ({ browser }) => {
   const { ctx, page } = await abrir(browser, "/gastos?range=3m");
   const tarjeta = await tarjetaHistorico(page);
-  await tarjeta.locator(".cf-datos-abrir").click();
+  await tarjeta.locator(".cf-btn-tabla").click();
   await page.waitForTimeout(300);
   const r = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   // La línea base de `/gastos` ya reporta contraste; el portón es de INCLUSIÓN.
@@ -412,3 +416,46 @@ test("y el dato lo respalda: a 3 meses la Hipoteca vale tres veces la de un mes"
   expect(unMes, "no se leyó la Hipoteca del mes").toBeGreaterThan(0);
   expect(tresMeses, `1m=${unMes} · 3m=${tresMeses}`).toBe(unMes * 3);
 });
+
+/**
+ * La leyenda y la nota del mes en curso caben DENTRO de su tarjeta, en los tres anchos.
+ *
+ * Es la comprobación que faltaba cuando el defecto apareció (decisión 48): `.cf-lienzo` tiene
+ * altura fija, y mientras el gráfico pintaba la leyenda entre sus children, lo que sobraba se
+ * salía de la tarjeta — a 1280 «Parcial» caía fuera, y a 768 y 390 la segunda fila de la leyenda
+ * y la nota quedaban tapadas por la tarjeta de abajo.
+ *
+ * Se mide la GEOMETRÍA y no el DOM porque el defecto era geométrico: el marcado estaba bien
+ * anidado, y aun así se veía por encima del borde. Un test de estructura habría pasado.
+ */
+for (const ancho of [390, 768, 1280]) {
+  test(`la leyenda y la nota caben en la tarjeta @${ancho}`, async ({ browser }) => {
+    const { ctx, page } = await abrir(browser, "/gastos", ancho);
+    const tarjeta = await tarjetaHistorico(page);
+    const caja = await tarjeta.boundingBox();
+    expect(caja, "la tarjeta no tiene caja").not.toBeNull();
+
+    const piezas = tarjeta.locator(".cf-leyenda-item, .cf-en-curso");
+    const n = await piezas.count();
+    // Conteo > 0 antes de leer: un localizador vacío haría pasar el bucle sin medir nada.
+    expect(n, "no se encontró ni un item de leyenda").toBeGreaterThan(0);
+
+    for (let i = 0; i < n; i++) {
+      const p = piezas.nth(i);
+      const b = await p.boundingBox();
+      const texto = (await p.innerText()).trim().slice(0, 40);
+      expect(b, `«${texto}» no tiene caja`).not.toBeNull();
+      // Un píxel de tolerancia: los bordes redondeados y el subpíxel del rasterizado pueden
+      // dejar la caja medio píxel fuera sin que nada se vea cortado.
+      expect(
+        b!.y + b!.height,
+        `«${texto}» se sale por abajo de la tarjeta (@${ancho})`,
+      ).toBeLessThanOrEqual(caja!.y + caja!.height + 1);
+      expect(b!.y, `«${texto}» se sale por arriba (@${ancho})`).toBeGreaterThanOrEqual(caja!.y - 1);
+      expect(b!.x + b!.width, `«${texto}» se sale por la derecha (@${ancho})`).toBeLessThanOrEqual(
+        caja!.x + caja!.width + 1,
+      );
+    }
+    await ctx.close();
+  });
+}

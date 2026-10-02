@@ -10,6 +10,7 @@ import type { NextMove } from "@/modules/personal-profile/engine/next-move";
 import type { Evolution } from "@/modules/personal-profile/engine/evolution";
 import { ARCHETYPE_PLAYBOOKS } from "@/lib/ai/advisor-knowledge";
 
+import { formatDateLong } from "@/lib/format";
 /** Etiquetas en español de la emoción dominante (para el motor financiero). */
 const EMOTION_LABEL: Record<string, string> = {
   tranquilidad: "Tranquilidad",
@@ -71,7 +72,7 @@ function lc(s: string): string {
 function formatSince(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" });
+  return formatDateLong(d);
 }
 
 /**

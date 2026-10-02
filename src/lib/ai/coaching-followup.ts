@@ -11,6 +11,8 @@
  * queda 'abierta' — nunca se celebra algo que no se pudo verificar.
  */
 
+import { formatNumber } from "@/lib/format";
+
 /** Estado del seguimiento de una recomendación. Espeja el check de la migración. */
 export type FollowStatus = "abierta" | "cumplida" | "vencida" | "sin_seguimiento";
 
@@ -132,7 +134,7 @@ export type SeguimientoResuelto = {
 /** Formatea un monto sin depender del módulo de moneda (el motor es puro). */
 function money(n: number, currency: string): string {
   const simbolo = currency === "CRC" ? "₡" : currency === "USD" ? "$" : "";
-  return `${simbolo}${Math.round(Math.abs(n)).toLocaleString("es-CR")}`;
+  return `${simbolo}${formatNumber(Math.round(Math.abs(n)))}`;
 }
 
 /**

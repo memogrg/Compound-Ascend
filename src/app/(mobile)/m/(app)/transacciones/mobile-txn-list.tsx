@@ -21,7 +21,7 @@ import {
   type MoneyFlowEffect,
 } from "@/modules/financial-base/engine/money-flow";
 import type { MonthMarker } from "@/modules/financial-base/engine/period";
-import { formatMoney } from "@/lib/format";
+import { formatDateLong, formatMoney } from "@/lib/format";
 
 import { Fab, BottomSheet, SwipeRow, ConfirmDialog, useToast } from "../../components/form-kit";
 import type { MIconName } from "../../components/m-icon";
@@ -524,11 +524,7 @@ function TxnDetail({
       : flow.effect === "in"
         ? `+ ${money} · entra a tu liquidez`
         : "No toca tu liquidez";
-  const fullDate = new Date(`${t.occurredOn}T00:00:00`).toLocaleDateString("es-MX", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const fullDate = formatDateLong(t.occurredOn);
   const after = liquidityAfterDisplay({ effect: flow.effect, balanceAfter });
   return (
     <div

@@ -15,7 +15,7 @@ import type { Debt, DebtVM, DebtPayment } from "@/modules/control";
 // El mismo helper que usa la web. Recibe la deuda CRUDA a propósito: si alguien le pasa un
 // VM convertido, el test de multimoneda lo dice.
 import { cuotaPrecargada, montoFilaDeuda } from "@/modules/control/engine/debt-strategy";
-import { formatMoney, formatPercent } from "@/lib/format";
+import { formatDayMonthTinyYear, formatMoney, formatPercent } from "@/lib/format";
 import { useCaptureToday } from "@/components/tz/timezone-context";
 
 import {
@@ -93,11 +93,7 @@ function debtSubtitle(args: { rank: number; apr: number; months: number | null }
 
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDayMonthTinyYear(iso);
 }
 
 function viaLabel(source: string | null | undefined): string {

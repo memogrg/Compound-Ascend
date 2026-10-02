@@ -14,10 +14,74 @@ export type PuntoDescribible = { x: string; y: number | null };
 /** Fila de datos de un gráfico: la etiqueta del eje X más un valor por serie. */
 export type FilaDato = { x: string } & Record<string, unknown>;
 
+/**
+ * Una celda: texto pelado, o texto con TONO.
+ *
+ * El tono es el mismo canal que usa el tooltip (`data-tono`) para decir si un número es bueno o
+ * malo sin depender solo del color. Se declara acá en vez de dejar que cada gráfico pinte su
+ * propia tabla, que es como acabamos con dos tablas en la misma tarjeta.
+ */
+export type CeldaDato = string | { texto: string; tono?: "bueno" | "malo" };
+
+/**
+ * Una fila, cuando necesita más que una lista de celdas.
+ *
+ * `nota` es una fila extra a todo el ancho, debajo de la de datos: el mes en curso lleva un
+ * mensaje que en una celda de quince caracteres se parte en cuatro renglones y duplica el alto
+ * de la tabla.
+ */
+export type FilaTabla = {
+  celdas: CeldaDato[];
+  /**
+   * `tono` es un `string` y no la unión de las celdas a propósito: el vocabulario NO es el mismo.
+   * Una celda dice si un número es `bueno` o `malo`; la nota del mes en curso dice si el ritmo es
+   * `neutro` o `alerta`, que no es lo mismo que «bueno». Forzar una sola unión obligaría a
+   * traducir un concepto al otro, y esa traducción es justo la que confunde «vas ahorrando» con
+   * «todavía no has gastado lo que te toca».
+   */
+  nota?: { texto: string; tono?: string };
+};
+
+/**
+ * La tabla accesible de un gráfico.
+ *
+ * `filas` acepta la forma simple (`string[]`, que es lo que devuelve `tablaDeDatos` y lo que usan
+ * casi todos los gráficos) **o** la rica. Es aditivo a propósito: extender el tipo no puede
+ * obligar a tocar los gráficos que ya funcionan.
+ */
 export type TablaDatos = {
   encabezados: string[];
-  filas: string[][];
+  filas: (string[] | FilaTabla)[];
+  /** Lo que va en el `<caption>`. Si falta, el marco pone el título del gráfico. */
+  titulo?: string;
 };
+
+/**
+ * La forma SIMPLE, que es lo que devuelve `tablaDeDatos` y lo que consume casi todo.
+ *
+ * Existe para que extender `TablaDatos` con la forma rica no obligue a los que ya indexan
+ * `filas[i][3]` a estrechar el tipo a mano. Es asignable a `TablaDatos`.
+ */
+export type TablaSimple = {
+  encabezados: string[];
+  filas: string[][];
+  titulo?: string;
+};
+
+/** Normaliza cualquiera de las dos formas a la rica, para que el marco pinte una sola cosa. */
+export function filaNormalizada(fila: string[] | FilaTabla): FilaTabla {
+  return Array.isArray(fila) ? { celdas: fila } : fila;
+}
+
+/** El texto de una celda, venga como venga. */
+export function textoCelda(c: CeldaDato): string {
+  return typeof c === "string" ? c : c.texto;
+}
+
+/** El tono de una celda, o `undefined`. */
+export function tonoCelda(c: CeldaDato): "bueno" | "malo" | undefined {
+  return typeof c === "string" ? undefined : c.tono;
+}
 
 /** Lo que se escribe donde no hay número. Un guion largo, no una celda vacía. */
 export const SIN_DATO = "—";
@@ -65,7 +129,7 @@ export function tablaDeDatos(
   series: readonly SerieDef[],
   formato: (valor: number) => string,
   etiquetaX = "Periodo",
-): TablaDatos {
+): TablaSimple {
   return {
     encabezados: [etiquetaX, ...series.map((s) => s.etiqueta)],
     filas: data.map((fila) => [

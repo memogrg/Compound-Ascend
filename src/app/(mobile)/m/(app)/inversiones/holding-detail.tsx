@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { formatMoney, formatPercent, formatMonthYear } from "@/lib/format";
+import { formatDayMonthTiny, formatMoney, formatMonthYear, formatPercent } from "@/lib/format";
 import { useCaptureToday } from "@/components/tz/timezone-context";
 import {
   listHoldingPurchasesAction,
@@ -111,10 +111,7 @@ const ALERT_KIND_LABEL: Record<AlertKind, string> = {
 
 /** Etiqueta de fecha corta (día + mes) para los puntos del gráfico con scrub. */
 function dayLabel(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-CR", {
-    day: "numeric",
-    month: "short",
-  });
+  return formatDayMonthTiny(iso);
 }
 
 export function HoldingDetailSheet({

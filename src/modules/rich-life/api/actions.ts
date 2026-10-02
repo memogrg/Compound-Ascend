@@ -19,6 +19,7 @@ import { getLatest, getChange, findIndicator } from "@/lib/economic-indicators";
 import { isSupabaseConfigured, requireUser } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
+import { formateadorNumero } from "@/lib/format";
 export type ActionResult = { ok: boolean; fieldErrors?: Record<string, string>; message?: string };
 
 function fieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
@@ -229,7 +230,7 @@ export async function getWidgetSnapshotAction(): Promise<WidgetSnapshot | null> 
     let indicatorChange: number | null = null;
     let indicatorUnit: string | null = null;
     try {
-      const fmt2 = new Intl.NumberFormat("es-CR", {
+      const fmt2 = formateadorNumero({
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });

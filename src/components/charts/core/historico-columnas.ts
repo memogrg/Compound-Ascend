@@ -7,6 +7,7 @@
  */
 import { formatMoney } from "@/lib/format";
 
+import type { FilaTabla, TablaDatos } from "./accesible";
 import { estaEnCurso, esTramoParcial, type PeriodoEnCurso } from "./periodo-en-curso";
 
 /** Un mes del histórico: lo que se gastó, lo que se había presupuestado, y si va a medias. */
@@ -133,5 +134,55 @@ export function mensajeEnCurso(
   return {
     texto: `Te quedan ${formatMoney(restante, moneda)} para ${dias} días (≈ ${formatMoney(porDia, moneda)}/día)`,
     tono: "neutro",
+  };
+}
+
+/** «58 %», o «—» cuando no hay presupuesto contra el que medir. */
+function textoEjecucion(real: number, presupuesto: number): string {
+  const pct = porcentajeEjecucion(real, presupuesto);
+  return pct === null ? "—" : `${pct} %`;
+}
+
+/**
+ * La tabla accesible del histórico, para que la pinte el MARCO y no el gráfico.
+ *
+ * Antes la pintaba `HistoricoGasto` por su cuenta, dentro de un `<details>` propio. Cuando el
+ * gráfico pasó a vivir en un `ChartFrame` —que exige su tabla— quedaron DOS tablas de los mismos
+ * datos en la misma tarjeta: seis filas donde hay tres meses. Para quien navega con lector de
+ * pantalla eso es peor que una sola, y lo cazó `gastos-historico.spec.ts`.
+ *
+ * Vive acá, con el resto de las cuentas: es texto derivado de números, que es exactamente lo que
+ * este módulo existe para poder probar sin navegador.
+ */
+export function tablaHistoricoGasto(
+  datos: readonly PuntoHistorico[],
+  moneda: string,
+  enCurso?: PeriodoEnCurso | null,
+): TablaDatos {
+  const filas: FilaTabla[] = filasHistorico(datos, enCurso).map((f) => {
+    const d = diferencia(f.real, f.presupuesto);
+    const avance = f.parcial ? mensajeEnCurso(f.real, f.presupuesto, enCurso, moneda) : null;
+    return {
+      celdas: [
+        f.parcial ? `${f.label} · parcial` : f.label,
+        formatMoney(f.real, moneda),
+        formatMoney(f.presupuesto, moneda),
+        // Mismo criterio que el tooltip: el mes abierto no lleva diferencia con signo. Un guion,
+        // que es «no aplica», y no un número que se va a evaporar solo.
+        avance || d === 0
+          ? "—"
+          : {
+              texto: `${d > 0 ? "+" : "−"}${formatMoney(Math.abs(d), moneda)}`,
+              tono: d > 0 ? ("malo" as const) : ("bueno" as const),
+            },
+        textoEjecucion(f.real, f.presupuesto),
+      ],
+      ...(avance ? { nota: { texto: avance.texto, tono: avance.tono } } : {}),
+    };
+  });
+  return {
+    titulo: "Gasto y presupuesto por mes",
+    encabezados: ["Mes", "Gasto", "Presupuesto", "Diferencia", "Ejecución"],
+    filas,
   };
 }

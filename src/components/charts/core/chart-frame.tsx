@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { HelpTip } from "@/components/shared/help-tip";
 
 import { ChartEmpty } from "../chart-empty";
-import type { TablaDatos } from "./accesible";
+import { filaNormalizada, textoCelda, tonoCelda, type TablaDatos } from "./accesible";
 import { NOMBRE_RANGO, type RangoPreset } from "./rangos";
 import { ALTO_MINIMO } from "./theme";
 
@@ -249,7 +249,11 @@ export function ChartFrame({
             aria-label={descripcion}
           >
             <table className="cf-tabla">
-              <caption>{descripcion}</caption>
+              {/* El `titulo` de la tabla gana sobre la descripción del gráfico cuando existe: «Gasto y
+                    presupuesto por mes» dice qué se está tabulando, mientras que la descripción
+                    narra la forma de la serie —que es lo que hace falta oír del GRÁFICO, no de
+                    la tabla—. */}
+              <caption>{tabla.titulo ?? descripcion}</caption>
               <thead>
                 <tr>
                   {tabla.encabezados.map((h) => (
@@ -260,19 +264,42 @@ export function ChartFrame({
                 </tr>
               </thead>
               <tbody>
-                {tabla.filas.map((fila) => (
-                  <tr key={fila[0]}>
-                    {fila.map((celda, i) =>
-                      i === 0 ? (
-                        <th key={i} scope="row">
-                          {celda}
-                        </th>
-                      ) : (
-                        <td key={i}>{celda}</td>
-                      ),
-                    )}
-                  </tr>
-                ))}
+                {/* Una fila puede venir en la forma simple (`string[]`) o en la rica, con tono por
+                    celda y una nota a todo el ancho. Se normaliza acá para que el marco pinte UNA
+                    sola cosa, y para que un gráfico con tabla más rica no tenga que pintarse la
+                    suya — que fue como acabamos con dos tablas de los mismos datos en una tarjeta. */}
+                {tabla.filas.map((cruda) => {
+                  const fila = filaNormalizada(cruda);
+                  const clave = textoCelda(fila.celdas[0] ?? "");
+                  return (
+                    <Fragment key={clave}>
+                      <tr>
+                        {fila.celdas.map((celda, i) =>
+                          i === 0 ? (
+                            <th key={i} scope="row">
+                              {textoCelda(celda)}
+                            </th>
+                          ) : (
+                            <td key={i} data-tono={tonoCelda(celda)}>
+                              {textoCelda(celda)}
+                            </td>
+                          ),
+                        )}
+                      </tr>
+                      {fila.nota ? (
+                        <tr className="cf-tabla-nota">
+                          <td
+                            className="cf-tabla-avance"
+                            colSpan={tabla.encabezados.length}
+                            data-tono={fila.nota.tono}
+                          >
+                            {fila.nota.texto}
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

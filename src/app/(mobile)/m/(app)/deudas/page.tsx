@@ -11,7 +11,7 @@ import {
   type DebtPayment,
 } from "@/modules/control";
 import type { DebtInput } from "@/modules/control/engine/debt-strategy";
-import { formatMoney, formatPercent, currencySymbol } from "@/lib/format";
+import { currencySymbol, formatDayMonthLong, formatMoney, formatPercent } from "@/lib/format";
 import {
   MSummaryCard,
   MSectionHeader,
@@ -43,7 +43,7 @@ const METHOD_LABEL: Record<string, string> = {
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString("es-MX", { day: "numeric", month: "long" });
+  return formatDayMonthLong(d);
 }
 
 export default async function MobileDeudas() {

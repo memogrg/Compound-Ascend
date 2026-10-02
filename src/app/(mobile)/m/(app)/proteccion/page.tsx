@@ -18,6 +18,7 @@ import {
 } from "../../components/content-kit";
 import { ProteccionManager } from "./proteccion-manager";
 
+import { formatMonthTinyYear } from "@/lib/format";
 /**
  * /m/proteccion — "Protección": score de defensa patrimonial, pólizas activas y
  * brechas de cobertura. Reutiliza el barrel wealth (getWealthSummary: protection
@@ -36,10 +37,7 @@ function statusOf(score: number): { label: string; tone: MTone } {
 /** Fecha corta ("dic 2026") para celdas estrechas; "—" si no hay. */
 function fmtShort(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", {
-    month: "short",
-    year: "numeric",
-  });
+  return formatMonthTinyYear(iso);
 }
 
 export default async function MobileProteccion() {
