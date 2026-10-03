@@ -197,6 +197,63 @@ function Linea({
   );
 }
 
+/**
+ * Un marco con los tres slots de 26.1, para poder verlos y medirlos.
+ *
+ * La leyenda es una lista cualquiera: el slot pinta lo que le den, y lo que se demuestra acá es el
+ * REPARTO, no una leyenda concreta. La dona trae la suya en 26.3.
+ */
+function MarcoConSlots({ lateral, sinLeyenda }: { lateral?: boolean; sinLeyenda?: boolean }) {
+  return (
+    <ChartFrame
+      titulo="Composición del mes"
+      subtitulo="por bloque"
+      alto={lateral ? 240 : 140}
+      estado="datos"
+      disposicionLeyenda={lateral ? "lateral" : "inferior"}
+      descripcion={describirGrafico({
+        titulo: "Composición del mes",
+        serie: SERIE.map((d) => ({ x: d.x, y: d.v })),
+        formato: (v) => formatMoney(v, MONEDA),
+      })}
+      tabla={tablaDeDatos(SERIE, SERIES, (v) => formatMoney(v, MONEDA), "Mes")}
+      acciones={
+        <a className="ghost-link" href="/mi-base-financiera">
+          Detalle
+        </a>
+      }
+      pie={<span>Los porcentajes se reparten por mayor resto, así que suman 100 exactos.</span>}
+      leyenda={
+        sinLeyenda ? undefined : (
+          <ul className="cf-leyenda">
+            {SERIES.map((se) => (
+              <li key={se.clave}>
+                <span className="cf-leyenda-btn">
+                  <span
+                    className="cf-swatch cf-swatch-bloque"
+                    style={{ background: se.color }}
+                    aria-hidden="true"
+                  />
+                  {se.etiqueta}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={SERIE} accessibilityLayer>
+          <XAxis dataKey="x" {...EJE} />
+          {SERIES.map((se) => (
+            <Line key={se.clave} dataKey={se.clave} stroke={se.color} {...TRAZO} />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </ChartFrame>
+  );
+}
+
 function Area_({ estado, datos = SERIE }: { estado: EstadoGrafico; datos?: typeof SERIE }) {
   return (
     <ChartFrame
@@ -572,6 +629,30 @@ export function GraficosEstadosDemo() {
         </Estado>
         <Estado nombre="período en curso">
           <Sparkline puntos={SERIE.slice(0, 3).map((d) => d.v)} />
+        </Estado>
+      </Entrada>
+      {/* ── Los tres slots del marco (26.1) ───────────────────────────────────────────── */}
+      <Entrada
+        id="gr-marco-slots"
+        titulo="Marco · acciones, pie y leyenda lateral"
+        nota="Los tres slots que la tanda 2 necesita. El corte de la leyenda lateral es del CONTENEDOR: las dos primeras celdas llevan un ancho fijo a propósito, a los dos lados de 420 px."
+        spec="`acciones` va en la cabecera, a la derecha, antes de «Ver tabla»: comparte fila con él, así que un bloque alto haría crecer la cabecera y rompería la invariante de los cuatro estados. `pie` va debajo de la tabla y FUERA del lienzo, por la misma razón que la leyenda (decisión 48). `disposicionLeyenda` en «lateral» pone la leyenda a la derecha del lienzo con una consulta de contenedor a 420 px, y con la tabla abierta vuelve a columna para que la tabla no quede encerrada en el ancho del gráfico."
+      >
+        <Estado nombre="lateral · contenedor 520 px">
+          <div style={{ width: 520, maxWidth: "100%" }}>
+            <MarcoConSlots lateral />
+          </div>
+        </Estado>
+        <Estado nombre="lateral · contenedor 360 px">
+          <div style={{ width: 360, maxWidth: "100%" }}>
+            <MarcoConSlots lateral />
+          </div>
+        </Estado>
+        <Estado nombre="inferior (el defecto)">
+          <MarcoConSlots />
+        </Estado>
+        <Estado nombre="sin leyenda, solo acciones y pie">
+          <MarcoConSlots sinLeyenda />
         </Estado>
       </Entrada>
     </LienzoCatalogo>
