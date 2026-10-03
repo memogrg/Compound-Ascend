@@ -323,6 +323,11 @@ function CompositionCard({
            lienzo; igualarlos metería ~50 px de aire muerto bajo un anillo de 132, porque en modo
            taxonomía el alto de la tarjeta lo manda la leyenda de nueve filas, no el anillo. */
         alto={ANILLO}
+        /* El lienzo mide el anillo y nada más. Sin esto el piso de `ALTO_MINIMO` (160) le metía
+           28 px de aire muerto debajo, y el hueco anillo→leyenda salía de 50 px a 390 en vez de
+           los 18 del `gap` de la fila. Una dona no tiene ejes ni tooltip anclado, que es para lo
+           que ese piso existe. */
+        ajustadoAlContenido
         estado={leyenda.filas.length === 0 ? "vacio" : "datos"}
         mensajeVacio="Agregá tu presupuesto en Mi Base Financiera."
         /* El total se dice en el nombre de la figura. Vivía solo en el centro del anillo, que es un

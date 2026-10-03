@@ -85,3 +85,45 @@ for (const ancho of ANCHOS) {
     await ctx.close();
   });
 }
+
+/**
+ * Las dos correcciones de marco a 390 (decisión 55), con número.
+ *
+ * Son geométricas y no de clase: lo que se promete es que el título quepa en un renglón y que entre
+ * el anillo y la leyenda quede el hueco de la fila y no el piso de `ALTO_MINIMO`. Medido antes del
+ * arreglo, con el CSS real y el contenedor de 318 px que le toca a esta tarjeta a 390: el hueco era
+ * de 46 px —18 del `gap` más 28 de aire muerto bajo un anillo de 132 en un lienzo de 160— y el
+ * título se partía en dos renglones en cuanto los controles pasaban de 100 px de ancho.
+ */
+test("a 390 el título del marco cabe en un renglón y el hueco anillo→leyenda es el del gap", async ({
+  browser,
+}) => {
+  const { ctx, page } = await abrirPanel(browser, 390);
+
+  const marco = page.locator("figure.cf").filter({ hasText: "Presupuesto del mes" }).first();
+  const titulo = marco.locator(".cf-titulo");
+  await expect(titulo, "no apareció el título del marco").toHaveCount(1);
+
+  // Un renglón se mide contra el `line-height` del propio elemento y no contra un número escrito a
+  // mano: si mañana cambia la tipografía, la aserción sigue diciendo lo mismo.
+  const lineas = await titulo.evaluate((n) => {
+    const lh = parseFloat(getComputedStyle(n).lineHeight) || 20;
+    return Math.max(1, Math.round(n.getBoundingClientRect().height / lh));
+  });
+  expect(lineas, "el título se partió: los controles le quitaron ancho").toBe(1);
+
+  const anillo = marco.locator('.cf-lienzo [role="img"]').first();
+  const leyenda = marco.locator(".cf-leyenda-lado");
+  await expect(anillo).toBeVisible();
+  await expect(leyenda).toHaveCount(1);
+  const cAnillo = (await anillo.boundingBox())!;
+  const cLeyenda = (await leyenda.boundingBox())!;
+  const hueco = Math.round(cLeyenda.y - (cAnillo.y + cAnillo.height));
+
+  // El tope es 24 y no 18 exactos para dejar sitio al redondeo del `line-height` de la primera fila
+  // de la leyenda. Lo que no puede volver son los 28 px de aire muerto del lienzo.
+  expect(hueco, `hueco anillo→leyenda: ${hueco} px`).toBeLessThanOrEqual(24);
+  expect(hueco, "hueco negativo: el anillo y la leyenda se solapan").toBeGreaterThanOrEqual(0);
+
+  await ctx.close();
+});

@@ -242,6 +242,7 @@ function DonaEnMarco({
     <ChartFrame
       titulo={titulo}
       alto={ANILLO_DEMO}
+      ajustadoAlContenido
       estado={estado ?? (leyenda.filas.length === 0 ? "vacio" : "datos")}
       mensajeVacio="Agregá tu presupuesto y acá vas a ver el reparto."
       mensajeError="No se pudo cargar el reparto."
