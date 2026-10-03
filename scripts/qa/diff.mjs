@@ -604,11 +604,14 @@ async function main() {
       hashes,
       pr: prActual,
       compararConAprobada: dirAprobadas ? compararConAprobada : undefined,
+      // Lo que el ARNÉS sacó del veredicto: inestables e ignoradas por `--exclude`. Una aprobación
+      // de una de esas no está caducada, solo no hizo falta en esta corrida.
+      fueraDelVeredicto: conDiff.filter((f) => f.inestable || f.excluida).map((f) => f.imagen),
     });
   } finally {
     if (sesionTolerancia) await sesionTolerancia.nav.close();
   }
-  const { aprobadas, caducadas, porTolerancia, prOk } = cotejo;
+  const { aprobadas, caducadas, porTolerancia, innecesarias, prOk } = cotejo;
   const porToleranciaPorImagen = new Map(porTolerancia.map((t) => [t.imagen, t.detalle]));
   const aprobadasSet = new Set(aprobadas);
   const reprobadas = reprobadasCrudas.filter((f) => !aprobadasSet.has(f.imagen));
@@ -632,6 +635,10 @@ async function main() {
           : `  ${img}  ·  sha256 ${hashes.get(img)?.slice(0, 12)}…`,
       );
     }
+  }
+  if (innecesarias.length) {
+    console.log(`\naprobaciones que NO hicieron falta (${innecesarias.length}) — no hacen fallar:`);
+    for (const i of innecesarias) console.log(`  ${i.imagen}  ·  ${i.motivo}`);
   }
   if (caducadas.length) {
     console.log(`\naprobaciones CADUCADAS (${caducadas.length}) — hacen fallar:`);

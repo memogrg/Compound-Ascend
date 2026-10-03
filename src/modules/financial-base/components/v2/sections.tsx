@@ -16,10 +16,12 @@ import {
   ChartFrame,
   HistoricoGasto,
   LeyendaHistoricoGasto,
+  LeyendaSeries,
   describirGrafico,
   tablaDeDatos,
   tablaHistoricoGasto,
   type PeriodoEnCurso,
+  type SerieDef,
 } from "@/components/charts/core";
 import {
   rotuloDelRango,
@@ -276,6 +278,18 @@ function TopTable({
   );
 }
 
+/**
+ * Las tres series del flujo libre, en un solo sitio: las leen el gráfico, la tabla y la leyenda.
+ *
+ * Estaban escritas a mano dentro del JSX del gráfico, y la tabla no existía. Con tres consumidores
+ * de la misma lista, tenerla tres veces es tenerla distinta.
+ */
+const SERIES_FLUJO: SerieDef[] = [
+  { clave: "Ingresos", etiqueta: "Ingresos", color: "var(--pos)", marca: "linea" },
+  { clave: "Gastos", etiqueta: "Gastos", color: "var(--c-expense)", marca: "linea" },
+  { clave: "Flujo libre", etiqueta: "Flujo libre", color: "var(--info)", marca: "linea" },
+];
+
 function tone(v: number, goodWhenPositive = true): MetricTone {
   if (Math.abs(v) < 0.001) return "neutral";
   return v > 0 === goodWhenPositive ? "pos" : "warn";
@@ -292,8 +306,12 @@ export function MiBaseSection({ view }: { view: V2View }) {
     budgetExpense: budget.budgetExpense,
     realExpense: monthFlow.real.operatingExpense,
   });
+  /**
+   * El flujo libre por mes. La clave del eje es `x` y no `label` porque `tablaDeDatos` la lee de
+   * ahí: una sola forma para el gráfico, la tabla y la leyenda.
+   */
   const flujoLine = history.map((h) => ({
-    label: h.label,
+    x: h.label,
     Ingresos: h.realIncome,
     Gastos: h.realExpense,
     "Flujo libre": h.freeCashflow,
@@ -379,18 +397,44 @@ export function MiBaseSection({ view }: { view: V2View }) {
         </ChartCard>
       </section>
 
-      <ChartCard title="C · Flujo de caja libre mensual" hint="ingresos · gastos · flujo">
-        <PremiumLineChart
-          data={flujoLine}
-          xKey="label"
-          currency={currency}
-          series={[
-            { key: "Ingresos", label: "Ingresos", color: "var(--pos)" },
-            { key: "Gastos", label: "Gastos", color: "var(--c-expense)" },
-            { key: "Flujo libre", label: "Flujo libre", color: "var(--info)" },
-          ]}
-        />
-      </ChartCard>
+      {/* C · Flujo de caja libre — al marco del núcleo (26.2).
+       *
+       * `alto` 220 es el del `ChartSkeleton` de `charts/lazy.tsx`, y no es cosmético: este gráfico
+       * es `dynamic(..., { ssr: false })`, así que su esqueleto aparece al hidratar y se va cuando
+       * llega el chunk. Si el marco midiera otra cosa, la página daría un salto justo ahí.
+       *
+       * `estado` sale de los datos. NO se pasa `error`: `loadBaseView` pide el histórico dentro de
+       * un `Promise.all`, así que un fallo del servicio rechaza la vista entera y la recoge el
+       * límite de error de la página — no existe un estado en el que este gráfico se pinte con un
+       * histórico fallido. Pasar `error` sin señal que lo dispare sería una promesa vacía.
+       */}
+      <div className="card card-pad">
+        <ChartFrame
+          titulo="C · Flujo de caja libre mensual"
+          subtitulo="ingresos · gastos · flujo"
+          alto={220}
+          estado={flujoLine.length < 2 ? "vacio" : "datos"}
+          mensajeVacio="Hacen falta al menos dos meses cerrados para trazar el flujo."
+          descripcion={describirGrafico({
+            titulo: "Flujo de caja libre mensual",
+            serie: flujoLine.map((f) => ({ x: f.x, y: f["Flujo libre"] })),
+            formato: (v) => formatMoney(v, currency),
+          })}
+          tabla={tablaDeDatos(flujoLine, SERIES_FLUJO, (v) => formatMoney(v, currency), "Mes")}
+          leyenda={<LeyendaSeries series={SERIES_FLUJO} />}
+        >
+          <PremiumLineChart
+            data={flujoLine}
+            xKey="x"
+            currency={currency}
+            series={SERIES_FLUJO.map((se) => ({
+              key: se.clave,
+              label: se.etiqueta,
+              color: se.color,
+            }))}
+          />
+        </ChartFrame>
+      </div>
 
       <section className="cols-2">
         {/* Estas dos suman lo REAL (transacciones del periodo), no el presupuesto. El

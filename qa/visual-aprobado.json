@@ -1,0 +1,42 @@
+{
+  "pr": 918,
+  "corrida": 37096906537,
+  "capturas": [
+    {
+      "ruta": "/mi-base-financiera",
+      "tema": "dark",
+      "ancho": 1280,
+      "sha256_despues": "f9f23291692bcff31aec73e2da7065997ba56b39b9b0b6258493f1b95dfbdfc6"
+    },
+    {
+      "ruta": "/mi-base-financiera",
+      "tema": "light",
+      "ancho": 1280,
+      "sha256_despues": "103452e275311048fbe5797ec889134123b135f5783bf389d47d8bf99270a74f"
+    },
+    {
+      "ruta": "/mi-base-financiera",
+      "tema": "dark",
+      "ancho": 768,
+      "sha256_despues": "f11a49adb7b949fde1e396e0018289ab36dff5a5419fc7b154dd75d842124f79"
+    },
+    {
+      "ruta": "/mi-base-financiera",
+      "tema": "light",
+      "ancho": 768,
+      "sha256_despues": "d3657126a884cb597b00d42dd3a113234f60defa2fe27143f7001b27d60f2a6f"
+    },
+    {
+      "ruta": "/mi-base-financiera",
+      "tema": "dark",
+      "ancho": 390,
+      "sha256_despues": "97771cc1393c32a1d46c21a9329879742217108a539d2cba07c3185ed5dcc388"
+    },
+    {
+      "ruta": "/mi-base-financiera",
+      "tema": "light",
+      "ancho": 390,
+      "sha256_despues": "3bdffe200eaea6d2e8443e852ba53dcf779aef82b2ba654cd799f11a4d7f6e8d"
+    }
+  ]
+}

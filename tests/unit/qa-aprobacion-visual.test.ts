@@ -94,6 +94,43 @@ describe("aprobación visual", () => {
     expect(r.sinAprobar).toEqual([IMG]);
   });
 
+  it("una aprobación que el ARNÉS sacó del veredicto no caduca: no hizo falta", async () => {
+    // Las dos redes se pisaban. Medido en la corrida 37101192627, con las 6 aprobaciones de la 2.6
+    // recién escritas: la sonda de determinismo marcó `light/390/mi-base-financiera.png` como
+    // inestable, así que salió del veredicto, así que no se reprobó, así que su aprobación «caducó»
+    // y el PR quedó en rojo — castigando la aprobación por ser innecesaria. «Ya no se reprueba»
+    // tiene que significar que la captura dejó de diferir, no que otra guarda se la llevó.
+    const r = await cotejar({
+      reprobadas: [],
+      aprobacion: aprobacionDe(899, [entrada("/configuracion", "light", 1280, HASH)]),
+      hashes: new Map(),
+      pr: 899,
+      fueraDelVeredicto: [IMG],
+    });
+
+    expect(r.caducadas, "castigó una aprobación que el arnés hizo innecesaria").toEqual([]);
+    expect(
+      r.innecesarias,
+      "y lo dice, porque una aprobación que sobra conviene saberla",
+    ).toHaveLength(1);
+    expect(r.innecesarias[0].imagen).toBe(IMG);
+    expect(r.innecesarias[0].motivo).toContain("no hizo falta");
+  });
+
+  it("si NO la sacó el arnés, una aprobación que ya no corresponde a nada sigue haciendo fallar", async () => {
+    const r = await cotejar({
+      reprobadas: [],
+      aprobacion: aprobacionDe(899, [entrada("/configuracion", "light", 1280, HASH)]),
+      hashes: new Map(),
+      pr: 899,
+      fueraDelVeredicto: [],
+    });
+
+    expect(r.caducadas).toHaveLength(1);
+    expect(r.caducadas[0].motivo).toBe("ya no se reprueba");
+    expect(r.innecesarias).toEqual([]);
+  });
+
   it("una aprobación que ya no corresponde a nada hace fallar, no se ignora", async () => {
     // Si sobrara en silencio, el fichero se llenaría de aprobaciones viejas y la siguiente
     // persona no sabría cuáles siguen vivas.
