@@ -14,6 +14,7 @@
  * · `lista` — categorías de gasto, que son veinticinco y no tienen orden natural. Ahí sí
  *   manda el monto, y el resto se agrega en una fila con su nombre, su monto y su porcentaje.
  */
+import type { FilaTabla, TablaDatos } from "./accesible";
 import { repartoMayorResto } from "./reparto";
 
 export type DatoDona = { name: string; value: number; color: string };
@@ -108,4 +109,71 @@ export function filasLeyenda(
     ],
     ocultas,
   };
+}
+
+/**
+ * La tabla de una dona, construida desde LAS MISMAS FILAS que dibuja el anillo.
+ *
+ * Esto no es comodidad. Si la tabla se armara con `data` crudo y el anillo con `filas`, en modo
+ * `lista` la tabla tendría veinticinco categorías y el anillo seis más «Otras N»: dos respuestas
+ * distintas a la misma pregunta en la misma tarjeta. Lo que está agrupado en el dibujo tiene que
+ * estar agrupado en la tabla, y lo que se agrupó se dice en la NOTA de esa fila.
+ */
+export function tablaDona(
+  { filas, ocultas }: ResultadoLeyenda,
+  formato: (valor: number) => string,
+  etiqueta = "Bloque",
+): TablaDatos {
+  return {
+    encabezados: [etiqueta, "Monto", "% del total"],
+    filas: filas.map((f): FilaTabla => {
+      const celdas = [f.name, formato(f.value), `${f.pct} %`];
+      if (!f.resto || ocultas.length === 0) return { celdas };
+      return {
+        celdas,
+        // Quien abre la tabla lo hace para ver los números; dejar «Otras 19» sin desglose ahí
+        // sería mandarlo de vuelta al gráfico a pulsar «Ver todas».
+        nota: {
+          texto: `Incluye ${ocultas.map((o) => `${o.name} ${formato(o.value)}`).join(", ")}.`,
+        },
+      };
+    }),
+  };
+}
+
+/**
+ * El `aria-label` de una dona: título, total y de cuántas partes se compone.
+ *
+ *   «Presupuesto del mes por bloque, total ₡1.726.097, 9 bloques»
+ *
+ * No vale `describirGrafico`, que narra una serie en el tiempo («de ene a sep, último valor…»):
+ * una dona no tiene último valor, tiene un reparto. Y el total pasa a decirse ACÁ porque hoy vive
+ * en el centro del anillo, que es un `<div>` encima del SVG: un lector lo lee suelto, sin saber de
+ * qué gráfico es.
+ */
+export function describirDona({
+  titulo,
+  filas,
+  formato,
+  nombrePartes = "bloques",
+  sub,
+}: {
+  titulo: string;
+  filas: readonly FilaDona[];
+  formato: (valor: number) => string;
+  nombrePartes?: string;
+  /**
+   * Qué es el total, con su período: «ingreso real del mes», «presupuesto».
+   *
+   * Viene del centro del anillo, donde es un `<div>` encima del SVG que el lector lee suelto. Acá
+   * va pegado al número que califica, que es la única posición en la que significa algo — un
+   * «al mes» sin cifra al lado no dice nada.
+   */
+  sub?: string;
+}): string {
+  if (filas.length === 0) return `${titulo}, sin datos`;
+  const total = filas.reduce((s, f) => s + f.value, 0);
+  const n = filas.length;
+  const partes = n === 1 ? nombrePartes.replace(/s$/, "") : nombrePartes;
+  return `${titulo}, total ${formato(total)}${sub ? ` (${sub})` : ""}, ${n} ${partes}`;
 }

@@ -17,8 +17,13 @@
 
 /* ── Cabecera ─────────────────────────────────────────────────────────────── */
 
+/* `flex-wrap` es lo que deja que los controles BAJEN en vez de estrechar el título.
+   Flexbox decide el salto con los tamaños hipotéticos —el del título es su `max-content`— antes de
+   encoger nada, así que la fila se parte exactamente cuando el título completo y el grupo de
+   controles no caben juntos. Donde ya caben (todas las tarjetas a 768 y 1280) no cambia nada. */
 .cf-cab {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
@@ -62,6 +67,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  /* A la derecha también cuando baja sola a su fila: `space-between` con un solo elemento en la
+     línea lo dejaría a la izquierda, y los controles saltarían de lado al envolverse. */
+  margin-left: auto;
 }
 
 /* ── Lienzo ───────────────────────────────────────────────────────────────── */
