@@ -55,6 +55,15 @@
   background: var(--chip);
 }
 
+/* Los controles de la derecha: lo que pase el llamador por `acciones`, y el botón de la tabla.
+   `flex: none` sobre el grupo para que el título siga quedándose el espacio sobrante. */
+.cf-acciones {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* ── Lienzo ───────────────────────────────────────────────────────────────── */
 
 .cf-lienzo {
@@ -107,6 +116,70 @@
   width: 14px;
   height: 2px;
   border-radius: 1px;
+}
+
+/* ── Leyenda al lado del lienzo (`disposicionLeyenda="lateral"`) ───────────────
+   Mismo reparto que `DonutConLeyenda`, y a propósito: lo que se mide al pasar la dona al marco
+   es que no cambie nada. El corte es del CONTENEDOR —`container-type: inline-size` en `.cf`— y
+   no de la ventana, porque la misma tarjeta se estrecha en `cols-2` a 1280 y ocupa todo el
+   ancho en `/m`.
+
+   `container-type` solo se declara en la disposición lateral: crea un contexto de contención
+   (`contain: layout inline-size style`) y no hay razón para imponérselo a los marcos que no lo
+   consultan. Los tooltips absolutos siguen anclados a `.cf-lienzo`, que ya es `position:
+   relative`, así que la contención no los mueve. */
+.cf[data-leyenda="lateral"] {
+  container-type: inline-size;
+}
+.cf-lateral {
+  display: flex;
+  /* `flex-start` y no `center`: con veinte filas la leyenda mide 500 px y un anillo centrado
+     contra ella queda flotando a media altura, con un hueco arriba que parece un error de
+     maquetación. Arriba, el anillo y la primera fila empiezan juntos. */
+  align-items: flex-start;
+  gap: 18px;
+}
+/* El lienzo NO se estira: mide lo que mide el gráfico (una dona de `size` px). Si creciera, el
+   anillo quedaría centrado en media tarjeta y la leyenda apretada contra el borde. */
+.cf-lateral > .cf-lienzo {
+  flex: none;
+}
+.cf-leyenda-lado {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Contenedor estrecho: la leyenda baja y se lleva el ancho entero. El tramo intermedio —la
+   leyenda al lado, en una columna de 90 px— era el peor de los dos mundos. */
+@container (max-width: 419px) {
+  .cf-lateral {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cf-lateral > .cf-lienzo {
+    align-self: center;
+  }
+  .cf-leyenda-lado {
+    width: 100%;
+  }
+}
+
+/* Con la tabla abierta, la fila vuelve a columna: la tabla se monta DENTRO del lienzo, y un
+   lienzo de 240 px la dejaría ilegible. El alto fijo del lienzo no se toca. */
+.cf-lateral[data-tabla="abierta"] {
+  flex-direction: column;
+  align-items: stretch;
+}
+.cf-lateral[data-tabla="abierta"] > .cf-lienzo {
+  flex: 1 1 auto;
+  align-self: stretch;
+}
+
+/* ── Nota al pie ──────────────────────────────────────────────────────────── */
+
+.cf-pie {
+  font-size: 12px;
+  color: var(--muted);
 }
 .cf-swatch[data-guion] {
   mask-image: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 7px);
