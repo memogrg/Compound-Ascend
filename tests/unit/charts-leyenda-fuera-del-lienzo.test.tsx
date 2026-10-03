@@ -27,12 +27,28 @@ const DATOS = [
 ];
 const EN_CURSO = { dia: 18, diasDelMes: 30 };
 
-/** El trozo de HTML que hay entre la apertura de `.cf-lienzo` y su cierre. */
+/**
+ * El trozo de HTML que hay entre la apertura de `.cf-lienzo` y su cierre, contando `<div>`.
+ *
+ * Antes devolvía «todo lo que sigue», con el argumento de que el lienzo era el último bloque del
+ * marco. Dejó de ser verdad: el marco tiene ahora un slot `pie` DESPUÉS del lienzo, así que ese
+ * atajo contaría como «dentro» justo lo que esta guarda existe para vigilar que esté fuera.
+ */
 function dentroDelLienzo(html: string): string {
   const i = html.indexOf('class="cf-lienzo"');
   if (i < 0) return "";
-  // El lienzo es el último bloque del marco, así que basta con todo lo que sigue.
-  return html.slice(i);
+  const abre = html.lastIndexOf("<div", i);
+  let prof = 0;
+  for (let k = abre; k < html.length; k++) {
+    if (html.startsWith("<div", k)) prof++;
+    else if (html.startsWith("</div>", k)) {
+      prof--;
+      if (prof === 0) return html.slice(abre, k + 6);
+    }
+  }
+  // Sin cierre equilibrado no se puede afirmar nada: devolver el resto haría pasar la guarda por
+  // la razón equivocada.
+  return html.slice(abre);
 }
 
 describe("la leyenda vive fuera del lienzo", () => {
@@ -70,5 +86,80 @@ describe("la leyenda vive fuera del lienzo", () => {
     );
     expect(solo).not.toContain("cf-leyenda");
     expect(solo).not.toContain("cf-en-curso");
+  });
+});
+
+/**
+ * Los dos slots nuevos del marco (26.1) viven también fuera del lienzo.
+ *
+ * `acciones` va en la cabecera y `pie` debajo de la tabla, y los dos por la misma razón que la
+ * leyenda: el lienzo tiene altura fija, y lo que se pinte dentro por encima de su alto se sale de
+ * la tarjeta (decisión 48). `pie` es el que importa vigilar, porque es el primer hijo del marco que
+ * va DESPUÉS del lienzo — y es lo que invalidó el atajo del delimitador de arriba.
+ */
+describe("`acciones` y `pie` tampoco entran en el lienzo", () => {
+  const html = renderToStaticMarkup(
+    <ChartFrame
+      titulo="Composición"
+      descripcion="Reparto por bloque."
+      estado="datos"
+      tabla={tablaHistoricoGasto(DATOS, "CRC", EN_CURSO)}
+      leyenda={<LeyendaHistoricoGasto datos={DATOS} enCurso={EN_CURSO} />}
+      acciones={<a href="/mi-base-financiera">marca-de-acciones</a>}
+      pie={<span>marca-del-pie</span>}
+      disposicionLeyenda="lateral"
+    >
+      <HistoricoGasto datos={DATOS} moneda="CRC" enCurso={EN_CURSO} />
+    </ChartFrame>,
+  );
+
+  it("los dos se renderizan", () => {
+    expect(html, "sin esto, lo de abajo pasaría por la razón equivocada").toContain(
+      "marca-de-acciones",
+    );
+    expect(html).toContain("marca-del-pie");
+    expect(html).toContain("cf-acciones");
+    expect(html).toContain("cf-pie");
+  });
+
+  it("ninguno cae dentro de `.cf-lienzo`", () => {
+    const lienzo = dentroDelLienzo(html);
+    expect(lienzo, "el marco tiene lienzo").not.toBe("");
+    expect(lienzo, "el lienzo quedó sin cerrar: el delimitador no delimita").toContain("</div>");
+    expect(lienzo, "`acciones` está dentro del lienzo").not.toContain("marca-de-acciones");
+    expect(lienzo, "`pie` está dentro del lienzo").not.toContain("marca-del-pie");
+    expect(lienzo, "la leyenda está dentro del lienzo").not.toContain("cf-leyenda");
+  });
+
+  it("en disposición lateral el lienzo y la leyenda son hermanos de una fila", () => {
+    // Lo que hace que el reparto lateral no toque el alto del lienzo: la leyenda está AL LADO, no
+    // dentro. Si alguien la metiera dentro para «que quede alineada», el alto fijo dejaría de valer.
+    expect(html).toContain('data-leyenda="lateral"');
+    expect(html).toContain('class="cf-lateral"');
+    expect(html).toContain('class="cf-leyenda-lado"');
+    const fila = html.slice(html.indexOf('class="cf-lateral"'));
+    expect(
+      fila.indexOf("cf-lienzo"),
+      "el lienzo tiene que venir antes que la leyenda en la fila",
+    ).toBeLessThan(fila.indexOf("cf-leyenda-lado"));
+  });
+
+  it("sin los slots, el marco no pinta sus envoltorios", () => {
+    const pelado = renderToStaticMarkup(
+      <ChartFrame
+        titulo="Composición"
+        descripcion="Reparto por bloque."
+        estado="datos"
+        tabla={tablaHistoricoGasto(DATOS, "CRC", EN_CURSO)}
+      >
+        <HistoricoGasto datos={DATOS} moneda="CRC" enCurso={EN_CURSO} />
+      </ChartFrame>,
+    );
+    expect(pelado, "un marco sin nota al pie no debería traer la caja vacía").not.toContain(
+      "cf-pie",
+    );
+    expect(pelado, "sin `disposicionLeyenda` no se declara contenedor").not.toContain(
+      'data-leyenda="lateral"',
+    );
   });
 });

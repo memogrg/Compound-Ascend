@@ -66,6 +66,23 @@ describe("aprobación visual", () => {
     expect(r.caducadas).toEqual([{ imagen: IMG, motivo: "el hash no coincide" }]);
   });
 
+  it("un fichero escrito para OTRO PR no hace fallar: no hay nada que reconciliar", async () => {
+    // El mecanismo se contradecía: decía «no se aplica ninguna aprobación» y acto seguido hacía
+    // fallar por esas mismas aprobaciones. Medido en la corrida 37093588495, de un PR que no movió
+    // ni una captura de producción: «no se aplica» + «aprobaciones CADUCADAS (12) — hacen fallar».
+    // Como `Diff visual` es obligatorio, el fichero de la 2.7 ponía en rojo a todo PR posterior.
+    const r = await cotejar({
+      reprobadas: [],
+      aprobacion: aprobacionDe(901, [entrada("/configuracion", "light", 1280, HASH)]),
+      hashes: new Map(),
+      pr: 917,
+    });
+
+    expect(r.prOk, "el PR no coincide").toBe(false);
+    expect(r.caducadas, "un fichero de otro PR no puede caducar contra este").toEqual([]);
+    expect(r.aprobadas).toEqual([]);
+  });
+
   it("una aprobación de OTRO PR no vale", async () => {
     const r = await cotejar({
       reprobadas: [IMG],
