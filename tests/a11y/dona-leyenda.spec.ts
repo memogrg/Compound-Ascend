@@ -13,6 +13,19 @@ import { congelarReloj } from "./reloj";
 /** Las rutas con tarjeta de dona. `/patrimonio` lleva tres: portafolio y las dos de asignación. */
 const RUTAS = ["/dashboard", "/gastos", "/mi-rich-life", "/patrimonio"] as const;
 
+/**
+ * El bloque de UNA dona: anillo más leyenda. Hay dos envoltorios según el camino.
+ *
+ * `.dl` es el de la tarjeta vieja (`DonutConLeyenda`), que todavía usan `/gastos`, `/ingresos`,
+ * `/mi-rich-life` y `/patrimonio`. `.cf-lateral` es el del marco del núcleo, que estrena
+ * `/dashboard` en 26.3 — ahí el reparto anillo/leyenda lo hace el marco y `.dl` ya no existe.
+ *
+ * Buscar solo `.dl` no fallaba igual en todos los casos, y la mitad silenciosa era la peor: donde
+ * se afirmaba sobre el conteo, el spec caía con «no hay donas en esta ruta»; donde se recorría en
+ * un bucle, el bucle daba cero vueltas y el test pasaba sin comprobar nada.
+ */
+const CAJA_DONA = ".dl, .cf-lateral";
+
 async function abrir(browser: Browser, ruta: string, ancho: number) {
   const ctx = await browser.newContext({
     storageState: ESTADO_SESION,
@@ -26,7 +39,7 @@ async function abrir(browser: Browser, ruta: string, ancho: number) {
   await page.goto(ruta, { waitUntil: "domcontentloaded", timeout: 60_000 });
   // Se espera el ELEMENTO, no un hueco en la red: la dona es `dynamic({ssr:false})` y hasta
   // que carga hay un esqueleto sin nada. (Cuando entre el ayudante compartido de
-  // `tests/a11y/navegar.ts` —rama de CI— esto pasa a ser `irA(page, ruta, ".dl")`.)
+  // `tests/a11y/navegar.ts` —rama de CI— esto pasa a ser `irA(page, ruta, CAJA_DONA)`.)
   //
   // Vale una fila O el estado vacío: la cuenta de demo tiene ₡0 invertido, así que las dos
   // donas de `/patrimonio` salen legítimamente vacías. Esperar solo `.dl-fila` ahí agotaba
@@ -66,7 +79,7 @@ for (const ruta of RUTAS) {
 
   test(`${ruta}: los porcentajes de cada dona suman exactamente 100`, async ({ browser }) => {
     const { ctx, page } = await abrir(browser, ruta, 1280);
-    const donas = page.locator(".dl");
+    const donas = page.locator(CAJA_DONA);
     const cuantas = await donas.count();
     expect(cuantas, "no hay donas en esta ruta").toBeGreaterThan(0);
     let medidas = 0;
@@ -89,7 +102,7 @@ for (const ruta of RUTAS) {
 
 test("a 390 la leyenda va DEBAJO de la dona, no a su lado", async ({ browser }) => {
   const { ctx, page } = await abrir(browser, "/gastos", 390);
-  const anillo = page.locator('.dl-caja [role="img"]').first();
+  const anillo = page.locator(`${CAJA_DONA}`).first().locator('[role="img"]').first();
   const lista = page.locator(".dl-lista").first();
   const a = await anillo.boundingBox();
   const l = await lista.boundingBox();
@@ -106,7 +119,7 @@ test("a 1280 en una tarjeta ancha la leyenda va AL LADO", async ({ browser }) =>
   // El complemento del anterior: el corte es del contenedor, así que tiene que cortar de
   // verdad en los dos sentidos. Sin esto, «siempre debajo» pasaría el test de arriba.
   const { ctx, page } = await abrir(browser, "/mi-rich-life", 1280);
-  const anillo = page.locator('.dl-caja [role="img"]').first();
+  const anillo = page.locator(`${CAJA_DONA}`).first().locator('[role="img"]').first();
   const lista = page.locator(".dl-lista").first();
   const a = (await anillo.boundingBox())!;
   const l = (await lista.boundingBox())!;
@@ -151,7 +164,7 @@ test("los bloques de la taxonomía se muestran TODOS, sin plegar", async ({ brow
   // responder, y que un bloque desaparezca porque este mes gastó poco hace imposible
   // comparar dos meses.
   const { ctx, page } = await abrir(browser, "/dashboard", 1280);
-  const dona = page.locator(".dl").first();
+  const dona = page.locator(CAJA_DONA).first();
   await expect(dona.locator(".dl-fila-resto"), "el panel no debe agrupar nada").toHaveCount(0);
   await expect(dona.locator(".dl-vertodas"), "ni ofrecer desplegable").toHaveCount(0);
 
@@ -178,7 +191,7 @@ test("la lista de categorías se ordena por monto y agrupa el resto", async ({ b
   const { ctx, page } = await abrir(browser, "/gastos?range=3m", 1280);
   const titulo = page.getByText("Composición por categoría").first();
   const tarjeta = titulo.locator("xpath=ancestor::*[contains(@class,'card')][1]");
-  const dona = tarjeta.locator(".dl");
+  const dona = tarjeta.locator(CAJA_DONA);
 
   const filas = dona.locator(".dl-fila");
   expect(await filas.count(), "seis mayores más la del resto").toBe(7);
@@ -201,7 +214,7 @@ test("«Ver todas» despliega la leyenda y NO toca el anillo", async ({ browser 
   const { ctx, page } = await abrir(browser, "/gastos?range=3m", 1280);
   const titulo = page.getByText("Composición por categoría").first();
   const tarjeta = titulo.locator("xpath=ancestor::*[contains(@class,'card')][1]");
-  const dona = tarjeta.locator(".dl");
+  const dona = tarjeta.locator(CAJA_DONA);
 
   const porciones = dona.locator(".recharts-pie-sector path, .recharts-sector");
   const antesPorciones = await porciones.count();
@@ -226,7 +239,7 @@ test("«Ver todas» despliega la leyenda y NO toca el anillo", async ({ browser 
 test("ninguna porción visible del anillo repite color", async ({ browser }) => {
   for (const ruta of ["/gastos?range=3m", "/dashboard"]) {
     const { ctx, page } = await abrir(browser, ruta, 1280);
-    const donas = page.locator(".dl");
+    const donas = page.locator(CAJA_DONA);
     for (let i = 0; i < (await donas.count()); i++) {
       const fills = await donas
         .nth(i)

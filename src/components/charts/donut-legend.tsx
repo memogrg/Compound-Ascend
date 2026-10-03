@@ -28,33 +28,11 @@
  * despliega el detalle en la LEYENDA; el anillo no cambia, porque veinte porciones no se
  * pueden leer por muchas veces que se dibujen.
  */
-import { useState } from "react";
-
-import { formatMoney } from "@/lib/format";
-
 import { DonutChart, type DonutDatum } from "./donut-chart";
-import { filasLeyenda, type FilaDona, type ModoLeyenda } from "./core/leyenda-dona";
+import { LeyendaDona } from "./core/leyenda-dona-lista";
+import { filasLeyenda, type ModoLeyenda } from "./core/leyenda-dona";
 
 export type { DonutDatum };
-
-function Fila({ f, moneda, oculta }: { f: FilaDona; moneda: string; oculta?: boolean }) {
-  const clase = oculta ? "dl-fila dl-fila-oculta" : f.resto ? "dl-fila dl-fila-resto" : "dl-fila";
-  return (
-    <li className={clase}>
-      <span
-        className="dl-punto"
-        // Ni la fila del sobrante ni las que hay dentro llevan color: el sobrante es UNA
-        // porción gris del anillo, y sus componentes no están dibujadas por separado. Un punto
-        // de color apuntaría a un sector que no existe.
-        style={f.resto || oculta ? undefined : { background: f.color }}
-        aria-hidden="true"
-      />
-      <span className="dl-nombre">{f.name}</span>
-      <span className="dl-pct tnum">{f.pct} %</span>
-      <span className="dl-monto tnum">{formatMoney(f.value, moneda)}</span>
-    </li>
-  );
-}
 
 export function DonutConLeyenda({
   data,
@@ -78,7 +56,6 @@ export function DonutConLeyenda({
   /** Qué decir cuando no hay nada que repartir. */
   vacio: string;
 }) {
-  const [verTodas, setVerTodas] = useState(false);
   const { filas, ocultas } = filasLeyenda(data, { modo });
 
   return (
@@ -95,26 +72,7 @@ export function DonutConLeyenda({
         {filas.length === 0 ? (
           <span className="dl-vacio muted">{vacio}</span>
         ) : (
-          <div className="dl-lado">
-            <ul className="dl-lista">
-              {filas.map((f) => (
-                <Fila key={f.name} f={f} moneda={currency} />
-              ))}
-              {verTodas
-                ? ocultas.map((f) => <Fila key={f.name} f={f} moneda={currency} oculta />)
-                : null}
-            </ul>
-            {ocultas.length > 0 ? (
-              <button
-                type="button"
-                className="dl-vertodas"
-                aria-expanded={verTodas}
-                onClick={() => setVerTodas((v) => !v)}
-              >
-                {verTodas ? "Ver menos" : `Ver todas (${ocultas.length} más)`}
-              </button>
-            ) : null}
-          </div>
+          <LeyendaDona filas={filas} ocultas={ocultas} moneda={currency} />
         )}
       </div>
     </div>
