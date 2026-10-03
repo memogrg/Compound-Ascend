@@ -9,7 +9,7 @@ export { ChartFrame, type EstadoGrafico } from "./chart-frame";
 export { ChartTooltip, type PayloadTooltip } from "./chart-tooltip";
 export { GradientDefs, useGradientIds } from "./gradient-defs";
 export { GlowFilter, useGlowId } from "./glow-filter";
-export { Legend } from "./legend";
+export { Legend, LeyendaSeries } from "./legend";
 export {
   ESTADO_INICIAL,
   esVisible,
