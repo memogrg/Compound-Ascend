@@ -44,7 +44,15 @@ async function abrir(browser: Browser, ruta: string, ancho: number) {
   // Vale una fila O el estado vacío: la cuenta de demo tiene ₡0 invertido, así que las dos
   // donas de `/patrimonio` salen legítimamente vacías. Esperar solo `.dl-fila` ahí agotaba
   // el minuto y el fallo parecía de la dona.
-  await page.locator(".dl-fila, .dl-vacio").first().waitFor({ state: "visible", timeout: 60_000 });
+  // Tres formas de «ya cargó»: una fila de leyenda, el vacío de la tarjeta vieja, o el vacío del
+  // marco. Lo tercero hace falta desde que la dona vive en el marco: ahí el estado vacío lo pinta
+  // `ChartEmpty`, que no tiene clase propia —solo `.muted`—, y el `data-estado` de la figura es el
+  // único hook estable. Sin él, una ruta migrada con donas legítimamente vacías (`/patrimonio` en la
+  // cuenta de demo) colgaría los 60 s y el fallo se leería como un selector roto.
+  await page
+    .locator('.dl-fila, .dl-vacio, figure.cf[data-estado="vacio"]')
+    .first()
+    .waitFor({ state: "visible", timeout: 60_000 });
   return { ctx, page };
 }
 
