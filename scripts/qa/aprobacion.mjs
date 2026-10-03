@@ -120,6 +120,22 @@ export async function cotejar({ reprobadas, aprobacion, hashes, pr, compararConA
     rechazadas.set(img, motivoDeRechazo(r, aprobacion));
   }
 
+  /**
+   * Un fichero escrito para OTRO PR no caduca contra este: no hay nada que reconciliar.
+   *
+   * Sin esta salida, el mecanismo se contradecía en el mismo log. Medido en la corrida
+   * 37093588495, de un PR que no movió ni una captura de producción:
+   *
+   *     ⚠ qa/visual-aprobado.json está escrito para el PR 901 y este es el 917:
+   *       no se aplica ninguna aprobación.
+   *     aprobaciones CADUCADAS (12) — hacen fallar:
+   *
+   * O sea: «no se aplica» y acto seguido hacía fallar por doce aprobaciones que acababa de decir
+   * que no aplicaban. Y como `Diff visual` es obligatorio, el fichero de aprobación de la 2.7
+   * —mergeado con ella— ponía en rojo a TODO PR posterior.
+   */
+  if (!prOk) return { aprobadas, sinAprobar, caducadas: [], porTolerancia, prOk };
+
   const reprobadasSet = new Set(reprobadas);
   for (const [img] of porImagen) {
     if (!reprobadasSet.has(img)) caducadas.push({ imagen: img, motivo: "ya no se reprueba" });
