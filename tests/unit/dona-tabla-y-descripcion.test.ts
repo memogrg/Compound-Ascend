@@ -7,6 +7,10 @@
  * misma tarjeta. Y lo que se agrupó tiene que poder abrirse desde la tabla, o quien la abre para
  * ver los números acaba devuelto al gráfico a pulsar «Ver todas».
  */
+import { readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, it, expect } from "vitest";
 
 import { describirDona, filaNormalizada, filasLeyenda, tablaDona } from "@/components/charts/core";
@@ -88,5 +92,36 @@ describe("describirDona", () => {
     expect(describirDona({ titulo: "Reparto", filas: [], formato: dinero })).toBe(
       "Reparto, sin datos",
     );
+  });
+});
+
+/**
+ * Ningún spec localiza una dona por el envoltorio de UN camino.
+ *
+ * La dona tiene dos envoltorios mientras la migración esté a medias: `.dl` en la tarjeta vieja y
+ * `.cf-lateral` en el marco. Al pasar `/dashboard` al marco, los specs que buscaban `.dl` a secas
+ * se partieron en dos — y la mitad silenciosa fue la peor: donde se afirmaba sobre el conteo el
+ * spec cayó diciendo «no hay donas en esta ruta», pero donde se recorría en un bucle el bucle dio
+ * cero vueltas y el test pasó **sin comprobar nada**. Un test que pasa por no encontrar su sujeto
+ * es peor que uno rojo.
+ *
+ * Esta guarda es estructural a propósito: el fallo que previene solo aparece con el servidor
+ * levantado y una ruta ya migrada, que es tarde.
+ */
+describe("los specs no buscan la dona por un solo envoltorio", () => {
+  const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../a11y");
+
+  it("ninguno usa `.dl` a secas como localizador", () => {
+    const culpables: string[] = [];
+    for (const f of readdirSync(RAIZ).filter((n) => n.endsWith(".spec.ts"))) {
+      const texto = readFileSync(path.join(RAIZ, f), "utf8");
+      // `locator(".dl")` o `locator('.dl')`, con o sin espacios. Las clases hijas —`.dl-fila`,
+      // `.dl-pct`, `.dl-lado`— sobreviven en los dos caminos y no son el problema.
+      if (/locator\(\s*["'`]\.dl["'`]\s*\)/.test(texto)) culpables.push(f);
+    }
+    expect(
+      culpables,
+      "localizan la dona por el envoltorio viejo: usá un selector que cubra los dos caminos",
+    ).toEqual([]);
   });
 });
