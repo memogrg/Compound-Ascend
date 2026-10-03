@@ -82,9 +82,23 @@ export function imagenDeEntrada(e) {
  * `{ estado: "dentro" | "fuera" | "sin-artefacto" | "sin-imagen", detalle? }`. Si no se pasa, el
  * comportamiento es el de antes: hash que no casa, aprobación caducada.
  */
-export async function cotejar({ reprobadas, aprobacion, hashes, pr, compararConAprobada }) {
+export async function cotejar({
+  reprobadas,
+  aprobacion,
+  hashes,
+  pr,
+  compararConAprobada,
+  fueraDelVeredicto = [],
+}) {
   if (!aprobacion)
-    return { aprobadas: [], sinAprobar: reprobadas, caducadas: [], porTolerancia: [], prOk: true };
+    return {
+      aprobadas: [],
+      sinAprobar: reprobadas,
+      caducadas: [],
+      porTolerancia: [],
+      innecesarias: [],
+      prOk: true,
+    };
   const prOk = Number(aprobacion.pr) === Number(pr);
   const porImagen = new Map((aprobacion.capturas ?? []).map((e) => [imagenDeEntrada(e), e]));
 
@@ -134,14 +148,44 @@ export async function cotejar({ reprobadas, aprobacion, hashes, pr, compararConA
    * que no aplicaban. Y como `Diff visual` es obligatorio, el fichero de aprobación de la 2.7
    * —mergeado con ella— ponía en rojo a TODO PR posterior.
    */
-  if (!prOk) return { aprobadas, sinAprobar, caducadas: [], porTolerancia, prOk };
+  if (!prOk) return { aprobadas, sinAprobar, caducadas: [], porTolerancia, innecesarias: [], prOk };
 
+  /**
+   * Una aprobación que el ARNÉS sacó del veredicto no está caducada: no hizo falta esta vez.
+   *
+   * Las dos redes se pisaban. La sonda de determinismo saca del veredicto las capturas que se
+   * mueven solas entre dos pasadas de la misma compilación; cuando a una de ellas le toca además
+   * tener aprobación, el cotejo la declaraba «ya no se reprueba» y hacía fallar el job — castigando
+   * la aprobación por ser innecesaria.
+   *
+   * Medido en la corrida 37101192627, con las 6 aprobaciones de la 2.6 recién escritas: la sonda
+   * marcó `light/390/mi-base-financiera.png` como inestable, así que salió del veredicto, así que
+   * no se reprobó, así que su aprobación «caducó» y el PR quedó en rojo. Cinco aprobadas y una
+   * caducada, sin que nada hubiera cambiado en la pantalla.
+   *
+   * «Ya no se reprueba» tiene que significar que la captura dejó de diferir, no que otra guarda se
+   * la llevó. Se dice en el log —una aprobación que sobra conviene saberla— pero no hace fallar.
+   */
+  const fuera = new Set(fueraDelVeredicto);
+  const innecesarias = [];
   const reprobadasSet = new Set(reprobadas);
   for (const [img] of porImagen) {
-    if (!reprobadasSet.has(img)) caducadas.push({ imagen: img, motivo: "ya no se reprueba" });
-    else if (rechazadas.has(img)) caducadas.push({ imagen: img, motivo: rechazadas.get(img) });
+    if (rechazadas.has(img)) {
+      caducadas.push({ imagen: img, motivo: rechazadas.get(img) });
+      continue;
+    }
+    if (reprobadasSet.has(img)) continue;
+    if (fuera.has(img)) {
+      innecesarias.push({
+        imagen: img,
+        motivo:
+          "el arnés la sacó del veredicto (inestable o excluida): la aprobación no hizo falta",
+      });
+      continue;
+    }
+    caducadas.push({ imagen: img, motivo: "ya no se reprueba" });
   }
-  return { aprobadas, sinAprobar, caducadas, porTolerancia, prOk };
+  return { aprobadas, sinAprobar, caducadas, porTolerancia, innecesarias, prOk };
 }
 
 /**

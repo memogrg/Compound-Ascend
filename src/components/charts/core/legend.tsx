@@ -70,3 +70,38 @@ export function Legend({
     </ul>
   );
 }
+
+/**
+ * Leyenda NO interactiva: la misma lectura que `Legend`, sin el interruptor.
+ *
+ * Existe porque sacar una leyenda del lienzo no es lo mismo que volverla interactiva. El gráfico
+ * de línea pintaba su leyenda con el `<Legend>` de Recharts, que no alterna nada: se lleva 22 px
+ * del alto del trazado y no se puede seleccionar ni leer con el teclado. Reemplazarla por `Legend`
+ * añadiría de paso la posibilidad de apagar series —un cambio de comportamiento que nadie pidió—,
+ * así que esto reproduce lo que había, fuera del lienzo.
+ *
+ * Con una sola serie no se pinta: una leyenda de un elemento no distingue nada.
+ */
+export function LeyendaSeries({ series }: { series: readonly SerieDef[] }) {
+  if (series.length < 2) return null;
+
+  return (
+    <ul className="cf-leyenda">
+      {series.map((s) => (
+        <li key={s.clave}>
+          {/* `<span>` y no `<button>`: no hay nada que pulsar. Un botón que no hace nada es
+              peor que ningún botón — se llega con Tab y no pasa nada. */}
+          <span className="cf-leyenda-btn">
+            <span
+              className={`cf-swatch cf-swatch-${s.marca === "linea" ? "linea" : "bloque"}`}
+              style={{ background: s.color }}
+              data-guion={s.guion ? "" : undefined}
+              aria-hidden="true"
+            />
+            {s.etiqueta}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
