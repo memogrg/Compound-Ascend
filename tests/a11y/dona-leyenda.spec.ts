@@ -93,10 +93,24 @@ for (const ruta of RUTAS) {
     let medidas = 0;
     for (let i = 0; i < cuantas; i++) {
       const pcts = await donas.nth(i).locator(".dl-pct").allTextContents();
-      // Tarjeta vacía: no hay nada que repartir. Se comprueba que sea EL estado vacío y no
-      // una leyenda que se quedó sin pintar.
+      // Tarjeta vacía: no hay nada que repartir. Se comprueba que sea EL estado vacío declarado y
+      // no una leyenda que se quedó sin pintar — la diferencia entre «no hay datos» y «el
+      // componente se rompió» es justo lo que este caso vigila.
+      //
+      // Dos formas de declararlo, según el camino: `.dl-vacio` en la tarjeta vieja, y el
+      // `data-estado` de la figura en el marco, donde el vacío lo pinta `ChartEmpty` y no tiene
+      // clase propia.
       if (pcts.length === 0) {
-        await expect(donas.nth(i).locator(".dl-vacio")).toHaveCount(1);
+        const vacioViejo = await donas.nth(i).locator(".dl-vacio").count();
+        const estadoMarco = await donas
+          .nth(i)
+          .locator("xpath=ancestor::figure[contains(@class,'cf')][1]")
+          .getAttribute("data-estado")
+          .catch(() => null);
+        expect(
+          vacioViejo === 1 || estadoMarco === "vacio",
+          `dona ${i} de ${ruta} sin porcentajes y sin estado vacío declarado (marco: ${estadoMarco})`,
+        ).toBe(true);
         continue;
       }
       const suma = pcts.map(aNumero).reduce((a, b) => a + b, 0);
