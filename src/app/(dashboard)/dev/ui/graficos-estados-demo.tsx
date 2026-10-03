@@ -12,23 +12,28 @@ import {
 } from "recharts";
 
 import { Sparkline } from "@/components/kpi";
-import { DonutConLeyenda } from "@/components/charts/lazy";
+import { DonutChart, DonutConLeyenda, type DonutDatum } from "@/components/charts/lazy";
 import {
   BARRA,
   CalendarioGasto,
   ChartFrame,
   EJE,
   HistoricoGasto,
+  LeyendaDona,
   LeyendaHistoricoGasto,
   TRAZO,
-  describirGrafico,
-  tablaDeDatos,
-  useAncho,
   anchoDeBarra,
+  describirDona,
+  describirGrafico,
+  filasLeyenda,
+  tablaDeDatos,
+  tablaDona,
+  useAncho,
   type EstadoGrafico,
+  type ModoLeyenda,
   type SerieDef,
 } from "@/components/charts/core";
-import { formatMoney } from "@/lib/format";
+import { formatCompact, formatMoney } from "@/lib/format";
 
 import { LienzoCatalogo } from "./controles-catalogo";
 
@@ -203,6 +208,63 @@ function Linea({
  * La leyenda es una lista cualquiera: el slot pinta lo que le den, y lo que se demuestra acá es el
  * REPARTO, no una leyenda concreta. La dona trae la suya en 26.3.
  */
+/** El tamaño del anillo, el mismo que usa `DonutChart` por defecto y el que pasa el panel. */
+const ANILLO_DEMO = 132;
+
+/** Un reparto largo, para que `lista` tenga qué plegar en «Otras N». */
+const DONA_LARGA = Array.from({ length: 11 }, (_, i) => ({
+  name: `Categoría ${i + 1}`,
+  value: (11 - i) * 90_000,
+  color: `var(--chart-${(i % 6) + 1})`,
+}));
+
+/**
+ * La dona dentro del marco: el camino que 26.3 estrena en `/dashboard`.
+ *
+ * Está acá con sus estados para que el catálogo no se quede diciendo solo lo que hacía el camino
+ * viejo. Mientras los dos existan, los dos se muestran.
+ */
+function DonaEnMarco({
+  modo,
+  datos = DONA,
+  estado,
+}: {
+  modo: ModoLeyenda;
+  datos?: readonly DonutDatum[];
+  estado?: EstadoGrafico;
+}) {
+  const titulo = modo === "lista" ? "Composición por categoría" : "Presupuesto del mes por bloque";
+  const leyenda = filasLeyenda(datos, { modo });
+  const dinero = (v: number) => formatMoney(v, MONEDA);
+  const total = leyenda.filas.reduce((s, f) => s + f.value, 0);
+
+  return (
+    <ChartFrame
+      titulo={titulo}
+      alto={ANILLO_DEMO}
+      estado={estado ?? (leyenda.filas.length === 0 ? "vacio" : "datos")}
+      mensajeVacio="Agregá tu presupuesto y acá vas a ver el reparto."
+      mensajeError="No se pudo cargar el reparto."
+      descripcion={describirDona({ titulo, filas: leyenda.filas, formato: dinero })}
+      tabla={tablaDona(leyenda, dinero, modo === "lista" ? "Categoría" : "Bloque")}
+      disposicionLeyenda="lateral"
+      leyenda={<LeyendaDona filas={leyenda.filas} ocultas={leyenda.ocultas} moneda={MONEDA} />}
+      acciones={
+        <a className="ghost-link" href="/mi-base-financiera">
+          Detalle
+        </a>
+      }
+    >
+      <DonutChart
+        data={leyenda.filas.map((f) => ({ name: f.name, value: f.value, color: f.color }))}
+        size={ANILLO_DEMO}
+        centerLabel={formatCompact(total, MONEDA)}
+        centerSub="presupuesto"
+      />
+    </ChartFrame>
+  );
+}
+
 function MarcoConSlots({ lateral, sinLeyenda }: { lateral?: boolean; sinLeyenda?: boolean }) {
   return (
     <ChartFrame
@@ -653,6 +715,33 @@ export function GraficosEstadosDemo() {
         </Estado>
         <Estado nombre="sin leyenda, solo acciones y pie">
           <MarcoConSlots sinLeyenda />
+        </Estado>
+      </Entrada>
+      {/* ── La dona en el marco del núcleo (26.3) ─────────────────────────────────────── */}
+      <Entrada
+        id="gr-dona-marco"
+        titulo="Dona · en el marco del núcleo"
+        nota="El camino nuevo: el marco pone título, estados y TABLA, y la leyenda va por su slot en disposición lateral. La tarjeta de arriba («Dona») es el camino viejo, que todavía usan cinco pantallas."
+        spec="La tabla se construye con `tablaDona` desde LAS MISMAS filas que dibuja el anillo, así que en modo `lista` tiene seis filas más «Otras N» y no veinticinco: lo agrupado en el dibujo está agrupado en la tabla, y lo que se agrupó va en la NOTA de esa fila. El nombre de la figura lo da `describirDona` —título, total y número de partes—, porque el total vivía solo en el centro del anillo, que es un `<div>` encima del SVG. `alto` es el del ANILLO y no el del esqueleto: igualarlos metería aire muerto debajo."
+      >
+        <Estado nombre="taxonomía · contenedor ancho">
+          <div style={{ width: 520, maxWidth: "100%" }}>
+            <DonaEnMarco modo="taxonomia" />
+          </div>
+        </Estado>
+        <Estado nombre="taxonomía · contenedor 360 px">
+          <div style={{ width: 360, maxWidth: "100%" }}>
+            <DonaEnMarco modo="taxonomia" />
+          </div>
+        </Estado>
+        <Estado nombre="lista · con «Otras N»">
+          <DonaEnMarco modo="lista" datos={DONA_LARGA} />
+        </Estado>
+        <Estado nombre="vacío">
+          <DonaEnMarco modo="taxonomia" datos={[]} />
+        </Estado>
+        <Estado nombre="error">
+          <DonaEnMarco modo="taxonomia" datos={[]} estado="error" />
         </Estado>
       </Entrada>
     </LienzoCatalogo>
