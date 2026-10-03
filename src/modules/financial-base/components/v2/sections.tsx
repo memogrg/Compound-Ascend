@@ -10,14 +10,18 @@ import {
   FinancialInsightCard,
   type FinancialReading,
 } from "@/components/shared/financial-insight-card";
-import { DonutConLeyenda, type DonutDatum } from "@/components/charts/lazy";
+import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
 import { PremiumLineChart, PerformanceChart } from "@/components/charts/lazy";
 import {
   ChartFrame,
   HistoricoGasto,
+  LeyendaDona,
   LeyendaHistoricoGasto,
+  describirDona,
   describirGrafico,
+  filasLeyenda,
   tablaDeDatos,
+  tablaDona,
   tablaHistoricoGasto,
   type PeriodoEnCurso,
 } from "@/components/charts/core";
@@ -434,6 +438,9 @@ export function MiBaseSection({ view }: { view: V2View }) {
   );
 }
 
+/** El tamaño del anillo, el mismo que usa `DonutChart` por defecto. */
+const ANILLO = 132;
+
 function DonutCard({
   title,
   data,
@@ -457,17 +464,43 @@ function DonutCard({
    */
   sub?: string;
 }) {
+  const leyenda = filasLeyenda(data, { modo });
+  const dinero = (v: number) => formatMoney(v, currency);
+
   return (
     <div className="card card-pad">
-      <div className="card-title">{title}</div>
-      <DonutConLeyenda
-        data={data}
-        currency={currency}
-        centerLabel={formatCompact(total, currency)}
-        centerSub={sub}
-        modo={modo}
-        vacio="Sin datos este mes."
-      />
+      <ChartFrame
+        titulo={title}
+        /* El lienzo mide el anillo y nada más: una dona no tiene ejes ni tooltip anclado, que es
+           para lo que existe el piso de `ALTO_MINIMO`. */
+        alto={ANILLO}
+        ajustadoAlContenido
+        estado={leyenda.filas.length === 0 ? "vacio" : "datos"}
+        mensajeVacio="Sin datos este mes."
+        /* El `sub` del centro viaja a la descripción, pegado al número que califica. En el centro
+           del anillo es un `<div>` encima del SVG que el lector lee suelto, y un «al mes» sin cifra
+           al lado no dice nada. */
+        descripcion={describirDona({
+          titulo: title,
+          filas: leyenda.filas,
+          formato: dinero,
+          nombrePartes: modo === "lista" ? "categorías" : "bloques",
+          sub,
+        })}
+        /* La tabla sale de LAS MISMAS filas que dibuja el anillo: en modo `lista` eso son las seis
+           mayores más «Otras N», con el desglose de lo agrupado en la nota de esa fila. Armarla con
+           `data` crudo daría veinticinco filas contra seis porciones. */
+        tabla={tablaDona(leyenda, dinero, modo === "lista" ? "Categoría" : "Bloque")}
+        disposicionLeyenda="lateral"
+        leyenda={<LeyendaDona filas={leyenda.filas} ocultas={leyenda.ocultas} moneda={currency} />}
+      >
+        <DonutChart
+          data={leyenda.filas.map((f) => ({ name: f.name, value: f.value, color: f.color }))}
+          size={ANILLO}
+          centerLabel={formatCompact(total, currency)}
+          centerSub={sub}
+        />
+      </ChartFrame>
     </div>
   );
 }

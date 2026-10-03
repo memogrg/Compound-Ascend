@@ -156,14 +156,24 @@ export function describirDona({
   filas,
   formato,
   nombrePartes = "bloques",
+  sub,
 }: {
   titulo: string;
   filas: readonly FilaDona[];
   formato: (valor: number) => string;
   nombrePartes?: string;
+  /**
+   * Qué es el total, con su período: «ingreso real del mes», «presupuesto».
+   *
+   * Viene del centro del anillo, donde es un `<div>` encima del SVG que el lector lee suelto. Acá
+   * va pegado al número que califica, que es la única posición en la que significa algo — un
+   * «al mes» sin cifra al lado no dice nada.
+   */
+  sub?: string;
 }): string {
   if (filas.length === 0) return `${titulo}, sin datos`;
   const total = filas.reduce((s, f) => s + f.value, 0);
   const n = filas.length;
-  return `${titulo}, total ${formato(total)}, ${n} ${n === 1 ? nombrePartes.replace(/s$/, "") : nombrePartes}`;
+  const partes = n === 1 ? nombrePartes.replace(/s$/, "") : nombrePartes;
+  return `${titulo}, total ${formato(total)}${sub ? ` (${sub})` : ""}, ${n} ${partes}`;
 }
