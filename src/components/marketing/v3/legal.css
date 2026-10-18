@@ -14,22 +14,6 @@
   padding: 40px 0 72px;
 }
 
-/* Aviso de borrador. Declara font-style y text-decoration a propósito: hereda de
-   un árbol que no controlamos (globals.css + Tailwind), y lo que no se declara
-   lo rellena cualquiera. */
-.lp .lg-borrador {
-  border: 1px solid var(--line);
-  border-left: 3px solid #b5822a;
-  border-radius: 10px;
-  padding: 14px 16px;
-  margin: 0 0 28px;
-  font-size: 14px;
-  line-height: 1.55;
-  font-style: normal;
-  text-decoration: none;
-  background: rgba(181, 130, 42, 0.06);
-}
-
 .lp .lg-meta {
   font-size: 13.5px;
   color: var(--mut);
@@ -113,14 +97,6 @@
 .lp .lg-tabla th {
   background: rgba(0, 0, 0, 0.03);
   font-weight: 600;
-}
-
-/* Pendiente de completar antes de enviar a las tiendas. Visible a propósito. */
-.lp .lg-pendiente {
-  background: rgba(181, 130, 42, 0.16);
-  border-radius: 4px;
-  padding: 0 4px;
-  font-style: normal;
 }
 
 .lp .lg-pasos {

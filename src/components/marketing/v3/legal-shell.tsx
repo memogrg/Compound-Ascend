@@ -47,12 +47,6 @@ export function LegalShell({ titulo, children }: { titulo: string; children: Rea
           <p className="lg-meta">
             Última actualización: {LEGAL_ACTUALIZADO} · Versión {LEGAL_VERSION}
           </p>
-          <p className="lg-borrador">
-            <strong>Borrador en revisión legal</strong> —{" "}
-            <span className="lg-pendiente">[Razón social]</span>, Costa Rica. Este texto describe lo
-            que la aplicación hace hoy; la versión definitiva se publica antes del lanzamiento en
-            las tiendas.
-          </p>
           {children}
         </article>
       </main>
@@ -63,7 +57,7 @@ export function LegalShell({ titulo, children }: { titulo: string; children: Rea
             <span className="cw">
               CARTERA<i>+</i>
             </span>{" "}
-            · Costa Rica
+            · AI TECH UMBRELLA LLC
           </span>
           <span>
             <Link href="/privacidad">Privacidad</Link> · <Link href="/terminos">Términos</Link> ·{" "}
