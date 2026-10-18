@@ -32,9 +32,12 @@ export default function PrivacidadPage() {
         en 2 S Biscayne Boulevard, Ste 3200 #7206, Miami, FL 33131. Para cualquier consulta sobre
         tus datos, escribinos a <a href={`mailto:${CORREO_PRIVACIDAD}`}>{CORREO_PRIVACIDAD}</a>.
       </p>
+      {/* TODO legal: validar con abogado la cláusula de ley aplicable (Florida vs. CR). */}
       <p>
-        Tratamos tus datos conforme a la <strong>Ley N.º 8968</strong> de Protección de la Persona
-        frente al tratamiento de sus datos personales y su reglamento.
+        Tratamos tus datos conforme a las leyes aplicables del estado de Florida y de los Estados
+        Unidos y, respecto de los usuarios residentes en Costa Rica, respetamos los derechos que les
+        reconoce la <strong>Ley N.º 8968</strong> de Protección de la Persona frente al Tratamiento
+        de sus Datos Personales.
       </p>
 
       <h2>2. Qué datos recogemos</h2>
@@ -201,7 +204,8 @@ export default function PrivacidadPage() {
       </p>
       <p>
         <strong>Transferencias internacionales.</strong> Estos proveedores operan desde Estados
-        Unidos, así que tus datos se procesan fuera de Costa Rica bajo las salvaguardas
+        Unidos, así que tus datos se almacenan y procesan en Estados Unidos, donde está constituida
+        AI TECH UMBRELLA LLC, y por los proveedores indicados en esta sección bajo las salvaguardas
         contractuales de cada uno.
       </p>
 
