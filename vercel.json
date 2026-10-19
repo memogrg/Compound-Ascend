@@ -41,6 +41,10 @@
       "schedule": "0 5 * * *"
     },
     {
+      "path": "/api/ingest/retention",
+      "schedule": "17 5 * * *"
+    },
+    {
       "path": "/api/rhythm/ventana",
       "schedule": "0 14 * * *"
     },
