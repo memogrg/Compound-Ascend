@@ -9,6 +9,7 @@ import { ImapFlow } from "imapflow";
 import { decodeMail } from "@/lib/ingestion/email/mime";
 import { getServerEnv } from "@/lib/env";
 import { AppError } from "@/lib/errors";
+import type { ExpungeImap } from "@/lib/ingestion/email/expunge";
 import {
   extractEnvelopeCandidates,
   extractRecipientCandidates,
@@ -32,12 +33,8 @@ function headerBlock(source: Buffer): string {
   return sep >= 0 ? raw.slice(0, sep) : raw;
 }
 
-/**
- * Crea el cliente IMAP real. Abre INBOX y expone listUnseen/markSeen/close sobre
- * la interfaz testeable. Lanza si faltan credenciales (el route comprueba antes
- * con isEmailIngestConfigured y se omite con gracia).
- */
-export async function createImapClient(): Promise<ImapClient> {
+/** Conecta al buzón de ingesta. Lanza si faltan credenciales. */
+async function connectFlow(): Promise<ImapFlow> {
   const env = getServerEnv();
   if (!env.GMAIL_IMAP_USER || !env.GMAIL_IMAP_APP_PASSWORD) {
     throw new AppError("INTERNAL", undefined, "IMAP de ingesta no configurado");
@@ -57,6 +54,55 @@ export async function createImapClient(): Promise<ImapClient> {
   });
 
   await flow.connect();
+  return flow;
+}
+
+/**
+ * Cliente para el expurgo de retención (expunge.ts). Conexión propia, separada de la del poll:
+ * cambia de carpeta (INBOX → papelera) y no debe dejar al poller parado en otra. Todo por UID.
+ * `messageMove` cae solo a COPY + \Deleted + EXPUNGE si el servidor no tiene MOVE, y
+ * `messageDelete` marca \Deleted y usa UID EXPUNGE con UIDPLUS.
+ */
+export async function createExpungeClient(): Promise<ExpungeImap & { close(): Promise<void> }> {
+  const flow = await connectFlow();
+  return {
+    async listMailboxes() {
+      return (await flow.list()).map((m) => ({ path: m.path, specialUse: m.specialUse ?? null }));
+    },
+    async openMailbox(path: string) {
+      await flow.mailboxOpen(path);
+    },
+    async searchBefore(day: Date) {
+      return (await flow.search({ before: day }, { uid: true })) || [];
+    },
+    async internalDates(uids: number[]) {
+      const out = new Map<number, string>();
+      for await (const m of flow.fetch(uids, { uid: true, internalDate: true }, { uid: true })) {
+        if (m.internalDate) out.set(m.uid, new Date(m.internalDate).toISOString());
+      }
+      return out;
+    },
+    async moveTo(uids: number[], dest: string) {
+      const res = await flow.messageMove(uids, dest, { uid: true });
+      if (!res) throw new Error(`MOVE a ${dest} no movió nada`);
+      return res.uidMap ?? null;
+    },
+    async deleteForever(uids: number[]) {
+      await flow.messageDelete(uids, { uid: true });
+    },
+    async close() {
+      await flow.logout();
+    },
+  };
+}
+
+/**
+ * Crea el cliente IMAP real. Abre INBOX y expone listUnseen/markSeen/close sobre
+ * la interfaz testeable. Lanza si faltan credenciales (el route comprueba antes
+ * con isEmailIngestConfigured y se omite con gracia).
+ */
+export async function createImapClient(): Promise<ImapClient> {
+  const flow = await connectFlow();
   await flow.mailboxOpen("INBOX");
 
   return {
