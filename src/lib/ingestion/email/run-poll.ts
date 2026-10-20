@@ -17,7 +17,12 @@ import {
   type ImapMessage,
   type IngestSummary,
 } from "@/lib/ingestion/email/imap-poller";
-import { createImapClient, isEmailIngestConfigured } from "@/lib/ingestion/email/imap-client";
+import {
+  createExpungeClient,
+  createImapClient,
+  isEmailIngestConfigured,
+} from "@/lib/ingestion/email/imap-client";
+import { expungeExpiredMail, type ExpungeReport } from "@/lib/ingestion/email/expunge";
 import { lookupOwnerByIngestAddress } from "@/lib/ingestion/email/address-lookup";
 
 const PROVIDER = "email_ingest";
@@ -149,6 +154,19 @@ async function runOnce(): Promise<PollOutcome> {
     return { skipped: false, ...summary };
   } finally {
     await box.close();
+  }
+}
+
+/**
+ * Expurgo de retención del buzón (expunge.ts) con el cliente real. Lo dispara solo el cron, una
+ * vez al día y DESPUÉS del poll de la misma petición, así que no compite con él por el buzón.
+ */
+export async function runImapExpunge(opts: { dryRun: boolean }): Promise<ExpungeReport> {
+  const client = await createExpungeClient();
+  try {
+    return await expungeExpiredMail(client, { dryRun: opts.dryRun, log: logger });
+  } finally {
+    await client.close().catch(() => {});
   }
 }
 
