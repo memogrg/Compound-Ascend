@@ -1,4 +1,11 @@
-import { DonutConLeyenda, type DonutDatum } from "@/components/charts/lazy";
+import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
+import {
+  ChartFrame,
+  LeyendaDona,
+  describirDona,
+  filasLeyenda,
+  tablaDona,
+} from "@/components/charts/core";
 import { Icon } from "@/components/ui/icon";
 import { DeleteButton } from "./delete-button";
 import { EditWealthButton } from "./wealth-actions";
@@ -12,6 +19,11 @@ import { HoldingDetailButton } from "./holding-detail-modal";
 import { formatCompact, formatDecimal, formatMoney, formatPercent } from "@/lib/format";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
 import type { AssetType, HoldingNativo } from "@/modules/wealth/types";
+
+/** El tamaño del anillo, el mismo que usa `DonutChart` por defecto. */
+const ANILLO = 132;
+
+const TITULO_CARTERA = "Distribución del portafolio";
 
 const SEMAFORO: Record<string, string> = {
   rojo: "var(--neg)",
@@ -53,6 +65,9 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
     value: d.value,
     color: d.color,
   }));
+  /** El anillo dibuja LAS FILAS de la leyenda, y la tabla sale de las mismas. */
+  const leyendaCartera = filasLeyenda(donut, { modo: "taxonomia" });
+  const dineroCartera = (v: number) => formatMoney(v, currency);
 
   // Part C: category breakdown
   const buckets = new Map<Bucket, { value: number; cost: number; count: number }>();
@@ -162,43 +177,74 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
       {/* Cartera */}
       <section className="split-2-3">
         <div className="card card-pad">
-          <div className="card-title">Distribución del portafolio</div>
-          <DonutConLeyenda
-            data={donut}
-            currency={currency}
-            centerLabel={formatCompact(portfolio.totalInvested, currency)}
-            centerSub="invertido"
-            vacio="Agrega inversiones para ver su distribución."
-          />
-          <div
-            style={{
-              display: "flex",
-              gap: 18,
-              marginTop: 16,
-              fontSize: 12,
-              color: "var(--muted)",
-              flexWrap: "wrap",
-            }}
+          {/* La dona al marco (26.5). Las notas al pie van por el slot `pie`, FUERA del lienzo:
+              el lienzo tiene alto fijo y lo que se pinte dentro por encima de su alto se sale de la
+              tarjeta (decisión 48). Antes eran un hermano de la dona dentro de la tarjeta. */}
+          <ChartFrame
+            titulo={TITULO_CARTERA}
+            alto={ANILLO}
+            ajustadoAlContenido
+            estado={leyendaCartera.filas.length === 0 ? "vacio" : "datos"}
+            mensajeVacio="Agrega inversiones para ver su distribución."
+            descripcion={describirDona({
+              titulo: TITULO_CARTERA,
+              filas: leyendaCartera.filas,
+              formato: dineroCartera,
+              nombrePartes: "clases",
+              sub: "invertido",
+            })}
+            tabla={tablaDona(leyendaCartera, dineroCartera, "Clase")}
+            disposicionLeyenda="lateral"
+            leyenda={
+              <LeyendaDona
+                filas={leyendaCartera.filas}
+                ocultas={leyendaCartera.ocultas}
+                moneda={currency}
+              />
+            }
+            pie={
+              <div
+                style={{
+                  display: "flex",
+                  gap: 18,
+                  marginTop: 16,
+                  fontSize: 12,
+                  color: "var(--muted)",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  Aporte mensual{" "}
+                  <strong style={{ color: "var(--ink-2)" }}>
+                    {formatMoney(portfolio.monthlyContribution, currency)}
+                  </strong>
+                </div>
+                <div>
+                  Diversificación{" "}
+                  <strong style={{ color: "var(--ink-2)", textTransform: "capitalize" }}>
+                    {portfolio.diversification}
+                  </strong>
+                </div>
+                <div>
+                  Concentración máx.{" "}
+                  <strong style={{ color: "var(--ink-2)" }}>
+                    {formatPercent(portfolio.topConcentration)}
+                  </strong>
+                </div>
+              </div>
+            }
           >
-            <div>
-              Aporte mensual{" "}
-              <strong style={{ color: "var(--ink-2)" }}>
-                {formatMoney(portfolio.monthlyContribution, currency)}
-              </strong>
-            </div>
-            <div>
-              Diversificación{" "}
-              <strong style={{ color: "var(--ink-2)", textTransform: "capitalize" }}>
-                {portfolio.diversification}
-              </strong>
-            </div>
-            <div>
-              Concentración máx.{" "}
-              <strong style={{ color: "var(--ink-2)" }}>
-                {formatPercent(portfolio.topConcentration)}
-              </strong>
-            </div>
-          </div>
+            <DonutChart
+              data={leyendaCartera.filas.map((f) => ({
+                name: f.name,
+                value: f.value,
+                color: f.color,
+              }))}
+              size={ANILLO}
+              centerLabel={formatCompact(portfolio.totalInvested, currency)}
+              centerSub="invertido"
+            />
+          </ChartFrame>
 
           {/* Part C: category summary */}
           {buckets.size > 0 && (

@@ -13,6 +13,39 @@ import { congelarReloj } from "./reloj";
 /** Las rutas con tarjeta de dona. `/patrimonio` lleva tres: portafolio y las dos de asignación. */
 const RUTAS = ["/dashboard", "/gastos", "/mi-rich-life", "/patrimonio"] as const;
 
+/**
+ * El bloque de UNA dona: anillo más leyenda. Hay dos envoltorios según el camino.
+ *
+ * `.dl` es el de la tarjeta vieja (`DonutConLeyenda`), que todavía usan `/gastos`, `/ingresos`,
+ * `/mi-rich-life` y `/patrimonio`. `.cf-lateral` es el del marco del núcleo, que estrena
+ * `/dashboard` en 26.3 — ahí el reparto anillo/leyenda lo hace el marco y `.dl` ya no existe.
+ *
+ * Buscar solo `.dl` no fallaba igual en todos los casos, y la mitad silenciosa era la peor: donde
+ * se afirmaba sobre el conteo, el spec caía con «no hay donas en esta ruta»; donde se recorría en
+ * un bucle, el bucle daba cero vueltas y el test pasaba sin comprobar nada.
+ */
+const CAJA_DONA = ".dl, .cf-lateral";
+
+/** Las porciones dibujadas del anillo. Recharts pinta una u otra clase según la versión. */
+const PORCIONES = ".recharts-pie-sector path, .recharts-sector";
+
+/**
+ * Espera a que el anillo haya PINTADO sus porciones, no solo a que exista su hueco.
+ *
+ * Hace falta desde que la dona vive en el marco. Antes, `DonutConLeyenda` era el componente
+ * diferido: anillo y leyenda llegaban en el mismo chunk, así que ver una fila de leyenda implicaba
+ * que el anillo ya estaba. Ahora la leyenda la pinta `LeyendaDona`, que no es diferida y se
+ * pre-renderiza en el servidor, mientras `DonutChart` sigue siendo `dynamic({ ssr: false })`: las
+ * filas aparecen bastante ANTES que las porciones.
+ *
+ * Medido en la corrida 37104164915: «Ver todas» leyó 0 porciones antes de pulsar y 7 después, y el
+ * caso falló diciendo «el anillo no debe cambiar» — acusando al desplegable de algo que era la
+ * carga del chunk.
+ */
+async function esperarPorciones(dona: Locator) {
+  await dona.locator(PORCIONES).first().waitFor({ state: "attached", timeout: 30_000 });
+}
+
 async function abrir(browser: Browser, ruta: string, ancho: number) {
   const ctx = await browser.newContext({
     storageState: ESTADO_SESION,
@@ -26,12 +59,20 @@ async function abrir(browser: Browser, ruta: string, ancho: number) {
   await page.goto(ruta, { waitUntil: "domcontentloaded", timeout: 60_000 });
   // Se espera el ELEMENTO, no un hueco en la red: la dona es `dynamic({ssr:false})` y hasta
   // que carga hay un esqueleto sin nada. (Cuando entre el ayudante compartido de
-  // `tests/a11y/navegar.ts` —rama de CI— esto pasa a ser `irA(page, ruta, ".dl")`.)
+  // `tests/a11y/navegar.ts` —rama de CI— esto pasa a ser `irA(page, ruta, CAJA_DONA)`.)
   //
   // Vale una fila O el estado vacío: la cuenta de demo tiene ₡0 invertido, así que las dos
   // donas de `/patrimonio` salen legítimamente vacías. Esperar solo `.dl-fila` ahí agotaba
   // el minuto y el fallo parecía de la dona.
-  await page.locator(".dl-fila, .dl-vacio").first().waitFor({ state: "visible", timeout: 60_000 });
+  // Tres formas de «ya cargó»: una fila de leyenda, el vacío de la tarjeta vieja, o el vacío del
+  // marco. Lo tercero hace falta desde que la dona vive en el marco: ahí el estado vacío lo pinta
+  // `ChartEmpty`, que no tiene clase propia —solo `.muted`—, y el `data-estado` de la figura es el
+  // único hook estable. Sin él, una ruta migrada con donas legítimamente vacías (`/patrimonio` en la
+  // cuenta de demo) colgaría los 60 s y el fallo se leería como un selector roto.
+  await page
+    .locator('.dl-fila, .dl-vacio, figure.cf[data-estado="vacio"]')
+    .first()
+    .waitFor({ state: "visible", timeout: 60_000 });
   return { ctx, page };
 }
 
@@ -66,16 +107,30 @@ for (const ruta of RUTAS) {
 
   test(`${ruta}: los porcentajes de cada dona suman exactamente 100`, async ({ browser }) => {
     const { ctx, page } = await abrir(browser, ruta, 1280);
-    const donas = page.locator(".dl");
+    const donas = page.locator(CAJA_DONA);
     const cuantas = await donas.count();
     expect(cuantas, "no hay donas en esta ruta").toBeGreaterThan(0);
     let medidas = 0;
     for (let i = 0; i < cuantas; i++) {
       const pcts = await donas.nth(i).locator(".dl-pct").allTextContents();
-      // Tarjeta vacía: no hay nada que repartir. Se comprueba que sea EL estado vacío y no
-      // una leyenda que se quedó sin pintar.
+      // Tarjeta vacía: no hay nada que repartir. Se comprueba que sea EL estado vacío declarado y
+      // no una leyenda que se quedó sin pintar — la diferencia entre «no hay datos» y «el
+      // componente se rompió» es justo lo que este caso vigila.
+      //
+      // Dos formas de declararlo, según el camino: `.dl-vacio` en la tarjeta vieja, y el
+      // `data-estado` de la figura en el marco, donde el vacío lo pinta `ChartEmpty` y no tiene
+      // clase propia.
       if (pcts.length === 0) {
-        await expect(donas.nth(i).locator(".dl-vacio")).toHaveCount(1);
+        const vacioViejo = await donas.nth(i).locator(".dl-vacio").count();
+        const estadoMarco = await donas
+          .nth(i)
+          .locator("xpath=ancestor::figure[contains(@class,'cf')][1]")
+          .getAttribute("data-estado")
+          .catch(() => null);
+        expect(
+          vacioViejo === 1 || estadoMarco === "vacio",
+          `dona ${i} de ${ruta} sin porcentajes y sin estado vacío declarado (marco: ${estadoMarco})`,
+        ).toBe(true);
         continue;
       }
       const suma = pcts.map(aNumero).reduce((a, b) => a + b, 0);
@@ -89,7 +144,7 @@ for (const ruta of RUTAS) {
 
 test("a 390 la leyenda va DEBAJO de la dona, no a su lado", async ({ browser }) => {
   const { ctx, page } = await abrir(browser, "/gastos", 390);
-  const anillo = page.locator('.dl-caja [role="img"]').first();
+  const anillo = page.locator(`${CAJA_DONA}`).first().locator('[role="img"]').first();
   const lista = page.locator(".dl-lista").first();
   const a = await anillo.boundingBox();
   const l = await lista.boundingBox();
@@ -106,7 +161,7 @@ test("a 1280 en una tarjeta ancha la leyenda va AL LADO", async ({ browser }) =>
   // El complemento del anterior: el corte es del contenedor, así que tiene que cortar de
   // verdad en los dos sentidos. Sin esto, «siempre debajo» pasaría el test de arriba.
   const { ctx, page } = await abrir(browser, "/mi-rich-life", 1280);
-  const anillo = page.locator('.dl-caja [role="img"]').first();
+  const anillo = page.locator(`${CAJA_DONA}`).first().locator('[role="img"]').first();
   const lista = page.locator(".dl-lista").first();
   const a = (await anillo.boundingBox())!;
   const l = (await lista.boundingBox())!;
@@ -151,7 +206,7 @@ test("los bloques de la taxonomía se muestran TODOS, sin plegar", async ({ brow
   // responder, y que un bloque desaparezca porque este mes gastó poco hace imposible
   // comparar dos meses.
   const { ctx, page } = await abrir(browser, "/dashboard", 1280);
-  const dona = page.locator(".dl").first();
+  const dona = page.locator(CAJA_DONA).first();
   await expect(dona.locator(".dl-fila-resto"), "el panel no debe agrupar nada").toHaveCount(0);
   await expect(dona.locator(".dl-vertodas"), "ni ofrecer desplegable").toHaveCount(0);
 
@@ -178,7 +233,7 @@ test("la lista de categorías se ordena por monto y agrupa el resto", async ({ b
   const { ctx, page } = await abrir(browser, "/gastos?range=3m", 1280);
   const titulo = page.getByText("Composición por categoría").first();
   const tarjeta = titulo.locator("xpath=ancestor::*[contains(@class,'card')][1]");
-  const dona = tarjeta.locator(".dl");
+  const dona = tarjeta.locator(CAJA_DONA);
 
   const filas = dona.locator(".dl-fila");
   expect(await filas.count(), "seis mayores más la del resto").toBe(7);
@@ -201,9 +256,12 @@ test("«Ver todas» despliega la leyenda y NO toca el anillo", async ({ browser 
   const { ctx, page } = await abrir(browser, "/gastos?range=3m", 1280);
   const titulo = page.getByText("Composición por categoría").first();
   const tarjeta = titulo.locator("xpath=ancestor::*[contains(@class,'card')][1]");
-  const dona = tarjeta.locator(".dl");
+  const dona = tarjeta.locator(CAJA_DONA);
 
-  const porciones = dona.locator(".recharts-pie-sector path, .recharts-sector");
+  const porciones = dona.locator(PORCIONES);
+  // El anillo, pintado, ANTES de contar: si se cuenta mientras llega su chunk, el «antes» vale 0 y
+  // el caso culpa al desplegable del tiempo de carga.
+  await esperarPorciones(dona);
   const antesPorciones = await porciones.count();
   const antesFilas = await dona.locator(".dl-fila").count();
 
@@ -226,13 +284,23 @@ test("«Ver todas» despliega la leyenda y NO toca el anillo", async ({ browser 
 test("ninguna porción visible del anillo repite color", async ({ browser }) => {
   for (const ruta of ["/gastos?range=3m", "/dashboard"]) {
     const { ctx, page } = await abrir(browser, ruta, 1280);
-    const donas = page.locator(".dl");
+    const donas = page.locator(CAJA_DONA);
     for (let i = 0; i < (await donas.count()); i++) {
+      // Una dona sin filas de leyenda es el estado vacío legítimo (la cuenta de demo tiene
+      // `/patrimonio` sin inversiones): ahí no hay porciones que comparar y se dice. Una dona CON
+      // filas tiene que tener porciones, así que se espera a que lleguen en vez de saltarla — el
+      // `continue` a secas convertía «el chunk no había cargado» en un test que pasa sin medir.
+      const conDatos = (await donas.nth(i).locator(".dl-fila").count()) > 0;
+      if (!conDatos) {
+        console.log(`${ruta}: dona ${i} vacía, sin porciones que comparar`);
+        continue;
+      }
+      await esperarPorciones(donas.nth(i));
       const fills = await donas
         .nth(i)
-        .locator(".recharts-pie-sector path, .recharts-sector")
+        .locator(PORCIONES)
         .evaluateAll((ns) => ns.map((n) => (n as SVGElement).getAttribute("fill") ?? ""));
-      if (fills.length === 0) continue;
+      expect(fills.length, `${ruta} · dona ${i}: con filas pero sin porciones`).toBeGreaterThan(0);
       expect(new Set(fills).size, `${ruta} · dona ${i}: ${fills.join(", ")}`).toBe(fills.length);
     }
     await ctx.close();

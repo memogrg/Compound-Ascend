@@ -36,6 +36,7 @@ export function ChartFrame({
   subtitulo,
   descripcion,
   alto = 220,
+  ajustadoAlContenido = false,
   reservaSuperior = 0,
   estado = "datos",
   mensajeVacio = "No hay suficiente historial para mostrar la gráfica.",
@@ -58,6 +59,17 @@ export function ChartFrame({
   /** `aria-label` del gráfico, de `describirGrafico()`. Es el titular hablado. */
   descripcion: string;
   alto?: number;
+  /**
+   * El lienzo mide exactamente `alto`, sin el mínimo de `ALTO_MINIMO`.
+   *
+   * Ese mínimo existe por una razón que no es universal: «por debajo, los ejes y el tooltip no
+   * caben». Una dona no tiene ejes ni tooltip anclado, y su anillo tiene tamaño propio (132 px),
+   * así que el piso de 160 le metía 28 px de aire muerto DEBAJO del anillo — medido a 390, el
+   * hueco entre el anillo y la leyenda salía de 50 px en vez de los 18 del `gap`.
+   *
+   * Solo lo pide quien sabe que su contenido mide lo que mide. Un gráfico con ejes no.
+   */
+  ajustadoAlContenido?: boolean;
   /**
    * Alto EXTRA sobre el del gráfico, para la franja del tooltip anclado en táctil.
    *
@@ -135,7 +147,7 @@ export function ChartFrame({
 }) {
   const [verTabla, setVerTabla] = useState(false);
   const idTabla = `cf-tabla-${useId()}`;
-  const altura = Math.max(alto, ALTO_MINIMO) + reservaSuperior;
+  const altura = (ajustadoAlContenido ? alto : Math.max(alto, ALTO_MINIMO)) + reservaSuperior;
   const figuraRef = useRef<HTMLElement>(null);
 
   /**
@@ -275,10 +287,10 @@ export function ChartFrame({
     >
       <figcaption className="cf-cab">
         <div className="cf-titulos">
-          <h3 className="cf-titulo">
-            {titulo}
-            {ayuda ? <HelpTip text={ayuda} label="Cómo se usa este gráfico" /> : null}
-          </h3>
+          {/* El título es TEXTO y nada más. La ayuda vivía dentro del `<h3>`, y un icono en línea
+              cuenta para el ancho del título: a 390 el «?» empujaba la última palabra a un segundo
+              renglón, y el título de una tarjeta no puede partirse por culpa de un control. */}
+          <h3 className="cf-titulo">{titulo}</h3>
           {subtitulo ? <p className="cf-sub">{subtitulo}</p> : null}
         </div>
         {/*
@@ -293,7 +305,11 @@ export function ChartFrame({
          * de tabulación, que es justo lo que hace falta — un «Ver tabla» alcanzable con el
          * teclado cuando no hay tabla sería una promesa vacía.
          */}
+        {/* Los controles van JUNTOS: la ayuda, lo que pase el llamador y «Ver tabla». Si no caben
+            al lado del título, bajan los tres a su propia fila —`flex-wrap` en `.cf-cab`— y el
+            título se queda con el ancho entero. Separarlos dejaría a uno arriba y a dos abajo. */}
         <div className="cf-acciones">
+          {ayuda ? <HelpTip text={ayuda} label="Cómo se usa este gráfico" /> : null}
           {acciones}
           <button
             type="button"
