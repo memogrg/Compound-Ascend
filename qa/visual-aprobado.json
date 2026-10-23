@@ -1,42 +1,42 @@
 {
-  "pr": 918,
-  "corrida": 37096906537,
+  "pr": 933,
+  "corrida": 39359776368,
   "capturas": [
     {
-      "ruta": "/mi-base-financiera",
+      "ruta": "/faqs",
       "tema": "dark",
       "ancho": 1280,
-      "sha256_despues": "f9f23291692bcff31aec73e2da7065997ba56b39b9b0b6258493f1b95dfbdfc6"
+      "sha256_despues": "a7d5096fd5e9865fee4816c01b908d92c5b97d00cd3b4ce9cd6913cb2a496722"
     },
     {
-      "ruta": "/mi-base-financiera",
+      "ruta": "/faqs",
       "tema": "light",
       "ancho": 1280,
-      "sha256_despues": "103452e275311048fbe5797ec889134123b135f5783bf389d47d8bf99270a74f"
+      "sha256_despues": "a7d5096fd5e9865fee4816c01b908d92c5b97d00cd3b4ce9cd6913cb2a496722"
     },
     {
-      "ruta": "/mi-base-financiera",
+      "ruta": "/faqs",
       "tema": "dark",
       "ancho": 768,
-      "sha256_despues": "f11a49adb7b949fde1e396e0018289ab36dff5a5419fc7b154dd75d842124f79"
+      "sha256_despues": "918ac2ccc01a1d2503de96c7a4ca8e2562c242fd7b7063a7a95480e6a7bb0423"
     },
     {
-      "ruta": "/mi-base-financiera",
+      "ruta": "/faqs",
       "tema": "light",
       "ancho": 768,
-      "sha256_despues": "d3657126a884cb597b00d42dd3a113234f60defa2fe27143f7001b27d60f2a6f"
+      "sha256_despues": "918ac2ccc01a1d2503de96c7a4ca8e2562c242fd7b7063a7a95480e6a7bb0423"
     },
     {
-      "ruta": "/mi-base-financiera",
+      "ruta": "/faqs",
       "tema": "dark",
       "ancho": 390,
-      "sha256_despues": "97771cc1393c32a1d46c21a9329879742217108a539d2cba07c3185ed5dcc388"
+      "sha256_despues": "9ef8ad2fd3b1b1f9a6377be150bffc0ff880f72ef6bf70b8627803bdd4d86633"
     },
     {
-      "ruta": "/mi-base-financiera",
+      "ruta": "/faqs",
       "tema": "light",
       "ancho": 390,
-      "sha256_despues": "3bdffe200eaea6d2e8443e852ba53dcf779aef82b2ba654cd799f11a4d7f6e8d"
+      "sha256_despues": "9ef8ad2fd3b1b1f9a6377be150bffc0ff880f72ef6bf70b8627803bdd4d86633"
     }
   ]
 }

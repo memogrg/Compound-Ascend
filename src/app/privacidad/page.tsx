@@ -27,13 +27,17 @@ export default function PrivacidadPage() {
 
       <h2>1. Quién es responsable</h2>
       <p>
-        El responsable del tratamiento es <span className="lg-pendiente">[Razón social]</span>, con
-        domicilio en Costa Rica. Para cualquier consulta sobre tus datos, escribinos a{" "}
-        <a href={`mailto:${CORREO_PRIVACIDAD}`}>{CORREO_PRIVACIDAD}</a>.
+        El responsable del tratamiento es <strong>AI TECH UMBRELLA LLC</strong>, sociedad de
+        responsabilidad limitada constituida en el estado de Florida, Estados Unidos, con domicilio
+        en 2 S Biscayne Boulevard, Ste 3200 #7206, Miami, FL 33131. Para cualquier consulta sobre
+        tus datos, escribinos a <a href={`mailto:${CORREO_PRIVACIDAD}`}>{CORREO_PRIVACIDAD}</a>.
       </p>
+      {/* TODO legal: validar con abogado la cláusula de ley aplicable (Florida vs. CR). */}
       <p>
-        Tratamos tus datos conforme a la <strong>Ley N.º 8968</strong> de Protección de la Persona
-        frente al tratamiento de sus datos personales y su reglamento.
+        Tratamos tus datos conforme a las leyes aplicables del estado de Florida y de los Estados
+        Unidos y, respecto de los usuarios residentes en Costa Rica, respetamos los derechos que les
+        reconoce la <strong>Ley N.º 8968</strong> de Protección de la Persona frente al Tratamiento
+        de sus Datos Personales.
       </p>
 
       <h2>2. Qué datos recogemos</h2>
@@ -195,13 +199,13 @@ export default function PrivacidadPage() {
         </table>
       </div>
       <p>
-        Sobre Gemini: según los términos de la API de pago de Google, el contenido enviado no se usa
-        para entrenar sus modelos.{" "}
-        <span className="lg-pendiente">[confirmar nivel de API contratado]</span>
+        Sobre Gemini: usamos la API de pago de Gemini, cuyos términos establecen que Google no
+        utiliza los datos enviados para entrenar sus modelos.
       </p>
       <p>
         <strong>Transferencias internacionales.</strong> Estos proveedores operan desde Estados
-        Unidos, así que tus datos se procesan fuera de Costa Rica bajo las salvaguardas
+        Unidos, así que tus datos se almacenan y procesan en Estados Unidos, donde está constituida
+        AI TECH UMBRELLA LLC, y por los proveedores indicados en esta sección bajo las salvaguardas
         contractuales de cada uno.
       </p>
 
@@ -234,9 +238,8 @@ export default function PrivacidadPage() {
         revisás y aceptás o descartás: <strong>nada se registra solo</strong>.
       </p>
       <p>
-        <strong>Retención:</strong>{" "}
-        <span className="lg-pendiente">[X días — pendiente de fijar]</span>. Hoy los mensajes y sus
-        propuestas se conservan hasta que los resolvés o hasta que borrás tu cuenta.
+        <strong>Retención: 30 días.</strong> Pasado ese plazo eliminamos el mensaje y su propuesta,
+        la hayas resuelto o no. Si borrás tu cuenta antes, se van con ella.
       </p>
       <p>
         La dirección se puede revocar, pero hoy esa acción no está disponible desde la aplicación:
@@ -280,10 +283,7 @@ export default function PrivacidadPage() {
             </tr>
             <tr>
               <td>Correos reenviados y sus propuestas</td>
-              <td>
-                <span className="lg-pendiente">[X días]</span> — hoy, hasta resolverlos o borrar la
-                cuenta
-              </td>
+              <td>30 días</td>
             </tr>
             <tr>
               <td>Registros de auditoría</td>
@@ -367,7 +367,7 @@ export default function PrivacidadPage() {
 
       <h2>14. Contacto</h2>
       <p>
-        <span className="lg-pendiente">[Razón social]</span> · Costa Rica ·{" "}
+        AI TECH UMBRELLA LLC · 2 S Biscayne Boulevard, Ste 3200 #7206, Miami, FL 33131 ·{" "}
         <a href={`mailto:${CORREO_PRIVACIDAD}`}>{CORREO_PRIVACIDAD}</a>
       </p>
     </LegalShell>
