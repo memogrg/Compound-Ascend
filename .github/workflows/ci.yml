@@ -60,7 +60,7 @@ jobs:
       # cuando acierta, `actions/cache` no reescribe, así que deja de crecer sola. La caché
       # de Next es incremental por dentro, así que una un poco vieja sigue sirviendo.
       - name: Cache de build Next
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .next/cache
           key: next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
