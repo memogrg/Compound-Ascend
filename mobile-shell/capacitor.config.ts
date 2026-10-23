@@ -103,6 +103,18 @@ const config: CapacitorConfig = {
       splashFullScreen: true,
       splashImmersive: false,
     },
+    SocialLogin: {
+      // Proveedores que empaqueta @capgo/capacitor-social-login (lo aplica su hook de
+      // `cap sync`: gradle.properties en Android, podspec en iOS). Solo usamos Google
+      // (google-native.ts inicializa únicamente `google`). Facebook en false deja fuera
+      // facebook-core, que inyectaba AD_ID y los ACCESS_ADSERVICES_* de Privacy Sandbox en el
+      // manifest fusionado, y los pods FBSDK en iOS. Twitter queda en su default.
+      providers: {
+        google: true,
+        facebook: false,
+        apple: true,
+      },
+    },
   },
 };
 
