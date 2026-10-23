@@ -76,9 +76,9 @@ export default function TerminosPage() {
 
       <h2>5. Propiedad intelectual</h2>
       <p>
-        La aplicación, su código, su diseño, su marca y sus contenidos son de{" "}
-        <span className="lg-pendiente">[Razón social]</span>. Se te concede una licencia personal,
-        limitada, revocable y no transferible para usar el servicio.
+        La aplicación, su código, su diseño, su marca y sus contenidos son de AI TECH UMBRELLA LLC.
+        Se te concede una licencia personal, limitada, revocable y no transferible para usar el
+        servicio.
       </p>
       <p>
         <strong>Tus datos son tuyos.</strong> Lo que registrás te pertenece; solo los usamos para
@@ -135,13 +135,13 @@ export default function TerminosPage() {
 
       <h2>10. Ley aplicable</h2>
       <p>
-        Estas condiciones se rigen por las leyes de la República de Costa Rica, y cualquier
+        Estas condiciones se rigen por las leyes del estado de Florida, Estados Unidos, y cualquier
         controversia se somete a sus tribunales.
       </p>
 
       <h2>11. Contacto</h2>
       <p>
-        <span className="lg-pendiente">[Razón social]</span> · Costa Rica ·{" "}
+        AI TECH UMBRELLA LLC · 2 S Biscayne Boulevard, Ste 3200 #7206, Miami, FL 33131 ·{" "}
         <a href={`mailto:${CORREO_PRIVACIDAD}`}>{CORREO_PRIVACIDAD}</a>
       </p>
     </LegalShell>
