@@ -6,7 +6,7 @@
  * El agujero: `startsWith("/") && !startsWith("//")` deja pasar `/\evil.com`, y el
  * parser de URL lo resuelve a `https://evil.com/`. Verificado:
  *
- *   new URL("/\\evil.com", "https://carteraplus.vercel.app").href
+ *   new URL("/\\evil.com", "https://carteraplus.aitechumbrella.com").href
  *   // → "https://evil.com/"
  *
  * No es una curiosidad de Node: los navegadores tratan `\` como `/` al resolver una

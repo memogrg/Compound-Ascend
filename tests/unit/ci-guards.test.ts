@@ -284,9 +284,10 @@ describe("la caché de imágenes del stack", () => {
       // Y excluye las MISMAS rutas que el diff saca de su veredicto estricto. `home` es la
       // landing, que anima su gráfica en bucle a propósito: medido, 6 de las 7 inestables del
       // shard 4 eran `home` en los seis combinados (99-252 px). Sin esta exclusión la landing se
-      // come el tope entera y tumba el job por una animación que se quiere.
+      // come el tope entera y tumba el job por una animación que se quiere. `mi-base-financiera`
+      // está de paso: se mueve sola entre pasadas y sale de las dos listas hasta cerrar CI-2.
       expect(bloque, `${job}: la sonda excluye lo que el diff ya excluye`).toMatch(
-        /--excluir home,dev_ui/,
+        /--excluir home,dev_ui,mi-base-financiera\s/,
       );
     }
   });

@@ -13,7 +13,7 @@ Se decide al correr `cap sync`/`cap copy`, que evalúan `capacitor.config.ts`:
 
 | Variables | Carga |
 |---|---|
-| *(ninguna)* | `https://carteraplus.vercel.app/m` — **producción, el default** |
+| *(ninguna)* | `https://carteraplus.aitechumbrella.com/m` — **producción, el default** |
 | `CAP_SERVER_URL=<url>` | esa URL (dev con live-reload contra tu Next.js en la LAN) |
 | `CAP_BUNDLED=1` | el contenido de `www/`, solo si se pide explícitamente |
 
