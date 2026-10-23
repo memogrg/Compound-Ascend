@@ -58,5 +58,5 @@ jobs:
             if [ "$EXPUNGE_DRY_RUN" != "false" ]; then QS="${QS}&dryRun=1"; fi
           fi
           curl --fail-with-body -sS -X POST \
-            "https://carteraplus.vercel.app/api/ingest/email/poll${QS}" \
+            "https://carteraplus.aitechumbrella.com/api/ingest/email/poll${QS}" \
             -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}"
