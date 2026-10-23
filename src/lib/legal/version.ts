@@ -7,10 +7,10 @@
  * persona, así que cambiarla es un hecho con consecuencias: subila solo cuando
  * el texto cambie de verdad.
  */
-export const LEGAL_VERSION = "2026-09-12";
+export const LEGAL_VERSION = "2026-10-17";
 
 /** La misma fecha, escrita para leer. */
-export const LEGAL_ACTUALIZADO = "12 de setiembre de 2026";
+export const LEGAL_ACTUALIZADO = "17 de octubre de 2026";
 
 /**
  * Correo de privacidad, el que aparece en las tres páginas legales.

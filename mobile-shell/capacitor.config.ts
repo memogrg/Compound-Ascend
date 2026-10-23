@@ -19,7 +19,7 @@ import { KeyboardResize } from '@capacitor/keyboard';
  *                               se empaqueta ya no es el prototipo, sino una página de
  *                               diagnóstico imposible de confundir con la app (ver www/).
  */
-const PROD_URL = 'https://carteraplus.vercel.app/m';
+const PROD_URL = 'https://carteraplus.aitechumbrella.com/m';
 const bundled = process.env.CAP_BUNDLED === '1';
 const serverUrl = process.env.CAP_SERVER_URL?.trim() || PROD_URL;
 

@@ -3,12 +3,23 @@ name: Email ingest poll
 on:
   schedule:
     - cron: "*/5 * * * *"
+    # Una vez al día: el poll de siempre + el expurgo de retención del buzón (correos de más de
+    # 30 días). Los ticks de */5 nunca expurgan; el paso lo distingue por github.event.schedule.
+    - cron: "20 5 * * *"
   workflow_dispatch:
     inputs:
       debug:
         description: "Solo diagnosticar: lista hasta 10 correos sin leer con sus candidatos, SIN procesarlos"
         type: boolean
         default: false
+      expunge:
+        description: "Además del poll, expurgar del buzón los correos de más de 30 días"
+        type: boolean
+        default: false
+      expunge_dry_run:
+        description: "Expurgo en dry-run: solo cuenta y lista UIDs y fechas, no mueve ni borra"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -25,10 +36,27 @@ jobs:
       # el asunto, las direcciones vistas en cabeceras y en qué nivel resolvería al
       # dueño. Es la herramienta para certificar un proveedor de correo nuevo sin
       # tener que pedirle la clave del cron a nadie.
+      #
+      # Expurgo: el borrado real lo decide el SERVIDOR (INGEST_IMAP_EXPUNGE_ENABLED === "true" en
+      # Vercel). `dryRun=1` solo puede encender el dry-run; ningún parámetro fuerza el borrado.
+      #
+      # debug y expunge son excluyentes: con debug=true no se expurga (el debug no procesa nada).
       - name: Trigger email ingest poll
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+          DEBUG: ${{ github.event.inputs.debug }}
+          EXPUNGE: ${{ github.event.inputs.expunge }}
+          EXPUNGE_DRY_RUN: ${{ github.event.inputs.expunge_dry_run }}
         run: |
-          DEBUG=""
-          if [ "${{ github.event.inputs.debug }}" = "true" ]; then DEBUG="?debug=1"; fi
+          QS=""
+          if [ "$DEBUG" = "true" ]; then
+            QS="?debug=1"
+          elif [ "$SCHEDULE" = "20 5 * * *" ]; then
+            QS="?expunge=1"
+          elif [ "$EXPUNGE" = "true" ]; then
+            QS="?expunge=1"
+            if [ "$EXPUNGE_DRY_RUN" != "false" ]; then QS="${QS}&dryRun=1"; fi
+          fi
           curl --fail-with-body -sS -X POST \
-            "https://carteraplus.vercel.app/api/ingest/email/poll${DEBUG}" \
+            "https://carteraplus.aitechumbrella.com/api/ingest/email/poll${QS}" \
             -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}"

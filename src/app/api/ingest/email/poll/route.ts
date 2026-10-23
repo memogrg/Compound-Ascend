@@ -9,16 +9,22 @@
  * solo: las propuestas quedan 'pending' hasta que el usuario las acepte.
  *
  * Acceso: SOLO cron. X-Cron-Secret = CRON_SECRET, o Authorization: Bearer
- * <CRON_SECRET> (el que añade Vercel Cron). Escritura con service-role (sin
- * sesión de usuario); la allowlist es la capa que evita procesar remitentes
- * arbitrarios.
+ * <CRON_SECRET> (el que añade Vercel Cron). `?expunge=1` agrega el expurgo de
+ * retención del buzón (lib/ingestion/email/expunge) y no cambia la autorización.
+ * Escritura con service-role (sin sesión de usuario); la allowlist es la capa que
+ * evita procesar remitentes arbitrarios.
  */
 import { NextResponse } from "next/server";
 import { corsHeaders } from "@/lib/security/cors";
 import { toSafeResponse, AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { isEmailIngestConfigured } from "@/lib/ingestion/email/imap-client";
-import { openIngestMailbox, runEmailIngestPoll } from "@/lib/ingestion/email/run-poll";
+import { resolveExpungeDryRun } from "@/lib/ingestion/email/expunge";
+import {
+  openIngestMailbox,
+  runEmailIngestPoll,
+  runImapExpunge,
+} from "@/lib/ingestion/email/run-poll";
 
 export const runtime = "nodejs";
 
@@ -84,6 +90,24 @@ async function handle(req: Request) {
     if (out.skipped) {
       return NextResponse.json({ ok: true, skipped: true, reason: out.reason }, { headers: cors });
     }
+
+    // Expurgo de retención: ?expunge=1 lo pide el tick diario del workflow (o un disparo manual).
+    // No relaja nada: el cron ya se autorizó arriba. Borra de verdad SOLO con
+    // INGEST_IMAP_EXPUNGE_ENABLED === "true" y sin ?dryRun; el parámetro solo enciende el dry-run.
+    // Si aborta (sin \Trash), responde 500 para que el Action quede en rojo: el poll ya corrió y
+    // es idempotente, así que no se pierde nada.
+    if (params.get("expunge")) {
+      const dryRun = resolveExpungeDryRun(
+        process.env.INGEST_IMAP_EXPUNGE_ENABLED,
+        params.get("dryRun"),
+      );
+      const expunge = await runImapExpunge({ dryRun });
+      return NextResponse.json(
+        { ok: expunge.ok, ...out, skipped: undefined, expunge },
+        { status: expunge.ok ? 200 : 500, headers: cors },
+      );
+    }
+
     return NextResponse.json({ ok: true, ...out, skipped: undefined }, { headers: cors });
   } catch (err) {
     // #53 · diagnosabilidad: el error de imapflow trae la causa REAL en campos propios —no en
