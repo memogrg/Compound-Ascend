@@ -16,7 +16,7 @@ import { safeInternalPath } from "@/lib/security/safe-redirect";
 const FALLBACK = "/dashboard";
 
 /** El sitio real, para comprobar a dónde llevaría de verdad lo que devolvemos. */
-const SITIO = "https://carteraplus.vercel.app";
+const SITIO = "https://carteraplus.aitechumbrella.com";
 
 describe("safeInternalPath", () => {
   describe("deja pasar rutas internas", () => {

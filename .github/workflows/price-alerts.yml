@@ -9,7 +9,7 @@
 #   · CRON_SECRET     — pestaña "Secrets" (es sensible; se enmascara en logs). El MISMO valor
 #                       que el env CRON_SECRET de Vercel.
 #   · ALERTS_CRON_URL — pestaña "Variables" (la URL de prod no es secreto). La URL del endpoint,
-#                       SIN query. Ejemplo: https://TU-APP.vercel.app/api/investments/price-alerts
+#                       SIN query. Ejemplo: https://carteraplus.aitechumbrella.com/api/investments/price-alerts
 #
 # Caveats honestos:
 #   · NO es tiempo real: el cron de GitHub puede retrasarse (a veces varios minutos); la alerta
