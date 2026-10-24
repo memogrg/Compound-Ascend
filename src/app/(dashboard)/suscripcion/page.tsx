@@ -14,6 +14,7 @@ import { FacturacionButton } from "@/modules/account/components/facturacion-butt
 import { ContinuarPago } from "@/modules/account/components/continuar-pago";
 import { PAID_PLANS, PLAN_LABEL, TRIAL_DAYS, type PaidPlan } from "@/lib/plan";
 
+import { formatDateLong } from "@/lib/format";
 export const dynamic = "force-dynamic";
 
 function esPlanDePago(v: string | undefined): v is PaidPlan {
@@ -21,11 +22,7 @@ function esPlanDePago(v: string | undefined): v is PaidPlan {
 }
 
 function fecha(iso: string): string {
-  return new Date(iso).toLocaleDateString("es-CR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  return formatDateLong(iso);
 }
 
 export default async function SuscripcionPage({

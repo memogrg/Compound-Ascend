@@ -19,6 +19,7 @@ import { ReferralCard } from "@/components/referrals/referral-card";
 import { getMyReferral } from "@/lib/referrals/service";
 import { MemoryPanel } from "@/components/memory/memory-panel";
 import { listMyMemoryAction, type MemoryItem } from "@/modules/assistant";
+import { formatDecimal } from "@/lib/format";
 
 /**
  * /m/perfil — identidad + ajustes agrupados (plan, moneda, hogar, cuenta).
@@ -30,7 +31,7 @@ export const dynamic = "force-dynamic"; // datos por sesión
 
 /** Compacta enteros grandes tipo "128k" (para el uso de tokens de IA). */
 function tk(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k` : String(Math.round(n));
+  return n >= 1000 ? `${formatDecimal(n / 1000, n % 1000 === 0 ? 0 : 1)}k` : formatDecimal(n, 0);
 }
 
 export default async function MobilePerfil() {

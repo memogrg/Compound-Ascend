@@ -12,6 +12,7 @@ import { TimezoneProvider } from "@/components/tz/timezone-context";
 import { CurrencyProvider } from "@/components/layout/currency-context";
 import { ToastProvider } from "../components/form-kit/toast";
 import { AppLockOverlay } from "../components/app-lock-overlay";
+import { AndroidBackHandler } from "../components/android-back-handler";
 import { WidgetSnapshotWriter } from "../components/widget-snapshot-writer";
 import { MobileRhythmNudge } from "../components/mobile-rhythm-nudge";
 
@@ -94,6 +95,11 @@ export default async function MobileAppLayout({ children }: { children: React.Re
           {/* Candado local con biometría (solo app nativa): se monta primero para tapar
           la UI lo antes posible al reanudar. No afecta a la web. */}
           <AppLockOverlay />
+          {/* Botón Atrás de Android. Va ACÁ y no en m/layout.tsx porque necesita el
+          ToastProvider, que vive en este layout: el aviso de "tocá de nuevo para salir"
+          es parte del comportamiento. La contrapartida es que /m/login y /m/signup, que
+          quedan fuera de este grupo, conservan el Atrás por defecto de Capacitor. */}
+          <AndroidBackHandler />
           {/* Escribe el snapshot del widget nativo en cada carga (solo app nativa; no-op en web). */}
           <WidgetSnapshotWriter />
           {/* Captura silenciosa de la zona horaria del dispositivo (una vez, si no hay guardada). */}

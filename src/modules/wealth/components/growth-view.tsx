@@ -1,4 +1,4 @@
-import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
+import { DonutConLeyenda, type DonutDatum } from "@/components/charts/lazy";
 import { Icon } from "@/components/ui/icon";
 import { DeleteButton } from "./delete-button";
 import { EditWealthButton } from "./wealth-actions";
@@ -9,7 +9,7 @@ import {
   EditHoldingButton,
 } from "./add-holding-wizard";
 import { HoldingDetailButton } from "./holding-detail-modal";
-import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
+import { formatCompact, formatDecimal, formatMoney, formatPercent } from "@/lib/format";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
 import type { AssetType, HoldingNativo } from "@/modules/wealth/types";
 
@@ -163,47 +163,13 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
       <section className="split-2-3">
         <div className="card card-pad">
           <div className="card-title">Distribución del portafolio</div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 18,
-              marginTop: 14,
-              flexWrap: "wrap",
-            }}
-          >
-            <DonutChart
-              data={donut}
-              centerLabel={formatCompact(portfolio.totalInvested, currency)}
-              centerSub="invertido"
-            />
-            <div
-              style={{ flex: 1, minWidth: 150, display: "flex", flexDirection: "column", gap: 8 }}
-            >
-              {donut.length === 0 ? (
-                <span className="muted" style={{ fontSize: 12.5 }}>
-                  Agrega inversiones para ver su distribución.
-                </span>
-              ) : (
-                donut.map((d) => (
-                  <div
-                    key={d.name}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "10px 1fr auto",
-                      gap: 9,
-                      alignItems: "center",
-                      fontSize: 12.5,
-                    }}
-                  >
-                    <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
-                    <span style={{ color: "var(--ink-2)" }}>{d.name}</span>
-                    <span className="muted tnum">{formatMoney(d.value, currency)}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+          <DonutConLeyenda
+            data={donut}
+            currency={currency}
+            centerLabel={formatCompact(portfolio.totalInvested, currency)}
+            centerSub="invertido"
+            vacio="Agrega inversiones para ver su distribución."
+          />
           <div
             style={{
               display: "flex",
@@ -410,7 +376,7 @@ function HoldingRow({
         >
           <span>{holding.symbol}</span>
           <span>·</span>
-          <span>{holding.quantity.toFixed(holding.quantity < 1 ? 6 : 4)} uds.</span>
+          <span>{formatDecimal(holding.quantity, holding.quantity < 1 ? 6 : 4)} uds.</span>
           {currentValue !== null ? (
             <span>{formatMoney(currentValue, liveH?.currency ?? holding.currency)}</span>
           ) : (

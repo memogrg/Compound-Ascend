@@ -10,25 +10,60 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# `packages: read` es lo que hace que el login a ghcr.io sirva para algo: sin él, el
+# GITHUB_TOKEN no puede leer paquetes y el `docker login` de abajo autenticaría a una
+# identidad sin permiso de descarga. `contents: read` es lo único más que hace falta —
+# el workflow no comenta, no etiqueta y no publica nada.
+permissions:
+  contents: read
+  packages: read
+
+env:
+  # En UN solo sitio: lo usan `supabase/setup-cli` de los dos jobs y la clave de la caché de
+  # imágenes, que tiene que invalidarse sola cuando esta versión suba (los tags de las
+  # imágenes los decide el CLI). Ver el comentario del job de migraciones para por qué es
+  # una versión fija y no "latest".
+  SUPABASE_CLI_VERSION: 2.109.1
+  # El instante en el que se congela el reloj para TODO lo que se compara entre corridas.
+  #
+  # Es un literal y no `new Date()` por una razón medida: los jobs de captura lo calculaban del
+  # reloj de pared, así que una base capturada ayer y una rama capturada hoy congelaban en días
+  # distintos. Mismo PR, misma base, dos corridas: la primera compartió día con la base y dio 11
+  # capturas distintas; la segunda, un día después, dio 30 — `/transacciones`, `/gastos` y
+  # `/empezar` sumadas por el calendario, no por el cambio.
+  #
+  # Tiene que estar en el PASADO: con el reloj adelantado, el token que emite gotrue con la hora
+  # real parece vencido en cada render y la página no termina de cargar (409 de refresco).
+  QA_INSTANTE: "2026-09-18T18:00:00Z"
+
 jobs:
   ci:
     name: Lint, Typecheck, Test & Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
+      # La clave NO lleva un hash de `src/**`, y es el arreglo de un problema medido: con él,
+      # la clave cambiaba en CADA commit, así que no acertaba nunca —el `restore-keys` hacía
+      # todo el trabajo— pero cada corrida ESCRIBÍA una entrada nueva de ~450 MB que ya no
+      # volvería a acertar jamás. El repo llegó a 21 entradas `next-*` sumando 9,2 GB de un
+      # cupo de 10, y al pasarse, GitHub desaloja por antigüedad de uso: lo primero que se
+      # llevaba era la caché de imágenes del stack, que es justo la que evita que el job
+      # muera en el registro.
+      #
+      # Con la clave atada solo al lockfile hay UNA entrada por cambio de dependencias:
+      # cuando acierta, `actions/cache` no reescribe, así que deja de crecer sola. La caché
+      # de Next es incremental por dentro, así que una un poco vieja sigue sirviendo.
       - name: Cache de build Next
         uses: actions/cache@v5
         with:
           path: .next/cache
-          key: next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**') }}
-          restore-keys: |
-            next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+          key: next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - run: npm ci
       # Va PRIMERO porque es el paso más barato (~5s) y el que más fácil se olvida.
@@ -56,7 +91,42 @@ jobs:
   # NOTA: marcar este check como REQUERIDO en branch protection para que bloquee.
   migrations:
     name: Migraciones aplican en BD fresca
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      # Solo para poder preguntar por su existencia en el `if` de los pasos de login.
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      # ─────────────────────────────────────────────────────────────────────────────────
+      # LA CAUSA RAÍZ de que estos dos jobs llevaran días en rojo, y no es el rate limit.
+      #
+      # `supabase/setup-cli@v2` exporta `SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io`. En el
+      # CLI 2.109.1 —comprobado en el binario de esa versión exacta— esa variable no elige
+      # un registro PREFERIDO: **apaga el fallback**.
+      #
+      #   registros(imagen) = env puesta ? [solo ese] : [public.ecr.aws, ghcr.io, docker.io]
+      #
+      # Por eso el error decía «failed to pull docker image from all registries: ghcr.io/…»
+      # con un solo registro en la lista: era la lista entera. Y por eso el limitador de
+      # ghcr.io sobre la IP del runner bastaba para tumbar el job.
+      #
+      # Vacía ⇒ el CLI la trata como ausente (`trim()`, `length === 0`) y recupera su
+      # comportamiento por defecto: **public.ecr.aws primero**, con ghcr.io y docker.io
+      # detrás. Comprobado que las ocho imágenes existen en `public.ecr.aws/supabase/*` con
+      # exactamente los mismos tags.
+      #
+      # OJO: ponerla acá NO basta, y la primera corrida verde lo demostró bajando igual de
+      # ghcr.io. `setup-cli` la exporta por `$GITHUB_ENV`, y eso GANA al `env` del job en
+      # todos los pasos siguientes. Hay que volver a vaciarla DESPUÉS de ese paso; se deja
+      # aquí igualmente para que el valor sea explícito allá donde se lea.
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
+      # Este job ya no solo APLICA el esquema: también corre `tests/rls` contra él, y esos
+      # tests hablan HTTP —`/rest/v1` y `/auth/v1/admin`—, no SQL. Así que a Postgres se le
+      # suman tres: **kong** (la puerta que enruta esas dos rutas), **gotrue** (crea y borra
+      # los usuarios de prueba) y **postgrest** (lee y escribe las filas). Las otras diez
+      # siguen fuera; `mailpit` también, porque los usuarios se crean con `email_confirm`
+      # y no se manda ningún correo.
+      # Vive en el `env` porque lo leen el arranque Y la clave de la caché — que incluye
+      # `$EXC`, así que cambiar esta línea invalida el tarball viejo por sí sola.
+      EXCLUIR_SERVICIOS: realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
     steps:
       - uses: actions/checkout@v7
 
@@ -72,19 +142,167 @@ jobs:
           # (`version.toLowerCase() === "latest" ? await resolveLatestVersion() : ...`), así
           # que un número la elimina: el binario se baja directo de releases/download/v<ver>.
           # 2.109.1 es la última ESTABLE (2026-07-07); todas las posteriores son beta.
-          # Para subirla: comprueba que exista una estable nueva y súbela en LOS DOS jobs.
-          version: 2.109.1
+          # Vive en el `env` del workflow: los dos jobs y la clave de caché la leen de ahí,
+          # así que subirla es cambiar UNA línea y la caché se invalida sola.
+          version: ${{ env.SUPABASE_CLI_VERSION }}
         env:
           SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Deshace lo que `setup-cli` acaba de exportar. Sin esto el CLI se queda con un único
+      # registro y perdemos el fallback — que es exactamente lo que tenía a `main` en rojo.
+      - name: Recuperar el fallback de registros del CLI
+        run: |
+          echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
+          echo "::notice::registro sin fijar: el CLI probará public.ecr.aws, luego ghcr.io y luego docker.io"
+
       # `supabase start` arranca el stack aplicando migraciones; `supabase db reset`
       # fuerza un re-apply LIMPIO de TODA la cadena y sale con código ≠ 0 si alguna
       # migración falla → el job (y el PR) fallan. Sin seed ni app: solo el esquema.
-      - name: Apply fresco de toda la cadena de migraciones
+
+      # ── Autenticación de registros, ANTES de cualquier `supabase start` ──────────────
+      #
+      # `supabase start` baja TRECE imágenes y **todas** salen de ghcr.io/supabase/*:
+      # postgres, gotrue, postgrest, realtime, storage-api, imgproxy, edge-runtime,
+      # postgres-meta, studio, logflare, vector, mailpit y kong. Ninguna de Docker Hub.
+      #
+      # Anónimamente, ghcr.io limita por IP, y la IP es la del runner compartido de
+      # GitHub: el error es `toomanyrequests: allowed: 44000/minute`, que no es culpa de
+      # este repo y no se arregla esperando —tres reintentos repartidos en 2,5 h dieron lo
+      # mismo—. Autenticado, la cuota pasa a contarse por usuario.
+      - name: Login en ghcr.io (cuota por usuario en vez de por IP del runner)
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Hoy NINGUNA imagen del stack viene de Docker Hub; este paso es preventivo, para el
+      # día en que el CLI de Supabase mueva alguna o añadamos un servicio propio.
+      #
+      # Sin `continue-on-error`, a propósito: `tests/unit/ci-guards.test.ts` prohíbe esa
+      # directiva en TODO el archivo —un job que se salta su propio veredicto ya nos costó
+      # un incidente— y no hace falta, porque el `if` ya se encarga de lo único que se
+      # quería cubrir: que el PR no dependa de unos secrets que todavía no existen. Si el
+      # secret existe pero es inválido, que falle es lo correcto: una credencial rota tiene
+      # que verse.
+      - name: Login en Docker Hub (preventivo — hoy no se descarga nada de ahí)
+        # `env` y no `secrets`: el contexto `secrets` no existe en el `if` de un paso.
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Aviso si Docker Hub no está autenticado
+        if: env.DOCKERHUB_USERNAME == ''
         run: |
-          supabase start
-          supabase db reset
+          echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las imágenes del stack salen de public.ecr.aws, con ghcr.io de respaldo."
+
+      # ── Caché de imágenes ────────────────────────────────────────────────────────────
+      #
+      # Mientras el job dependa de DESCARGAR imágenes de un registro público, depende de que
+      # ese registro esté de buenas. La caché convierte esa dependencia en una copia local:
+      # la primera corrida la llena y las siguientes no bajan nada.
+      #
+      # La clave lleva la versión del CLI —que es quien decide los tags— y un hash de la
+      # lista de exclusiones, que es quien decide CUÁNTAS imágenes son. Cambiar cualquiera de
+      # las dos invalida la caché sola, sin que nadie tenga que acordarse.
+      #
+      # El `v2` es a mano: al recuperar el fallback, las imágenes pasan a llamarse
+      # `public.ecr.aws/supabase/*` en vez de `ghcr.io/supabase/*`, y un tarball con los
+      # nombres viejos no le sirve al CLI. Súbelo cada vez que cambie CÓMO se nombran.
+      - name: Clave de la caché de imágenes
+        id: clave_imagenes
+        run: |
+          # CLI + config.toml + exclusiones: los tres deciden QUÉ imágenes y con qué tags se
+          # bajan, así que cualquiera de los tres invalida la caché solo. `config.toml` entra
+          # porque ahí se activan o apagan servicios enteros.
+          CFG=$(sha256sum supabase/config.toml | cut -c1-12)
+          EXC=$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)
+          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-migrations-$CFG-$EXC" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de imágenes del stack
+        id: cache_imagenes
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/supabase-imagenes/stack.tar
+          key: ${{ steps.clave_imagenes.outputs.valor }}
+
+      - name: Cargar imágenes de la caché
+        run: scripts/ci/imagenes-supabase.sh cargar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Levantar el stack
+        run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
+
+      # Solo cuando la caché no acertó: si acertó, el tarball ya es el que está en disco.
+      - name: Guardar imágenes para la próxima corrida
+        if: steps.cache_imagenes.outputs.cache-hit != 'true'
+        run: scripts/ci/imagenes-supabase.sh guardar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Apply fresco de toda la cadena de migraciones
+        run: supabase db reset
+
+      # Hasta acá el job demostraba que la cadena APLICA. `tests/rls` demuestra que lo
+      # aplicado se COMPORTA: aislamiento por usuario, y el incremento atómico del ledger de
+      # IA bajo concurrencia. Corre acá y no en otro job porque el stack ya está arriba con la
+      # cadena entera aplicada, así que las funciones nuevas existen sin montar nada más.
+      # Este job no traía Node ni dependencias; de ahí los dos pasos que siguen.
+      - uses: actions/setup-node@v6
+        with:
+          # 22 y no 20 a propósito. Cinco de los siete ficheros de `tests/rls` usan
+          # `@supabase/supabase-js`, que construye un `RealtimeClient` dentro de
+          # `createClient` y exige `WebSocket` nativo: en Node 20 revienta con «native
+          # WebSocket not found» ANTES de la primera aserción. Medido en mi Mac: con v20,
+          # 2 ficheros en rojo y 13 pruebas omitidas; con v22, 7 ficheros y 25 pruebas, todas
+          # pasando.
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      - name: Evidencia RLS — el esquema se comporta (tests/rls)
+        run: |
+          # `supabase status -o env` entrecomilla los valores; se les quitan las comillas
+          # (idéntico al paso «Migraciones y variables del stack efímero» de los E2E).
+          #
+          # Las TRES credenciales, no dos. Cada fichero de `tests/rls` se auto-salta con
+          # `describe.skipIf(!ready)` y `ready` incluye la ANON en seis de los siete: sin
+          # exportarla, vitest sale 0 habiendo omitido la mayor parte de la suite. Es la
+          # forma exacta que tiene este arnés de dar un verde falso, así que abajo se
+          # comprueba que no omitió NADA.
+          while IFS='=' read -r key val; do
+            val="${val%\"}"; val="${val#\"}"
+            case "$key" in
+              API_URL) export SUPABASE_TEST_URL="$val" ;;
+              ANON_KEY) export SUPABASE_TEST_ANON_KEY="$val" ;;
+              SERVICE_ROLE_KEY) export SUPABASE_TEST_SERVICE_ROLE_KEY="$val" ;;
+            esac
+          done < <(supabase status -o env)
+
+          # `NO_COLOR` porque en CI vitest colorea: la línea del resumen sale como
+          # «ESC[2m      Tests ESC[22m …», y la guarda de abajo la buscaba por «^ *Tests».
+          # En mi Mac el pipe salía sin color, así que el fallo solo existía en CI — y el
+          # síntoma fue un rojo que decía «la suite no llegó a correr» debajo de la suite
+          # entera en verde. Se quita el color Y se limpian los escapes al leer: una guarda
+          # que depende de cómo venga coloreada la salida vuelve a fallar al primer cambio.
+          set -o pipefail
+          NO_COLOR=1 npx vitest run tests/rls 2>&1 | tee /tmp/rls.log
+
+      # Un `exit 0` de vitest no dice que la suite corriera: con las credenciales sin
+      # exportar sale 0 con todo omitido. Esta guarda convierte ese silencio en rojo.
+      - name: La suite de RLS corrió entera
+        run: |
+          RESUMEN=$(sed -E 's/\x1b\[[0-9;]*m//g' /tmp/rls.log | grep -E '^ *Tests +[0-9]' | tail -1)
+          echo "$RESUMEN"
+          if [ -z "$RESUMEN" ]; then
+            echo "::error::vitest no imprimió el resumen de pruebas: la suite de RLS no llegó a correr."
+            exit 1
+          fi
+          if echo "$RESUMEN" | grep -q 'skipped'; then
+            echo "::error::la suite de RLS omitió pruebas: $RESUMEN"
+            echo "Casi siempre es una credencial SUPABASE_TEST_* sin exportar, no un test roto."
+            exit 1
+          fi
 
   # Guard BLOQUEANTE: levanta la app contra un Supabase real, crea un usuario y
   # navega. Es el ÚNICO job que EJERCITA el esquema en vez de solo aplicarlo, y
@@ -108,9 +326,51 @@ jobs:
   # GitHub permite mergear igual. Aplica lo mismo al job `migrations`.
   e2e:
     name: E2E smoke
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: ci
-    if: github.event_name == 'pull_request'
+    # PR (donde bloquea) **y** push a main.
+    #
+    # Lo segundo es lo que hace que la caché de imágenes sirva de algo. `actions/cache` restaura
+    # desde la rama actual y desde la rama por defecto; como estos dos jobs solo corrían en PR,
+    # su tarball nunca llegaba a `refs/heads/main` y NINGUNA rama podía restaurarlo. Medido en
+    # un PR de una línea abierto justo para esto: `Pulling` = 89, 96 y 63, y ni una línea de
+    # «Cache restored from key: imagenes-v2-…». La única que acertaba era la de `migrations`,
+    # que es el único job que sí corre en push.
+    #
+    # El precio es una corrida de E2E por merge. Es menos de lo que costaban los relanzamientos
+    # que provocaba el problema, y de paso da verificación post-merge sobre el código ya
+    # fusionado, que hasta ahora nadie hacía.
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    env:
+      # Solo para poder preguntar por su existencia en el `if` de los pasos de login.
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      # ─────────────────────────────────────────────────────────────────────────────────
+      # LA CAUSA RAÍZ de que estos dos jobs llevaran días en rojo, y no es el rate limit.
+      #
+      # `supabase/setup-cli@v2` exporta `SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io`. En el
+      # CLI 2.109.1 —comprobado en el binario de esa versión exacta— esa variable no elige
+      # un registro PREFERIDO: **apaga el fallback**.
+      #
+      #   registros(imagen) = env puesta ? [solo ese] : [public.ecr.aws, ghcr.io, docker.io]
+      #
+      # Por eso el error decía «failed to pull docker image from all registries: ghcr.io/…»
+      # con un solo registro en la lista: era la lista entera. Y por eso el limitador de
+      # ghcr.io sobre la IP del runner bastaba para tumbar el job.
+      #
+      # Vacía ⇒ el CLI la trata como ausente (`trim()`, `length === 0`) y recupera su
+      # comportamiento por defecto: **public.ecr.aws primero**, con ghcr.io y docker.io
+      # detrás. Comprobado que las ocho imágenes existen en `public.ecr.aws/supabase/*` con
+      # exactamente los mismos tags.
+      #
+      # OJO: ponerla acá NO basta, y la primera corrida verde lo demostró bajando igual de
+      # ghcr.io. `setup-cli` la exporta por `$GITHUB_ENV`, y eso GANA al `env` del job en
+      # todos los pasos siguientes. Hay que volver a vaciarla DESPUÉS de ese paso; se deja
+      # aquí igualmente para que el valor sea explícito allá donde se lea.
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
+      # El smoke abre un navegador, inicia sesión y navega: necesita Postgres, kong, gotrue,
+      # postgrest, realtime y storage. Fuera quedan los cinco que nada de eso toca — Studio,
+      # imgproxy, mailpit (el usuario se siembra ya confirmado) y el par logflare + vector.
+      EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
     steps:
       - uses: actions/checkout@v7
 
@@ -118,31 +378,123 @@ jobs:
       # requiere WebSocket nativo (ausente en Node 20). Ver issue #94.
       - uses: actions/setup-node@v6
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
 
       - run: npm ci
 
       - name: Supabase CLI
         uses: supabase/setup-cli@v2
         with:
-          # Misma versión fija que el job de migraciones: ver allí el porqué. Si subes una,
-          # sube la otra — que los dos jobs prueben contra el mismo CLI es parte del punto.
-          version: 2.109.1
+          # Misma versión que el job de migraciones, y del mismo sitio: el `env` del workflow.
+          version: ${{ env.SUPABASE_CLI_VERSION }}
         env:
           SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Levantar Supabase local + migraciones
+      # Deshace lo que `setup-cli` acaba de exportar. Sin esto el CLI se queda con un único
+      # registro y perdemos el fallback — que es exactamente lo que tenía a `main` en rojo.
+      - name: Recuperar el fallback de registros del CLI
         run: |
-          supabase start
+          echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
+          echo "::notice::registro sin fijar: el CLI probará public.ecr.aws, luego ghcr.io y luego docker.io"
+
+      # ── Autenticación de registros, ANTES de cualquier `supabase start` ──────────────
+      #
+      # `supabase start` baja TRECE imágenes y **todas** salen de ghcr.io/supabase/*:
+      # postgres, gotrue, postgrest, realtime, storage-api, imgproxy, edge-runtime,
+      # postgres-meta, studio, logflare, vector, mailpit y kong. Ninguna de Docker Hub.
+      #
+      # Anónimamente, ghcr.io limita por IP, y la IP es la del runner compartido de
+      # GitHub: el error es `toomanyrequests: allowed: 44000/minute`, que no es culpa de
+      # este repo y no se arregla esperando —tres reintentos repartidos en 2,5 h dieron lo
+      # mismo—. Autenticado, la cuota pasa a contarse por usuario.
+      - name: Login en ghcr.io (cuota por usuario en vez de por IP del runner)
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Hoy NINGUNA imagen del stack viene de Docker Hub; este paso es preventivo, para el
+      # día en que el CLI de Supabase mueva alguna o añadamos un servicio propio.
+      #
+      # Sin `continue-on-error`, a propósito: `tests/unit/ci-guards.test.ts` prohíbe esa
+      # directiva en TODO el archivo —un job que se salta su propio veredicto ya nos costó
+      # un incidente— y no hace falta, porque el `if` ya se encarga de lo único que se
+      # quería cubrir: que el PR no dependa de unos secrets que todavía no existen. Si el
+      # secret existe pero es inválido, que falle es lo correcto: una credencial rota tiene
+      # que verse.
+      - name: Login en Docker Hub (preventivo — hoy no se descarga nada de ahí)
+        # `env` y no `secrets`: el contexto `secrets` no existe en el `if` de un paso.
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Aviso si Docker Hub no está autenticado
+        if: env.DOCKERHUB_USERNAME == ''
+        run: |
+          echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las imágenes del stack salen de public.ecr.aws, con ghcr.io de respaldo."
+
+      # ── Caché de las imágenes del stack ──────────────────────────────────────────────
+      #
+      # Este job NO la tenía, y era una decisión medida: descargarlas de public.ecr.aws
+      # tardaba MENOS que restaurar el tarball y hacerle `docker load` (3m40s contra 4m36s),
+      # y ocupaban 1,07 GiB de un cupo de 10 GiB que el repo tenía lleno.
+      #
+      # Se revierte porque las dos premisas cambiaron:
+      #
+      #  · **El cupo ya no está lleno.** Estaba ocupado por 21 entradas `next-*` de ~450 MB
+      #    que no acertaban nunca (su clave llevaba un hash de `src/**`, que cambia en cada
+      #    commit). Arreglada esa clave y borradas las de los PR ya mergeados, el repo pasó
+      #    de 10,39 GB a 4,43 GB.
+      #  · **El minuto de más no era el problema.** En una sola noche, tres corridas de los
+      #    dos jobs E2E murieron con `toomanyrequests: Data limit exceeded` bajando esas
+      #    mismas imágenes, y cada relanzamiento gastaba el cupo que necesitaba el siguiente.
+      #
+      # Y conviene no vender esto como lo que no es. RE-MEDIDO con la caché ya poblada, el
+      # tiempo NO mejora en estos dos jobs: `docker load` de un tar de 3,6 GB cuesta 96s y
+      # 69s, y el smoke pasó de 4m51s a 5m21s (nav-v2, de 5m25s a 5m12s; migraciones, de
+      # 2m20s a 2m0s, que ahí sí gana). Lo que se compra es que `Pulling` sea CERO: el job
+      # deja de poder morir porque un registro público esté de malas. Medio minuto por
+      # corrida a cambio de quitar un modo de fallo entero.
+      - name: Clave de la caché de imágenes
+        id: clave_imagenes
+        run: |
+          CFG=$(sha256sum supabase/config.toml | cut -c1-12)
+          EXC=$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)
+          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-smoke-$CFG-$EXC" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de imágenes del stack
+        id: cache_imagenes
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/supabase-imagenes/stack.tar
+          key: ${{ steps.clave_imagenes.outputs.valor }}
+
+      - name: Cargar imágenes de la caché
+        run: scripts/ci/imagenes-supabase.sh cargar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Levantar el stack
+        run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
+
+      # Solo cuando la caché no acertó: si acertó, el tarball ya es el que está en disco.
+      - name: Guardar imágenes para la próxima corrida
+        if: steps.cache_imagenes.outputs.cache-hit != 'true'
+        run: scripts/ci/imagenes-supabase.sh guardar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Migraciones y variables del stack efímero
+        run: |
           supabase migration up --local
           # Exporta URL + claves del stack efímero al entorno del job.
           # `supabase status -o env` entrecomilla los valores ("..."); hay que
           # quitar las comillas o GITHUB_ENV las conserva literales y rompen la
           # validación de URL en supabase-js (issue #94).
-          # El seeder usa SUPABASE_URL/SERVICE_ROLE_KEY; el dev server (npm run
-          # dev) lee NEXT_PUBLIC_SUPABASE_URL/ANON_KEY en runtime para el login.
+          # El seeder usa SUPABASE_URL/SERVICE_ROLE_KEY; el build del smoke INLINEA
+          # NEXT_PUBLIC_SUPABASE_URL/ANON_KEY, así que tienen que estar en el entorno
+          # ANTES de compilar — y por eso este paso va antes del de Playwright.
           supabase status -o env | while IFS='=' read -r key val; do
             val="${val%\"}"; val="${val#\"}"
             case "$key" in
@@ -159,6 +511,22 @@ jobs:
       # Los grants a los roles de Supabase ahora viven en la migración
       # 20260620000001_grants_public_roles.sql (issue #98), así que `supabase
       # migration up` los aplica; ya no hace falta el paso de psql aquí.
+
+      # ── UN instante, para la siembra y para la app ───────────────────────────────────
+      #
+      # Lo calcula el propio arnés (`instanteCongelado`), que desde el arreglo del 28-sep no
+      # devuelve nunca uno futuro: con el reloj adelantado, el token que emite gotrue con la
+      # hora REAL parece vencido en cada render, todos los componentes de servidor piden
+      # refrescarlo a la vez y gotrue responde 409. La página no falla — se queda cargando.
+      #
+      # Y va al `$GITHUB_ENV` para que lo lean los DOS: la siembra (que si no anclara aquí
+      # escribiría el mes real mientras la app mira otro, y el panel saldría vacío en cada
+      # cruce de mes) y `qa:start`, que lo toma de `QA_FREEZE`.
+      - name: Instante congelado, uno solo
+        run: |
+          INSTANTE=$(node -e "import('./scripts/qa/snap.mjs').then(m => console.log(m.instanteCongelado().toISOString()))")
+          echo "QA_FREEZE=$INSTANTE" >> "$GITHUB_ENV"
+          echo "::notice::instante congelado (siembra y app): $INSTANTE"
 
       - name: Seed usuario E2E
         run: node scripts/seed-e2e-user.mjs
@@ -193,13 +561,13 @@ jobs:
           psql "$DB_URL" -v ON_ERROR_STOP=1
           -c "insert into public.budget_items (user_id, type, name, amount, currency, frequency, period_year, period_month, income_type, source_kind)
           select u.id, 'income', 'Salario E2E', 1000000, 'CRC', 'mensual',
-          extract(year from now())::int, extract(month from now())::int, 'activo', 'manual'
+          extract(year from '$QA_FREEZE'::timestamptz)::int, extract(month from '$QA_FREEZE'::timestamptz)::int, 'activo', 'manual'
           from auth.users u
           where u.email = '$E2E_EMAIL'
           and not exists (select 1 from public.budget_items b where b.user_id = u.id and b.type = 'income');
           insert into public.budget_items (user_id, type, name, amount, currency, frequency, period_year, period_month, source_kind)
           select u.id, 'expense', 'Vivienda E2E', 400000, 'CRC', 'mensual',
-          extract(year from now())::int, extract(month from now())::int, 'manual'
+          extract(year from '$QA_FREEZE'::timestamptz)::int, extract(month from '$QA_FREEZE'::timestamptz)::int, 'manual'
           from auth.users u
           where u.email = '$E2E_EMAIL'
           and not exists (select 1 from public.budget_items b where b.user_id = u.id and b.type = 'expense');
@@ -208,6 +576,25 @@ jobs:
           from auth.users u
           where u.email = '$E2E_EMAIL'
           and not exists (select 1 from public.investment_holdings h where h.user_id = u.id);"
+
+      # Los términos, PENDIENTES también acá.
+      #
+      # `seed-e2e-user.mjs` los marca aceptados para que la barra de re-aceptación no tape el
+      # contenido que busca el smoke. El precio era que NINGÚN job de CI veía nunca esa barra,
+      # y por eso los dos daban verde mientras en local los cinco enlaces de la navegación
+      # inferior eran intocables: anclada a `bottom: 0` con z-index 60, la barra legal tapaba
+      # entera a la de navegación (z-index 45).
+      #
+      # Con el ancla arreglada, la barra ya no tapa nada y el smoke puede correr con ella
+      # montada — que es el estado de cualquier cuenta anterior al registro de términos. Su
+      # último paso comprueba exactamente eso con la bandera APAGADA.
+      - name: Dejar los términos PENDIENTES (para que la barra legal se monte)
+        env:
+          E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
+        run: >
+          psql "$DB_URL" -v ON_ERROR_STOP=1
+          -c "update public.profiles p set terms_version = null, terms_accepted_at = null
+          from auth.users u where u.id = p.id and u.email = '$E2E_EMAIL';"
 
       - name: Navegador Playwright
         run: npx playwright install --with-deps chromium
@@ -229,3 +616,1247 @@ jobs:
           path: /tmp/compound-e2e-results
           retention-days: 7
           if-no-files-found: ignore
+
+  e2e_nav_v2:
+    name: E2E nav-v2
+    runs-on: ubuntu-24.04
+    needs: ci
+    # PR (donde bloquea) **y** push a main.
+    #
+    # Lo segundo es lo que hace que la caché de imágenes sirva de algo. `actions/cache` restaura
+    # desde la rama actual y desde la rama por defecto; como estos dos jobs solo corrían en PR,
+    # su tarball nunca llegaba a `refs/heads/main` y NINGUNA rama podía restaurarlo. Medido en
+    # un PR de una línea abierto justo para esto: `Pulling` = 89, 96 y 63, y ni una línea de
+    # «Cache restored from key: imagenes-v2-…». La única que acertaba era la de `migrations`,
+    # que es el único job que sí corre en push.
+    #
+    # El precio es una corrida de E2E por merge. Es menos de lo que costaban los relanzamientos
+    # que provocaba el problema, y de paso da verificación post-merge sobre el código ya
+    # fusionado, que hasta ahora nadie hacía.
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    env:
+      # Solo para poder preguntar por su existencia en el `if` de los pasos de login.
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      # ─────────────────────────────────────────────────────────────────────────────────
+      # LA CAUSA RAÍZ de que estos dos jobs llevaran días en rojo, y no es el rate limit.
+      #
+      # `supabase/setup-cli@v2` exporta `SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io`. En el
+      # CLI 2.109.1 —comprobado en el binario de esa versión exacta— esa variable no elige
+      # un registro PREFERIDO: **apaga el fallback**.
+      #
+      #   registros(imagen) = env puesta ? [solo ese] : [public.ecr.aws, ghcr.io, docker.io]
+      #
+      # Por eso el error decía «failed to pull docker image from all registries: ghcr.io/…»
+      # con un solo registro en la lista: era la lista entera. Y por eso el limitador de
+      # ghcr.io sobre la IP del runner bastaba para tumbar el job.
+      #
+      # Vacía ⇒ el CLI la trata como ausente (`trim()`, `length === 0`) y recupera su
+      # comportamiento por defecto: **public.ecr.aws primero**, con ghcr.io y docker.io
+      # detrás. Comprobado que las ocho imágenes existen en `public.ecr.aws/supabase/*` con
+      # exactamente los mismos tags.
+      #
+      # OJO: ponerla acá NO basta, y la primera corrida verde lo demostró bajando igual de
+      # ghcr.io. `setup-cli` la exporta por `$GITHUB_ENV`, y eso GANA al `env` del job en
+      # todos los pasos siguientes. Hay que volver a vaciarla DESPUÉS de ese paso; se deja
+      # aquí igualmente para que el valor sea explícito allá donde se lea.
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
+      # El smoke abre un navegador, inicia sesión y navega: necesita Postgres, kong, gotrue,
+      # postgrest, realtime y storage. Fuera quedan los cinco que nada de eso toca — Studio,
+      # imgproxy, mailpit (el usuario se siembra ya confirmado) y el par logflare + vector.
+      EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
+    steps:
+      - uses: actions/checkout@v7
+
+      # Node 22: supabase-js >=2.1xx inicializa Realtime en `createClient` y
+      # requiere WebSocket nativo (ausente en Node 20). Ver issue #94.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          # Misma versión que el job de migraciones, y del mismo sitio: el `env` del workflow.
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+        env:
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Deshace lo que `setup-cli` acaba de exportar. Sin esto el CLI se queda con un único
+      # registro y perdemos el fallback — que es exactamente lo que tenía a `main` en rojo.
+      - name: Recuperar el fallback de registros del CLI
+        run: |
+          echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
+          echo "::notice::registro sin fijar: el CLI probará public.ecr.aws, luego ghcr.io y luego docker.io"
+
+      # ── Autenticación de registros, ANTES de cualquier `supabase start` ──────────────
+      #
+      # `supabase start` baja TRECE imágenes y **todas** salen de ghcr.io/supabase/*:
+      # postgres, gotrue, postgrest, realtime, storage-api, imgproxy, edge-runtime,
+      # postgres-meta, studio, logflare, vector, mailpit y kong. Ninguna de Docker Hub.
+      #
+      # Anónimamente, ghcr.io limita por IP, y la IP es la del runner compartido de
+      # GitHub: el error es `toomanyrequests: allowed: 44000/minute`, que no es culpa de
+      # este repo y no se arregla esperando —tres reintentos repartidos en 2,5 h dieron lo
+      # mismo—. Autenticado, la cuota pasa a contarse por usuario.
+      - name: Login en ghcr.io (cuota por usuario en vez de por IP del runner)
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Hoy NINGUNA imagen del stack viene de Docker Hub; este paso es preventivo, para el
+      # día en que el CLI de Supabase mueva alguna o añadamos un servicio propio.
+      #
+      # Sin `continue-on-error`, a propósito: `tests/unit/ci-guards.test.ts` prohíbe esa
+      # directiva en TODO el archivo —un job que se salta su propio veredicto ya nos costó
+      # un incidente— y no hace falta, porque el `if` ya se encarga de lo único que se
+      # quería cubrir: que el PR no dependa de unos secrets que todavía no existen. Si el
+      # secret existe pero es inválido, que falle es lo correcto: una credencial rota tiene
+      # que verse.
+      - name: Login en Docker Hub (preventivo — hoy no se descarga nada de ahí)
+        # `env` y no `secrets`: el contexto `secrets` no existe en el `if` de un paso.
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Aviso si Docker Hub no está autenticado
+        if: env.DOCKERHUB_USERNAME == ''
+        run: |
+          echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las imágenes del stack salen de public.ecr.aws, con ghcr.io de respaldo."
+
+      # ── Caché de las imágenes del stack ──────────────────────────────────────────────
+      #
+      # Este job NO la tenía, y era una decisión medida: descargarlas de public.ecr.aws
+      # tardaba MENOS que restaurar el tarball y hacerle `docker load` (3m40s contra 4m36s),
+      # y ocupaban 1,07 GiB de un cupo de 10 GiB que el repo tenía lleno.
+      #
+      # Se revierte porque las dos premisas cambiaron:
+      #
+      #  · **El cupo ya no está lleno.** Estaba ocupado por 21 entradas `next-*` de ~450 MB
+      #    que no acertaban nunca (su clave llevaba un hash de `src/**`, que cambia en cada
+      #    commit). Arreglada esa clave y borradas las de los PR ya mergeados, el repo pasó
+      #    de 10,39 GB a 4,43 GB.
+      #  · **El minuto de más no era el problema.** En una sola noche, tres corridas de los
+      #    dos jobs E2E murieron con `toomanyrequests: Data limit exceeded` bajando esas
+      #    mismas imágenes, y cada relanzamiento gastaba el cupo que necesitaba el siguiente.
+      #
+      # Y conviene no vender esto como lo que no es. RE-MEDIDO con la caché ya poblada, el
+      # tiempo NO mejora en estos dos jobs: `docker load` de un tar de 3,6 GB cuesta 96s y
+      # 69s, y el smoke pasó de 4m51s a 5m21s (nav-v2, de 5m25s a 5m12s; migraciones, de
+      # 2m20s a 2m0s, que ahí sí gana). Lo que se compra es que `Pulling` sea CERO: el job
+      # deja de poder morir porque un registro público esté de malas. Medio minuto por
+      # corrida a cambio de quitar un modo de fallo entero.
+      - name: Clave de la caché de imágenes
+        id: clave_imagenes
+        run: |
+          CFG=$(sha256sum supabase/config.toml | cut -c1-12)
+          EXC=$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)
+          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-navv2-$CFG-$EXC" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de imágenes del stack
+        id: cache_imagenes
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/supabase-imagenes/stack.tar
+          key: ${{ steps.clave_imagenes.outputs.valor }}
+
+      - name: Cargar imágenes de la caché
+        run: scripts/ci/imagenes-supabase.sh cargar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Levantar el stack
+        run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
+
+      # Solo cuando la caché no acertó: si acertó, el tarball ya es el que está en disco.
+      - name: Guardar imágenes para la próxima corrida
+        if: steps.cache_imagenes.outputs.cache-hit != 'true'
+        run: scripts/ci/imagenes-supabase.sh guardar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Migraciones y variables del stack efímero
+        run: |
+          supabase migration up --local
+          # Exporta URL + claves del stack efímero al entorno del job.
+          # `supabase status -o env` entrecomilla los valores ("..."); hay que
+          # quitar las comillas o GITHUB_ENV las conserva literales y rompen la
+          # validación de URL en supabase-js (issue #94).
+          # El seeder usa SUPABASE_URL/SERVICE_ROLE_KEY; el build del smoke INLINEA
+          # NEXT_PUBLIC_SUPABASE_URL/ANON_KEY, así que tienen que estar en el entorno
+          # ANTES de compilar — y por eso este paso va antes del de Playwright.
+          supabase status -o env | while IFS='=' read -r key val; do
+            val="${val%\"}"; val="${val#\"}"
+            case "$key" in
+              API_URL)
+                echo "SUPABASE_URL=$val"
+                echo "NEXT_PUBLIC_SUPABASE_URL=$val"
+                ;;
+              ANON_KEY) echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$val" ;;
+              SERVICE_ROLE_KEY) echo "SUPABASE_SERVICE_ROLE_KEY=$val" ;;
+              DB_URL) echo "DB_URL=$val" ;;
+            esac
+          done >> "$GITHUB_ENV"
+
+      # Los grants a los roles de Supabase ahora viven en la migración
+      # 20260620000001_grants_public_roles.sql (issue #98), así que `supabase
+      # migration up` los aplica; ya no hace falta el paso de psql aquí.
+
+      # ── UN instante, para la siembra y para la app ───────────────────────────────────
+      #
+      # Lo calcula el propio arnés (`instanteCongelado`), que desde el arreglo del 28-sep no
+      # devuelve nunca uno futuro: con el reloj adelantado, el token que emite gotrue con la
+      # hora REAL parece vencido en cada render, todos los componentes de servidor piden
+      # refrescarlo a la vez y gotrue responde 409. La página no falla — se queda cargando.
+      #
+      # Y va al `$GITHUB_ENV` para que lo lean los DOS: la siembra (que si no anclara aquí
+      # escribiría el mes real mientras la app mira otro, y el panel saldría vacío en cada
+      # cruce de mes) y `qa:start`, que lo toma de `QA_FREEZE`.
+      - name: Instante congelado, uno solo
+        run: |
+          INSTANTE=$(node -e "import('./scripts/qa/snap.mjs').then(m => console.log(m.instanteCongelado().toISOString()))")
+          echo "QA_FREEZE=$INSTANTE" >> "$GITHUB_ENV"
+          echo "::notice::instante congelado (siembra y app): $INSTANTE"
+
+      - name: Seed usuario E2E
+        run: node scripts/seed-e2e-user.mjs
+        env:
+          E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+      # Datos mínimos para el smoke: presupuesto del MES EN CURSO (para que
+      # health.hasData sea true y /dashboard pinte el HERO en vez del
+      # EmptyState) y un holding (para que /patrimonio liste una posición).
+      #
+      # Va a budget_items y NO a income_sources: los indicadores se calculan
+      # desde el presupuesto vivo, no desde las tablas del Módulo 2 original
+      # —que ninguna pantalla escribe ya—. Sembrar income_sources dejaba al
+      # usuario E2E sin datos visibles y el smoke caía en el EmptyState.
+      #
+      # El gasto MANUAL es tan necesario como el ingreso: sin él el mes se
+      # considera "sin presupuesto" y los indicadores caen al mes cerrado
+      # anterior (que en una cuenta recién sembrada no existe), ver
+      # engine/periodo-indicadores.
+      #
+      # Sin created_by/last_edited_by: son columnas de auditoría nullables que
+      # agrega una migración dinámica (household_backfillable_tables) y el smoke
+      # no las necesita — nombrarlas ataría este seed a esa lista.
+      #
+      # Vía psql como superusuario: ni service_role ni authenticated tienen
+      # grant de INSERT en el stack local. Idempotente.
+      - name: Seed datos E2E (presupuesto + holding vía SQL superuser)
+        env:
+          E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
+        run: >
+          psql "$DB_URL" -v ON_ERROR_STOP=1
+          -c "insert into public.budget_items (user_id, type, name, amount, currency, frequency, period_year, period_month, income_type, source_kind)
+          select u.id, 'income', 'Salario E2E', 1000000, 'CRC', 'mensual',
+          extract(year from '$QA_FREEZE'::timestamptz)::int, extract(month from '$QA_FREEZE'::timestamptz)::int, 'activo', 'manual'
+          from auth.users u
+          where u.email = '$E2E_EMAIL'
+          and not exists (select 1 from public.budget_items b where b.user_id = u.id and b.type = 'income');
+          insert into public.budget_items (user_id, type, name, amount, currency, frequency, period_year, period_month, source_kind)
+          select u.id, 'expense', 'Vivienda E2E', 400000, 'CRC', 'mensual',
+          extract(year from '$QA_FREEZE'::timestamptz)::int, extract(month from '$QA_FREEZE'::timestamptz)::int, 'manual'
+          from auth.users u
+          where u.email = '$E2E_EMAIL'
+          and not exists (select 1 from public.budget_items b where b.user_id = u.id and b.type = 'expense');
+          insert into public.investment_holdings (user_id, symbol, asset_type, quantity, average_cost, cost_basis, currency, label)
+          select u.id, 'VOO', 'etf', 10, 400, 4000, 'USD', 'VOO'
+          from auth.users u
+          where u.email = '$E2E_EMAIL'
+          and not exists (select 1 from public.investment_holdings h where h.user_id = u.id);"
+
+      # Y acá se DESHACE el `terms_version` que sembró seed-e2e-user.mjs, a propósito y
+      # solo en este job.
+      #
+      # El seed lo marca para que la barra de re-aceptación no tape el contenido que busca
+      # el smoke. El precio fue que este job —el único que mide la navegación inferior— no
+      # veía nunca esa barra, y por eso daba verde mientras en local los cinco enlaces eran
+      # intocables: anclada a `bottom: 0` con z-index 60, la barra legal tapaba entera a la
+      # de navegación (z-index 45). No era cuestión de tener más datos —la cuenta de CI casi
+      # no tiene— sino de una pieza de interfaz global que el seed apagaba.
+      #
+      # Con los términos pendientes, los specs de la bandera corren con el mismo cascarón
+      # que ve quien tiene una cuenta anterior al registro. El smoke, que sí necesita la
+      # pantalla despejada, corre en otro job con su propio seed y no se toca.
+      - name: Dejar los términos PENDIENTES (para que la barra legal se monte)
+        env:
+          E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
+        run: >
+          psql "$DB_URL" -v ON_ERROR_STOP=1
+          -c "update public.profiles p set terms_version = null, terms_accepted_at = null
+          from auth.users u where u.id = p.id and u.email = '$E2E_EMAIL';"
+
+      - name: Navegador Playwright
+        run: npx playwright install --with-deps chromium
+
+      # ── Lo propio de este job ───────────────────────────────────────────────────────
+      #
+      # `NEXT_PUBLIC_NAV_V2` se INLINEA en el bundle al compilar, así que no basta con
+      # ponerla al arrancar: hay que compilar con ella. Por eso este job hace su propio
+      # build en vez de reutilizar el del job `ci`.
+      - name: Compilar con la bandera encendida
+        run: npm run build
+        env:
+          NEXT_PUBLIC_NAV_V2: "1"
+
+      # Se comprueba el ARTEFACTO, no el código de salida: un build que no arranca deja el
+      # `.next` anterior y todo lo que viene después mide la versión equivocada.
+      - name: Servidor congelado
+        run: |
+          npm run qa:start -- --port 3001 &
+          # Espera activa con curl en vez de `npx wait-on`: esa descarga un paquete que no
+          # está en el lockfile, y un job de CI no debería traerse dependencias de la red
+          # que nadie fijó.
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:3001/login; then
+              echo "servidor arriba tras ${i}s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::el servidor congelado no respondió en 120s"
+          exit 1
+        env:
+          NEXT_PUBLIC_NAV_V2: "1"
+
+      - name: Specs de la bandera (15 pruebas)
+        env:
+          E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          A11Y_BASE_URL: http://localhost:3001
+          PLAYWRIGHT_JSON_OUTPUT_NAME: /tmp/nav-v2.json
+        run: >
+          npx playwright test -c playwright.a11y.config.ts --reporter=list,json
+          bottom-nav-v2 command-palette mobile-nav-v2 barra-legal
+
+      # Y la bandera se verifica por el RESULTADO, no por un grep al bundle: si llegó, ningún
+      # caso se saltó por su causa. Ver el porqué en el propio script.
+      - name: Verificar que la bandera llegó (ningún caso saltado por ella)
+        if: always()
+        run: node scripts/ci/verificar-bandera-nav.mjs /tmp/nav-v2.json
+
+      # Evidencia del fallo: Playwright ya guarda screenshot + trace en
+      # /tmp/compound-e2e-results (only-on-failure / retain-on-failure); sin
+      # subirlos no se pueden inspeccionar. Útil para diagnosticar el smoke.
+
+      - name: Subir evidencia nav-v2 (si falla)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nav-v2-playwright-results
+          path: /tmp/compound-a11y-results
+          retention-days: 7
+          if-no-files-found: ignore
+
+  e2e_a11y:
+    name: E2E a11y (${{ matrix.shard }}/2)
+    runs-on: ubuntu-24.04
+    needs: ci
+    # Dos shards porque la suite entera mide 15,8-17,8 min en una máquina, por encima del
+    # tope de 15 que nos pusimos. El reparto lo hace Playwright (`--shard`), así que la
+    # config que se usa en local no cambia: quien la corra a mano la sigue corriendo entera.
+    #
+    # El precio es levantar el stack dos veces (~2 min cada uno con la caché acertando). Se
+    # paga a cambio de que el reloj baje a la mitad, que es lo que decide si alguien espera
+    # el verde o lo mira de reojo.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    # La suite de accesibilidad no corría en CI, y eso costó caro: 22 casos podían estar en
+    # rojo en la máquina con el PR en verde. Pasó — el catálogo de estados multiplicó los
+    # elementos de `/dev/ui` y 21 localizadores dejaron de saber dónde mirar; nadie se enteró
+    # hasta que alguien la corrió a mano.
+    #
+    # PR **y** push a main, por lo mismo que los otros dos E2E: `actions/cache` restaura desde
+    # la rama actual y desde la por defecto, así que sin la corrida en push su tarball nunca
+    # llegaría a `refs/heads/main` y ninguna rama podría acertarle.
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      # Ver el porqué largo en el job `E2E nav-v2`: vacía recupera el fallback de registros
+      # del CLI (public.ecr.aws → ghcr.io → docker.io).
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
+      # La auditoría abre un navegador, inicia sesión y recorre pantallas con datos. Fuera
+      # quedan los cinco que nada de eso toca.
+      EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
+      # La cuenta demo que siembra `seed-demo-familia.mjs`. Se resuelve por email, nunca por id.
+      # Es una cuenta SINTÉTICA, escrita acá a la vista: `.local` es un TLD reservado
+      # (RFC 6762), así que no hay —ni puede haber— buzón detrás. Antes salía de la variable
+      # `DEMO_EMAIL`, que apuntaba al buzón REAL de la demo de producción: un correo personal
+      # legible por cualquiera con acceso a los logs de un repo público, y una cuenta de
+      # producción que cada corrida de CI borraba y reescribía.
+      E2E_EMAIL: demo@ci.local
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+        env:
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Recuperar el fallback de registros del CLI
+        run: |
+          echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
+          echo "::notice::registro sin fijar: el CLI probará public.ecr.aws, luego ghcr.io y luego docker.io"
+
+      - name: Login en ghcr.io (cuota por usuario en vez de por IP del runner)
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login en Docker Hub (preventivo — hoy no se descarga nada de ahí)
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Aviso si Docker Hub no está autenticado
+        if: env.DOCKERHUB_USERNAME == ''
+        run: |
+          echo "::notice::DOCKERHUB_USERNAME no está configurado; sin login en Docker Hub. Hoy no afecta: las imágenes del stack salen de public.ecr.aws, con ghcr.io de respaldo."
+
+      # Misma caché que los otros dos E2E, con su propio token en la clave: el tarball depende
+      # de qué servicios se excluyen, y este job excluye los mismos que nav-v2 pero no comparte
+      # entrada para que una corrida no le pise el tar a la otra.
+      - name: Clave de la caché de imágenes
+        id: clave_imagenes
+        run: |
+          CFG=$(sha256sum supabase/config.toml | cut -c1-12)
+          EXC=$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)
+          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-a11y${{ matrix.shard }}-$CFG-$EXC" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de imágenes del stack
+        id: cache_imagenes
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/supabase-imagenes/stack.tar
+          key: ${{ steps.clave_imagenes.outputs.valor }}
+
+      - name: Cargar imágenes de la caché
+        run: scripts/ci/imagenes-supabase.sh cargar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Levantar el stack
+        run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
+
+      - name: Guardar imágenes para la próxima corrida
+        if: steps.cache_imagenes.outputs.cache-hit != 'true'
+        run: scripts/ci/imagenes-supabase.sh guardar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Migraciones y variables del stack efímero
+        run: |
+          supabase migration up --local
+          supabase status -o env | while IFS='=' read -r key val; do
+            val="${val%\"}"; val="${val#\"}"
+            case "$key" in
+              API_URL)
+                echo "SUPABASE_URL=$val"
+                echo "NEXT_PUBLIC_SUPABASE_URL=$val"
+                ;;
+              ANON_KEY) echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$val" ;;
+              SERVICE_ROLE_KEY) echo "SUPABASE_SERVICE_ROLE_KEY=$val" ;;
+              DB_URL) echo "DB_URL=$val" ;;
+            esac
+          done >> "$GITHUB_ENV"
+
+      # ── El entorno, en un fichero, porque dos piezas lo exigen ───────────────────────
+      #
+      # `seed-demo-familia.mjs` pide `DEMO_ENV_FILE` explícito —BORRA y reescribe las cuentas
+      # de demo, y esas cuentas existen también en producción, así que el entorno hay que
+      # NOMBRARLO— y `con-env.mjs` se niega a compilar si no carga ningún `.env*`, que es la
+      # guarda que evitó una captura entera medida sin claves.
+      #
+      # Se escribe `.env.local` con los valores del stack EFÍMERO que acaba de arrancar este
+      # job: una base que nace y muere acá. No hay forma de que apunte a producción — la URL
+      # sale de `supabase status` del contenedor local, no de un secreto.
+      - name: Entorno del stack efímero en .env.local
+        run: |
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY"
+            echo "DEMO_PASSWORD=$DEMO_PASSWORD"
+          } > .env.local
+          echo "::notice::.env.local escrito contra $NEXT_PUBLIC_SUPABASE_URL (stack efímero de este job)"
+        env:
+          DEMO_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+      # La auditoría mide pantallas CON datos: sin ellas, media suite se pasea por estados
+      # vacíos y el inventario no dice nada de lo que ve una persona.
+      - name: Sembrar la cuenta demo
+        # `DEMO_EMAIL_OVERRIDE` reapunta las DOS identidades de la demo (el titular y Marta,
+        # que cuelga del mismo buzón por plus-addressing) a la cuenta sintética. Sin él, el
+        # seeder cae a su default, que es el buzón real de producción — y el seeder BORRA y
+        # reescribe lo que encuentra, así que ese default no puede ser lo que corra en CI.
+        run: DEMO_ENV_FILE=.env.local DEMO_EMAIL_OVERRIDE=demo@ci.local node scripts/demo/seed-demo-familia.mjs
+
+      # Los términos se dejan PENDIENTES a propósito, igual que en nav-v2: la barra legal es
+      # una pieza global, y sus specs son parte de esta suite. Con el seed marcándolos, la
+      # barra no se monta y esos casos medirían una pantalla que nadie tiene.
+      - name: Dejar los términos PENDIENTES (para que la barra legal se monte)
+        run: >
+          psql "$DB_URL" -v ON_ERROR_STOP=1
+          -c "update public.profiles p set terms_version = null, terms_accepted_at = null
+          from auth.users u where u.id = p.id and u.email = '${{ env.E2E_EMAIL }}';"
+
+      # Con `con-env.mjs`, que resuelve el entorno contra la raíz y se niega a compilar sin
+      # él: un build con `NEXT_PUBLIC_*` vacíos no falla, arranca — y falla después, por
+      # dentro, en las pantallas que necesitan las claves.
+      - name: Compilar
+        run: node scripts/dev/con-env.mjs npm run build
+
+      - name: Navegador Playwright
+        run: npx playwright install --with-deps chromium
+
+      # El mismo servidor congelado que toma las capturas visuales: `start-frozen.mjs` pone
+      # QA_FREEZE, QA_BLOCK_EXTERNAL=1 y TZ=UTC él mismo.
+      - name: Servidor congelado
+        run: |
+          node scripts/dev/con-env.mjs npm run qa:start -- --port 3001 --freeze "$QA_INSTANTE" &
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:3001/login; then
+              echo "servidor arriba tras ${i}s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::el servidor congelado no respondió en 120s"
+          exit 1
+
+      - name: Suite de accesibilidad (shard ${{ matrix.shard }} de 2)
+        env:
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          A11Y_BASE_URL: http://localhost:3001
+        run: npx playwright test -c playwright.a11y.config.ts --shard=${{ matrix.shard }}/2
+
+      - name: Subir evidencia a11y (si falla)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-playwright-results-${{ matrix.shard }}
+          path: /tmp/compound-a11y-results
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # ── El acelerador visual ──────────────────────────────────────────────────────────────
+  #
+  # La evidencia visual de un PR eran dos capturas a mano de 25 minutos cada una, en la
+  # máquina de quien lo escribía. Eso no escala y, peor, es donde se cuelan las medidas
+  # falsas: un puerto ocupado, una compilación bajo el servidor, dos orígenes distintos.
+  # Acá lo produce CI, con el mismo arnés y las mismas guardas.
+
+  # ¿Hay interfaz que capturar? Cuatro jobs de captura por un cambio en un README son 40
+  # minutos de runner tirados, y el ruido acostumbra a mirar los verdes sin leerlos.
+  #
+  # Sin acciones de terceros: `git diff --name-only` contra el merge-base y ya. Una acción
+  # para esto sería una dependencia más que auditar por una línea de shell.
+  toca_interfaz:
+    name: ¿El PR toca interfaz?
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request'
+    outputs:
+      si: ${{ steps.mirar.outputs.si }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - id: mirar
+        run: |
+          BASE=$(git merge-base origin/${{ github.base_ref }} HEAD)
+          CAMBIOS=$(git diff --name-only "$BASE" HEAD)
+          if echo "$CAMBIOS" | grep -qE '^(src/|public/|scripts/qa/|scripts/demo/|package(-lock)?\.json|next\.config\.|\.github/workflows/ci\.yml)'; then
+            echo "si=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::el PR toca interfaz: se capturan las pantallas"
+          else
+            echo "si=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::el PR no toca interfaz (ni src, ni public, ni el arnés, ni las dependencias): capturas y diff se saltan"
+          fi
+
+  capturas_main:
+    name: Capturas de main (${{ matrix.shard }}/4)
+    runs-on: ubuntu-24.04
+    needs: ci
+    # Solo en push: son la BASE contra la que se compara cada PR.
+    if: github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
+      EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+        env:
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Recuperar el fallback de registros del CLI
+        run: echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
+
+      - name: Login en ghcr.io (cuota por usuario en vez de por IP del runner)
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clave de la caché de imágenes
+        id: clave_imagenes
+        run: |
+          CFG=$(sha256sum supabase/config.toml | cut -c1-12)
+          EXC=$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)
+          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-visual${{ matrix.shard }}-$CFG-$EXC" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de imágenes del stack
+        id: cache_imagenes
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/supabase-imagenes/stack.tar
+          key: ${{ steps.clave_imagenes.outputs.valor }}
+
+      - name: Cargar imágenes de la caché
+        run: scripts/ci/imagenes-supabase.sh cargar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Levantar el stack
+        run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
+
+      - name: Guardar imágenes para la próxima corrida
+        if: steps.cache_imagenes.outputs.cache-hit != 'true'
+        run: scripts/ci/imagenes-supabase.sh guardar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Migraciones y variables del stack efímero
+        run: |
+          supabase migration up --local
+          supabase status -o env | while IFS='=' read -r key val; do
+            val="${val%\"}"; val="${val#\"}"
+            case "$key" in
+              API_URL)
+                echo "SUPABASE_URL=$val"
+                echo "NEXT_PUBLIC_SUPABASE_URL=$val"
+                ;;
+              ANON_KEY) echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$val" ;;
+              SERVICE_ROLE_KEY) echo "SUPABASE_SERVICE_ROLE_KEY=$val" ;;
+              DB_URL) echo "DB_URL=$val" ;;
+            esac
+          done >> "$GITHUB_ENV"
+
+      # UN instante para la siembra y para la app, y FIJO — no del reloj de pared.
+      #
+      # Calcularlo hacía que una base capturada ayer y una rama capturada hoy congelaran en días
+      # distintos, y entonces toda pantalla con fechas difería sin que el PR la tocara. `diff.mjs`
+      # ahora se NIEGA a comparar dos corridas con instantes distintos, así que esto no puede
+      # volver a pasar en silencio; fijarlo acá es lo que hace que no pase nunca.
+      - name: Instante congelado, uno solo
+        run: |
+          echo "QA_FREEZE=${{ env.QA_INSTANTE }}" >> "$GITHUB_ENV"
+          echo "::notice::instante congelado (siembra y app): ${{ env.QA_INSTANTE }}"
+
+      - name: Entorno del stack efímero en .env.local
+        run: |
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY"
+            echo "DEMO_PASSWORD=$DEMO_PASSWORD"
+          } > .env.local
+        env:
+          DEMO_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+      # La captura mide pantallas CON datos: sin ellas media evidencia serían estados vacíos.
+      - name: Sembrar la cuenta demo
+        # `DEMO_EMAIL_OVERRIDE` reapunta las DOS identidades de la demo (el titular y Marta,
+        # que cuelga del mismo buzón por plus-addressing) a la cuenta sintética. Sin él, el
+        # seeder cae a su default, que es el buzón real de producción — y el seeder BORRA y
+        # reescribe lo que encuentra, así que ese default no puede ser lo que corra en CI.
+        run: DEMO_ENV_FILE=.env.local DEMO_EMAIL_OVERRIDE=demo@ci.local node scripts/demo/seed-demo-familia.mjs
+
+      # `NEXT_PUBLIC_QA_SIN_ANIMACION=1` fuerza `ANIMACION_ACTIVA` a falso en el núcleo de
+      # gráficos. Hoy no cambia nada —el producto ya la quiere apagada—, y por eso está: lo que
+      # compra no es un comportamiento nuevo, es que no pueda dejar de ser cierto sin que estas
+      # capturas se enteren. Va en `BANDERAS_UI`, así que viaja en el manifiesto y el diff se
+      # niega a comparar una base y una rama compiladas con distinto valor.
+      - name: Compilar con las banderas de producción
+        run: NEXT_PUBLIC_QA_SIN_ANIMACION=1 node scripts/dev/con-env.mjs npm run build
+
+      - name: Navegador Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Servidor congelado
+        run: |
+          node scripts/dev/con-env.mjs npm run qa:start -- --port 3001 &
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:3001/login; then exit 0; fi
+            sleep 2
+          done
+          echo "::error::el servidor congelado no respondió en 120s"
+          exit 1
+
+      - name: Capturar (shard ${{ matrix.shard }} de 4)
+        env:
+          E2E_EMAIL: demo@ci.local
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          # En CI se retira `--deterministic-mode` (no produce fotogramas en el runner). Ver
+          # `snap.mjs`; lo que esa bandera prometía se demuestra en el paso siguiente.
+          QA_CI: "1"
+        run: |
+          node scripts/qa/snap.mjs --base-url http://localhost:3001 \
+            --shard ${{ matrix.shard }}/4 --out capturas
+
+      # Quitar la bandera del determinismo y confiar sería cambiar una garantía por una
+      # suposición. Se vuelve a capturar un puñado de rutas contra el MISMO servidor y la misma
+      # compilación, con umbral CERO y sin filtro de antialiasing: cualquier píxel distinto es
+      # inestabilidad, y entonces las capturas no sirven como evidencia.
+      # La MISMA pasada otra vez: mismas rutas, mismas seis combinaciones. Antes era una lista
+      # aparte de 20 rutas en `light/1280`, y ese agujero costó un PR ajeno —`/mi-base-financiera`
+      # parpadeó en `light/768`, la sonda dio 0/20 porque ese ancho no lo miraba, y la diferencia
+      # aterrizó como reprobada a nombre del PR de postcss (#892), que no había tocado nada—.
+      #
+      # Lo que se detecta y lo que se compara son ahora el mismo conjunto. Y cuesta POCO: ~50
+      # capturas por shard contra las ~40 de la lista vieja, +11 %.
+      - name: Segunda pasada (las mismas rutas y combinaciones)
+        env:
+          E2E_EMAIL: demo@ci.local
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          QA_CI: "1"
+        run: |
+          node scripts/qa/snap.mjs --base-url http://localhost:3001 \
+            --shard ${{ matrix.shard }}/4 --out capturas-b
+
+      - name: Sonda de determinismo (las dos pasadas, por imagen)
+        run: |
+          # mi-base-financiera: inestable entre pasadas de la misma compilación (72–109 px, delta 21
+          # en claro); sacar de aquí al cerrar CI-2.
+          node scripts/qa/sonda-determinismo.mjs --a capturas --b capturas-b \
+            --out-diff diff-determinismo --tope 2 --excluir home,dev_ui,mi-base-financiera
+
+      # Lo que la sonda descubrió tiene que VIAJAR: los dos jobs no comparten disco, y lo único
+      # que llega al diff visual es este artefacto. Sin este paso, el diff no sabría qué rutas
+      # se mueven solas y volvería a culpar al PR de una pantalla que cambia sin que nadie la
+      # toque — que es el error que la sonda existe para no cometer.
+      - name: Marcar las rutas inestables en el manifiesto
+        run: |
+          node scripts/qa/marcar-inestables.mjs --capturas capturas \
+            --inestables diff-determinismo/inestables.json --tanda-a capturas --tanda-b capturas-b
+
+          # Cada shard guarda SU manifiesto con su número. `download-artifact` con patrón deja
+          # los artefactos aplanados en la misma carpeta, así que cuatro `manifest.json` se
+          # pisan y sobrevive uno solo — y con él se pierde lo que los otros tres midieron. Los
+          # PNG no colisionan (cada shard captura rutas distintas), así que el estropicio no se
+          # ve: 200 capturas comparadas y el manifiesto de un cuarto de ellas.
+          mv capturas/manifest.json "capturas/manifest-${{ matrix.shard }}.json"
+
+      # Una guarda que bloquea y no deja ver qué vio se desactiva a la semana. Cuando la sonda
+      # reprueba, lo único que queda en el log es un conteo de píxeles («106 · delta 21»), y con
+      # eso no se puede decidir si es un número que anima, una fecha que se coló o una animación
+      # que `finalizarAnimaciones` no apaga. Las dos tandas y su página de comparación suben
+      # SOLO en el fallo: en verde no hay nada que mirar y serían 40 MB por corrida.
+      - name: Página de comparación de la sonda (solo si reprobó)
+        if: failure()
+        run: |
+          node scripts/qa/comparacion.mjs --a capturas --b capturas-b \
+            --diff diff-determinismo --out comparacion-determinismo \
+            --titulo "Sonda de determinismo · misma compilación, dos tandas"
+
+      - name: Subir la evidencia de la sonda (solo si reprobó)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonda-determinismo-${{ github.job }}-${{ matrix.shard }}
+          path: |
+            comparacion-determinismo
+            diff-determinismo
+          retention-days: 14
+
+      - name: Subir las capturas como base
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-${{ github.sha }}-${{ matrix.shard }}
+          path: capturas
+          retention-days: 14
+
+  capturas_rama:
+    name: Capturas de la rama (${{ matrix.shard }}/4)
+    runs-on: ubuntu-24.04
+    needs: [ci, toca_interfaz]
+    # Un check SALTADO cuenta como cumplido en el ruleset, así que saltarlo no abre un agujero.
+    if: github.event_name == 'pull_request' && needs.toca_interfaz.outputs.si == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
+      EXCLUIR_SERVICIOS: imgproxy,mailpit,studio,logflare,vector
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+        env:
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Recuperar el fallback de registros del CLI
+        run: echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
+
+      - name: Login en ghcr.io (cuota por usuario en vez de por IP del runner)
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clave de la caché de imágenes
+        id: clave_imagenes
+        run: |
+          CFG=$(sha256sum supabase/config.toml | cut -c1-12)
+          EXC=$(printf '%s' "${{ env.EXCLUIR_SERVICIOS }}" | sha256sum | cut -c1-12)
+          echo "valor=imagenes-v2-${{ env.SUPABASE_CLI_VERSION }}-visual${{ matrix.shard }}-$CFG-$EXC" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de imágenes del stack
+        id: cache_imagenes
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/supabase-imagenes/stack.tar
+          key: ${{ steps.clave_imagenes.outputs.valor }}
+
+      - name: Cargar imágenes de la caché
+        run: scripts/ci/imagenes-supabase.sh cargar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Levantar el stack
+        run: scripts/ci/supabase-start.sh -x "${{ env.EXCLUIR_SERVICIOS }}"
+
+      - name: Guardar imágenes para la próxima corrida
+        if: steps.cache_imagenes.outputs.cache-hit != 'true'
+        run: scripts/ci/imagenes-supabase.sh guardar ~/.cache/supabase-imagenes/stack.tar
+
+      - name: Migraciones y variables del stack efímero
+        run: |
+          supabase migration up --local
+          supabase status -o env | while IFS='=' read -r key val; do
+            val="${val%\"}"; val="${val#\"}"
+            case "$key" in
+              API_URL)
+                echo "SUPABASE_URL=$val"
+                echo "NEXT_PUBLIC_SUPABASE_URL=$val"
+                ;;
+              ANON_KEY) echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$val" ;;
+              SERVICE_ROLE_KEY) echo "SUPABASE_SERVICE_ROLE_KEY=$val" ;;
+              DB_URL) echo "DB_URL=$val" ;;
+            esac
+          done >> "$GITHUB_ENV"
+
+      # UN instante para la siembra y para la app, y FIJO — no del reloj de pared.
+      #
+      # Calcularlo hacía que una base capturada ayer y una rama capturada hoy congelaran en días
+      # distintos, y entonces toda pantalla con fechas difería sin que el PR la tocara. `diff.mjs`
+      # ahora se NIEGA a comparar dos corridas con instantes distintos, así que esto no puede
+      # volver a pasar en silencio; fijarlo acá es lo que hace que no pase nunca.
+      - name: Instante congelado, uno solo
+        run: |
+          echo "QA_FREEZE=${{ env.QA_INSTANTE }}" >> "$GITHUB_ENV"
+          echo "::notice::instante congelado (siembra y app): ${{ env.QA_INSTANTE }}"
+
+      - name: Entorno del stack efímero en .env.local
+        run: |
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY"
+            echo "DEMO_PASSWORD=$DEMO_PASSWORD"
+          } > .env.local
+        env:
+          DEMO_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+      # La captura mide pantallas CON datos: sin ellas media evidencia serían estados vacíos.
+      - name: Sembrar la cuenta demo
+        # `DEMO_EMAIL_OVERRIDE` reapunta las DOS identidades de la demo (el titular y Marta,
+        # que cuelga del mismo buzón por plus-addressing) a la cuenta sintética. Sin él, el
+        # seeder cae a su default, que es el buzón real de producción — y el seeder BORRA y
+        # reescribe lo que encuentra, así que ese default no puede ser lo que corra en CI.
+        run: DEMO_ENV_FILE=.env.local DEMO_EMAIL_OVERRIDE=demo@ci.local node scripts/demo/seed-demo-familia.mjs
+
+      # `NEXT_PUBLIC_QA_SIN_ANIMACION=1` fuerza `ANIMACION_ACTIVA` a falso en el núcleo de
+      # gráficos. Hoy no cambia nada —el producto ya la quiere apagada—, y por eso está: lo que
+      # compra no es un comportamiento nuevo, es que no pueda dejar de ser cierto sin que estas
+      # capturas se enteren. Va en `BANDERAS_UI`, así que viaja en el manifiesto y el diff se
+      # niega a comparar una base y una rama compiladas con distinto valor.
+      - name: Compilar con las banderas de producción
+        run: NEXT_PUBLIC_QA_SIN_ANIMACION=1 node scripts/dev/con-env.mjs npm run build
+
+      - name: Navegador Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Servidor congelado
+        run: |
+          node scripts/dev/con-env.mjs npm run qa:start -- --port 3001 &
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:3001/login; then exit 0; fi
+            sleep 2
+          done
+          echo "::error::el servidor congelado no respondió en 120s"
+          exit 1
+
+      - name: Capturar (shard ${{ matrix.shard }} de 4)
+        env:
+          E2E_EMAIL: demo@ci.local
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          # En CI se retira `--deterministic-mode` (no produce fotogramas en el runner). Ver
+          # `snap.mjs`; lo que esa bandera prometía se demuestra en el paso siguiente.
+          QA_CI: "1"
+        run: |
+          node scripts/qa/snap.mjs --base-url http://localhost:3001 \
+            --shard ${{ matrix.shard }}/4 --out capturas
+
+      # Quitar la bandera del determinismo y confiar sería cambiar una garantía por una
+      # suposición. Se vuelve a capturar un puñado de rutas contra el MISMO servidor y la misma
+      # compilación, con umbral CERO y sin filtro de antialiasing: cualquier píxel distinto es
+      # inestabilidad, y entonces las capturas no sirven como evidencia.
+      # La MISMA pasada otra vez: mismas rutas, mismas seis combinaciones. Antes era una lista
+      # aparte de 20 rutas en `light/1280`, y ese agujero costó un PR ajeno —`/mi-base-financiera`
+      # parpadeó en `light/768`, la sonda dio 0/20 porque ese ancho no lo miraba, y la diferencia
+      # aterrizó como reprobada a nombre del PR de postcss (#892), que no había tocado nada—.
+      #
+      # Lo que se detecta y lo que se compara son ahora el mismo conjunto. Y cuesta POCO: ~50
+      # capturas por shard contra las ~40 de la lista vieja, +11 %.
+      - name: Segunda pasada (las mismas rutas y combinaciones)
+        env:
+          E2E_EMAIL: demo@ci.local
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          QA_CI: "1"
+        run: |
+          node scripts/qa/snap.mjs --base-url http://localhost:3001 \
+            --shard ${{ matrix.shard }}/4 --out capturas-b
+
+      - name: Sonda de determinismo (las dos pasadas, por imagen)
+        run: |
+          # mi-base-financiera: inestable entre pasadas de la misma compilación (72–109 px, delta 21
+          # en claro); sacar de aquí al cerrar CI-2.
+          node scripts/qa/sonda-determinismo.mjs --a capturas --b capturas-b \
+            --out-diff diff-determinismo --tope 2 --excluir home,dev_ui,mi-base-financiera
+
+      # Lo que la sonda descubrió tiene que VIAJAR: los dos jobs no comparten disco, y lo único
+      # que llega al diff visual es este artefacto. Sin este paso, el diff no sabría qué rutas
+      # se mueven solas y volvería a culpar al PR de una pantalla que cambia sin que nadie la
+      # toque — que es el error que la sonda existe para no cometer.
+      - name: Marcar las rutas inestables en el manifiesto
+        run: |
+          node scripts/qa/marcar-inestables.mjs --capturas capturas \
+            --inestables diff-determinismo/inestables.json --tanda-a capturas --tanda-b capturas-b
+
+          # Cada shard guarda SU manifiesto con su número. `download-artifact` con patrón deja
+          # los artefactos aplanados en la misma carpeta, así que cuatro `manifest.json` se
+          # pisan y sobrevive uno solo — y con él se pierde lo que los otros tres midieron. Los
+          # PNG no colisionan (cada shard captura rutas distintas), así que el estropicio no se
+          # ve: 200 capturas comparadas y el manifiesto de un cuarto de ellas.
+          mv capturas/manifest.json "capturas/manifest-${{ matrix.shard }}.json"
+
+      # Una guarda que bloquea y no deja ver qué vio se desactiva a la semana. Cuando la sonda
+      # reprueba, lo único que queda en el log es un conteo de píxeles («106 · delta 21»), y con
+      # eso no se puede decidir si es un número que anima, una fecha que se coló o una animación
+      # que `finalizarAnimaciones` no apaga. Las dos tandas y su página de comparación suben
+      # SOLO en el fallo: en verde no hay nada que mirar y serían 40 MB por corrida.
+      - name: Página de comparación de la sonda (solo si reprobó)
+        if: failure()
+        run: |
+          node scripts/qa/comparacion.mjs --a capturas --b capturas-b \
+            --diff diff-determinismo --out comparacion-determinismo \
+            --titulo "Sonda de determinismo · misma compilación, dos tandas"
+
+      - name: Subir la evidencia de la sonda (solo si reprobó)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonda-determinismo-${{ github.job }}-${{ matrix.shard }}
+          path: |
+            comparacion-determinismo
+            diff-determinismo
+          retention-days: 14
+
+      # Evidencia del fallo de login: el mensaje de Playwright no dice cuál de las tres
+      # condiciones —visible, habilitado, estable— es la que falta, y adivinarlo ya costó dos
+      # vueltas de CI.
+      - name: Subir la evidencia si el login falló
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fallo-login-${{ matrix.shard }}
+          path: |
+            qa-fallo-login.png
+            qa-fallo-login.html
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Subir las capturas de la rama
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-pr${{ github.event.number }}-${{ matrix.shard }}
+          path: capturas
+          retention-days: 14
+
+  diff_visual:
+    name: Diff visual
+    runs-on: ubuntu-24.04
+    needs: [capturas_rama, toca_interfaz]
+    if: github.event_name == 'pull_request' && needs.toca_interfaz.outputs.si == 'true'
+    # Informativo en su primera vida, pero SIN `continue-on-error` — esa directiva está
+    # prohibida en este archivo (`tests/unit/ci-guards.test.ts`) porque un job que se salta su
+    # propio veredicto ya costó un incidente. No hace falta: mientras no esté en el ruleset,
+    # un rojo acá se ve y no bloquea. Cuando acumule tres verdes, se añade al ruleset y pasa a
+    # bloquear sin tocar una línea de este workflow.
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      # `diff.mjs` compara los PNG dentro de un Chromium —el canvas del navegador hace de
+      # decodificador, para no traer una librería de imágenes a un repo que ya trae un
+      # navegador entero—, así que este job necesita el binario. Faltaba desde que existe, y
+      # no se notó porque hasta ahora el job siempre moría antes, resolviendo la base.
+      - name: Navegador Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Bajar las capturas de la rama
+        uses: actions/download-artifact@v4
+        with:
+          pattern: capturas-pr${{ github.event.number }}-*
+          merge-multiple: true
+          path: rama
+
+      # La base es el MERGE-BASE, no la punta de `main`: comparar contra una punta que ya
+      # avanzó mete en el diff cambios de otros PR y el veredicto deja de ser sobre este.
+      # La base es el MERGE-BASE, no la punta de `main`: comparar contra una punta que ya
+      # avanzó mete en el diff cambios de otros PR y el veredicto deja de ser sobre este.
+      #
+      # Y si no hay base, el job NO se pone verde. Un diff que no se pudo hacer no es un diff
+      # que salió bien — dar verde ahí es exactamente la clase de medida falsa que este job
+      # viene a impedir. Si la corrida de la base está en marcha, se espera; si no existe o
+      # falló, se termina en rojo diciendo qué hacer.
+      - name: Bajar las capturas de la base (merge-base con main)
+        id: base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BASE=$(git merge-base origin/${{ github.base_ref }} HEAD)
+          echo "sha=$BASE" >> "$GITHUB_OUTPUT"
+          echo "::notice::merge-base = $BASE"
+
+          # Hasta 25 min de sondeo cada 60 s: la corrida de `main` puede ir por delante.
+          for i in $(seq 1 25); do
+            ESTADO=$(gh run list --commit "$BASE" --workflow ci.yml --json status,conclusion \
+              --jq '[.[]][0] | "\(.status)/\(.conclusion // "-")"')
+            case "$ESTADO" in
+              completed/success) break ;;
+              completed/*)
+                echo "::error::la corrida de ci.yml del merge-base $BASE terminó en $ESTADO."
+                echo "Sin capturas de la base no hay diff, y sin diff este job no se pone verde."
+                echo "Qué hacer: arreglá esa corrida de \`main\` y relanzá este job."
+                exit 1 ;;
+              "") 
+                echo "::error::no existe ninguna corrida de ci.yml para el merge-base $BASE."
+                echo "Pasa cuando la base es anterior al job de capturas, o si se borró la corrida."
+                echo "Qué hacer: relanzá este job cuando la corrida de \`main\` de ese commit exista y termine."
+                exit 1 ;;
+              *)
+                echo "corrida de la base en $ESTADO — esperando (intento $i de 25)"
+                sleep 60 ;;
+            esac
+          done
+
+          RID=$(gh run list --commit "$BASE" --workflow ci.yml --json databaseId,conclusion \
+            --jq '[.[] | select(.conclusion=="success")][0].databaseId')
+          if [ -z "$RID" ]; then
+            echo "::error::la corrida del merge-base $BASE no terminó en verde tras 25 min de espera."
+            echo "Qué hacer: relanzar cuando la corrida de main termine."
+            exit 1
+          fi
+          mkdir -p base
+          # Una corrida verde NO implica que tenga capturas: las de `main` anteriores a este
+          # job terminaron bien y no subieron ninguna. Se comprueba y se dice, en vez de dejar
+          # que `gh` escupa «no valid artifacts found» y que quien mire adivine qué significa.
+          if ! gh run download "$RID" --pattern "capturas-$BASE-*" --dir /tmp/base-art; then
+            echo "::error::la corrida $RID del merge-base $BASE terminó en verde pero no tiene capturas."
+            echo "Pasa mientras \`main\` no haya corrido todavía con el job de capturas: su primer"
+            echo "push posterior a este PR deja la base lista."
+            echo "Qué hacer: relanzar este job cuando la corrida de main de $BASE tenga el artefacto."
+            exit 1
+          fi
+          find /tmp/base-art -mindepth 1 -maxdepth 1 -type d -exec cp -a {}/. base/ \;
+          echo "hay=si" >> "$GITHUB_OUTPUT"
+
+      # ── Las capturas de la corrida de la que salieron los hashes aprobados (decisión 52) ──
+      #
+      # El sha256 es byte a byte y las capturas NO son byte a byte reproducibles: medido en la
+      # corrida 37038208517, de 12 aprobadas casaron 11 y falló una (`light/390/ingresos.png`)
+      # entre dos corridas cuyo único cambio era el propio fichero de aprobación. Con estas
+      # capturas en la mano, un PNG distinto pero dentro de tolerancia sigue valiendo.
+      #
+      # Este paso NO puede tumbar el job: si el artefacto caducó o la corrida se borró, la
+      # carpeta se queda vacía y `diff.mjs` caduca esas aprobaciones DICIENDO que no pudo
+      # mirarlas. Fallar acá convertiría «no pude comprobarlo» en «el PR rompió algo».
+      #
+      # Mismo camino y mismo token que el paso de la base: `gh run download`. El repo es público,
+      # así que el `GITHUB_TOKEN` lee artefactos sin pedir permisos nuevos en el workflow.
+      - name: Bajar las capturas de la corrida aprobada
+        if: hashFiles('qa/visual-aprobado.json') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RID=$(node -e "const a=require('./qa/visual-aprobado.json'); process.stdout.write(String(a.corrida ?? ''))")
+          if [ -z "$RID" ]; then
+            echo "::notice::qa/visual-aprobado.json no anota \`corrida\`: las aprobaciones valdrán solo por hash."
+            exit 0
+          fi
+          # La carpeta se crea DESPUÉS de bajar, no antes. Crearla antes y dejarla vacía hacía
+          # que el diff dijera «esa captura no está en el artefacto» cuando la verdad es que no
+          # había artefacto ninguno, y distinguir esos dos motivos es justo el punto: uno manda a
+          # reaprobar y el otro a volver a aprobar con una corrida viva.
+          if ! gh run download "$RID" --pattern "capturas-*" --dir /tmp/aprobadas-art; then
+            echo "::notice::la corrida $RID ya no tiene capturas (artefacto caducado o corrida borrada): las aprobaciones que necesiten mirarse caducarán diciéndolo."
+            exit 0
+          fi
+          mkdir -p aprobadas
+          find /tmp/aprobadas-art -mindepth 1 -maxdepth 1 -type d -exec cp -a {}/. aprobadas/ \;
+          echo "::notice::capturas de la corrida aprobada $RID: $(find aprobadas -name '*.png' | wc -l) PNG"
+
+      - name: Comparar
+        run: |
+          set -o pipefail
+          # `--pr` es lo que habilita leer `qa/visual-aprobado.json`. El job solo corre en
+          # pull_request, pero el número va explícito: sin él el fichero se ignora, y ese es el
+          # comportamiento correcto en `main` —una base no se aprueba, se compara contra ella—.
+          #
+          # `--aprobadas` es la carpeta del paso anterior. Se pasa SIEMPRE, también cuando está
+          # vacía: así `diff.mjs` puede distinguir «no había con qué comparar» de «nadie me pidió
+          # comparar», que piden cosas distintas a quien lee el motivo.
+          #
+          # mi-base-financiera: inestable entre pasadas de la misma compilación (72–109 px, delta 21
+          # en claro); sacar de aquí al cerrar CI-2. `--exclude` va por slug (sin tema ni ancho),
+          # así que sale la ruta completa.
+          node scripts/qa/diff.mjs --a base --b rama --out-diff diffs \
+            --pr ${{ github.event.number }} --aprobadas aprobadas \
+            --exclude home,dev_ui,mi-base-financiera --max-diff-pixels 60 --max-delta 2 --ignore-delta-below 5 \
+            | tee diff.log || echo "DIFF_FALLA=1" >> "$GITHUB_ENV"
+
+      - name: Página de comparación
+        run: |
+          node scripts/qa/comparacion.mjs --a base --b rama --diff diffs --out comparacion \
+            --titulo "PR #${{ github.event.number }} · ${{ github.event.pull_request.title }}"
+          cp diff.log comparacion/
+          cp diffs/reporte.json comparacion/
+
+      # El resumen del PR dice QUÉ rutas cambian. El log completo queda en el artefacto; lo
+      # que se lee de un vistazo tiene que ser la lista, no 200 líneas de ceros.
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo "## Diff visual"
+            echo
+            node -e '
+              const r = require("./diffs/reporte.json");
+              const rep = r.capturas.filter(c => c.reprobada);
+              console.log(`**${r.comparadas} comparadas · ${rep.length} reprobada(s)**`);
+              if (r.parcial) console.log(`\n⚠ PARCIAL: ${r.parcial.comparadas} de ${r.parcial.esperadas}.`);
+              if (rep.length) {
+                console.log("\n| captura | px | delta |");
+                console.log("|---|---|---|");
+                for (const c of rep) console.log(`| \`${c.imagen}\` | ${c.px} | ${c.maxDelta} |`);
+              } else console.log((r.aprobadas ?? []).length ? "\nNinguna pantalla se movió sin aprobación." : "\nNinguna pantalla de producción se movió.");
+              // Aparte y nombradas: no cuentan para el veredicto, pero esconderlas sería
+              // presentar como «0 cambios» un diff que no miró esas pantallas.
+              const ines = r.inestables ?? [];
+              // Las aprobadas se nombran en el resumen del PR, no solo en la página. Un
+              // «0 reprobadas» sin decir que hubo aprobaciones es una media verdad.
+              const apr = r.aprobadas ?? [];
+              if (apr.length) {
+                const tol = apr.filter(a => a.porTolerancia);
+                console.log(`\n### ${apr.length} captura(s) APROBADAS a mano — ${apr.length - tol.length} por hash, ${tol.length} por tolerancia`);
+                console.log("\nCambiaron a propósito y quedan fuera del veredicto. La aprobación va atada al PNG");
+                console.log("«después» de una corrida concreta: si es idéntico vale por hash, y si no, se compara");
+                console.log("contra el aprobado con el criterio del veredicto. Si la pantalla se mueve, caduca sola.");
+                console.log("\n| captura | vale por | medida |");
+                console.log("|---|---|---|");
+                for (const a of apr) console.log(`| \`${a.imagen}\` | ${a.porTolerancia ? "tolerancia" : "hash"} | ${a.porTolerancia ? a.detalle : "\`" + (a.sha256||"").slice(0,16) + "…\`"} |`);
+              }
+              const cad = r.caducadas ?? [];
+              if (cad.length) {
+                console.log(`\n### ${cad.length} aprobación(es) CADUCADA(S) — hacen fallar`);
+                for (const c of cad) console.log(`- \`${c.imagen}\` — ${c.motivo}`);
+              }
+              if (ines.length) {
+                console.log(`\n### ${ines.length} ruta(s) INESTABLE(S), fuera del veredicto`);
+                console.log("\nLa sonda las vio cambiar entre dos tandas de la **misma** compilación,");
+                console.log("así que compararlas entre base y rama no mide nada. Las dos tandas de cada");
+                console.log("una están en `comparacion.html`.");
+                console.log("\n| ruta | px entre tandas | delta |");
+                console.log("|---|---|---|");
+                for (const i of ines) console.log(`| \`${i.ruta}\` | ${i.px} | ${i.maxDelta} |`);
+              }
+            '
+            echo
+            echo "La página \`comparacion.html\` (antes / después / diferencia, lado a lado) va en el artefacto."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Subir la comparación
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comparacion-visual-pr${{ github.event.number }}
+          path: comparacion
+          retention-days: 14
+
+      - name: Veredicto
+        run: |
+          if [ "${DIFF_FALLA:-}" = "1" ]; then
+            echo "::error::el diff visual reprobó — mirá la página de comparación en el artefacto"
+            exit 1
+          fi

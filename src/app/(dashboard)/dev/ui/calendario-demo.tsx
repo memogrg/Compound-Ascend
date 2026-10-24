@@ -1,0 +1,275 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Area, ComposedChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
+
+import {
+  CalendarioGasto,
+  INSTRUCCIONES_TECLADO,
+  ChartFrame,
+  describirGrafico,
+  formatoEjeX,
+  cuantiles,
+  diaDeLaSemana,
+  mesesHaciaAtras,
+  nivelDe,
+  escalaNice,
+  incluyeCero,
+  recortar,
+  tablaDeDatos,
+  presetsUtiles,
+  type DiaGasto,
+  type RangoPreset,
+} from "@/components/charts/core";
+import { REJILLA, EJE, TRAZO, type SerieDef } from "@/components/charts/core/theme";
+import { formatAxisCompact, formatMoney, formateadorFecha } from "@/lib/format";
+import { currentPeriodInTz, todayISOInTz } from "@/lib/time/user-time-core";
+
+/**
+ * Los dos deltas del 2.5, sin dependencias nuevas: el calendario de gasto y el zoom por
+ * presets. Datos fijos — esta página no lee nada.
+ */
+const MONEDA = "CRC";
+
+/** El mes en curso, una sola vez: lo usan la rejilla y la serie de 36 meses. */
+const AHORA = currentPeriodInTz("America/Costa_Rica");
+/** «septiembre 2026»: mes completo y año. «sep 26» obliga a descifrar una abreviatura para
+ *  saber de qué mes habla la rejilla, que es lo primero que hay que saber. */
+const MES_LARGO = formateadorFecha({ month: "long", year: "numeric" }).format(
+  new Date(AHORA.year, AHORA.month - 1, 1),
+);
+const PERIODO_ACTUAL = `${AHORA.year}-${String(AHORA.month).padStart(2, "0")}`;
+
+/**
+ * El mes EN CURSO, a medias: hay gasto hasta hoy y de mañana en adelante es futuro.
+ *
+ * El mes y el día salen del reloj (congelado en la captura), no de constantes: con
+ * "2026-09-18" escrito a mano la demo dejaba de tener días futuros en octubre, y el estado
+ * «futuro» —que es justo lo que esta pantalla enseña— desaparecía sin que nada fallara.
+ */
+const HOY = PERIODO_ACTUAL;
+const ANIO = AHORA.year;
+const MES = AHORA.month;
+const DIA_REAL = Number(todayISOInTz("America/Costa_Rica").slice(8, 10));
+
+/**
+ * Cuántos días del mes llevan gasto — y por qué NO son simplemente los transcurridos.
+ *
+ * La demo enseña tres estados de celda: con gasto, sin gasto y **futuro**. El último día del mes
+ * no hay ningún día futuro, así que ese estado desaparecía y `charts-calendario.spec.ts` fallaba
+ * con «esperaba > 0 celdas `data-futuro`, recibió 0» — una vez al mes, el día 30 o 31, sin que
+ * nadie hubiera tocado nada. Pasó el 30-sep-2026.
+ *
+ * El arreglo no fue aflojar el spec: el estado «futuro» es justo lo que esta pantalla viene a
+ * enseñar, y un catálogo que no lo muestra está roto aunque nadie proteste. Se reserva SIEMPRE el
+ * último día del mes como futuro.
+ *
+ * **El tope ya no existe para que un spec pase.** Eso lo arregló #905: los specs congelan el reloj
+ * del navegador en `QA_INSTANTE`, así que la suite ve siempre un día de mitad de mes y le daría
+ * igual este tope. Existe por el catálogo: una persona que lo abra el 30 o el 31 tiene que poder
+ * ver los tres estados, igual que cualquier otro día. Esa es la razón que queda, y es suficiente.
+ *
+ * (Una versión anterior de este comentario decía que «nada en la app lee `QA_FREEZE`». Era
+ * engañoso: el preload `scripts/qa/server-freeze.js` parchea `Date` en el proceso del servidor,
+ * así que el servidor SÍ corre congelado. Lo que no llegaba al navegador era el congelado, y eso
+ * es lo que #905 cerró.)
+ */
+const DIAS_DEL_MES = new Date(ANIO, MES, 0).getDate();
+const DIA_HOY = Math.min(DIA_REAL, DIAS_DEL_MES - 1);
+
+/**
+ * El «hoy» que ve el calendario, que es el CAPADO y no el real.
+ *
+ * `data-futuro` lo decide `c.fecha > hoy`, no si el día trae datos. Capar solo los días con gasto
+ * no alcanzaba: el 30 de septiembre, «hoy» seguía siendo el 30 y ningún día del mes queda después.
+ * Las dos cosas tienen que moverse juntas o el catálogo pierde el estado igual.
+ */
+const FECHA_HOY = `${HOY}-${String(DIA_HOY).padStart(2, "0")}`;
+const DIAS: DiaGasto[] = Array.from({ length: DIA_HOY }, (_, i) => i + 1).map((d) => {
+  // Patrón realista: fines de semana caros, un día grande a mitad de mes, tres días sin gasto.
+  const dow = diaDeLaSemana(ANIO, MES, d);
+  const finde = dow === 5 || dow === 6;
+  const sinGasto = [4, 11, 17].includes(d);
+  const base = sinGasto ? 0 : finde ? 42_000 + d * 900 : 9_500 + d * 420;
+  const pico = d === 15 ? 118_000 : 0;
+  return {
+    fecha: `${HOY}-${String(d).padStart(2, "0")}`,
+    monto: base + pico,
+    movimientos: sinGasto ? 0 : finde ? 4 : 2,
+  };
+});
+
+/**
+ * 36 meses de patrimonio CONTADOS HACIA ATRÁS desde el mes en curso, no hacia adelante
+ * desde una fecha fija: así la serie nunca tiene puntos en el futuro y los presets («6M»,
+ * «1A») recortan de verdad contra el presente. `currentPeriodInTz` es puro y respeta el
+ * reloj congelado de la captura (`QA_FREEZE`), que es lo que hace la demo reproducible.
+ */
+const PATRIMONIO = mesesHaciaAtras(PERIODO_ACTUAL, 36).map((x, i) => ({
+  x,
+  neto: 18_000_000 + i * 640_000 + (i % 5) * 180_000,
+}));
+
+/** Los mismos cortes que usa la rejilla, para que la columna «Paso» no invente otros. */
+const CORTES = cuantiles(
+  DIAS.map((d) => d.monto),
+  5,
+);
+
+const SERIE: SerieDef[] = [
+  { clave: "neto", etiqueta: "Patrimonio neto", color: "var(--chart-1)", marca: "area" },
+];
+
+export function CalendarioDemo() {
+  const [rango, setRango] = useState<RangoPreset>("1A");
+  const [dia, setDia] = useState<DiaGasto | null>(null);
+
+  const presets = useMemo(() => presetsUtiles(PATRIMONIO.length, ["6M", "1A", "2A", "Todo"]), []);
+  const datos = useMemo(() => recortar(PATRIMONIO, rango), [rango]);
+  // El dominio se recalcula sobre lo VISIBLE, no sobre los 36 meses: con el eje fijo al
+  // total, «6M» pintaba una línea casi plana pegada al techo y el zoom no mostraba nada.
+  const escala = useMemo(
+    () =>
+      escalaNice(
+        datos.map((d) => d.neto),
+        // El 0 entra SI CABE: con los 36 meses (18 a 40,5 M) el mínimo es el 44 % del
+        // máximo y la serie sigue ocupando más de la mitad del alto, así que el área es
+        // honesta. Con «6M» (37 a 40,5 M) el mínimo es el 91 % y desde 0 la serie viviría
+        // en el 9 % superior: ahí la línea dice más.
+        { moneda: MONEDA, desdeCeroSiCabe: true },
+      ),
+    [datos],
+  );
+  // **Área honesta.** El relleno de un área codifica «cuánto hay» con su superficie, y eso
+  // solo es cierto si la base es el CERO. Con el eje recortado a 36-42 M, el relleno mide la
+  // distancia al borde inferior del gráfico —un número que no existe— y un mes que sube un
+  // 4 % parece duplicarse. Sin el 0 dentro, la serie se dibuja como LÍNEA: ahí lo que se lee
+  // es la pendiente, que sí es honesta con el eje cortado.
+  const conBaseCero = incluyeCero(escala.dominio);
+
+  return (
+    /* El `id` es el ancla de `tests/a11y/charts-calendario.spec.ts`. Existe porque el
+       catálogo de estados monta el calendario SEIS veces más en la misma página, y un
+       `.cal-grid` a secas pasó a resolver a siete elementos: veinte casos en rojo que no
+       hablaban del calendario, sino de dónde estaban mirando. */
+    <div id="demo-calendario" style={{ display: "grid", gap: 26 }}>
+      <ChartFrame
+        titulo={`Gasto diario · ${MES_LARGO}`}
+        subtitulo="Cada celda es un día; el color, cuánto se gastó"
+        ayuda={INSTRUCCIONES_TECLADO}
+        descripcion={describirGrafico({
+          titulo: "Gasto diario de septiembre",
+          serie: DIAS.map((d) => ({ x: d.fecha, y: d.monto })),
+          formato: (v) => formatMoney(v, MONEDA),
+        })}
+        alto={400}
+        tabla={tablaDeDatos(
+          // El PASO de la rampa va como columna: el color es el único canal que dice
+          // «cuánto» en la rejilla, y quien no lo distingue —daltonismo, contraste bajo,
+          // lector de pantalla— se quedaba sin esa información. WCAG 1.4.1.
+          DIAS.map((d) => ({ x: d.fecha, gasto: d.monto, paso: nivelDe(d.monto, CORTES) + 1 })),
+          [
+            { clave: "gasto", etiqueta: "Gasto", color: "var(--chart-1)", marca: "area" },
+            { clave: "paso", etiqueta: "Paso", color: "var(--chart-1)", marca: "area" },
+          ],
+          (v) => (Number.isInteger(v) && v >= 1 && v <= 5 ? String(v) : formatMoney(v, MONEDA)),
+          "Día",
+        )}
+        anuncio={dia ? `${dia.fecha}: ${formatMoney(dia.monto, MONEDA)}` : null}
+        onSoltar={() => setDia(null)}
+      >
+        <CalendarioGasto
+          anio={ANIO}
+          mes={MES}
+          dias={DIAS}
+          moneda={MONEDA}
+          hoy={FECHA_HOY}
+          onFijar={setDia}
+        />
+      </ChartFrame>
+
+      <ChartFrame
+        titulo="Patrimonio neto"
+        subtitulo="36 meses · los chips recortan la serie, y la tabla los sigue"
+        descripcion={describirGrafico({
+          titulo: "Patrimonio neto",
+          serie: datos.map((d) => ({ x: formatoEjeX(d.x), y: d.neto })),
+          formato: (v) => formatMoney(v, MONEDA),
+        })}
+        alto={230}
+        rangos={presets}
+        rangoActivo={rango}
+        onRango={setRango}
+        tabla={tablaDeDatos(
+          datos.map((d) => ({ ...d, x: formatoEjeX(d.x) })),
+          SERIE,
+          (v) => formatMoney(v, MONEDA),
+          "Mes",
+        )}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={datos} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <CartesianGrid
+              stroke={REJILLA.color}
+              strokeDasharray={REJILLA.discontinua ? "3 3" : undefined}
+              vertical={false}
+            />
+            <XAxis
+              dataKey="x"
+              tickFormatter={formatoEjeX}
+              stroke={EJE.color}
+              tick={{ fontSize: EJE.tamanoFuente }}
+              tickLine={false}
+              axisLine={false}
+            />
+            {/* El eje Y VISIBLE: sin él, recortar el rango cambia la escala en silencio y
+                dos capturas del mismo gráfico no son comparables. Compacto porque un
+                ₡20.560.000 completo se come un tercio del ancho. */}
+            <YAxis
+              domain={escala.dominio}
+              ticks={escala.ticks}
+              tickFormatter={(v: number) => formatAxisCompact(v, MONEDA)}
+              stroke={EJE.color}
+              tick={{ fontSize: EJE.tamanoFuente }}
+              tickLine={false}
+              axisLine={false}
+              width={52}
+            />
+            {/* UNA sola serie, no dos que se intercambian. El relleno se apaga con una
+                transición de opacidad (`charts-core.css`), así que pasar de área a línea al
+                cambiar de chip es un desvanecido de 200 ms y no un salto. Montar y
+                desmontar componentes distintos hacía que Recharts volviera a dibujar el
+                trazo desde cero, y el cambio se veía como un parpadeo. */}
+            <Area
+              type="monotone"
+              dataKey="neto"
+              stroke="var(--chart-1)"
+              strokeWidth={TRAZO.ancho}
+              fill="var(--chart-1)"
+              fillOpacity={conBaseCero ? 0.14 : 0}
+              // Sin relleno, el extremo derecho se pierde contra el borde: el punto final
+              // dice DÓNDE termina la serie. Solo ese, no los 36.
+              dot={(props: { cx?: number; cy?: number; index?: number; key?: React.Key | null }) =>
+                !conBaseCero &&
+                props.index === datos.length - 1 &&
+                typeof props.cx === "number" &&
+                typeof props.cy === "number" ? (
+                  <circle
+                    key={props.key ?? "fin"}
+                    cx={props.cx}
+                    cy={props.cy}
+                    r={3.5}
+                    fill="var(--chart-1)"
+                  />
+                ) : (
+                  <g key={props.key ?? `v-${props.index}`} />
+                )
+              }
+              isAnimationActive={false}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </ChartFrame>
+    </div>
+  );
+}

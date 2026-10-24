@@ -279,6 +279,38 @@ describe("Promerica · muestras reales", () => {
   });
 });
 
+describe("Coma de prosa pegada al monto · el separador colgante no es decimal", () => {
+  // BCR (`moneyAfter`) y Promerica (`parseCompra`) capturan el monto con `([\d.,]+)`, sin
+  // ancla de dígito al final: si la redacción sigue con coma, la coma entra en la captura.
+  // Davivienda usa `([\d.,]*\d)` y por eso DAVI_UBER_EATS ("por CRC 12,444.00, fue
+  // aprobada") nunca tuvo el problema. Variantes de las muestras de arriba, no correos nuevos.
+  const BCR_TRANSFER_COMA = BCR_TRANSFER.replace(
+    "Monto debitado ₡137.400,00",
+    "Monto debitado ₡12.444,00, rebajado de su cuenta de ahorros",
+  );
+  const PROMERICA_COMPRA_COMA = PROMERICA_COMPRA.replace(
+    "Monto CRC: 16,915.00",
+    "Monto CRC: 12,444.00, cargado a su tarjeta",
+  );
+
+  it("BCR: «₡12.444,00, rebajado de…» son 12 444, no 1 244 400", () => {
+    const [m] = bcrNotificationSource.parse(BCR_TRANSFER_COMA);
+    expect(m!.amount).toBe(12444);
+    expect(m!.currency).toBe("CRC");
+  });
+
+  it("Promerica: «CRC: 12,444.00, cargado a…» son 12 444, no 1 244 400", () => {
+    const [m] = promericaNotificationSource.parse(PROMERICA_COMPRA_COMA);
+    expect(m!.amount).toBe(12444);
+    expect(m!.currency).toBe("CRC");
+  });
+
+  it("Davivienda ya era inmune por el ancla de dígito final", () => {
+    const [m] = daviviendaNotificationSource.parse(DAVI_UBER_EATS, { from: "Alertas@davibank.cr" });
+    expect(m!.amount).toBe(12444);
+  });
+});
+
 describe("Router · con texto aplanado (HTML sin saltos) también funciona", () => {
   const flat = (s: string) => s.replace(/\s*\n\s*/g, " ");
   it("BCR, BN, Davivienda y Promerica aplanados", () => {

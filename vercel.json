@@ -5,8 +5,12 @@
       "schedule": "0 8 * * *"
     },
     {
+      "path": "/api/investments/snapshot",
+      "schedule": "30 8 * * *"
+    },
+    {
       "path": "/api/base/snapshot",
-      "schedule": "0 6 1 * *"
+      "schedule": "0 12 1 * *"
     },
     {
       "path": "/api/debts/reminders",
@@ -35,6 +39,10 @@
     {
       "path": "/api/assistant/chat-retention",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/ingest/retention",
+      "schedule": "17 5 * * *"
     },
     {
       "path": "/api/rhythm/ventana",

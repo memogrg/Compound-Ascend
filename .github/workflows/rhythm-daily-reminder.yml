@@ -53,10 +53,10 @@ concurrency:
 
 jobs:
   remind:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Recordatorio de registro a quien tenga las 19:00 en su zona
         run: |
           curl --fail-with-body -sS -X POST \
-            "https://carteraplus.vercel.app/api/rhythm/diario" \
+            "https://carteraplus.aitechumbrella.com/api/rhythm/diario" \
             -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}"

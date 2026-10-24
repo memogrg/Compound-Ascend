@@ -141,47 +141,10 @@
 .invx .donut-card {
   padding: 20px 22px;
 }
-.invx .donut-row {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  margin-top: 12px;
-}
-.invx .donut {
-  width: 130px;
-  height: 130px;
-  flex: none;
-}
-.invx .leg {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-.invx .leg-row {
-  display: grid;
-  grid-template-columns: 10px 1fr auto;
-  gap: 9px;
-  align-items: center;
-  font-size: 12.5px;
-}
-.invx .leg-row .sw {
-  width: 9px;
-  height: 9px;
-  border-radius: 3px;
-}
-.invx .leg-row .nm {
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.invx .leg-row .pc {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--muted);
-}
+/* `.donut-row`, `.leg`, `.leg-row` y los suyos vivían aquí: eran la copia de la leyenda de
+   esta pantalla, con su propio `ellipsis` que truncaba «Fondos de inversión». Ahora la dona y
+   su leyenda son un componente (`DonutConLeyenda`, clases `.dl-*` en `charts-core.css`) y esto
+   ya no lo usa nadie. `.ring-wrap` NO se borra: lo siguen usando el móvil y Rich Life. */
 
 /* ---- Investments table ---- */
 .invx .inv-th {

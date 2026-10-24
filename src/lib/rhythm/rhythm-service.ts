@@ -386,6 +386,7 @@ async function _getFotoDelMes(period: Period, ctx?: AuthContext): Promise<FotoDe
     const padreDe = new Map(cats.map((c) => [c.id, c.parentId ?? null]));
 
     const entradas = Object.entries(budget.expenseByKey);
+    const derivadas = new Set(budget.derivedKeys ?? []);
     return {
       period,
       dia: diaDe(todayIso),
@@ -422,6 +423,9 @@ async function _getFotoDelMes(period: Period, ctx?: AuthContext): Promise<FotoDe
         frascoId: padreDe.get(categoryId) ?? null,
         budgetMensual: b.value,
         gastoVentana: spanReal.expenseByKey[categoryId]?.value ?? 0,
+        // De aquí sale que un sobre generado por una entidad no se declare ocioso: su
+        // presupuesto y su gasto ni siquiera comparten clave. Ver `idle-envelopes.ts`.
+        derivada: derivadas.has(categoryId),
       })),
       mesesHistoria,
     };

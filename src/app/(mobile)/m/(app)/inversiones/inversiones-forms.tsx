@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { formatMoney, currencySymbol } from "@/lib/format";
+import { currencySymbol, formatDecimal, formatMoney } from "@/lib/format";
 // Motor compartido: mismo cálculo que la web y que la proyección de ingreso pasivo.
 import {
   calcularRendimiento,
@@ -72,6 +72,7 @@ import {
   type ActionResult,
   type Opt,
 } from "../../components/form-kit";
+import { normalizarMontoTexto, parseMonto } from "@/lib/parse-monto";
 
 const numStr = (n: number | undefined): string => (n == null ? "" : String(n));
 
@@ -1305,7 +1306,7 @@ function RentalCostsBlock(props: {
           ) : null}
           <div className="between" style={{ fontSize: 12.5, marginTop: 6 }}>
             <span className="muted">ROI operativo anual</span>
-            <strong>{(roi.operatingRoi * 100).toFixed(1)}%</strong>
+            <strong>{formatDecimal(roi.operatingRoi * 100, 1)}%</strong>
           </div>
         </div>
       ) : null}
@@ -1313,7 +1314,46 @@ function RentalCostsBlock(props: {
   );
 }
 
-/** Input de dinero con string (para rc, que el engine espera como string). */
+/**
+ * Lo que el dedo escribió, tal cual, mientras el padre sigue recibiendo la cadena ya
+ * normalizada. Compartido por MoneyStr y PctStr.
+ *
+ * Normalizar EN EL VALOR DEL INPUT reescribía el campo bajo el dedo: al teclear «1.500»
+ * el padre guardaba «1500» y el input volvía a pintar «1500», así que el punto
+ * desaparecía y «1.5000» era IMPOSIBLE de escribir — el siguiente cero caía sobre
+ * «1500» y daba 15000—. Mismo patrón que MoneyField del form-kit: el texto vive local,
+ * el significado sale hacia afuera.
+ *
+ * La resiembra compara lo que el texto SIGNIFICA, no su forma. Mientras se teclea
+ * «1500,» ya significa 1500, que es lo que el padre tiene, así que el campo no se
+ * reescribe solo y no le arranca la coma al dedo que la acaba de poner. Cuando el valor
+ * cambia de verdad desde afuera (semilla del formulario, reinicio tras guardar), el
+ * significado difiere y el texto lo sigue.
+ *
+ * Compara con `parseMonto` y no encadenando `normalizarMontoTexto`, porque esa función
+ * NO es idempotente: «1.500,500» da «1500.500», y volver a pasarla da «1500500» (tres
+ * dígitos detrás del punto se leen como miles). Con un `rc` guardado así, la condición
+ * quedaría verdadera en cada render.
+ */
+function useTextoDeMonto(value: string, onChange: (v: string) => void) {
+  const [texto, setTexto] = useState(value);
+  if (parseMonto(texto) !== parseMonto(value)) setTexto(value);
+  return {
+    texto,
+    alEscribir: (bruto: string) => {
+      setTexto(bruto);
+      onChange(normalizarMontoTexto(bruto));
+    },
+  };
+}
+
+/**
+ * Input de dinero con string (para rc, que el engine espera como string).
+ *
+ * El padre guarda TEXTO, no número, y lo consumen ~14 `parseFloat` más abajo: por eso
+ * lo que sale de acá sigue viniendo normalizado, con punto, y ninguno de esos lectores
+ * se toca. Lo que cambió es que el input ya no muestra esa cadena, sino la tecleada.
+ */
 function MoneyStr({
   label,
   value,
@@ -1325,6 +1365,7 @@ function MoneyStr({
   onChange: (v: string) => void;
   cur: string;
 }) {
+  const { texto, alEscribir } = useTextoDeMonto(value, onChange);
   return (
     <div className="m-qfield">
       <div className="m-qlabel">{label}</div>
@@ -1333,8 +1374,10 @@ function MoneyStr({
         <input
           className="m-inp m-money-inp"
           inputMode="decimal"
-          value={value}
-          onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))}
+          // En es-CR el decimal es la coma; se lo decimos al navegador, igual que MoneyField.
+          lang="es-CR"
+          value={texto}
+          onChange={(e) => alEscribir(e.target.value)}
           placeholder="0"
         />
       </div>
@@ -1350,6 +1393,7 @@ function PctStr({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const { texto, alEscribir } = useTextoDeMonto(value, onChange);
   return (
     <div className="m-qfield">
       <div className="m-qlabel">{label}</div>
@@ -1357,8 +1401,9 @@ function PctStr({
         <input
           className="m-inp m-money-inp"
           inputMode="decimal"
-          value={value}
-          onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))}
+          lang="es-CR"
+          value={texto}
+          onChange={(e) => alEscribir(e.target.value)}
           placeholder="0"
         />
         <span className="m-money-sym">%</span>

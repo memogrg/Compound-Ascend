@@ -1,0 +1,18 @@
+/* ── Barra de re-aceptación legal, en `/m` ────────────────────────────────────
+   Mismo componente que la web (`components/legal/aceptar-terminos-banner.tsx`), otro
+   anclaje. Acá no hay tabbar, pero sí el FAB de crear, y con `bottom: 0` lo tapaba entero:
+   el botón vive a `--fab-gap` del borde con z-index 50 y la barra viene con 60, así que
+   ganaba ella.
+
+   Se sienta ARRIBA del FAB con la misma expresión que `.m-rhythm-nudge`, para que los dos
+   sigan al botón si cambia de tamaño en vez de repetir un número mágico.
+
+   Fichero aparte —y no un bloque más en `mobile.css`— porque `mobile.css` son 4.000 líneas
+   de la piel móvil y esto es el override de UN componente compartido: mezclarlo hace que el
+   día que alguien busque «por qué la barra legal está más arriba en /m» tenga que leer el
+   archivo entero. Se importa desde el layout de `/m`, así que no alcanza al cascarón web.
+   ------------------------------------------------------------------------------------ */
+.m-shell .legal-accept-bar,
+body:has(.m-shell) .legal-accept-bar {
+  bottom: calc(var(--fab-gap) + var(--fab-size) + 12px + env(safe-area-inset-bottom, 0px));
+}

@@ -19,7 +19,7 @@ import { KeyboardResize } from '@capacitor/keyboard';
  *                               se empaqueta ya no es el prototipo, sino una página de
  *                               diagnóstico imposible de confundir con la app (ver www/).
  */
-const PROD_URL = 'https://carteraplus.vercel.app/m';
+const PROD_URL = 'https://carteraplus.aitechumbrella.com/m';
 const bundled = process.env.CAP_BUNDLED === '1';
 const serverUrl = process.env.CAP_SERVER_URL?.trim() || PROD_URL;
 
@@ -102,6 +102,18 @@ const config: CapacitorConfig = {
       showSpinner: false,
       splashFullScreen: true,
       splashImmersive: false,
+    },
+    SocialLogin: {
+      // Proveedores que empaqueta @capgo/capacitor-social-login (lo aplica su hook de
+      // `cap sync`: gradle.properties en Android, podspec en iOS). Solo usamos Google
+      // (google-native.ts inicializa únicamente `google`). Facebook en false deja fuera
+      // facebook-core, que inyectaba AD_ID y los ACCESS_ADSERVICES_* de Privacy Sandbox en el
+      // manifest fusionado, y los pods FBSDK en iOS. Twitter queda en su default.
+      providers: {
+        google: true,
+        facebook: false,
+        apple: true,
+      },
     },
   },
 };

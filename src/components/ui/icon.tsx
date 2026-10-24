@@ -38,7 +38,14 @@ export type IconName =
   | "repeat"
   | "lock"
   | "camera"
-  | "calendar";
+  | "calendar"
+  // Los cinco núcleos de la navegación v2 (`nav-v2.ts`). Copiados del ICON del
+  // prototipo `docs/cartera-plus-redesign/prototipos/01-shell.html`.
+  | "home"
+  | "flow"
+  | "flag"
+  | "coins"
+  | "iso";
 
 const PATHS: Record<IconName, string> = {
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/>',
@@ -80,6 +87,26 @@ const PATHS: Record<IconName, string> = {
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/>',
   camera:
     '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+  // ── Navegación v2 ─────────────────────────────────────────────────────────
+  home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  flow: '<path d="M4 7h12l-3-3M20 17H8l3 3"/>',
+  flag: '<path d="M5 21V4M5 4h12l-2 4 2 4H5"/>',
+  coins:
+    '<ellipse cx="12" cy="7" rx="7" ry="3"/>' +
+    '<path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7"/>' +
+    '<path d="M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/>',
+  /**
+   * Isotipo C+. Reescalado del `ICON.iso` del prototipo, que viene en un viewBox de 64:
+   * `Icon` fija `viewBox="0 0 24 24"`, así que las coordenadas van multiplicadas por 24/64
+   * (0.375) — incluidos los dos `stroke-width`, que el original declara por trazo (7 y 4.6)
+   * y aquí se repiten en cada `path` porque el del `<svg>` padre es uno solo.
+   *
+   * El "+" va en `var(--accent)`, no en el `#378451` literal del prototipo: es el mismo
+   * verde, pero declarado como token voltea con el tema igual que en `BrandMark`.
+   */
+  iso:
+    '<path d="M16.5 6.75a6.75 6.75 0 1 0 0 10.5" stroke-width="2.625"/>' +
+    '<path d="M17.25 9v6M14.25 12h6" stroke="var(--accent)" stroke-width="1.725"/>',
 };
 
 type IconProps = {

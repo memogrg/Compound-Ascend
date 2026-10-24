@@ -1,11 +1,15 @@
-import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
+import Link from "next/link";
+
+import { DonutConLeyenda, type DonutDatum } from "@/components/charts/lazy";
+import { textoPasivos } from "@/modules/rich-life/engine/pasivos-texto";
 import { DeleteButton } from "./delete-button";
 import { EditRichButton, AddRichButton } from "./rich-actions";
-import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
+import { formatCompact, formatDecimal, formatMoney, formatPercent } from "@/lib/format";
 import type { RichLifeSummary } from "@/modules/rich-life/services/rich-life-service";
 import { type PatrimonioServiceResult, MilestoneLadder } from "@/modules/wealth";
 import type { RichTrend, Asset, Liability } from "@/modules/rich-life/types";
 import { composeLiquidity } from "@/modules/rich-life/engine/liquidity-composition";
+import { rotuloConCierre } from "@/modules/rich-life/engine/periodo-cierre";
 
 const TREND: Record<RichTrend, { label: string; cls: string; delta: string }> = {
   mas_rico: { label: "Te estás haciendo más rico", cls: "var(--pos)", delta: "up" },
@@ -23,9 +27,24 @@ export function RichLifeDashboard({
   summary: RichLifeSummary;
   patrimonio?: PatrimonioServiceResult;
 }) {
-  const { snapshot: s, assets, liabilities, currency } = summary;
+  const { snapshot: s, assets, liabilities, debtLiabilities, currency } = summary;
+
+  // La tarjeta de pasivos cuenta también las deudas del módulo: sin esto decía «0
+  // registrado(s)» a alguien cuyas deudas ya estaban restando en el neto de arriba.
+  const txtPasivos = textoPasivos(
+    liabilities.length,
+    {
+      cantidad: debtLiabilities.length,
+      total: debtLiabilities.reduce((acc, l) => acc + l.balance, 0),
+    },
+    currency,
+  );
   const ind = s.indicators;
   const trend = TREND[ind.trend];
+  // El veredicto NOMBRA su periodo. Sale del Δ entre los dos últimos meses cerrados,
+  // mientras que la cifra de al lado va del último cierre a HOY: sin rótulo, "más rico"
+  // junto a un número negativo se lee como una contradicción en vez de como dos periodos.
+  const trendLabel = rotuloConCierre(trend.label, ind.closedPeriod);
 
   const assetDonut: DonutDatum[] = s.assetsByClass.map((a) => ({
     name: a.label,
@@ -58,7 +77,7 @@ export function RichLifeDashboard({
             }}
           >
             <span className={`delta ${trend.delta}`} style={{ marginTop: 0 }}>
-              {trend.label}
+              {trendLabel}
             </span>
             {ind.wealthVelocity !== null ? (
               <span
@@ -181,7 +200,7 @@ export function RichLifeDashboard({
           <Ind
             label="Activos productivos"
             value={formatPercent(ind.productiveAssetsPct)}
-            note="trabajan para ti"
+            note="generan renta"
           />
           <Ind
             label="Activos líquidos"
@@ -190,7 +209,7 @@ export function RichLifeDashboard({
           />
           <Ind
             label="Meses de independencia"
-            value={String(ind.monthsOfIndependence)}
+            value={formatDecimal(ind.monthsOfIndependence)}
             note="sin nuevos ingresos"
           />
           <Ind
@@ -293,7 +312,8 @@ export function RichLifeDashboard({
         />
         <ListCard
           title="Mis pasivos"
-          sub={`${liabilities.length} registrado(s)`}
+          sub={txtPasivos.sub}
+          aviso={txtPasivos.deudas}
           currency={currency}
           addKind="liability"
           items={liabilities.map((l) => ({
@@ -305,7 +325,7 @@ export function RichLifeDashboard({
             kind: "liability" as const,
             entity: l,
           }))}
-          emptyText="Agrega hipotecas u otras deudas grandes."
+          emptyText={txtPasivos.vacio}
         />
       </section>
     </div>
@@ -412,15 +432,15 @@ function PatrimonioSections({
         />
         <MetricCard
           label="Años de Libertad"
-          value={`${anios}`}
+          value={formatDecimal(anios, 2)}
           note="años que cubre tu patrimonio"
           tip={`Qué es: cuántos años de tu estilo de vida cubre tu patrimonio invertible. ${contraQue}Por qué importa: traduce tu capital a tiempo de tranquilidad. Qué hago: súbelo invirtiendo más y conteniendo el gasto.`}
         />
         <MetricCard
           label="Meses de colchón"
-          value={`${r.mesesDeColchon}`}
+          value={formatDecimal(r.mesesDeColchon)}
           note="liquidez vs. gasto mensual"
-          tip={`Qué es: cuántos meses cubrirías con tu dinero líquido si se cortaran tus ingresos. ${queCuenta}${contraQue}Por qué importa: es tu colchón de seguridad. Qué hago: apunta primero a 3-6 meses de gastos.`}
+          tip={`Cómo se calcula: liquidez total —tus metas incluidas— ÷ presupuesto mensual. Qué es: cuántos meses cubrirías con tu dinero líquido si se cortaran tus ingresos. ${queCuenta}${contraQue}Ojo: tu «fondo de paz» mide otra cosa —solo el fondo formal, entre el gasto esencial—, así que los dos números no tienen por qué coincidir. Qué hago: apuntá primero a 3-6 meses de gastos.`}
         />
         <MetricCard
           label="Cobertura de ingreso pasivo"
@@ -496,49 +516,12 @@ function DonutCard({
   return (
     <div className="card card-pad">
       <div className="card-title">{title}</div>
-      <div
-        style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14, flexWrap: "wrap" }}
-      >
-        <DonutChart data={data} centerLabel={formatCompact(total, currency)} />
-        <div style={{ flex: 1, minWidth: 140, display: "flex", flexDirection: "column", gap: 8 }}>
-          {data.length === 0 ? (
-            <span className="muted" style={{ fontSize: 12.5 }}>
-              {empty}
-            </span>
-          ) : (
-            data.map((d) => (
-              <div
-                key={d.name}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "10px 1fr auto",
-                  gap: 9,
-                  alignItems: "center",
-                  fontSize: 12.5,
-                }}
-              >
-                <span style={{ width: 9, height: 9, borderRadius: 3, background: d.color }} />
-                <span
-                  style={{
-                    color: "var(--muted)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {d.name}
-                </span>
-                <span
-                  className="tnum"
-                  style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--muted)" }}
-                >
-                  {formatMoney(d.value, currency)}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      <DonutConLeyenda
+        data={data}
+        currency={currency}
+        centerLabel={formatCompact(total, currency)}
+        vacio={empty}
+      />
     </div>
   );
 }
@@ -546,6 +529,7 @@ function DonutCard({
 function ListCard({
   title,
   sub,
+  aviso,
   items,
   emptyText,
   currency,
@@ -553,6 +537,8 @@ function ListCard({
 }: {
   title: string;
   sub: string;
+  /** Línea de contexto con enlace, para lo que se cuenta acá pero se gestiona en otro sitio. */
+  aviso?: { texto: string; href: string } | null;
   items: {
     id: string;
     name: string;
@@ -574,6 +560,14 @@ function ListCard({
           <div className="card-sub">{sub}</div>
         </div>
       </div>
+      {aviso ? (
+        <p className="muted" style={{ margin: 0, padding: "0 24px 12px", fontSize: 12.5 }}>
+          {aviso.texto}{" "}
+          <Link href={aviso.href} style={{ color: "var(--text)" }}>
+            Ver deudas
+          </Link>
+        </p>
+      ) : null}
       {items.length === 0 ? (
         <div
           className="muted"

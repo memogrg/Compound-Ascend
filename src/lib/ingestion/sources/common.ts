@@ -6,6 +6,7 @@
  */
 
 import type { NotificationMeta } from "@/lib/ingestion/types";
+import { parseMonto } from "@/lib/parse-monto";
 
 export type { NotificationMeta };
 
@@ -24,30 +25,17 @@ export function flatten(s: string): string {
 }
 
 /**
- * Convierte "5,000.00" / "5.000,00" / "5 000,50" / "5000" a número. Regla: el ÚLTIMO
- * separador con exactamente 2 dígitos después es el decimal; el resto son miles.
- * Devuelve null si no hay dígitos.
+ * Convierte "5,000.00" / "5.000,00" / "5 000,50" / "5000" a número.
+ *
+ * Usa el lector único con `decimalesMaximos: 2`: los avisos de BCR, BN, Davivienda y
+ * Promerica siempre traen centavos, así que un separador que deje más de dos dígitos era
+ * de miles. Devuelve la magnitud — el signo lo decide el tipo de movimiento, no el texto.
+ *
+ * `null` si no hay dígitos.
  */
 export function parseAmountLoose(raw: string): number | null {
-  // Sin espacios y sin separadores colgando ("12,444.00," → "12,444.00").
-  const s = raw.replace(/[\s ]/g, "").replace(/^[.,]+|[.,]+$/g, "");
-  if (!/\d/.test(s)) return null;
-  const m = s.match(/^(.*?)([.,])(\d{1,2})$/);
-  let intPart: string;
-  let dec = "";
-  if (m && m[3]!.length === 2) {
-    intPart = m[1]!;
-    dec = m[3]!;
-  } else if (m && m[3]!.length === 1) {
-    intPart = m[1]!;
-    dec = m[3]! + "0";
-  } else {
-    intPart = s;
-  }
-  const digits = intPart.replace(/[^\d]/g, "");
-  if (!digits) return null;
-  const n = parseFloat(dec ? `${digits}.${dec}` : digits);
-  return Number.isFinite(n) ? n : null;
+  const n = parseMonto(raw, { decimalesMaximos: 2 });
+  return n === undefined || !Number.isFinite(n) ? null : Math.abs(n);
 }
 
 const CURRENCY_TOKEN =

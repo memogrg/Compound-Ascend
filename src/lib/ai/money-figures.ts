@@ -7,34 +7,21 @@
  * Sin IO, sin `server-only`: testeable a fondo.
  */
 
+import { parseMonto } from "@/lib/parse-monto";
+
 /** Debajo de esto, probablemente son conteos/porcentajes/meses — no montos de dinero. */
 export const MIN_MONEY = 10_000;
 /** Tolerancia relativa (2%) para redondeo/formato de visualización. */
 export const REL_TOL = 0.02;
 
-/** Parsea un token numérico en formato español ("1.250.000", "1,25") a float. */
+/**
+ * Parsea un token numérico en formato español ("1.250.000", "1,25") a float.
+ *
+ * Delega en `@/lib/parse-monto`: una sola regla para todo el repositorio. `null` en vez de
+ * `undefined` porque es el contrato que esperan `extractMoneyFigures` y el guard.
+ */
 export function parseNumberToken(tok: string): number | null {
-  let t = tok.replace(/[^\d.,]/g, "");
-  if (!t) return null;
-  const hasDot = t.includes(".");
-  const hasComma = t.includes(",");
-  if (hasDot && hasComma) {
-    // El separador más a la derecha es el decimal.
-    if (t.lastIndexOf(",") > t.lastIndexOf(".")) t = t.replace(/\./g, "").replace(",", ".");
-    else t = t.replace(/,/g, "");
-  } else if (hasComma) {
-    // Coma como decimal solo si es el último separador con ≤2 dígitos de cola.
-    const parts = t.split(",");
-    if (parts.length === 2 && parts[1] !== undefined && parts[1].length <= 2) t = parts.join(".");
-    else t = t.replace(/,/g, "");
-  } else if (hasDot) {
-    // Punto como miles cuando son grupos de 3; como decimal cuando hay una cola de 1-2 dígitos.
-    const parts = t.split(".");
-    const last = parts[parts.length - 1];
-    if (parts.length > 2 || (last !== undefined && last.length === 3)) t = parts.join("");
-  }
-  const n = Number(t);
-  return Number.isFinite(n) ? n : null;
+  return parseMonto(tok) ?? null;
 }
 
 /** Extrae los montos de dinero citados (maneja sufijos "millones"/"mil"). */

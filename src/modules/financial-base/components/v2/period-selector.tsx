@@ -4,56 +4,11 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
+import { buildOptions, currentOption } from "@/lib/url-state/period-options";
 
-const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-
-const BACK_MONTHS = 17; // ~18 meses hacia atrás (incluye el mes actual)
-const FWD_MONTHS = 1; // un mes futuro (planificación)
-
-function label(year: number, month: number): string {
-  return `${MONTHS[month - 1]} ${year}`;
-}
-
-/**
- * Opciones ancladas al mes actual REAL (`now`), no al `current` seleccionado.
- * Así el mes actual siempre aparece sin importar cuál esté elegido (antes se
- * generaban hacia atrás desde `current`, y elegir un mes viejo "escondía" los
- * más nuevos). Si `current` cae fuera del rango (deep-link antiguo), se inserta.
- */
-function buildOptions(current: string, now = new Date()): { value: string; label: string }[] {
-  const out: { value: string; label: string }[] = [];
-  // Arranca en el mes futuro más lejano y baja hasta BACK_MONTHS atrás.
-  let y = now.getFullYear();
-  let m = now.getMonth() + 1 + FWD_MONTHS;
-  while (m > 12) {
-    m -= 12;
-    y += 1;
-  }
-  for (let i = 0; i < BACK_MONTHS + 1 + FWD_MONTHS; i++) {
-    out.push({ value: `${y}-${String(m).padStart(2, "0")}`, label: label(y, m) });
-    m -= 1;
-    if (m === 0) {
-      m = 12;
-      y -= 1;
-    }
-  }
-  // Garantiza que el periodo seleccionado siempre esté disponible.
-  if (/^\d{4}-\d{2}$/.test(current) && !out.some((o) => o.value === current)) {
-    const [cy, cm] = current.split("-").map(Number);
-    out.push({ value: current, label: label(cy!, cm!) });
-    out.sort((a, b) => b.value.localeCompare(a.value)); // descendente
-  }
-  return out;
-}
-
-/** Opción mínima (solo el mes seleccionado) para el primer render/SSR. */
-function currentOption(current: string): { value: string; label: string } {
-  if (/^\d{4}-\d{2}$/.test(current)) {
-    const [y, m] = current.split("-").map(Number);
-    return { value: current, label: label(y!, m!) };
-  }
-  return { value: current, label: current };
-}
+/* La lógica (ventana de meses, etiquetas, inserción del deep-link viejo) vive ahora en
+   `@/lib/url-state/period-options`, compartida con el control global de la barra superior
+   v2. Acá solo queda el componente; el comportamiento es el mismo. */
 
 export function PeriodSelector({ current }: { current: string }) {
   const router = useRouter();

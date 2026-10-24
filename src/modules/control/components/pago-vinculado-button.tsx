@@ -30,6 +30,7 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { useCaptureToday } from "@/components/tz/timezone-context";
 import { formatMoney, currencySymbol, CURRENCY_OPTIONS } from "@/lib/format";
+import { parseMonto } from "@/lib/parse-monto";
 import {
   addGoalContributionAction,
   reportPaymentAction,
@@ -64,6 +65,14 @@ const COPY: Record<
     tip: "Registra el pago: cuenta como gasto del mes, baja el saldo y queda en el historial de la deuda",
   },
 };
+
+/**
+ * Lectura del monto tecleado: una sola coma pasa a punto. Extraída tal cual para el test
+ * de caracterización (T-16); el comportamiento no cambia.
+ */
+export function leerMontoTecleado(amount: string): number | undefined {
+  return parseMonto(amount);
+}
 
 export function PagoVinculadoButton({
   kind,
@@ -124,7 +133,7 @@ export function PagoVinculadoButton({
     setError(null);
   }, []);
 
-  const crudo = amount.trim() === "" ? null : Number(amount.replace(",", "."));
+  const crudo = leerMontoTecleado(amount) ?? null;
   const monto = crudo !== null && Number.isFinite(crudo) ? crudo : null;
   const errs = ctx ? validarPago({ monto, moneda: currency, fecha: date, ctx, hoy: hoy() }) : {};
   const hayError = Object.keys(errs).length > 0;

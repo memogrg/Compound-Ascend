@@ -12,8 +12,9 @@ import {
   ReferenceLine,
 } from "recharts";
 import { formatMoney, formatAxisCompact } from "@/lib/format";
-import { niceDomain } from "./scale";
+import { niceEscala } from "./scale";
 import { ChartEmpty } from "./chart-empty";
+import { ANIMACION_ACTIVA } from "./core";
 
 export type AreaPoint = { date: string; value: number };
 
@@ -77,7 +78,7 @@ export function PerformanceChart({
   const values = data.map((d) => d.value);
   if (costBasis !== undefined) values.push(costBasis);
   if (goalValue !== undefined) values.push(goalValue);
-  const domain = niceDomain(values, {
+  const escala = niceEscala(values, {
     symmetric: true,
     ticks: yTicks,
     paddingRatio: full ? 0 : 0.06,
@@ -119,7 +120,8 @@ export function PerformanceChart({
                 la card ya da la magnitud. */}
             {full ? (
               <YAxis
-                domain={domain}
+                domain={escala.dominio}
+                ticks={escala.ticks}
                 width={48}
                 tickCount={yTicks}
                 tick={{ ...TICK, fill: "var(--muted)", fontSize: 10.5 }}
@@ -128,7 +130,7 @@ export function PerformanceChart({
                 tickFormatter={(v) => fmtTick(Number(v))}
               />
             ) : (
-              <YAxis domain={domain} hide />
+              <YAxis domain={escala.dominio} hide />
             )}
             {showAxes && (
               <XAxis
@@ -174,7 +176,7 @@ export function PerformanceChart({
               fill={`url(#${gradId})`}
               dot={false}
               activeDot={{ r: 3, fill: color }}
-              isAnimationActive={false}
+              isAnimationActive={ANIMACION_ACTIVA}
             />
             <Tooltip
               contentStyle={{

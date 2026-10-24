@@ -1,18 +1,18 @@
 /**
  * Orquestador de precios: cadena de proveedores con cache y fallback.
- * Stocks/ETF: Finnhub → AlphaVantage → Yahoo.  Cripto: CoinGecko → Binance.
+ * Stocks/ETF: cadena configurada (MARKET_PROVIDER_STOCKS; Finnhub si no se configura) →
+ * AlphaVantage → Yahoo.  Cripto: CoinGecko → Binance.
  */
 import "server-only";
 import { priceCache, TTL } from "@/lib/market-data/cache";
 import {
-  finnhub,
+  configuredStockQuote,
+  configuredHighlights,
   alphaVantage,
   yahoo,
   binance,
   coingecko,
   coingeckoBatch,
-  coingeckoHighlights,
-  finnhubHighlights,
   yahooHistory,
   coingeckoHistory,
   logProviderMiss,
@@ -27,7 +27,7 @@ export type AssetType = "stock" | "etf" | "crypto";
 export type MarketPrice = Quote & { symbol: string; assetType: AssetType; cached: boolean };
 import { persistMarketPrice } from "@/lib/market-data/persist";
 
-const STOCK_CHAIN = [finnhub, alphaVantage, yahoo];
+const STOCK_CHAIN = [configuredStockQuote, alphaVantage, yahoo];
 const CRYPTO_CHAIN = [coingecko, binance];
 
 // Single-flight: coalesce ráfagas idénticas (mismo set de símbolos en vuelo) → un render = 1 batch,
@@ -85,21 +85,27 @@ export async function getMarketPrice(
 
   const ttl = assetType === "crypto" ? TTL.crypto : TTL.stock;
   const cacheKey = `price:${assetType}:${symbol}`;
-  const cached = priceCache.get<Quote>(cacheKey);
-  if (cached) return { ...cached, symbol, assetType, cached: true };
+  // L1 síncrono para distinguir "precio en vivo" de cacheado (flag `cached`).
+  const hit = priceCache.get<Quote>(cacheKey);
+  if (hit) return { ...hit, symbol, assetType, cached: true };
 
+  // Miss: L2 (Redis compartido) → cadena de proveedores, con single-flight por símbolo. Si otra
+  // instancia ya lo trajo, esto no vuelve a pegarle al proveedor.
   const chain = assetType === "crypto" ? CRYPTO_CHAIN : STOCK_CHAIN;
-  for (const provider of chain) {
-    const quote = await provider(symbol);
-    if (quote) {
-      priceCache.set(cacheKey, quote, ttl);
-      // Persiste en BD para historial y acceso offline (fire-and-forget).
-      persistMarketPrice(symbol, assetType, quote.price, quote.currency, quote.provider);
-      return { ...quote, symbol, assetType, cached: false };
+  const quote = await priceCache.getOrFetch<Quote | null>(cacheKey, ttl, async () => {
+    for (const provider of chain) {
+      const q = await provider(symbol);
+      if (q) {
+        // Persiste en BD para historial y acceso offline (fire-and-forget).
+        persistMarketPrice(symbol, assetType, q.price, q.currency, q.provider);
+        return q;
+      }
     }
-  }
-  logProviderMiss(symbol, assetType);
-  return null;
+    logProviderMiss(symbol, assetType);
+    return null;
+  });
+  if (!quote) return null;
+  return { ...quote, symbol, assetType, cached: false };
 }
 
 /**
@@ -156,8 +162,7 @@ export async function getMarketHighlights(
   }
 
   // 3) ÚLTIMO RECURSO: fetch en vivo (si el store aún no tiene el símbolo). Con dato bueno cachea.
-  const h =
-    assetType === "crypto" ? await coingeckoHighlights(symbol) : await finnhubHighlights(symbol);
+  const h = await configuredHighlights(symbol, assetType === "crypto" ? "crypto" : "stock");
   if (h && (h.price !== null || h.high !== null)) {
     priceCache.set(freshKey, h, TTL.highlights);
     priceCache.set(staleKey, h, TTL.highlightsStale);
@@ -211,12 +216,7 @@ export async function searchSymbols(query: string): Promise<SymbolResult[]> {
   const q = query.trim();
   if (q.length < 1 || q.length > 40) return [];
   const cacheKey = `search:${q.toLowerCase()}`;
-  const cached = priceCache.get<SymbolResult[]>(cacheKey);
-  if (cached) return cached;
-
-  const results = await searchFinnhub(q);
-  priceCache.set(cacheKey, results, TTL.search);
-  return results;
+  return priceCache.getOrFetch<SymbolResult[]>(cacheKey, TTL.search, () => searchFinnhub(q));
 }
 
 async function searchFinnhub(q: string): Promise<SymbolResult[]> {

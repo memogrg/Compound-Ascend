@@ -21,6 +21,7 @@ import {
   detectEmergencyFundGap,
   detectConcentration,
   detectReturnBelowInflation,
+  KINDS_DETECTORES,
 } from "@/lib/insights/detectors";
 import type { Debt } from "@/modules/control/types";
 import type { UserInsightRow } from "@/lib/supabase/database.types";
@@ -91,8 +92,20 @@ export async function refreshInsights(ctx?: AuthContext): Promise<void> {
     const last = await getInsightsFreshness(ctx);
     if (!isStale(last)) return; // guardia de frescura
     // Import dinámico para no acoplar lib/insights con el módulo control.
-    const { listGoals, listDebts } = await import("@/modules/control/services/control-service");
-    const [goals, debts] = await Promise.all([listGoals(ctx), listDebts(ctx)]);
+    const { listGoals, listDebts, deriveDebtsForEngine } =
+      await import("@/modules/control/services/control-service");
+    const { getCurrentDebtBalances } = await import("@/modules/control/services/debts-service");
+    const [goals, anclas, liveBalances] = await Promise.all([
+      listGoals(ctx),
+      listDebts(ctx),
+      getCurrentDebtBalances(ctx),
+    ]);
+    // Saldo VIVO (ancla − pagos), NO el ancla de alta: una tarjeta ya saldada seguía saliendo como
+    // "la deuda más cara" y con su monto de alta. Misma derivación que el diagnóstico de control
+    // (deriveDebtsForEngine), para que la campana no pueda discrepar del panel.
+    // Se deriva en la moneda NATIVA de cada deuda (destino = su propia moneda ⇒ convertCurrency es
+    // identidad): los detectores formatean cada monto con `d.currency`, no con una de agregación.
+    const debts = anclas.flatMap((d) => deriveDebtsForEngine([d], liveBalances, d.currency, {}));
     const detected = runDetectors({ goals, debts }, simNow());
     const spend = await getDisfruteSpend(ctx);
     if (spend) detected.push(...detectDisfruteSpike(spend));
@@ -520,8 +533,10 @@ export async function refreshDailyPatrimonioInsight(ctx?: AuthContext): Promise<
     if (!isStale(last?.updated_at ? new Date(last.updated_at) : null, 20)) return;
 
     const { getPatrimonioReport, buildDailyPatrimonioInsight } = await import("@/modules/wealth");
-    const { report, level, diagnosis } = await getPatrimonioReport(ctx);
-    const detected = buildDailyPatrimonioInsight(report, level, diagnosis);
+    const { report, level, diagnosis, protectionGaps } = await getPatrimonioReport(ctx);
+    // Con las brechas: la microacción de la bandera de protección depende de QUÉ falta, y
+    // mandar a revisar el fondo de emergencia a quien lo tiene cubierto es peor que callar.
+    const detected = buildDailyPatrimonioInsight(report, level, diagnosis, protectionGaps);
     const household_id = await getActiveHouseholdId(supabase, userId);
 
     // Uno activo a la vez: como related_id es null, el upsert no dedupea; cerramos
@@ -594,8 +609,8 @@ export async function writeDailyInsightForUserCron(
 export async function generateDailyRitualForUser(userId: string): Promise<void> {
   const { getPatrimonioReportForUser, buildDailyPatrimonioInsight } =
     await import("@/modules/wealth");
-  const { report, level, diagnosis } = await getPatrimonioReportForUser(userId);
-  const detected = buildDailyPatrimonioInsight(report, level, diagnosis);
+  const { report, level, diagnosis, protectionGaps } = await getPatrimonioReportForUser(userId);
+  const detected = buildDailyPatrimonioInsight(report, level, diagnosis, protectionGaps);
   await writeDailyInsightForUserCron(userId, detected);
 }
 
@@ -657,13 +672,21 @@ export async function getActiveInsights(limit = 5, ctx?: AuthContext): Promise<I
   return rows.slice(0, limit);
 }
 
-/** Última actualización de insights del usuario (guardia de frescura para 4b). */
+/**
+ * Última actualización de insights del usuario (guardia de frescura para 4b).
+ *
+ * Solo cuentan los kinds que escribe la PASADA de detectores. Sin ese filtro entraba
+ * `ritual_patrimonio`, que tiene su propio cron diario (13:00Z, /api/patrimonio/daily-insight):
+ * su fila recién insertada era la más reciente de la tabla, `isStale(last, 12)` daba false y los
+ * detectores no volvían a correr aunque sus propias filas tuvieran días.
+ */
 export async function getInsightsFreshness(ctx?: AuthContext): Promise<Date | null> {
   const { db: supabase, userId } = await resolveAuth(ctx);
   const { data } = await supabase
     .from("user_insights")
     .select("updated_at")
     .eq("user_id", userId)
+    .in("kind", KINDS_DETECTORES)
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();

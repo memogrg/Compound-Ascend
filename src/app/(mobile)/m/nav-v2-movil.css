@@ -1,0 +1,34 @@
+/* ============================================================
+   PESTAÑAS DE NÚCLEO EN /m — detrás de NEXT_PUBLIC_NAV_V2
+   ============================================================
+   Prefijo `mn2-`, scopeado a `.m-shell` como todo el móvil. `mobile.css` no se toca: esto
+   AÑADE lo que `.m-seg` no tiene y no cambia ni una de sus reglas.
+
+   Sin `position` y sin `z-index` a propósito. La escalera de capas de `.m-shell` está
+   calibrada al detalle (topbar 20, FAB 50, drawer 60, hojas 70, diálogos 80, toast 90) y
+   una regla nueva ahí dentro es justo lo que rompió el drawer del escritorio en #817. */
+
+/* `.m-seg` reparte el ancho con `flex: 1` porque nació para 2-3 opciones cortas. Con las
+   cuatro de Flujo o Patrimonio a 390 px cada una baja de ~70 px y «Transacciones» se
+   parte. Acá el ancho lo pide el texto y lo que sobra se desplaza. */
+.m-shell .mn2-tabs {
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  /* La barra de scroll no aporta nada en un teléfono y roba 4 px de alto al recuadro. */
+  scrollbar-width: none;
+}
+.m-shell .mn2-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.m-shell .mn2-tabs .m-seg-item {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  /* Sin esto una etiqueta larga envuelve y la barra pasa a dos líneas, que deja de leerse
+     como una barra. */
+  white-space: nowrap;
+  /* `.m-seg-item` nació para `<button>`; acá son `<a>`, que heredan el subrayado del
+     enlace. Se declara lo que NO debe heredarse, que es la lección del repo. */
+  text-decoration: none;
+}

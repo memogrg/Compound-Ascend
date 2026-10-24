@@ -1,0 +1,219 @@
+/**
+ * Las primitivas de KPI sobre `/dev/ui`.
+ *
+ * **El número pintado no existe como texto.** NumberFlow renderiza dentro de un shadow root
+ * en el que CADA posición contiene los diez dígitos apilados (`0123456789`), y el que se ve
+ * se elige con un `transform`. El `textContent` de ese shadow root es literalmente
+ * «₡0123456789.0123456789…»: no se puede leer de ahí qué cifra muestra, ni con `innerText`
+ * (el host devuelve cadena vacía). Consecuencias, las dos importantes:
+ *
+ *  - La coincidencia carácter a carácter con `formatMoney` se prueba en el FORMATEADOR
+ *    —`tests/unit/kpi.test.tsx`, que compara la salida de `Intl` con la de `format.ts` para
+ *    ocho valores—, porque es lo que NumberFlow recibe y reparte entre las posiciones.
+ *  - Acá se comprueba lo que sí es observable en el navegador: el texto accesible (el
+ *    `sr-only`, que es la única cifra escrita del DOM) y la GEOMETRÍA del elemento — cuántas
+ *    posiciones de dígito hay, y si están girando.
+ *
+ * `/dev/ui` vive bajo `(dashboard)`: exige sesión, y devuelve 404 en producción.
+ */
+import AxeBuilder from "@axe-core/playwright";
+import { test, expect, type Browser, type Page } from "@playwright/test";
+
+import { ESTADO_SESION } from "./sesion";
+import { congelarReloj } from "./reloj";
+
+const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+const RUTA = "/dev/ui";
+
+/** Lo que muestra el hero al montar. Debe salir, carácter a carácter, de `formatMoney`. */
+const HERO_INICIAL = "₡1.234.567";
+const HERO_ALTERNO = "₡987.450";
+
+async function abrir(browser: Browser, movimiento = true, ancho = 1280) {
+  const ctx = await browser.newContext({
+    storageState: ESTADO_SESION,
+    viewport: { width: ancho, height: 1000 },
+    reducedMotion: movimiento ? "no-preference" : "reduce",
+  });
+  const page = await ctx.newPage();
+  // El reloj del navegador, congelado: sin esto el spec mide el día en que corre.
+  await congelarReloj(page);
+  const avisos: string[] = [];
+  // La hidratación se queja por consola, no por excepción: si no se escucha, no se entera nadie.
+  page.on("console", (m) => {
+    const t = m.text();
+    if (/hydrat|did not match|server.*client/i.test(t)) avisos.push(t);
+  });
+  await page.goto(RUTA, { waitUntil: "networkidle", timeout: 60_000 });
+  await page.waitForTimeout(800);
+  return { ctx, page, avisos };
+}
+
+/**
+ * El hero y su botón se buscan DENTRO de la demo, nunca en la página.
+ *
+ * El catálogo de estados (delta 2.6a) monta ocho `KpiHero` más, así que `.kpi-hero` resolvía
+ * a nueve elementos y seis casos caían en rojo hablando de un hero que no era el suyo. El
+ * ancla la pone `kpi-demo.tsx`. La fila de tarjetas tiene la suya (`#kpi-tarjetas`), que
+ * desde 2.6c vive en el catálogo.
+ */
+function dentro(page: Page) {
+  return page.locator("#demo-kpi");
+}
+
+/**
+ * Cuántas posiciones de dígito tiene pintadas el hero.
+ *
+ * Es la huella observable de la cifra: ₡1.234.567 son 7 dígitos y ₡987.450 son 6. Si el
+ * elemento no se hubiera actualizado, seguirían siendo 7 aunque el `sr-only` ya dijera otra
+ * cosa — que es exactamente el fallo que este test tiene que poder ver.
+ *
+ * El selector atraviesa el shadow root abierto: Playwright lo hace por defecto.
+ */
+async function digitosPintados(page: Page): Promise<number> {
+  return dentro(page).locator(".kpi-hero-cifra number-flow-react .digit").count();
+}
+
+/** Los dígitos que están girando ahora mismo. Con movimiento reducido deben ser 0. */
+async function digitosGirando(page: Page): Promise<number> {
+  return dentro(page).locator(".kpi-hero-cifra number-flow-react .digit.is-spinning").count();
+}
+
+test("el hero anuncia el número entero y lo pinta con tantos dígitos como tiene", async ({
+  browser,
+}) => {
+  const { ctx, page } = await abrir(browser);
+  await dentro(page).locator(".kpi-hero").scrollIntoViewIfNeeded();
+  // La ÚNICA cifra escrita del DOM. Es la que lee un lector de pantalla, y sale de
+  // `formatMoney` sin intermediarios.
+  await expect(dentro(page).locator(".kpi-hero-cifra .sr-only")).toHaveText(HERO_INICIAL);
+  // Y lo pintado le corresponde: ₡1.234.567 son siete dígitos.
+  expect(await digitosPintados(page)).toBe(7);
+  await ctx.close();
+});
+
+test("«Simular cambio» cambia la cifra, no solo el texto accesible", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser);
+  await dentro(page).getByRole("button", { name: "Simular cambio" }).scrollIntoViewIfNeeded();
+  expect(await digitosPintados(page)).toBe(7);
+
+  await dentro(page).getByRole("button", { name: "Simular cambio" }).click();
+
+  await expect(dentro(page).locator(".kpi-hero-cifra .sr-only")).toHaveText(HERO_ALTERNO);
+  // Lo pintado tiene que moverse con el estado. Comprobar solo el `sr-only` dejaría pasar
+  // justo el fallo que se busca: React actualiza y el elemento se queda con el valor viejo.
+  await expect.poll(() => digitosPintados(page), { timeout: 5_000 }).toBe(6);
+  await ctx.close();
+});
+
+test("con movimiento reducido la cifra aparece ya escrita", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser, false);
+  await dentro(page).getByRole("button", { name: "Simular cambio" }).scrollIntoViewIfNeeded();
+  await dentro(page).getByRole("button", { name: "Simular cambio" }).click();
+
+  // Sin `poll`: inmediatamente después del clic el número ya es el nuevo y nada gira.
+  expect(await digitosPintados(page)).toBe(6);
+  expect(await digitosGirando(page)).toBe(0);
+  await expect(dentro(page).locator(".kpi-hero-cifra .sr-only")).toHaveText(HERO_ALTERNO);
+  await ctx.close();
+});
+
+test("el chip de variación no confía solo en el color", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser);
+  const chips = page.locator("#kpi-tarjetas .kpi-delta");
+  await expect(chips.first()).toBeVisible();
+  const n = await chips.count();
+  for (let i = 0; i < n; i++) {
+    const texto = await chips.nth(i).innerText();
+    // Flecha + palabra: quien no distingue rojo de verde lee lo mismo.
+    expect(texto).toMatch(/[↑↓→]/);
+    expect(texto).toMatch(/sube|baja|sin cambio/);
+  }
+  await ctx.close();
+});
+
+test("el mismo signo lleva tono opuesto según la métrica", async ({ browser }) => {
+  // Ingresos +₡120.000 es bueno; Gastos +₡84.000 es malo. Es la regla que justifica
+  // `describirDelta`, y acá se comprueba pintada.
+  const { ctx, page } = await abrir(browser);
+  const tono = (etiqueta: string) =>
+    page
+      .locator("#kpi-tarjetas .kpi-card", { hasText: etiqueta })
+      .locator(".kpi-delta")
+      .getAttribute("data-tono");
+  expect(await tono("Ingresos")).toBe("bueno");
+  expect(await tono("Gastos")).toBe("malo");
+  await ctx.close();
+});
+
+test("el medidor se anuncia como meter con su rango", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser);
+  const meter = dentro(page).locator(".kpi-hero [role='meter']");
+  await expect(meter).toHaveAttribute("aria-valuenow", "43");
+  await expect(meter).toHaveAttribute("aria-valuemin", "0");
+  await expect(meter).toHaveAttribute("aria-valuemax", "100");
+  await expect(meter).toHaveAttribute("aria-label", /Presupuesto/);
+  await ctx.close();
+});
+
+test("la sparkline es decorativa: no la anuncia nadie", async ({ browser }) => {
+  // El dato está en la cifra de al lado. Una sparkline «accesible» solo añadiría ruido.
+  const { ctx, page } = await abrir(browser);
+  await expect(dentro(page).locator(".kpi-spark").first()).toHaveAttribute("aria-hidden", "true");
+  await ctx.close();
+});
+
+test("el medidor pinta la misma cadena que anuncia", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser);
+  const meter = dentro(page).locator(".kpi-hero [role='meter']");
+  const texto = await meter.getAttribute("aria-valuetext");
+  expect(texto).toBe("43 %");
+  await expect(dentro(page).locator(".kpi-hero .kpi-meter-valor")).toHaveText(texto!);
+  await ctx.close();
+});
+
+test("a 390 la etiqueta «vs …» cae a la misma altura en las cuatro tarjetas", async ({
+  browser,
+}) => {
+  // Si la etiqueta baja de línea solo en las tarjetas cuyo importe es largo, la fila queda
+  // con cuatro chips a alturas distintas. Por debajo de 420 px baja siempre.
+  const { ctx, page } = await abrir(browser, true, 390);
+  // Acotado a la fila del demo de KPI: `.kpi-card` a secas recogía también la tarjeta
+  // suelta de `lectura-demo`, y el `toBe(4)` fallaba con 5 sin que nada estuviera mal.
+  const tarjetas = page.locator("#kpi-tarjetas .kpi-card");
+  const n = await tarjetas.count();
+  expect(n, "no se encontró la fila de tarjetas KPI").toBeGreaterThan(1);
+  await tarjetas.first().scrollIntoViewIfNeeded();
+
+  const relativas: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const tarjeta = await tarjetas.nth(i).boundingBox();
+    const etiqueta = await tarjetas.nth(i).locator(".kpi-delta-vs").boundingBox();
+    expect(tarjeta, `tarjeta ${i} sin caja`).not.toBeNull();
+    expect(etiqueta, `etiqueta ${i} sin caja`).not.toBeNull();
+    relativas.push(Math.round(etiqueta!.y - tarjeta!.y));
+  }
+  // Una sola altura para las cuatro (tolerancia 1 px por redondeo del layout).
+  expect(
+    Math.max(...relativas) - Math.min(...relativas),
+    relativas.join(" · "),
+  ).toBeLessThanOrEqual(1);
+  await ctx.close();
+});
+
+test("la hidratación no protesta", async ({ browser }) => {
+  const { ctx, page, avisos } = await abrir(browser);
+  await dentro(page).locator(".kpi-hero").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(500);
+  expect(avisos, avisos.join("\n")).toHaveLength(0);
+  await ctx.close();
+});
+
+test("axe no encuentra nada en la sección KPI", async ({ browser }) => {
+  const { ctx, page } = await abrir(browser);
+  const r = await new AxeBuilder({ page }).withTags(TAGS).include(".kpi-hero").analyze();
+  const tarjetas = await new AxeBuilder({ page }).withTags(TAGS).include(".kpi-card").analyze();
+  const todas = [...r.violations, ...tarjetas.violations];
+  expect(todas.map((v) => `${v.id} (${v.impact}) ×${v.nodes.length}`).join("\n")).toBe("");
+  await ctx.close();
+});

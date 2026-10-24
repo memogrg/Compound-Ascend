@@ -39,11 +39,22 @@ const serverSchema = z.object({
   GEMINI_MODEL: optionalStr,
   FINNHUB_TOKEN: optionalStr,
   ALPHA_VANTAGE_KEY: optionalStr,
-  // CoinGecko Demo API key (plan gratuito con registro). Si está, se manda en el header
-  // x-cg-demo-api-key en TODAS las llamadas → mucho más rate limit que el endpoint público
-  // (IPs compartidas de serverless se rate-limitean rápido). Opcional: sin ella funciona keyless
-  // (como en local/dev). En PROD conviene setearla para que el ATH/precio no falle por 429.
+  // CoinGecko API key. Opcional: sin ella funciona keyless (como en local/dev). Con plan
+  // "demo" va en x-cg-demo-api-key contra api.coingecko.com; con plan "pro" (cualquier plan PAGO,
+  // Basic incluido) va en x-cg-pro-api-key contra pro-api.coingecko.com. Mezclarlos no degrada:
+  // falla. Por eso el plan se declara aparte — las dos llaves no se distinguen mirándolas.
   COINGECKO_API_KEY: optionalStr,
+  COINGECKO_API_PLAN: optionalStr, // "pro" | "demo" (default demo)
+  // Feed de mercado pago (src/lib/market-data/vendors). Las MISMAS variables van también en los
+  // secrets/variables del Action del colector: son dos lugares y se cargan por separado.
+  MASSIVE_API_KEY: optionalStr,
+  TWELVEDATA_API_KEY: optionalStr,
+  // Cadena por tipo de activo, en orden: "massive,finnhub" = primario massive, respaldo finnhub.
+  // Sin setear: finnhub para acciones y coingecko para cripto, como antes de tener planes pagos.
+  MARKET_PROVIDER_STOCKS: optionalStr,
+  MARKET_PROVIDER_CRYPTO: optionalStr,
+  // Sufijo de bolsa → código de Twelve Data, además de .L/.LSE → LSE (ej. "DE=XETR,AS=Euronext").
+  MARKET_EXCHANGE_SUFFIXES: optionalStr,
   // Indicadores económicos — Costa Rica (API SDDE del BCCR, REST/JSON con Bearer).
   // Registro/suscripción en https://www.bccr.fi.cr/indicadores-economicos (token JWT).
   BCCR_SDDE_TOKEN: optionalStr, // token Bearer (JWT) de la suscripción SDDE
