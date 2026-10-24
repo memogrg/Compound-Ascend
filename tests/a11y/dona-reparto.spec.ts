@@ -113,19 +113,50 @@ test("a 390 el título del marco cabe en un renglón y el hueco anillo→leyenda
   expect(lineas, "el título se partió: los controles le quitaron ancho").toBe(1);
 
   /**
-   * Cuánto SOBRA, no solo que quepa.
+   * La regla de la decisión 61, afirmada: **el token del título manda**. Si el título completo no
+   * cabe junto a los controles, los que bajan a su propia fila son los controles — el título no se
+   * parte nunca.
    *
-   * Que el título quepa en un renglón depende de dos cosas que se mueven por separado: el ancho
-   * que los controles le dejan y lo que mide el texto con la tipografía de turno. Un caso que solo
-   * dice «1 renglón» no deja ver que el margen se está agotando, y cuando se agote el fallo
-   * aparecerá en un PR que no tocó nada de esto. Al pasar `.cf-titulo` al token de `.card-title`
-   * (15 px con `--font-display` en vez de 14 con la del cuerpo), «Presupuesto del mes» pasó de
-   * 137,2 px a 157,7 medidos con las fuentes reales: +20,5. Esta línea dice contra cuánto.
+   * El mecanismo ya está puesto desde la 26.3: `.cf-cab` lleva `flex-wrap: wrap` y `.cf-acciones`
+   * va con `flex: none`, así que flexbox decide el salto con los tamaños HIPOTÉTICOS —el del
+   * título es su `max-content`— antes de encoger nada. Lo que faltaba era afirmarlo, porque «1
+   * renglón» a secas no distingue «cabía de sobra» de «cabía por los pelos», y el token subió el
+   * ancho del título: «Presupuesto del mes» pasa de 137,2 px a 157,7 medidos con las fuentes
+   * reales (+20,5) al cambiar 14 px con la familia del cuerpo por 15 con `--font-display`.
+   *
+   * El ancho del TEXTO se mide con un `Range` sobre el contenido del `h3` y no con su
+   * `scrollWidth`: el `h3` es de bloque y ocupa todo su hueco, así que su `scrollWidth` devuelve
+   * el ancho de la caja y no el de las letras — con eso, la holgura habría salido 0 siempre y la
+   * comprobación no habría medido nada.
    */
-  const holgura = await titulo.evaluate((n) => ({
-    texto: Math.round(n.scrollWidth),
-    hueco: Math.round((n.parentElement ?? n).getBoundingClientRect().width),
-  }));
+  const cab = await marco.locator(".cf-cab").evaluate((n) => {
+    const t = n.querySelector(".cf-titulo") as HTMLElement;
+    const a = n.querySelector(".cf-acciones") as HTMLElement | null;
+    const rango = document.createRange();
+    rango.selectNodeContents(t);
+    const cajaT = t.getBoundingClientRect();
+    const cajaA = a?.getBoundingClientRect() ?? null;
+    return {
+      ancho: Math.round(n.getBoundingClientRect().width),
+      texto: Math.round(rango.getBoundingClientRect().width),
+      controles: cajaA ? Math.round(cajaA.width) : 0,
+      gap: Math.round(parseFloat(getComputedStyle(n).columnGap) || 0),
+      // ¿Comparten renglón? Por solape vertical de las dos cajas, no por coordenada exacta: los
+      // controles van alineados arriba pero no empiezan en el mismo píxel que el título.
+      mismaFila: cajaA ? cajaA.top < cajaT.bottom && cajaT.top < cajaA.bottom : true,
+    };
+  });
+  // Los tres anchos tienen que ser anchos de ALGO. Sin esto, un `.cf-acciones` que dejara de
+  // existir daría `controles: 0` y `mismaFila: true`, y la regla de abajo pasaría sola sin haber
+  // mirado nada — el modo de fallo más caro de este arnés.
+  expect(cab.ancho, "la cabecera del marco no mide nada").toBeGreaterThan(0);
+  expect(cab.texto, "el título no tiene texto que medir").toBeGreaterThan(0);
+  expect(
+    cab.controles,
+    "no se encontró `.cf-acciones`: la regla no estaría mirando nada",
+  ).toBeGreaterThan(0);
+
+  const holgura = { texto: cab.texto, hueco: cab.ancho - cab.gap - cab.controles };
 
   const anillo = marco.locator('.cf-lienzo [role="img"]').first();
   const leyenda = marco.locator(".cf-leyenda-lado");
@@ -139,9 +170,31 @@ test("a 390 el título del marco cabe en un renglón y el hueco anillo→leyenda
   // romperlo para saber cuánto mide de verdad, y las dos medidas de la decisión 55 son justo lo que
   // hay que poder leer de una corrida verde.
   console.log(
-    `dona a 390: título ${lineas} renglón(es) · texto ${holgura.texto} px en ${holgura.hueco} px ` +
-      `(holgura ${holgura.hueco - holgura.texto}) · hueco anillo→leyenda ${hueco} px`,
+    `dona a 390: título ${lineas} renglón(es) · texto ${cab.texto} px + controles ${cab.controles} ` +
+      `+ gap ${cab.gap} contra ${cab.ancho} de cabecera (holgura ` +
+      `${holgura.hueco - holgura.texto}) · controles ${cab.mismaFila ? "en la fila del título" : "en su propia fila"} ` +
+      `· hueco anillo→leyenda ${hueco} px`,
   );
+
+  /**
+   * La regla, en una línea: comparten renglón EXACTAMENTE cuando caben juntos.
+   *
+   * Las dos aserciones son COMPLEMENTARIAS, y conviene decir cuál caza qué para no creerlas más
+   * fuertes de lo que son. Medido quitando `flex-wrap` del `.cf-cab` sobre el CSS real: el título
+   * se parte en dos renglones, y como el `Range` mide entonces el renglón más ANCHO (123 px en vez
+   * de 158), `cabenJuntos` sale verdadero y esta comprobación pasa. O sea que al mecanismo roto lo
+   * caza «1 renglón», de arriba; y lo que caza esta es el defecto contrario — una cabecera que
+   * gasta un renglón de más donde los controles sí cabían.
+   *
+   * El margen de 1 px es del redondeo de los tres anchos, no una tolerancia de criterio.
+   */
+  const cabenJuntos = cab.texto + cab.gap + cab.controles <= cab.ancho + 1;
+  expect(
+    cab.mismaFila,
+    cabenJuntos
+      ? `caben juntos (${cab.texto}+${cab.gap}+${cab.controles} ≤ ${cab.ancho}) y los controles bajaron igual`
+      : `no caben (${cab.texto}+${cab.gap}+${cab.controles} > ${cab.ancho}) y los controles no bajaron: el título se parte`,
+  ).toBe(cabenJuntos);
 
   // El tope es 24 y no 18 exactos para dejar sitio al redondeo del `line-height` de la primera fila
   // de la leyenda. Lo que no puede volver son los 28 px de aire muerto del lienzo.
