@@ -112,6 +112,21 @@ test("a 390 el título del marco cabe en un renglón y el hueco anillo→leyenda
   });
   expect(lineas, "el título se partió: los controles le quitaron ancho").toBe(1);
 
+  /**
+   * Cuánto SOBRA, no solo que quepa.
+   *
+   * Que el título quepa en un renglón depende de dos cosas que se mueven por separado: el ancho
+   * que los controles le dejan y lo que mide el texto con la tipografía de turno. Un caso que solo
+   * dice «1 renglón» no deja ver que el margen se está agotando, y cuando se agote el fallo
+   * aparecerá en un PR que no tocó nada de esto. Al pasar `.cf-titulo` al token de `.card-title`
+   * (15 px con `--font-display` en vez de 14 con la del cuerpo), «Presupuesto del mes» pasó de
+   * 137,2 px a 157,7 medidos con las fuentes reales: +20,5. Esta línea dice contra cuánto.
+   */
+  const holgura = await titulo.evaluate((n) => ({
+    texto: Math.round(n.scrollWidth),
+    hueco: Math.round((n.parentElement ?? n).getBoundingClientRect().width),
+  }));
+
   const anillo = marco.locator('.cf-lienzo [role="img"]').first();
   const leyenda = marco.locator(".cf-leyenda-lado");
   await expect(anillo).toBeVisible();
@@ -123,7 +138,10 @@ test("a 390 el título del marco cabe en un renglón y el hueco anillo→leyenda
   // Las cotas se afirman, pero los VALORES se imprimen: un caso que solo dice «≤ 24» obliga a
   // romperlo para saber cuánto mide de verdad, y las dos medidas de la decisión 55 son justo lo que
   // hay que poder leer de una corrida verde.
-  console.log(`dona a 390: título ${lineas} renglón(es) · hueco anillo→leyenda ${hueco} px`);
+  console.log(
+    `dona a 390: título ${lineas} renglón(es) · texto ${holgura.texto} px en ${holgura.hueco} px ` +
+      `(holgura ${holgura.hueco - holgura.texto}) · hueco anillo→leyenda ${hueco} px`,
+  );
 
   // El tope es 24 y no 18 exactos para dejar sitio al redondeo del `line-height` de la primera fila
   // de la leyenda. Lo que no puede volver son los 28 px de aire muerto del lienzo.
