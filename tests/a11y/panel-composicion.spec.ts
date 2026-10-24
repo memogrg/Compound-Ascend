@@ -32,14 +32,30 @@ async function abrir(browser: Browser, ruta: string, ancho = 1280) {
 
 const aNumero = (s: string) => Number(s.replace(/[^\d]/g, ""));
 
+/**
+ * La tarjeta de la composición, localizada POR SU TÍTULO y no por su posición.
+ *
+ * Antes era `.dl` la primera y `.card-title` el primero de la página. Las dos se rompieron al
+ * pasar la dona al marco del núcleo (26.3): el envoltorio `.dl` ya no existe en esta tarjeta
+ * —lo hace el marco— y el título vive en `.cf-titulo`, así que `.card-title` el primero habría
+ * seguido encontrando algo, el título de OTRA tarjeta, y el spec habría afirmado sobre ella.
+ * Filtrar por el texto del título ata el localizador a lo que el caso trata.
+ */
+const TITULO_TARJETA = "Presupuesto del mes por bloque";
+
+function tarjetaComposicion(page: Page) {
+  return page.locator("figure.cf").filter({ hasText: TITULO_TARJETA }).first();
+}
+
 /** El total del centro de la dona del panel, y su subtítulo. */
 async function centroDelPanel(page: Page) {
-  const dona = page.locator(".dl").first();
-  const filas = await dona.locator(".dl-monto").allTextContents();
+  const marco = tarjetaComposicion(page);
+  await expect(marco, "no apareció la tarjeta de la composición").toBeVisible();
+  const filas = await marco.locator(".dl-monto").allTextContents();
   return {
     suma: filas.map(aNumero).reduce((a, b) => a + b, 0),
-    sub: (await dona.locator(".donut-sub").innerText()).trim(),
-    titulo: (await page.locator(".card-title").first().innerText()).trim(),
+    sub: (await marco.locator(".donut-sub").innerText()).trim(),
+    titulo: (await marco.locator(".cf-titulo").first().innerText()).trim(),
   };
 }
 
@@ -89,13 +105,10 @@ test("y por eso el rótulo dice presupuesto, con su período", async ({ browser 
   // decía «gastos» y el subtítulo «al mes»: el período estaba, la naturaleza estaba al revés.
   const { ctx, page } = await abrir(browser, "/dashboard");
   const { titulo, sub } = await centroDelPanel(page);
-  expect(titulo, `título: ${titulo}`).toBe("Presupuesto del mes por bloque");
+  expect(titulo, `título: ${titulo}`).toBe(TITULO_TARJETA);
   expect(sub, `subtítulo: ${sub}`).toBe("presupuesto");
   // Y no queda ningún «gasto» suelto en la tarjeta que vuelva a prometer lo que no muestra.
-  const tarjeta = page
-    .locator(".dl")
-    .first()
-    .locator("xpath=ancestor::*[contains(@class,'card')][1]");
+  const tarjeta = tarjetaComposicion(page).locator("xpath=ancestor::*[contains(@class,'card')][1]");
   expect((await tarjeta.innerText()).toLowerCase(), "sigue diciendo «gastos»").not.toContain(
     "composición de gastos",
   );

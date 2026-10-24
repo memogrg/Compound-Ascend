@@ -1,42 +1,42 @@
 {
-  "pr": 933,
-  "corrida": 39359776368,
+  "pr": 919,
+  "corrida": 40037039732,
   "capturas": [
     {
-      "ruta": "/faqs",
+      "ruta": "/dashboard",
       "tema": "dark",
       "ancho": 1280,
-      "sha256_despues": "a7d5096fd5e9865fee4816c01b908d92c5b97d00cd3b4ce9cd6913cb2a496722"
+      "sha256_despues": "a6408af7c5f85e46376da200726b93627dc44cdbc936e788b747ae1179d3a3e9"
     },
     {
-      "ruta": "/faqs",
+      "ruta": "/dashboard",
       "tema": "light",
       "ancho": 1280,
-      "sha256_despues": "a7d5096fd5e9865fee4816c01b908d92c5b97d00cd3b4ce9cd6913cb2a496722"
+      "sha256_despues": "60e5511b973c5a7031eaa616f0d056c511d678d78f94ec9df7790c4697556dc8"
     },
     {
-      "ruta": "/faqs",
+      "ruta": "/dashboard",
       "tema": "dark",
       "ancho": 768,
-      "sha256_despues": "918ac2ccc01a1d2503de96c7a4ca8e2562c242fd7b7063a7a95480e6a7bb0423"
+      "sha256_despues": "8ad55a065e7442d084159ccf529dd67b8b9a30a45d0ba480e044f057f1806909"
     },
     {
-      "ruta": "/faqs",
+      "ruta": "/dashboard",
       "tema": "light",
       "ancho": 768,
-      "sha256_despues": "918ac2ccc01a1d2503de96c7a4ca8e2562c242fd7b7063a7a95480e6a7bb0423"
+      "sha256_despues": "ae8add7195e564a24c5f539818e199cf7fe01532697bfe172e1411dc93524f9b"
     },
     {
-      "ruta": "/faqs",
+      "ruta": "/dashboard",
       "tema": "dark",
       "ancho": 390,
-      "sha256_despues": "9ef8ad2fd3b1b1f9a6377be150bffc0ff880f72ef6bf70b8627803bdd4d86633"
+      "sha256_despues": "be80e9cbc911066af3afa3505dfcb34eedc319aa1e082d87b3ad25127ac8b0c5"
     },
     {
-      "ruta": "/faqs",
+      "ruta": "/dashboard",
       "tema": "light",
       "ancho": 390,
-      "sha256_despues": "9ef8ad2fd3b1b1f9a6377be150bffc0ff880f72ef6bf70b8627803bdd4d86633"
+      "sha256_despues": "72e1c56debbb02e90c67e33adeb18df3128b27fb5330189c3dd942368f1fcf36"
     }
   ]
 }

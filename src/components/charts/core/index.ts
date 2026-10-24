@@ -33,6 +33,7 @@ export {
 export {
   describirGrafico,
   describirPunto,
+  filaNormalizada,
   tablaDeDatos,
   SIN_DATO,
   type FilaDato,
@@ -84,4 +85,14 @@ export {
   etiquetasDeRango,
   type CeldaCalendario,
 } from "./calendario";
+export { LeyendaDona } from "./leyenda-dona-lista";
+export {
+  describirDona,
+  filasLeyenda,
+  tablaDona,
+  type DatoDona,
+  type FilaDona,
+  type ModoLeyenda,
+  type ResultadoLeyenda,
+} from "./leyenda-dona";
 export { recortar, presetsUtiles, mesesHaciaAtras, NOMBRE_RANGO, type RangoPreset } from "./rangos";
