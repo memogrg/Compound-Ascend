@@ -26,6 +26,26 @@ const RUTAS = ["/dashboard", "/gastos", "/mi-rich-life", "/patrimonio"] as const
  */
 const CAJA_DONA = ".dl, .cf-lateral";
 
+/** Las porciones dibujadas del anillo. Recharts pinta una u otra clase según la versión. */
+const PORCIONES = ".recharts-pie-sector path, .recharts-sector";
+
+/**
+ * Espera a que el anillo haya PINTADO sus porciones, no solo a que exista su hueco.
+ *
+ * Hace falta desde que la dona vive en el marco. Antes, `DonutConLeyenda` era el componente
+ * diferido: anillo y leyenda llegaban en el mismo chunk, así que ver una fila de leyenda implicaba
+ * que el anillo ya estaba. Ahora la leyenda la pinta `LeyendaDona`, que no es diferida y se
+ * pre-renderiza en el servidor, mientras `DonutChart` sigue siendo `dynamic({ ssr: false })`: las
+ * filas aparecen bastante ANTES que las porciones.
+ *
+ * Medido en la corrida 37104164915: «Ver todas» leyó 0 porciones antes de pulsar y 7 después, y el
+ * caso falló diciendo «el anillo no debe cambiar» — acusando al desplegable de algo que era la
+ * carga del chunk.
+ */
+async function esperarPorciones(dona: Locator) {
+  await dona.locator(PORCIONES).first().waitFor({ state: "attached", timeout: 30_000 });
+}
+
 async function abrir(browser: Browser, ruta: string, ancho: number) {
   const ctx = await browser.newContext({
     storageState: ESTADO_SESION,
@@ -44,7 +64,15 @@ async function abrir(browser: Browser, ruta: string, ancho: number) {
   // Vale una fila O el estado vacío: la cuenta de demo tiene ₡0 invertido, así que las dos
   // donas de `/patrimonio` salen legítimamente vacías. Esperar solo `.dl-fila` ahí agotaba
   // el minuto y el fallo parecía de la dona.
-  await page.locator(".dl-fila, .dl-vacio").first().waitFor({ state: "visible", timeout: 60_000 });
+  // Tres formas de «ya cargó»: una fila de leyenda, el vacío de la tarjeta vieja, o el vacío del
+  // marco. Lo tercero hace falta desde que la dona vive en el marco: ahí el estado vacío lo pinta
+  // `ChartEmpty`, que no tiene clase propia —solo `.muted`—, y el `data-estado` de la figura es el
+  // único hook estable. Sin él, una ruta migrada con donas legítimamente vacías (`/patrimonio` en la
+  // cuenta de demo) colgaría los 60 s y el fallo se leería como un selector roto.
+  await page
+    .locator('.dl-fila, .dl-vacio, figure.cf[data-estado="vacio"]')
+    .first()
+    .waitFor({ state: "visible", timeout: 60_000 });
   return { ctx, page };
 }
 
@@ -216,7 +244,10 @@ test("«Ver todas» despliega la leyenda y NO toca el anillo", async ({ browser 
   const tarjeta = titulo.locator("xpath=ancestor::*[contains(@class,'card')][1]");
   const dona = tarjeta.locator(CAJA_DONA);
 
-  const porciones = dona.locator(".recharts-pie-sector path, .recharts-sector");
+  const porciones = dona.locator(PORCIONES);
+  // El anillo, pintado, ANTES de contar: si se cuenta mientras llega su chunk, el «antes» vale 0 y
+  // el caso culpa al desplegable del tiempo de carga.
+  await esperarPorciones(dona);
   const antesPorciones = await porciones.count();
   const antesFilas = await dona.locator(".dl-fila").count();
 
@@ -241,11 +272,21 @@ test("ninguna porción visible del anillo repite color", async ({ browser }) => 
     const { ctx, page } = await abrir(browser, ruta, 1280);
     const donas = page.locator(CAJA_DONA);
     for (let i = 0; i < (await donas.count()); i++) {
+      // Una dona sin filas de leyenda es el estado vacío legítimo (la cuenta de demo tiene
+      // `/patrimonio` sin inversiones): ahí no hay porciones que comparar y se dice. Una dona CON
+      // filas tiene que tener porciones, así que se espera a que lleguen en vez de saltarla — el
+      // `continue` a secas convertía «el chunk no había cargado» en un test que pasa sin medir.
+      const conDatos = (await donas.nth(i).locator(".dl-fila").count()) > 0;
+      if (!conDatos) {
+        console.log(`${ruta}: dona ${i} vacía, sin porciones que comparar`);
+        continue;
+      }
+      await esperarPorciones(donas.nth(i));
       const fills = await donas
         .nth(i)
-        .locator(".recharts-pie-sector path, .recharts-sector")
+        .locator(PORCIONES)
         .evaluateAll((ns) => ns.map((n) => (n as SVGElement).getAttribute("fill") ?? ""));
-      if (fills.length === 0) continue;
+      expect(fills.length, `${ruta} · dona ${i}: con filas pero sin porciones`).toBeGreaterThan(0);
       expect(new Set(fills).size, `${ruta} · dona ${i}: ${fills.join(", ")}`).toBe(fills.length);
     }
     await ctx.close();
