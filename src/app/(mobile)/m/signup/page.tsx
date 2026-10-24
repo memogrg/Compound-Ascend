@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { MobileSignupForm } from "../components/mobile-signup-form";
+import { PieLegal } from "@/components/legal/pie-legal";
 
 /**
  * Registro del móvil (/m/signup), misma piel que /m/login. Vive fuera del grupo (app):
@@ -51,6 +52,17 @@ export default function MobileSignup() {
       </div>
 
       <MobileSignupForm />
+
+      <PieLegal
+        voz="tu"
+        style={{
+          textAlign: "center",
+          marginTop: 18,
+          fontSize: 12,
+          lineHeight: 1.5,
+          color: "var(--text-muted)",
+        }}
+      />
     </div>
   );
 }

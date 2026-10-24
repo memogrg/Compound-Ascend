@@ -17,6 +17,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { logger } from "@/lib/logger";
 import { TRIAL_DAYS, type PaidPlan } from "@/lib/plan";
 
+import { formatDayMonthLong } from "@/lib/format";
 /** Cliente de Stripe de este usuario; lo crea la primera vez y lo guarda. */
 async function clienteDe(userId: string, email: string | null): Promise<string> {
   const stripe = getStripe();
@@ -49,7 +50,7 @@ async function clienteDe(userId: string, email: string | null): Promise<string> 
 export function fechaPrimerCobro(desde: Date = new Date()): string {
   const d = new Date(desde);
   d.setDate(d.getDate() + TRIAL_DAYS);
-  return d.toLocaleDateString("es-CR", { day: "numeric", month: "long" });
+  return formatDayMonthLong(d);
 }
 
 export async function crearCheckout(input: {

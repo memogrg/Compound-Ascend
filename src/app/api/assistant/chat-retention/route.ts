@@ -1,7 +1,12 @@
 /**
  * GET/POST /api/assistant/chat-retention — limpieza de retención del chat del asesor.
- * Borra de chat_messages todo lo más viejo que CHAT_RETENTION_DAYS (lib/ai/chat-retention),
- * para TODOS los usuarios. Cron diario (vercel.json).
+ * Borra todo lo más viejo que CHAT_RETENTION_DAYS (lib/ai/chat-retention) de las DOS tablas
+ * donde queda la conversación, para TODOS los usuarios. Cron diario (vercel.json):
+ *
+ *   - `chat_messages`         — el hilo que la persona ve.
+ *   - `ai_conversation_turns` — el contexto que se le pasa al modelo. Se lee con una ventana
+ *     de 120 minutos, así que lo viejo ya era inalcanzable… pero seguía ahí. Sin este paso
+ *     la tabla crecía sin techo guardando lo que la interfaz promete borrar en 1 semana.
  *
  * ANTES de purgar corre la EXTRACCIÓN DE MEMORIA (lib/ai/memory-extraction): es el único momento
  * en que la conversación del día ya está cerrada y todavía existe. Lo que la persona contó de su
@@ -15,6 +20,8 @@
  *
  * Usa service-role (no hay sesión y recorre a todos los usuarios). IDEMPOTENTE: el borrado es
  * por corte de fecha, así que correrlo dos veces el mismo día no cambia nada la segunda vez.
+ *
+ * `ai_coaching_thread` NO se purga, por diseño: es otra cosa, no el historial del chat.
  */
 import { NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/auth/session";
@@ -53,12 +60,23 @@ async function handle(req: Request) {
       });
     }
 
-    // 2. Purgar. Pase lo que pase arriba.
+    // 2. Purgar. Pase lo que pase arriba. Primero el hilo visible: si ese falla, LANZA y el
+    //    cron se entera, porque es la promesa al usuario.
     const { purgeExpiredChatMessages } = await import("@/lib/ai/chat-store");
-    const deleted = await purgeExpiredChatMessages();
+    const chatMessages = await purgeExpiredChatMessages();
+
+    // 3. Y los turnos del contexto, que son la misma conversación guardada aparte. Degrada a
+    //    null si falla: limpieza interna, no puede tapar el resultado del paso 2.
+    const { purgeExpiredConversationTurns } = await import("@/lib/ai/conversation-store");
+    const conversationTurns = await purgeExpiredConversationTurns();
 
     return NextResponse.json(
-      { ok: true, retentionDays: CHAT_RETENTION_DAYS, deleted, memoria },
+      {
+        ok: true,
+        retentionDays: CHAT_RETENTION_DAYS,
+        deleted: { chat_messages: chatMessages, ai_conversation_turns: conversationTurns },
+        memoria,
+      },
       { headers: cors },
     );
   } catch (err) {

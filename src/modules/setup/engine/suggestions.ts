@@ -12,6 +12,7 @@
  */
 import type { SetupSnapshot, SetupSobre } from "@/modules/setup/types";
 
+import { formateadorNumero } from "@/lib/format";
 /**
  * Reparto de referencia por frasco, como fracción del ingreso NETO mensual.
  * Es un punto de partida conversable, no una regla: los seis frascos normales
@@ -40,7 +41,7 @@ export type Suggestion = {
 };
 
 function money(v: number, currency: string): string {
-  return new Intl.NumberFormat("es-CR", {
+  return formateadorNumero({
     style: "currency",
     currency,
     maximumFractionDigits: 0,
@@ -180,8 +181,10 @@ export function nextAfterBudget(s: SetupSnapshot, free: number): NextMove | null
   }
 
   // 2) Deuda cara: rinde más que cualquier inversión razonable.
+  // `balance` es el saldo VIVO (setup-state lo deriva con deriveDebtsForEngine). El filtro `> 0`
+  // es lo que impide sugerir "abonale a X" sobre una deuda ya saldada: antes no filtraba saldo.
   const cara = s.debts
-    .filter((d) => (d.apr ?? 0) >= 20)
+    .filter((d) => (d.apr ?? 0) >= 20 && d.balance > 0)
     .sort((a, b) => (b.apr ?? 0) - (a.apr ?? 0));
   const peor = cara[0];
   if (peor) {

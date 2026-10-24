@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { empezarAction, signInWithGoogleAction, type ActionState } from "@/lib/auth/actions";
 import { PAID_PLANS, PLAN_LABEL, PLAN_PRICE_USD, PLAN_PROMISE, type PaidPlan } from "@/lib/plan";
+import { CasillaTerminos } from "@/components/legal/casilla-terminos";
 
 const inicial: ActionState = { ok: false };
 
@@ -81,6 +82,12 @@ export function EmpezarForm({
               <em className="emp-err">{state.fieldErrors.password}</em>
             ) : null}
           </label>
+
+          <CasillaTerminos
+            id="acepta_terminos_empezar"
+            defaultChecked={state.values?.acepta_terminos === "on"}
+            error={state.fieldErrors?.acepta_terminos}
+          />
 
           <button type="submit" className="lp-btn btn-green btn-lg emp-enviar" disabled={pending}>
             {pending ? "Abriendo el pago seguro…" : "Continuar al pago seguro"}

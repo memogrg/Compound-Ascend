@@ -20,6 +20,11 @@ vi.mock("@/lib/ai/chat-store", () => ({
   purgeExpiredChatMessages: () => purgeMock(),
 }));
 
+const purgeTurnosMock = vi.fn(async (): Promise<number | null> => 5);
+vi.mock("@/lib/ai/conversation-store", () => ({
+  purgeExpiredConversationTurns: () => purgeTurnosMock(),
+}));
+
 const SIN_HECHOS = { usuarios: 0, extraidos: 0, dedupeados: 0, archivados: 0, fallidos: 0 };
 const extractMock = vi.fn(async () => SIN_HECHOS);
 vi.mock("@/lib/ai/memory-extraction", () => ({
@@ -38,6 +43,7 @@ function req(headers: Record<string, string> = {}) {
 beforeEach(() => {
   process.env.CRON_SECRET = SECRET;
   purgeMock.mockClear();
+  purgeTurnosMock.mockClear();
   extractMock.mockClear();
   extractMock.mockResolvedValue(SIN_HECHOS);
 });
@@ -66,16 +72,33 @@ describe("GET/POST /api/assistant/chat-retention", () => {
     const json = (await res.json()) as {
       ok: boolean;
       retentionDays: number;
-      deleted: number;
+      deleted: { chat_messages: number | null; ai_conversation_turns: number | null };
       memoria: unknown;
     };
+    // Las DOS tablas donde queda la conversación se reportan por separado: si una purga
+    // deja de correr, un contador ausente lo dice y un total sumado lo escondería.
     expect(json).toEqual({
       ok: true,
       retentionDays: CHAT_RETENTION_DAYS,
-      deleted: 12,
+      deleted: { chat_messages: 12, ai_conversation_turns: 5 },
       memoria: SIN_HECHOS,
     });
     expect(purgeMock).toHaveBeenCalledTimes(1);
+    expect(purgeTurnosMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("un fallo al purgar los turnos NO tapa el resultado de chat_messages", async () => {
+    // El store degrada a null en vez de lanzar: la purga del hilo visible es la promesa
+    // al usuario y su número tiene que llegar igual.
+    purgeTurnosMock.mockResolvedValueOnce(null);
+
+    const res = await GET(req({ "x-cron-secret": SECRET }));
+
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      deleted: { chat_messages: number | null; ai_conversation_turns: number | null };
+    };
+    expect(json.deleted).toEqual({ chat_messages: 12, ai_conversation_turns: null });
   });
 
   it("acepta el Authorization: Bearer que manda Vercel Cron", async () => {
@@ -102,21 +125,25 @@ describe("GET/POST /api/assistant/chat-retention", () => {
     extractMock.mockRejectedValueOnce(new Error("gemini caído"));
     const res = await GET(req({ "x-cron-secret": SECRET }));
     expect(res.status).toBe(200);
-    const json = (await res.json()) as { deleted: number; memoria: unknown };
+    const json = (await res.json()) as {
+      deleted: { chat_messages: number | null };
+      memoria: unknown;
+    };
     expect(purgeMock).toHaveBeenCalledTimes(1);
-    expect(json.deleted).toBe(12);
+    expect(json.deleted.chat_messages).toBe(12);
     expect(json.memoria).toBeNull();
   });
 
   it("es idempotente: la segunda corrida no encuentra nada más que borrar", async () => {
     purgeMock.mockResolvedValueOnce(12).mockResolvedValueOnce(0);
+    purgeTurnosMock.mockResolvedValueOnce(5).mockResolvedValueOnce(0);
     const primera = (await (await GET(req({ "x-cron-secret": SECRET }))).json()) as {
-      deleted: number;
+      deleted: { chat_messages: number; ai_conversation_turns: number };
     };
     const segunda = (await (await GET(req({ "x-cron-secret": SECRET }))).json()) as {
-      deleted: number;
+      deleted: { chat_messages: number; ai_conversation_turns: number };
     };
-    expect(primera.deleted).toBe(12);
-    expect(segunda.deleted).toBe(0);
+    expect(primera.deleted).toEqual({ chat_messages: 12, ai_conversation_turns: 5 });
+    expect(segunda.deleted).toEqual({ chat_messages: 0, ai_conversation_turns: 0 });
   });
 });

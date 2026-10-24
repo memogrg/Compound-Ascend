@@ -53,9 +53,14 @@ captures/
 .idea/navEditor.xml
 
 # Keystore files
-# Uncomment the following lines if you do not want to check your keystore files in.
-#*.jks
-#*.keystore
+# Never commit signing material: the upload key and its passwords live outside the repo.
+*.jks
+*.keystore
+keystore.properties
+*.p12
+*.pem
+release/
+app/release/
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild

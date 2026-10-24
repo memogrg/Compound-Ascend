@@ -1358,9 +1358,12 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
             <span className="cw">
               CARTERA<i>+</i>
             </span>{" "}
-            · Costa Rica
+            · AI TECH UMBRELLA LLC
           </span>
-          <span>Es información y educación financiera, no asesoría formal. © 2026</span>
+          <span>
+            Es información y educación financiera, no asesoría formal. © 2026 ·{" "}
+            <a href="/privacidad">Privacidad</a> · <a href="/terminos">Términos</a>
+          </span>
         </div>
       </footer>
 

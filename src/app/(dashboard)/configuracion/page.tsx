@@ -33,6 +33,7 @@ import { isEmailConfigured } from "@/lib/email/send";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { PLAN_LABEL, isPaidPlan } from "@/lib/plan";
 
+import { formatNumber } from "@/lib/format";
 /** Fila de la hoja de configuración: encabezado (título + descripción) | cuerpo. */
 function SetRow({
   title,
@@ -159,8 +160,7 @@ export default async function Page() {
         <div className="usage-lb">
           <span>Uso de IA este mes</span>
           <span className="tk">
-            {acc.tokensUsed.toLocaleString("es-CR")} / {acc.tokenLimit.toLocaleString("es-CR")}{" "}
-            tokens
+            {formatNumber(acc.tokensUsed)} / {formatNumber(acc.tokenLimit)} tokens
           </span>
         </div>
         <div className="bar-track" style={{ height: 9 }}>
@@ -261,6 +261,16 @@ export default async function Page() {
         desc="Descargá una copia completa de tu información cuando querás. Es tuya y te la llevás."
       >
         <ExportDataButton />
+      </SetRow>
+
+      {/* Legal. Antes de la zona de peligro a propósito: quien va a borrar la cuenta
+          suele querer leer primero qué pasa con sus datos. */}
+      <SetRow title="Legal" desc="Las condiciones del servicio y qué hacemos con tus datos.">
+        <div style={{ display: "grid", gap: 8 }}>
+          <Link href="/privacidad">Política de privacidad</Link>
+          <Link href="/terminos">Términos y condiciones</Link>
+          <Link href="/eliminar-cuenta">Cómo eliminar tu cuenta</Link>
+        </div>
       </SetRow>
 
       <SetRow

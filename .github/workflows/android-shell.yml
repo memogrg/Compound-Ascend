@@ -1,0 +1,85 @@
+name: Android shell
+
+# Compila el APK de debug del shell de Capacitor en cada PR que toque mobile-shell/
+# (salvo iOS). No firma nada ni usa secretos, y no depende de Docker ni de ghcr.io:
+# el rate limit que tumba a los jobs de Supabase de ci.yml no lo afecta.
+on:
+  pull_request:
+    paths:
+      - 'mobile-shell/**'
+      - '!mobile-shell/ios/**'
+      - '.github/workflows/android-shell.yml'
+  # En main: deja compilado cada merge que toca el shell y es lo que llena la caché de
+  # Gradle (setup-gradle solo escribe desde la rama por defecto).
+  push:
+    branches: [main]
+    paths:
+      - 'mobile-shell/**'
+      - '!mobile-shell/ios/**'
+      - '.github/workflows/android-shell.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: android-shell-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  assemble-debug:
+    name: Android shell (assembleDebug)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mobile-shell
+    steps:
+      - uses: actions/checkout@v7
+
+      # Node 20, igual que el job principal de ci.yml (Capacitor 7 es por Node 20; ver README).
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mobile-shell/package-lock.json
+
+      # AGP 8.13.2 / Gradle 8.13 piden JDK 17+ y no corren sobre 25. Temurin 21 es el que
+      # documenta el README para compilar en local.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # SDK: se usa el que trae ubuntu-latest en ANDROID_HOME, sin android-actions/setup-android.
+      # La imagen (runner-images, Ubuntu 24.04) incluye las plataformas android-36 y build-tools
+      # 35/36 con licencias aceptadas, que es lo que pide compileSdk 36 con AGP 8.13. Si una
+      # imagen futura las quita, el build falla en "Failed to find target"; ahí se agrega
+      # setup-android.
+
+      # En PRs la caché de Gradle es de solo lectura; la escriben los push a main.
+      - uses: gradle/actions/setup-gradle@v6
+
+      # postinstall corre patch-package: los parches de patches/ son parte del build nativo.
+      - run: npm ci
+
+      - run: npx cap sync android
+
+      - name: Deriva de cap sync
+        run: |
+          if ! git diff --exit-code --ignore-cr-at-eol -- android/; then
+            echo "::error::cap sync android dejó cambios sin commitear: correlo localmente y commiteá los archivos generados"
+            exit 1
+          fi
+
+      - name: assembleDebug
+        working-directory: mobile-shell/android
+        # gradlew está commiteado con modo 100755: no hace falta chmod.
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: mobile-shell/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+          if-no-files-found: error

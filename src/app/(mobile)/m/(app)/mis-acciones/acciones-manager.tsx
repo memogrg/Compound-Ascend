@@ -25,6 +25,7 @@ import {
   mAmount,
 } from "../../components/content-kit";
 import { BottomSheet, useToast } from "../../components/form-kit";
+import { aRutaMobile } from "../../lib/rutas-web-a-mobile";
 // Rutas directas y NO el barrel de actions: éste es un componente de cliente, y el barrel
 // re-exporta los servicios ("server-only") — importarlo desde acá rompe el build móvil.
 import {
@@ -384,7 +385,7 @@ export function AccionesManager({
         {teach ? (
           <Link
             className="m-acc-btn m-acc-btn-primary"
-            href={teach.route}
+            href={aRutaMobile(teach.route)}
             onClick={() => setTeach(null)}
           >
             Ir a hacerlo

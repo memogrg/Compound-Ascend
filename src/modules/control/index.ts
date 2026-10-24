@@ -22,6 +22,7 @@ export type {
 } from "./engine/amortization";
 export {
   getControlSummary,
+  deriveDebtsForEngine,
   listDebts,
   getDebt,
   listGoals,

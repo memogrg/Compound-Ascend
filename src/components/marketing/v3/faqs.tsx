@@ -1362,9 +1362,11 @@ export function Faqs({ conSesion = false }: { conSesion?: boolean }) {
             <span className="cw">
               CARTERA<i>+</i>
             </span>{" "}
-            · Costa Rica
+            · AI TECH UMBRELLA LLC
           </span>
-          <span>Privacidad · Términos</span>
+          <span>
+            <Link href="/privacidad">Privacidad</Link> · <Link href="/terminos">Términos</Link>
+          </span>
         </div>
       </footer>
       <FaqsMotion />

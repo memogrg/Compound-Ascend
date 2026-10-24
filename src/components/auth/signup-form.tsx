@@ -5,6 +5,7 @@ import { useActionState, useEffect } from "react";
 import { signUpAction, type ActionState } from "@/lib/auth/actions";
 import { Field } from "@/components/auth/field";
 import { SubmitButton } from "@/components/auth/submit-button";
+import { CasillaTerminos } from "@/components/legal/casilla-terminos";
 
 const initial: ActionState = { ok: false };
 
@@ -73,7 +74,7 @@ export function SignupForm({
         type="email"
         autoComplete="email"
         placeholder="tu@correo.com"
-        defaultValue={defaultEmail}
+        defaultValue={state.values?.email ?? defaultEmail}
         error={state.fieldErrors?.email}
         required
       />
@@ -94,6 +95,10 @@ export function SignupForm({
         placeholder="Repite tu contraseña"
         error={state.fieldErrors?.confirm}
         required
+      />
+      <CasillaTerminos
+        defaultChecked={state.values?.acepta_terminos === "on"}
+        error={state.fieldErrors?.acepta_terminos}
       />
       <SubmitButton>Crear mi cuenta</SubmitButton>
     </form>

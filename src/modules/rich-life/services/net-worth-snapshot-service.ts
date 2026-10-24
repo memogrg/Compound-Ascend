@@ -198,9 +198,16 @@ export async function generateNetWorthSnapshotsForAllUsers(
  * Best-effort desde la carga de pantalla (web y móvil): deja registrado el mes EN CURSO.
  * NUNCA lanza — si falla, la pantalla se pinta igual, solo se queda sin el punto del mes.
  *
- * Mismo patrón (y misma razón) que `ensureTodaySnapshot` en Patrimonio: sin esto la
- * serie no arranca hasta que corra el cron del día 1, y el asesor seguiría sin historial
- * de patrimonio durante todo el primer mes.
+ * Sin esto la serie no arranca hasta que corra el cron del día 1, y el asesor seguiría sin
+ * historial de patrimonio durante todo el primer mes.
+ *
+ * ⚠️ Es la ÚLTIMA escritura de snapshots que queda en una carga de pantalla. La gemela de
+ * Patrimonio (`ensureTodaySnapshot`, `portfolio_snapshots`) ya se fue al barrido diario porque
+ * hacía que el gráfico cambiara de forma entre dos visitas seguidas. Esta sobrevive por una
+ * diferencia real: su periodo es el MES, así que reescribe la misma fila del 1.º durante todo
+ * el mes en vez de añadir un punto nuevo en cada visita — el mismo dato, no una serie más
+ * larga. El inventario y el plan para moverla están en
+ * `docs/cartera-plus-redesign/16-snapshots-patrimonio.md`.
  *
  * Recibe el resumen ya calculado por la página: `getRichLifeSummary()` es el trabajo
  * caro de esa carga y ninguno de los dos servicios usa React cache(), así que volver a

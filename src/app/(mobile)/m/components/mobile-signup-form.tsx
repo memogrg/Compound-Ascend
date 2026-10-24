@@ -6,6 +6,7 @@ import Link from "next/link";
 import { signUpAction, type ActionState } from "@/lib/auth/actions";
 
 import { AuthSuccess } from "./mobile-auth-success";
+import { CasillaTerminos } from "@/components/legal/casilla-terminos";
 
 /**
  * Registro del móvil (/m/signup). REUTILIZA la misma Server Action de la web
@@ -101,6 +102,13 @@ export function MobileSignupForm() {
           <span className="m-field-err">{state.fieldErrors.confirm}</span>
         ) : null}
       </label>
+
+      <CasillaTerminos
+        id="acepta_terminos_movil"
+        variant="movil"
+        defaultChecked={state.values?.acepta_terminos === "on"}
+        error={state.fieldErrors?.acepta_terminos}
+      />
 
       <button
         className="m-btn m-btn-block m-btn-primary"

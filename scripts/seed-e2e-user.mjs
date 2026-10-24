@@ -8,6 +8,7 @@
  *   E2E_EMAIL, E2E_PASSWORD
  */
 import { createClient } from "@supabase/supabase-js";
+import { readFile } from "node:fs/promises";
 
 /** Quita comillas y espacios envolventes (defensa ante exports tipo KEY="val"). */
 const clean = (v) => v?.trim().replace(/^["']|["']$/g, "");
@@ -76,9 +77,25 @@ if (!userId) {
 // el middleware la manda a /suscripcion y el smoke muere en "Flujo del mes"
 // sin decir por qué. Se siembra en `max` porque el recorrido toca funciones de
 // todos los niveles, y un usuario que de verdad usa la app tiene plan.
+// `terms_version` se siembra con la versión vigente: sin eso el bot ve la barra de
+// aceptación en TODA pantalla del recorrido, tapando el contenido que el smoke va a
+// buscar. Se lee de src/lib/legal/version.ts para que suba sola cuando suba la versión.
+const legal = await readFile(new URL("../src/lib/legal/version.ts", import.meta.url), "utf8");
+const LEGAL_VERSION = /LEGAL_VERSION = "([^"]+)"/.exec(legal)?.[1];
+if (!LEGAL_VERSION) {
+  console.error("No se pudo leer LEGAL_VERSION de src/lib/legal/version.ts");
+  process.exit(1);
+}
+
 const { error: profileError } = await admin
   .from("profiles")
-  .update({ display_name: "E2E Bot", onboarding_completed: true, plan: "max" })
+  .update({
+    display_name: "E2E Bot",
+    onboarding_completed: true,
+    plan: "max",
+    terms_version: LEGAL_VERSION,
+    terms_accepted_at: new Date().toISOString(),
+  })
   .eq("id", userId);
 
 if (profileError) {

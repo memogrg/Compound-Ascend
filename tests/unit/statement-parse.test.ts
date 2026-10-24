@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseStatement,
   pareceBloqueDeEstado,
-  parseMonto,
+  montoDeFila as parseMonto,
   parseFecha,
 } from "@/lib/ai/statement-parse";
 

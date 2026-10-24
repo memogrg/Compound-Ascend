@@ -63,6 +63,12 @@ export type ProfileRow = Timestamps & {
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
 
+  // ── Aceptación legal (migración 20260912000001) ───────────────────────
+  /** LEGAL_VERSION que la persona aceptó. `null` = pendiente (cuenta anterior al registro). */
+  terms_version: string | null;
+  /** Cuándo. Va con `terms_version`: la fecha sola no dice qué se aceptó. */
+  terms_accepted_at: string | null;
+
   /**
    * Prioridad declarada para ordenar "Mis acciones" (migración 20260909000001).
    * null = no la eligió a mano → se deriva del ranking `priorities` del onboarding.
@@ -877,6 +883,12 @@ export type DividendRow = Audited & {
 export type PortfolioSnapshotRow = {
   id: string;
   user_id: string;
+  // household_id / created_by: la tabla los tiene desde 20260601000011 (que crea hasta el
+  // índice `idx_portfolio_snapshots_household`), pero este tipo no los declaraba y por eso el
+  // insert del cron los omitía sin que el compilador dijera nada. Cuatro filas de producción
+  // quedaron sin ellos, invisibles para el resto del hogar.
+  household_id: string | null;
+  created_by: string | null;
   date: string;
   portfolio_value: number;
   investment_value: number;
@@ -1393,6 +1405,16 @@ export interface Database {
       ensure_household: {
         Args: { p_name?: string | null };
         Returns: string;
+      };
+      increment_ai_usage: {
+        Args: {
+          p_user_id: string;
+          p_period: string;
+          p_tokens: number;
+          p_requests?: number;
+          p_cost?: number;
+        };
+        Returns: number;
       };
       resolve_referral_code: {
         Args: { p_code: string };

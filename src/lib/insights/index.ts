@@ -34,6 +34,7 @@ export {
   runDetectors,
   APR_CARO,
   CONCENTRACION_ALTA,
+  KINDS_DETECTORES,
 } from "@/lib/insights/detectors";
 
 export { suggestedAction, type InsightAction } from "@/lib/insights/actions";

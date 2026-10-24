@@ -3,6 +3,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { GoogleButton } from "@/components/auth/google-button";
 import { SignupForm } from "@/components/auth/signup-form";
 import { PAID_PLANS, PLAN_LABEL, PLAN_PRICE_USD, TRIAL_DAYS, type PaidPlan } from "@/lib/plan";
+import { PieLegal } from "@/components/legal/pie-legal";
 
 export const metadata = { title: "Crear cuenta — CARTERA+" };
 
@@ -53,6 +54,9 @@ export default async function SignupPage({
       <GoogleButton />
       <div className="auth-divider">o con tu correo</div>
       <SignupForm defaultEmail={email} next={destino} />
+      <PieLegal
+        style={{ textAlign: "center", marginTop: 18, fontSize: 12, lineHeight: 1.5, opacity: 0.75 }}
+      />
     </AuthShell>
   );
 }

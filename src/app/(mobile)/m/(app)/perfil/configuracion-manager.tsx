@@ -70,13 +70,8 @@ const NOTIF_ROWS: {
 }[] = [
   { key: "inApp", label: "En la app", hint: 'Avisos del día en "Qué noté".' },
   { key: "email", label: "Correo", hint: "Resumen semanal por correo." },
-  {
-    key: "push",
-    label: "Notificaciones push",
-    hint: "Avisos en tu dispositivo.",
-    disabled: true,
-    badge: "Próximamente",
-  },
+  // push se agrega cuando exista @capacitor/push-notifications. Se quita del array en vez
+  // de deshabilitarse: una fila apagada con "Próximamente" ocupa lugar y no ofrece nada.
 ];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -248,6 +243,16 @@ export function ConfiguracionManager({
       <MSectionHeader title="Tus datos" />
       <MContentCard style={{ marginBottom: 14 }}>
         <ExportDataButton variant="mobile" />
+      </MContentCard>
+
+      {/* Legal. Antes de la zona de peligro a propósito: quien va a borrar la cuenta
+          suele querer leer primero qué pasa con sus datos. Son rutas públicas, así que
+          abren en la misma WebView sin sacar a nadie de la app. */}
+      <MSectionHeader title="Legal" />
+      <MContentCard style={{ marginBottom: 14 }}>
+        <MDataRow href="/privacidad" title="Política de privacidad" chevron />
+        <MDataRow href="/terminos" title="Términos y condiciones" chevron />
+        <MDataRow href="/eliminar-cuenta" title="Cómo eliminar tu cuenta" chevron />
       </MContentCard>
 
       {/* Zona de peligro — separada y en tono de peligro; su ConfirmDialog de 2 pasos intacto. */}
@@ -764,8 +769,8 @@ function HouseholdSheet({
       {/* Sobre-límite: nadie se va, solo se bloquean invitaciones nuevas. */}
       {quota.overLimit ? (
         <div className="m-field-err" role="status" style={{ lineHeight: 1.5 }}>
-          Tu hogar tiene {quota.usedActive} personas y tu plan incluye {quota.limit}. Nadie pierde
-          acceso, pero no puedes invitar hasta subir de plan.
+          Tu hogar tiene {quota.usedActive} personas y tu cuenta incluye {quota.limit}. Nadie pierde
+          acceso, pero por ahora no se pueden enviar invitaciones nuevas.
         </div>
       ) : null}
 

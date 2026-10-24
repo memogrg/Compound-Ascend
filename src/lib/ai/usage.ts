@@ -44,9 +44,14 @@ export async function assertTokenBudget(userId: string): Promise<void> {
     if (!isWithinLimit(plan, used)) {
       throw new AppError(
         "RATE_LIMITED",
+        // Estos textos se muestran TAMBIÉN en /m/asistente (app nativa), donde no se
+        // puede dirigir a comprar fuera de la tienda (Apple 3.1.1). Por eso informan el
+        // estado y no invitan a pagar. El CTA de la web, si hace falta, va en su propio
+        // componente leyendo el código RATE_LIMITED — no en el mensaje del servidor, que
+        // es común a las dos plataformas.
         plan === "ninguno"
-          ? "Tu cuenta no tiene una suscripción activa. Elegí un plan para volver a conversar con My Agent C+."
-          : "Alcanzaste el uso de My Agent C+ de este mes en tu plan. Podés subir de plan para tener más.",
+          ? "Tu cuenta no tiene un plan activo, así que My Agent C+ está en pausa."
+          : "Alcanzaste el uso mensual de My Agent C+ incluido en tu cuenta. Se renueva el próximo mes.",
       );
     }
   } catch (err) {
@@ -67,9 +72,32 @@ export async function recordUsage(
   if (!isSupabaseConfigured()) return;
   const total = Math.max(0, Math.round(tokensIn + tokensOut));
   if (total === 0) return;
+  const supabase = createServiceRoleClient();
+  const period = currentPeriod();
+
+  // Camino preferido: incremento atómico en una sola sentencia (sin condición de carrera).
   try {
-    const supabase = createServiceRoleClient();
-    const period = currentPeriod();
+    const { error } = await supabase.rpc("increment_ai_usage", {
+      p_user_id: userId,
+      p_period: period,
+      p_tokens: total,
+      p_requests: 1,
+    });
+    if (!error) return;
+    // El RPC puede no existir todavía (migración no aplicada): caemos al camino clásico para que
+    // el despliegue sea seguro en cualquier orden. Se registra para no perder la señal.
+    logger.warn("increment_ai_usage RPC no disponible; uso read-modify-write", {
+      code: (error as { code?: string }).code ?? "?",
+      message: error.message,
+    });
+  } catch (err) {
+    logger.warn("increment_ai_usage RPC lanzó; uso read-modify-write", {
+      message: err instanceof Error ? err.message : "?",
+    });
+  }
+
+  // Fallback: read-modify-write (no atómico, best-effort). Solo mientras la migración no esté.
+  try {
     const { data: existing } = await supabase
       .from("ai_usage_ledger")
       .select("tokens_used,requests")

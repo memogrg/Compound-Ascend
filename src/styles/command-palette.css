@@ -1,0 +1,200 @@
+/* ============================================================
+   PALETA DE COMANDOS (⌘K) — detrás de NEXT_PUBLIC_NAV_V2
+   ============================================================
+   Prefijo `cp-`, como `sb2-` y `tb2-`: ni colisión con el shell viejo ni con una utilidad
+   de Tailwind. El diálogo, el scrim y la trampa de foco los pone `Modal`
+   (`primitives-modal.css`); acá solo va lo de adentro y el ajuste de tamaño. */
+
+/* El `Modal` genérico es estrecho y centrado; una paleta va ancha y alta. `:has()` acota
+   el ajuste al diálogo que contiene la paleta, sin tocar el resto de los modales.
+   `position: relative` es el ancla del botón de cerrar (abajo). */
+.modal:has(.cp) {
+  position: relative;
+  width: min(640px, calc(100vw - 32px));
+  max-width: none;
+  margin-top: 15vh;
+  align-self: flex-start;
+}
+
+/* La cabecera del modal se DISUELVE: `display: contents` le quita la caja —y con ella la
+   franja vacía de 50 px que quedaba sobre el campo— sin sacar nada del DOM. El título
+   sigue ahí, visualmente oculto, y sigue siendo el `aria-labelledby` del diálogo; el
+   `.modal-x` pasa a ser hijo directo de `.modal` y se coloca dentro de la fila del campo.
+   Se hace con CSS y no tocando `modal.tsx` porque la cabecera es el contrato de TODOS los
+   modales del repo. */
+.modal:has(.cp) .modal-head,
+.modal:has(.cp) .modal-head > div {
+  display: contents;
+}
+
+/* El título vive para los lectores de pantalla, no para la vista: la paleta se explica
+   sola con su campo, y un encabezado ahí roba altura al primer resultado. */
+.modal:has(.cp) .modal-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Cerrar, dentro de la fila del campo y con su mismo alto (34 px). `absolute` y no un
+   hijo más del flex porque el orden del DOM lo pone ANTES del campo: colocarlo en flujo
+   lo dejaría encima, no a la derecha. */
+.modal:has(.cp) .modal-x {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 34px;
+  height: 34px;
+  margin-left: 0;
+}
+
+.cp {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* El padding lo ponía `.modal-body`, y la paleta no usa ese envoltorio. */
+  padding: 14px 16px 0;
+}
+
+/* ── Campo ────────────────────────────────────────────────────────────────── */
+
+.cp-campo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* 42 px a la derecha: el hueco del botón de cerrar, que va superpuesto. */
+  padding: 0 42px 12px 2px;
+  border-bottom: 1px solid var(--border);
+}
+.cp-lupa {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  color: var(--muted);
+}
+.cp-input {
+  flex: 1;
+  height: 34px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  outline: none;
+}
+.cp-input::placeholder {
+  color: var(--muted);
+}
+
+/* ── Resultados ───────────────────────────────────────────────────────────── */
+
+.cp-lista {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 52vh;
+  /* `min-height: 0` para que pueda encogerse dentro del flex y el pie no se salga del
+     diálogo cuando la lista es larga. */
+  min-height: 0;
+  overflow-y: auto;
+}
+.cp-envoltura {
+  display: block;
+}
+
+.cp-grupo {
+  padding: 10px 8px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cp-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--r-btn);
+  color: var(--text);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+/* El activo usa `--text` sobre `--accent-soft`: 13.22 de contraste. El par «activo» del
+   sidebar (`--accent` sobre `--accent-soft`) da 3.56 y no llega al 4.5 de AA — ya costó 27
+   nodos de `color-contrast` en el delta de las pestañas. */
+.cp-item-on {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+  /* La barra a la izquierda: el estado activo no depende solo del color (WCAG 1.4.1). */
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.cp-icono {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+.cp-icono svg {
+  width: 16px;
+  height: 16px;
+}
+.cp-item-on .cp-icono {
+  color: var(--accent);
+}
+
+.cp-etiqueta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-vacio {
+  margin: 20px 0 8px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+/* ── Pie de pistas ────────────────────────────────────────────────────────── */
+
+/* `aria-hidden` porque es una chuleta visual: quien usa lector de pantalla ya recibe el
+   patrón de combobox por los roles, y leerle «flecha arriba flecha abajo navegar» en cada
+   apertura sería ruido. Los `<kbd>` no son focalizables, así que no dispara
+   `aria-hidden-focus`. */
+.cp-pie {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  margin-top: 4px;
+  padding: 9px 2px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted);
+}
+/* Las teclas usan `.kbd` de `shell.css`, la misma del atajo en la barra superior: son la
+   misma cosa y no hay motivo para una segunda definición. */
+.cp-pie .cp-sep {
+  opacity: 0.6;
+}
+
+/* ── Movimiento ───────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .modal:has(.cp),
+  .cp-item {
+    transition: none;
+    animation: none;
+  }
+}

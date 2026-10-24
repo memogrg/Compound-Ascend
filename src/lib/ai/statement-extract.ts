@@ -19,7 +19,7 @@ import "server-only";
  * Es un parseo por PEGADO, no un hot-path: la llamada extra es aceptable.
  */
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
-import { parseFecha, parseMonto, type StatementRow } from "@/lib/ai/statement-parse";
+import { parseFecha, montoDeFila, type StatementRow } from "@/lib/ai/statement-parse";
 import { logger } from "@/lib/logger";
 
 /** Tope de filas que se aceptan del modelo (mismo espíritu que el tope del alta en lote). */
@@ -102,7 +102,7 @@ function validar(c: Cruda): StatementRow | null {
     typeof c.monto === "number" && Number.isFinite(c.monto)
       ? Math.abs(c.monto)
       : typeof c.monto === "string"
-        ? parseMonto(c.monto)
+        ? montoDeFila(c.monto)
         : null;
   if (monto === null || monto <= 0) return null;
 

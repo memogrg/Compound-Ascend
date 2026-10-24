@@ -32,6 +32,27 @@ export function isDefenseFundGoalType(goalType: string | null | undefined): bool
   return !!goalType && (DEFENSE_FUND_GOAL_TYPES as readonly string[]).includes(goalType);
 }
 
+/**
+ * ¿Existe ese fondo de defensa, CON saldo? Una sola implementación para las dos pantallas.
+ *
+ * Estaba duplicada, y las dos copias no decían lo mismo: `wealth-service` miraba `goal_type` con
+ * `current_amount > 0` (correcto) y `rich-life-service` usaba un proxy —«¿tiene algún activo
+ * líquido?»— sobre unos activos «líquidos» que son SINTÉTICOS: el saco de liquidez más toda meta
+ * con saldo. O sea que cualquier meta con plata encendía los dos fondos. En la cuenta de demo,
+ * «Universidad de Sofía» contaba como fondo de PAZ.
+ *
+ * Y no se quedaba en Rich Life: `patrimonio-service` reusa ese mismo agregado, así que el proxy
+ * llegaba hasta la tarjeta del panel y su puntaje de protección.
+ *
+ * Registrado ≠ acumulado, a propósito: una meta creada y vacía no protege de nada.
+ */
+export function tieneFondoDeDefensa(
+  goals: { goal_type?: string | null; current_amount?: number | string | null }[],
+  tipo: (typeof DEFENSE_FUND_GOAL_TYPES)[number],
+): boolean {
+  return goals.some((g) => g.goal_type === tipo && Number(g.current_amount ?? 0) > 0);
+}
+
 export type FundSizing = {
   /** Objetivo en moneda principal (≥0). */
   target: number;

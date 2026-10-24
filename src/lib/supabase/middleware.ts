@@ -22,6 +22,9 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 // ya hay sesión. NO va en AUTH_PAGES: con sesión y sin plan es justo donde hay
 // que estar (modo «reanudar pago»), y /empezar/pagar necesita la sesión viva
 // para abrir Stripe a nombre del usuario.
+// `/privacidad`, `/terminos` y `/eliminar-cuenta` son públicas por exigencia de las
+// tiendas: Play Console y App Store las revisan SIN instalar la app y sin sesión. Una
+// política detrás del login no cumple.
 const PUBLIC_PREFIXES = [
   "/login",
   "/signup",
@@ -31,6 +34,9 @@ const PUBLIC_PREFIXES = [
   "/faqs",
   "/empezar",
   "/m",
+  "/privacidad",
+  "/terminos",
+  "/eliminar-cuenta",
 ];
 /** Rutas de autenticación: si ya hay sesión, redirigir al panel. */
 const AUTH_PAGES = ["/login", "/signup", "/reset-password"];
@@ -60,6 +66,23 @@ function isPublic(pathname: string): boolean {
   // La raíz es la landing pública; page.tsx redirige a /dashboard si hay sesión.
   if (pathname === "/") return true;
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
+
+/**
+ * Propaga el pathname a los Server Components como header de REQUEST.
+ *
+ * Next no se lo pasa a un layout, y el layout móvil lo necesita para su PROPIO muro de
+ * plan: `/m` está en PUBLIC_PREFIXES, así que el muro de acá abajo nunca corre para la
+ * app nativa (y no debe: manda a Stripe, que Apple 3.1.1 prohíbe dentro de la app).
+ *
+ * Se reconstruyen los headers desde `request` en cada llamada —y no una sola vez arriba—
+ * porque el callback de cookies muta `request.cookies` antes de rearmar la respuesta:
+ * una copia vieja perdería la sesión recién refrescada.
+ */
+function conPathname(request: NextRequest): { headers: Headers } {
+  const headers = new Headers(request.headers);
+  headers.set("x-pathname", request.nextUrl.pathname);
+  return { headers };
 }
 
 /**
@@ -94,12 +117,12 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) {
-    const passthrough = NextResponse.next({ request });
+    const passthrough = NextResponse.next({ request: conPathname(request) });
     captureReferral(request, passthrough);
     return passthrough;
   }
 
-  let response = NextResponse.next({ request });
+  let response = NextResponse.next({ request: conPathname(request) });
 
   const supabase = createServerClient<Database>(url, anon, {
     cookies: {
@@ -108,7 +131,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
       },
       setAll(cookiesToSet: CookieToSet[]) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
+        response = NextResponse.next({ request: conPathname(request) });
         cookiesToSet.forEach(({ name, value, options }) =>
           response.cookies.set(name, value, options),
         );

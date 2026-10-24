@@ -1,6 +1,9 @@
 import Link from "next/link";
 
+import { navV2Enabled } from "@/lib/flags";
+
 import { MobileMenu } from "./mobile-menu";
+import { EyebrowNucleo, NucleoTabsMovil } from "./nucleo-tabs-movil";
 
 /**
  * Header sticky de cristal, unificado para TODAS las pantallas /m. Se comporta como el de
@@ -57,88 +60,102 @@ export function MobileHeader({
   /** extra opcional a la izquierda de las acciones (p. ej. el % de Gastos) */
   badge?: React.ReactNode;
 }) {
+  // El `<header>` sigue siendo el PRIMER hijo de `.m-pad`: el fragmento no crea caja, así
+  // que `.m-scroll:has(.m-topbar)` —que es quien aporta el inset superior— sigue casando.
+  // Las pestañas van FUERA del header a propósito: dentro competirían por el ancho con el
+  // título y las acciones, que ya están ajustadas.
   return (
-    <header className="between m-topbar m-glass" style={{ marginBottom: 16 }}>
-      <div className="row" style={{ minWidth: 0, flex: 1, gap: 11 }}>
-        {variant === "home" ? (
-          <>
-            <span className="iso" aria-hidden>
-              <IsoCPlus />
-            </span>
-            <div style={{ minWidth: 0 }}>
-              {greeting ? (
-                <div className="muted" style={{ fontSize: 12 }}>
-                  {greeting}
+    <>
+      <header className="between m-topbar m-glass" style={{ marginBottom: 16 }}>
+        <div className="row" style={{ minWidth: 0, flex: 1, gap: 11 }}>
+          {variant === "home" ? (
+            <>
+              <span className="iso" aria-hidden>
+                <IsoCPlus />
+              </span>
+              <div style={{ minWidth: 0 }}>
+                {greeting ? (
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {greeting}
+                  </div>
+                ) : null}
+                <div
+                  className="m-greeting"
+                  style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
+                  {name}
                 </div>
-              ) : null}
-              <div
-                className="m-greeting"
-                style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-              >
-                {name}
               </div>
-            </div>
-          </>
-        ) : (
-          <>
-            {/* La flecha y el logo NUNCA conviven: significan cosas distintas —la flecha
+            </>
+          ) : (
+            <>
+              {/* La flecha y el logo NUNCA conviven: significan cosas distintas —la flecha
                 sube un nivel, el logo lleva a Inicio— y dos controles de navegación en la
                 misma esquina obligan a leer antes de tocar. En móvil nadie lee.
                 Por eso `home` solo se atiende cuando no hay `backHref`. */}
-            {backHref ? (
-              <Link href={backHref} className="bk" aria-label={backLabel}>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M15 6l-6 6 6 6" />
-                </svg>
-              </Link>
-            ) : home ? (
-              <Link href="/m" className="iso m-iso-home" aria-label="Ir a Inicio">
-                <IsoCPlus />
-              </Link>
-            ) : null}
-            <div style={{ minWidth: 0, flex: 1 }}>
-              {eyebrow ? <div className="ov">{eyebrow}</div> : null}
-              {title ? (
-                <div className="h-title m-hd-title" style={{ marginTop: 2 }}>
-                  {title}
-                </div>
+              {backHref ? (
+                <Link href={backHref} className="bk" aria-label={backLabel}>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M15 6l-6 6 6 6" />
+                  </svg>
+                </Link>
+              ) : home ? (
+                <Link href="/m" className="iso m-iso-home" aria-label="Ir a Inicio">
+                  <IsoCPlus />
+                </Link>
               ) : null}
-            </div>
-          </>
-        )}
-      </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                {/* Bajo bandera el eyebrow lo pone el MODELO (el núcleo de la ruta), y la
+                  prop queda de respaldo para donde no hay núcleo — Configuración— y para
+                  la app con la bandera apagada. Las 18 páginas que la pasan no se tocan. */}
+                {navV2Enabled() ? (
+                  <EyebrowNucleo fallback={eyebrow} title={title} />
+                ) : eyebrow ? (
+                  <div className="ov">{eyebrow}</div>
+                ) : null}
+                {title ? (
+                  <div className="h-title m-hd-title" style={{ marginTop: 2 }}>
+                    {title}
+                  </div>
+                ) : null}
+              </div>
+            </>
+          )}
+        </div>
 
-      <div className="row" style={{ gap: 6, flex: "none" }}>
-        {badge}
-        {/* Chat del agente: misma ruta que Inicio, presente en todas las pantallas. */}
-        <Link
-          href="/m/asistente"
-          className="icon-btn"
-          aria-label="Asistente IA"
-          title="Asistente IA"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.9}
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        <div className="row" style={{ gap: 6, flex: "none" }}>
+          {badge}
+          {/* Chat del agente: misma ruta que Inicio, presente en todas las pantallas. */}
+          <Link
+            href="/m/asistente"
+            className="icon-btn"
+            aria-label="Asistente IA"
+            title="Asistente IA"
           >
-            <path d="M21 15a2 2 0 0 1-2 2H8l-4 3V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
-            <path d="M12 8.5v4M10 10.5h4" />
-          </svg>
-        </Link>
-        {/* Campana + Menú (overlays por portal a body). */}
-        <MobileMenu />
-      </div>
-    </header>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.9}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15a2 2 0 0 1-2 2H8l-4 3V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
+              <path d="M12 8.5v4M10 10.5h4" />
+            </svg>
+          </Link>
+          {/* Campana + Menú (overlays por portal a body). */}
+          <MobileMenu />
+        </div>
+      </header>
+      {navV2Enabled() ? <NucleoTabsMovil /> : null}
+    </>
   );
 }

@@ -13,7 +13,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
-import { formatMoney } from "@/lib/format";
+import { formatDateLong, formatMoney } from "@/lib/format";
 import { QuickAddModal } from "@/modules/financial-base/components/v2/quick-add-modal";
 import {
   removeTransactionAction,
@@ -65,11 +65,7 @@ function effectColor(effect: MoneyFlowEffect): string {
 }
 
 function fullDate(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  return formatDateLong(iso);
 }
 
 /** Línea de viaje "origen → destino": colorea "Tu liquidez" según el efecto. */
@@ -386,30 +382,28 @@ function Row({
 
   return (
     <div>
-      <div
-        className="list-row"
-        style={{ gridTemplateColumns: "34px 1fr auto auto auto", cursor: "pointer" }}
-        role="button"
-        tabIndex={0}
-        aria-expanded={expanded}
-        onClick={() => setExpanded((v) => !v)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setExpanded((v) => !v);
-          }
-        }}
-      >
+      {/* La fila ya NO es `role="button"`.
+          Lo era, y contenía el botón de «Acciones» y su menú: un control dentro de otro, que
+          es la violación `nested-interactive` de axe — 44 nodos, todos acá, el bloque más
+          grande de la línea base después del contraste.
+          Ahora el control es el NOMBRE, y se estira sobre toda la fila con un pseudo-elemento
+          (`.txn-row-abrir::after`, base.css). El clic sigue funcionando en cualquier punto,
+          el foco de teclado cae en un solo sitio con nombre accesible propio, y el botón de
+          «Acciones» queda de hermano por encima del pseudo-elemento. */}
+      <div className="list-row txn-row" style={{ gridTemplateColumns: "34px 1fr auto auto auto" }}>
         <div className="env-ic" style={iconStyle}>
           <Icon name={originIcon(t)} width={2} />
         </div>
         <div style={{ minWidth: 0 }}>
-          <div
-            className="env-name"
+          <button
+            type="button"
+            className="env-name txn-row-abrir"
             style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((v) => !v)}
           >
             {t.merchantOrSource || t.description || (isIncome ? "Ingreso" : "Gasto")}
-          </div>
+          </button>
           <div
             className="env-sub"
             style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
@@ -426,10 +420,11 @@ function Row({
           </div>
           <div className="small">{relativeDate(t.occurredOn)}</div>
         </div>
-        {/* Acciones: no deben disparar el expand de la fila. */}
+        {/* Acciones: hermanas del control de la fila, por encima del pseudo-elemento que lo
+            estira. Ya no hace falta frenar la propagación —no hay ningún `onClick` padre que
+            interceptar—, que era el parche que hacía falta cuando la fila entera era un botón. */}
         <div
-          style={{ display: "flex", alignItems: "center", gap: 6, position: "relative" }}
-          onClick={(e) => e.stopPropagation()}
+          style={{ display: "flex", alignItems: "center", gap: 6, position: "relative", zIndex: 1 }}
         >
           {t.status === "pending_review" ? (
             <span
