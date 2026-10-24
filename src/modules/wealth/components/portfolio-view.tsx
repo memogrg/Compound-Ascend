@@ -13,7 +13,14 @@ import { parseAsStringLiteral, useQueryState } from "nuqs";
 
 import { navV2Enabled } from "@/lib/flags";
 import "./portfolio-view.css";
-import { DonutConLeyenda, type DonutDatum } from "@/components/charts/lazy";
+import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
+import {
+  ChartFrame,
+  LeyendaDona,
+  describirDona,
+  filasLeyenda,
+  tablaDona,
+} from "@/components/charts/core";
 import { PerformanceChart, type AreaPoint } from "@/components/charts/lazy";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
@@ -540,6 +547,9 @@ function PeriodSeg({
 
 // ── Dona de asignación con leyenda ─────────────────────────────────
 
+/** El tamaño del anillo, el mismo que usa `DonutChart` por defecto. */
+const ANILLO = 132;
+
 function DonutCard({
   title,
   slices,
@@ -559,18 +569,40 @@ function DonutCard({
     value: Math.round(s.value),
     color: s.color,
   }));
+  const leyenda = filasLeyenda(data, { modo: "taxonomia" });
+  const dinero = (v: number) => formatMoney(v, currency);
+
   return (
     <div className="card donut-card">
-      <div className="card-title" style={{ fontSize: 14 }}>
-        {title}
-      </div>
-      <DonutConLeyenda
-        data={data}
-        currency={currency}
-        centerLabel={centerTop}
-        centerSub={centerSub}
-        vacio="Agrega inversiones para ver su distribución."
-      />
+      {/* El tamaño del título lo pone AHORA el marco (`.cf-titulo`, 14 px). Esta tarjeta lo forzaba
+          a 14 con un estilo en línea sobre `.card-title`, que son 15: el override existía para
+          empatar con las de al lado y ya no hace falta. Lo que sí cambia es la familia —
+          `.card-title` usa `--font-display` y `.cf-titulo` la del cuerpo—, y es el mismo cambio que
+          ya aceptaron las tarjetas de la 2.7. */}
+      <ChartFrame
+        titulo={title}
+        alto={ANILLO}
+        ajustadoAlContenido
+        estado={leyenda.filas.length === 0 ? "vacio" : "datos"}
+        mensajeVacio="Agrega inversiones para ver su distribución."
+        descripcion={describirDona({
+          titulo: title,
+          filas: leyenda.filas,
+          formato: dinero,
+          nombrePartes: "clases",
+          sub: centerSub,
+        })}
+        tabla={tablaDona(leyenda, dinero, "Clase")}
+        disposicionLeyenda="lateral"
+        leyenda={<LeyendaDona filas={leyenda.filas} ocultas={leyenda.ocultas} moneda={currency} />}
+      >
+        <DonutChart
+          data={leyenda.filas.map((f) => ({ name: f.name, value: f.value, color: f.color }))}
+          size={ANILLO}
+          centerLabel={centerTop}
+          centerSub={centerSub}
+        />
+      </ChartFrame>
     </div>
   );
 }
