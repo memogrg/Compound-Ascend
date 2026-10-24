@@ -86,6 +86,17 @@ export function monthParam(p: Period): string {
   return `${p.year}-${pad(p.month)}`;
 }
 
+/**
+ * ¿`a` es un mes ANTERIOR a `b`?
+ *
+ * Compara `(year, month)` y nada más. Ni cadenas ni `Date`: comparar "2026-9" con "2026-10"
+ * como texto daría que octubre es menor, y construir un `Date` reintroduce la zona horaria
+ * en una pregunta que no la necesita — el mes ya viene resuelto en la zona del usuario.
+ */
+export function esPeriodoAnterior(a: Period, b: Period): boolean {
+  return a.year * 12 + a.month < b.year * 12 + b.month;
+}
+
 // ── Rango de agregación (tab Ingresos · Fase 1) ───────────────────────────
 // Controla la ventana del histórico y la agregación de los cuadros. "all" se
 // resuelve a meses concretos en el loader (desde la transacción más antigua).

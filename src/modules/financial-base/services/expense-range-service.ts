@@ -14,6 +14,11 @@ import { householdMemberIds } from "@/lib/household/active";
  * Todo en la moneda de visualización (lo garantizan getRealTotals/getRealHistory).
  * `1m` deja el span en el mes actual → idéntico al comportamiento de arranque.
  */
+import {
+  presupuestoPorMes,
+  totalDelRango,
+  type MesPresupuestado,
+} from "@/modules/financial-base/engine/presupuesto-por-mes";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import {
@@ -22,7 +27,7 @@ import {
   type HistoryPoint,
   type KeyedTotals,
 } from "@/modules/financial-base/services/transaction-service";
-import { getEntityFallbackBudget } from "@/modules/financial-base/services/expense-jars-service";
+import { getEntityFallbackBudgetPorPeriodo } from "@/modules/financial-base/services/expense-jars-service";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
 import { previousMonthPeriod } from "@/modules/financial-base/engine/period";
 import type { Period } from "@/modules/financial-base/types";
@@ -32,7 +37,13 @@ export type ExpenseRange = (typeof EXPENSE_RANGES)[number];
 
 export type ExpenseRangeView = {
   range: ExpenseRange;
+  /** Total del rango. Se DERIVA de `budgetByMonth`, para que titular y gráfico no puedan
+   *  contar cosas distintas. */
   budgetExpense: number;
+  /** El presupuesto de CADA mes del rango, que es lo que pinta el histórico. */
+  budgetByMonth: MesPresupuestado[];
+  /** Cuántos meses cubre el rango: lo usan los rótulos de los KPI. */
+  months: number;
   realExpense: number;
   expenseByKey: KeyedTotals;
   history: HistoryPoint[];
@@ -86,26 +97,36 @@ export async function getExpenseRangeView(
   for (let i = 0; i < monthsBack - 1; i++) spanStart = previousMonthPeriod(spanStart);
   const spanPeriod: Period = { ...period, from: spanStart.from };
 
-  const [spanTotals, history, fallback] = await Promise.all([
+  // Los periodos del rango, del más viejo al más nuevo: el mismo orden que `getRealHistory`.
+  const periodos: Period[] = [];
+  {
+    let p = period;
+    for (let i = 0; i < monthsBack; i++) {
+      periodos.unshift(p);
+      p = previousMonthPeriod(p);
+    }
+  }
+
+  const [spanTotals, history, fallbackPorMes] = await Promise.all([
     getRealTotals(spanPeriod),
     getRealHistory(period, monthsBack),
     // Presupuesto que no vive en budget_items (aporte de holdings/rentas). Sin esto el
     // titular no cuadraba con los frascos de su propia pantalla: mismo dinero contado
-    // como gastado pero no como presupuestado.
-    getEntityFallbackBudget(period, await getDisplayCurrency()),
+    // como gastado pero no como presupuestado. Va por MES: antes se sumaba una sola vez y
+    // los meses anteriores quedaban cojos frente a su propio gasto.
+    getEntityFallbackBudgetPorPeriodo(periodos, await getDisplayCurrency()),
   ]);
 
-  // Se suma UNA vez, al mes de `period`, no a cada bucket del rango. Del aporte solo
-  // conocemos su valor actual; multiplicarlo por los meses del rango inventaría un
-  // historial que no está en ninguna parte, y sobreestimaría a quien empezó a aportar
-  // hace poco. Para "1m" —la tarjeta y el arranque de Gastos— es exacto, que es donde
-  // estaba la contradicción. Los rangos largos quedan como estaban para los meses
-  // pasados; eso lo cierra de verdad el día que los holdings emitan su línea derivada.
-  const budgetExpense = history.reduce((s, h) => s + h.budgetExpense, 0) + fallback;
+  // El presupuesto de cada mes, y el total DERIVADO de esa serie. Antes el total se
+  // calculaba aparte y el gráfico pintaba una línea horizontal con él: un total de tres
+  // meses comparado contra el gasto de cada mes suelto.
+  const budgetByMonth = presupuestoPorMes(history, fallbackPorMes);
 
   return {
     range,
-    budgetExpense,
+    budgetExpense: totalDelRango(budgetByMonth),
+    budgetByMonth,
+    months: monthsBack,
     realExpense: spanTotals.realExpense,
     expenseByKey: spanTotals.expenseByKey,
     history,

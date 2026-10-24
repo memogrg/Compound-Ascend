@@ -1,0 +1,24 @@
+# Prompts delta — fase 0 · Fundamentos
+
+Un prompt a la vez, en este orden. Cada uno abre su propia rama, termina con la cadena de verificación de abajo en verde y se detiene ANTES de `git commit` (Claude Code pide aprobación; Memo revisa `git status` + `git diff --staged`, aprueba el commit, hace push y abre el PR).
+
+| # | Rama | Qué entrega | Toca lógica | Verificación |
+| --- | --- | --- | --- | --- |
+| 0.1 | `chore/redesign-secrets-docs` | `.gitignore` de `.claude/`, carpeta `docs/cartera-plus-redesign/` versionada | No | `git status` limpio de secretos |
+| 0.2 | `claude/agitated-wescoff-65711d` → PR | Fix del saldo vivo de deuda (alerta falsa del panel) | Sí (ya escrito) | tests + demo |
+| 0.3 | `chore/qa-snapshots` | Script `scripts/qa/snap.mjs`: capturas de las 19 rutas a 390/768/1280 px con la cuenta E2E; línea base ANTES de tocar CSS | No | carpeta `qa-snapshots/base/` |
+| 0.4 | `refactor/css-layers` | `globals.css` partido en archivos y `@layer`, cero cambio visual | No | diff de capturas = 0 px |
+| 0.5 | `feat/design-tokens-v2` | Tokens de gráfico y motion (claro/oscuro) + `format.ts` como formateador único | No | `/dev/ui` interno renderiza los tokens |
+| 0.6 | `chore/nuqs-axe` | `nuqs`, `@axe-core/playwright`, spec de a11y sobre las 19 rutas | No | axe sin violaciones serias (o lista de las existentes) |
+
+Reglas fijas en todos los prompts: repo-first (leer antes de escribir), Conventional Commits, un commit = un cambio lógico, nunca `git add .`, nunca tocar `.env*`, nunca cambiar apariencia en un `refactor/`.
+
+**`npm run typecheck && npm run lint && npm run format:check && npx vitest run tests/unit/ && npm run build`, en la rama, tras el último archivo tocado y antes del push.** En 0.6 se reportó «lint idéntico al baseline» con una corrida de otra rama, anterior a los archivos nuevos; el CI cazó lo que la verificación no: un `.cjs` que abortaba ESLint entero. En la fase 1 volvió a pasar por el otro extremo: la cadena no incluía `format:check` —que el job de CI sí corre— y un fichero nuevo mal formateado puso el PR en rojo. La cadena de aquí es la del CI, no un subconjunto.
+
+**Prettier solo con `--write` acotado a los archivos propios; nunca `npm run format`.** El script apunta a `src/**` entero y reformatea ficheros que no son del cambio (221 en una prueba), enterrando el diff real.
+
+**Nunca `git stash -u` ni `git clean` en este repo.** Hay carpetas sin versionar de Memo (`docs/apple-app-store/`, `_qa/`, `scripts/demo/`, código en curso bajo `src/`): el `-u` se las lleva todas al stash y el árbol queda incompleto —en 0.6 eso rompió el build—. Stash solo con rutas explícitas: `git stash push -m "…" -- <rutas>`.
+
+**No silenciar `stderr` en comandos de git, y no pasar a `git add` una ruta recién renombrada.** `git add` falla entero ante un pathspec inexistente; con `2>/dev/null` el fallo pasa desapercibido y el commit sale incompleto (pasó en 0.6: quedó un commit con el rename pero sin las referencias, y hubo que enmendarlo).
+
+**Antes de crear un archivo, comprobar si ya existe** (`test -f` / `ls`) y, si existe, editarlo o hacer append — nunca `cat >` ni escribirlo entero encima. En 0.5 se sobrescribió así `tests/unit/format.test.ts`, que ya tenía 25 tests (incluido el guard de regresión P0-2 de símbolos de moneda); se recuperó del índice de git, pero el archivo nuevo no lo habría delatado. La señal que lo destapa es `git diff --stat`: un archivo que solo debía crecer no puede mostrar borrados.

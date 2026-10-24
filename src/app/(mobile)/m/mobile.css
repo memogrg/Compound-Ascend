@@ -888,6 +888,13 @@ body:has(.m-shell[data-theme="dark"]) {
   text-transform: uppercase;
   color: var(--text-muted);
 }
+/* El renglón del eyebrow, RESERVADO y sin texto: lo monta el esqueleto para que el
+   encabezado no crezca cuando llega la página. El espacio de ancho cero le da a la caja
+   exactamente el alto de una línea de `.ov`, sin un `min-height` que haya que mantener en
+   sincronía con la fuente. */
+.m-shell .ov-reserva::before {
+  content: "\200B";
+}
 .m-shell .h-title {
   font-family: var(--font-display);
   font-weight: 700;

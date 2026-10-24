@@ -48,6 +48,20 @@ export type SobreHistorico = {
   budgetMensual: number;
   /** Gasto real ACUMULADO en toda la ventana. */
   gastoVentana: number;
+  /**
+   * ¿La línea la genera una entidad (deuda, meta, póliza, recurrente, dividendo, renta) en vez
+   * de haberla escrito una persona? (`budget_items.source_kind` ≠ `'manual'`.)
+   *
+   * Un sobre derivado no admite la pregunta «¿lo usás?»: no se gasta DESDE él, se genera desde
+   * su entidad, y su presupuesto y su gasto real ni siquiera se cuentan con la misma clave — la
+   * línea de una meta nace sin categoría y el aporte se agrupa por `category_id`, así que el
+   * sobre marca 100 % sin usar por construcción. En la cuenta de demo eso producía dos avisos
+   * falsos: «casi no usás Aporte — Fondo de emergencia» con ₡400.000 aportados en la ventana, y
+   * «casi no usás Otras deudas» con tres cuotas pagadas.
+   *
+   * Opcional a propósito: un llamador que todavía no la pase se comporta como antes.
+   */
+  derivada?: boolean;
 };
 
 /** Qué se puede hacer con un sobre ocioso. */
@@ -113,6 +127,10 @@ export function detectarOciosos(input: {
 
   const totalBudget = input.sobres.reduce((acc, s) => acc + Math.max(0, s.budgetMensual), 0);
   const relevante = (s: SobreHistorico): boolean => {
+    // Los derivados quedan fuera de las DOS puntas: ni se declaran ociosos, ni sirven de
+    // receptor. Mover presupuesto a una línea derivada tampoco sirve: el siguiente sync la
+    // regenera desde su entidad y el movimiento se pierde sin avisar.
+    if (s.derivada) return false;
     if (s.budgetMensual <= 0) return false;
     if (totalBudget <= 0) return true; // cuenta recién armada: no se puede pesar
     return s.budgetMensual / totalBudget >= pesoMin;
@@ -222,6 +240,9 @@ function construirSalidas(args: {
           s.categoryId !== ocioso.categoryId &&
           s.frascoId === frascoPropio &&
           !args.idsOciosos.has(s.categoryId) &&
+          // Ni fusionar CONTRA un derivado: la fusión reasigna referencias y borra la categoría
+          // del ocioso, y el destino volvería a generarse desde su entidad en el siguiente sync.
+          !s.derivada &&
           s.gastoVentana > 0,
       )
     : undefined;

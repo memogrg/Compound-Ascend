@@ -179,6 +179,7 @@ export function DefenseFundsMobile({
             value={peace.months}
             disabled={pending}
             onChange={(e) => onMonths(Number(e.target.value))}
+            aria-label="Meses de gasto esencial de tu fondo de paz"
             // Solo top/bottom/left: el `padding-right` (hueco del chevron) lo pone .m-select.
             // Con `padding: 4px 8px` el atajo pisaba ese hueco y el chevron caía sobre el
             // texto ("mes⌄s"). #98

@@ -2,15 +2,22 @@ import "server-only";
 
 /**
  * Recolector de datos de mercado (cron). Junta los símbolos DISTINTOS que el usuario tiene en
- * holdings + price_alerts, trae precio + ATH/máximo en 1-2 llamadas batched (cripto: /coins/markets;
- * acciones/ETF: Finnhub 52-sem, por-símbolo) y hace UPSERT al store market_price_cache. La app, el AI,
+ * holdings + price_alerts, trae precio + ATH/máximo por la cadena de proveedores configurada
+ * (src/lib/market-data/vendors) y hace UPSERT al store market_price_cache. La app, el AI,
  * la valuación y las alertas LEEN de ese store — sin pegarle a CoinGecko en vivo por consulta.
  *
  * Best-effort: un símbolo que falla no frena a los demás. Service-role (sin sesión): recorre TODOS
  * los usuarios. Loguea el status de cada llamada (instrumentación) para saber si el fetch responde.
  */
 import { logger } from "@/lib/logger";
-import { isValidPrice } from "@/lib/market-data/validity";
+import {
+  buildChain,
+  buildStoreRow,
+  fetchWithFallback,
+  marketConfigFromEnv,
+  type ChainRow,
+  type StoreRow,
+} from "@/lib/market-data/vendors";
 
 /** asset_type del holding → tipo de mercado del feed. */
 const MARKET_TYPE: Record<string, "stock" | "etf" | "crypto"> = {
@@ -49,111 +56,81 @@ export async function collectTargets(): Promise<SymbolTarget[]> {
   return out;
 }
 
-/** Upsert de UNA fila del store (service-role). Solo escribe los campos con dato (deja el resto). */
-async function upsertStore(row: {
-  symbol: string;
-  assetType: string;
-  price: number | null;
-  currency: string;
-  provider: string;
-  athUsd: number | null;
-  athDate: string | null;
-  high24h: number | null;
-  highKind: "ath" | "52w" | null;
-}): Promise<void> {
+/**
+ * Upsert de UNA fila del store (service-role). La fila ya viene armada por buildStoreRow, que es
+ * el que decide qué NO se escribe (precio inválido) y qué columnas se omiten (máximo inválido).
+ */
+async function upsertStore(row: StoreRow): Promise<void> {
   const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
   const admin = createServiceRoleClient();
-  // INTEGRIDAD: un precio inválido (≤0, null, NaN) es basura del proveedor (timeout/vacío). NO
-  // sobreescribimos la fila → se PRESERVA el último valor bueno y su fecha (nunca guardamos "$0").
-  if (!isValidPrice(row.price)) return;
-  // El ATH sigue la misma regla: si vino inválido, se OMITE del payload (no se manda la clave) para
-  // que el upsert conserve el ATH previo en vez de pisarlo con null.
-  const athFields = isValidPrice(row.athUsd)
-    ? {
-        ath_usd: row.athUsd,
-        ath_date: row.athDate,
-        high_24h: isValidPrice(row.high24h) ? row.high24h : null,
-        high_kind: row.highKind,
-      }
-    : {};
-  await admin.from("market_price_cache").upsert(
-    {
-      symbol: row.symbol,
-      asset_type: row.assetType,
-      price: row.price,
-      currency: row.currency,
-      provider: row.provider,
-      fetched_at: new Date().toISOString(),
-      ttl_seconds: row.assetType === "crypto" ? 300 : 60,
-      ...athFields,
-    },
-    { onConflict: "symbol,asset_type" },
-  );
+  await admin.from("market_price_cache").upsert(row, { onConflict: "symbol,asset_type" });
 }
 
 export type CollectResult = { targets: number; crypto: number; stock: number; written: number };
 
 /**
- * Corre una recolección: 1 llamada batched para todas las cripto (/coins/markets con ids coma) +
- * Finnhub por acción/ETF. Upsert al store. Devuelve conteos para el log del cron.
+ * Corre una recolección con la cadena configurada de cada tipo de activo —la MISMA capa que el
+ * colector de GitHub Actions, con la env de Vercel— y upsertea al store.
+ *
+ * Este camino es la ruta /api/market-data/refresh, que no está en los crons de vercel.json: el
+ * colector que corre de verdad es scripts/market-data-collect.ts. Se mantiene al día para que no
+ * sea un tercer comportamiento distinto el día que alguien lo dispare a mano.
  */
 export async function runCollection(): Promise<CollectResult> {
-  const { coingeckoMarketsBatch, finnhubHighlights } = await import("@/lib/market-data/providers");
+  const { getServerEnv } = await import("@/lib/env");
   const targets = await collectTargets();
   const cryptoSymbols = targets.filter((t) => t.marketType === "crypto").map((t) => t.symbol);
   const stockTargets = targets.filter((t) => t.marketType !== "crypto");
+  const warn = (msg: string) => logger.warn("collector.vendor", { msg });
+  const cfg = marketConfigFromEnv(getServerEnv(), warn);
+  const deps = {
+    fetch: ((i: RequestInfo | URL, n?: RequestInit) => fetch(i, n)) as typeof fetch,
+    warn,
+  };
   let written = 0;
 
-  // CRIPTO: UNA llamada batched para TODAS (precio + ATH). asset_type del store = "crypto" (MARKET
-  // type — el mismo que escribe persistMarketPrice y lee fetchCachedPrices; NO el holding "cripto").
-  if (cryptoSymbols.length > 0) {
-    const rows = await coingeckoMarketsBatch(cryptoSymbols);
-    for (const [symbol, r] of Object.entries(rows)) {
-      try {
-        await upsertStore({
-          symbol,
-          assetType: "crypto",
-          price: r.price,
-          currency: "USD",
-          provider: "coingecko",
-          athUsd: r.ath,
-          athDate: r.athDate,
-          high24h: r.high24h,
-          highKind: isValidPrice(r.ath) ? "ath" : null,
-        });
-        if (isValidPrice(r.price)) written += 1;
-      } catch (err) {
-        logger.error("collector: upsert cripto falló", {
-          symbol,
-          message: err instanceof Error ? err.message : "?",
-        });
-      }
-    }
-  }
-
-  // ACCIONES/ETF: Finnhub por símbolo (no batchea gratis; el volumen es menor). Máx = 52 semanas.
-  // asset_type del store = market type ("stock"/"etf").
-  for (const t of stockTargets) {
+  const escribir = async (row: ChainRow, assetType: string) => {
+    const payload = buildStoreRow(row, assetType);
+    if (!payload) return;
     try {
-      const h = await finnhubHighlights(t.symbol);
-      if (!h) continue;
-      await upsertStore({
-        symbol: t.symbol,
-        assetType: t.marketType, // "stock" | "etf"
-        price: h.price,
-        currency: h.currency,
-        provider: "finnhub",
-        athUsd: h.high, // para acciones el "máximo" es 52-sem (high_kind lo distingue)
-        athDate: h.highDate,
-        high24h: null,
-        highKind: h.highKind, // '52w'
-      });
-      if (isValidPrice(h.price)) written += 1;
+      await upsertStore(payload);
+      written += 1;
     } catch (err) {
-      logger.error("collector: upsert acción falló", {
-        symbol: t.symbol,
+      logger.error("collector: upsert falló", {
+        symbol: row.symbol,
         message: err instanceof Error ? err.message : "?",
       });
+    }
+  };
+
+  // CRIPTO. asset_type del store = "crypto" (MARKET type — el mismo que escribe persistMarketPrice y
+  // lee fetchCachedPrices; NO el holding "cripto").
+  if (cryptoSymbols.length > 0) {
+    const r = await fetchWithFallback(
+      buildChain("crypto", cfg, deps),
+      cryptoSymbols,
+      "highlights",
+      warn,
+    );
+    for (const row of Object.values(r.rows)) await escribir(row, "crypto");
+  }
+
+  // ACCIONES/ETF. El store separa "stock" de "etf"; los proveedores no: se pide junto y cada fila
+  // vuelve a su asset_type.
+  if (stockTargets.length > 0) {
+    const tipos = new Map<string, Set<string>>();
+    for (const t of stockTargets) {
+      if (!tipos.has(t.symbol)) tipos.set(t.symbol, new Set());
+      tipos.get(t.symbol)!.add(t.marketType);
+    }
+    const r = await fetchWithFallback(
+      buildChain("stock", cfg, deps),
+      [...tipos.keys()],
+      "highlights",
+      warn,
+    );
+    for (const row of Object.values(r.rows)) {
+      for (const assetType of tipos.get(row.symbol) ?? []) await escribir(row, assetType);
     }
   }
 

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -12,8 +13,14 @@
         <!-- windowSoftInputMode explícito: capacitor.config.ts (Keyboard.resize) da por sentado
              que en Android el teclado lo resuelve el adjustResize del manifest. Sin declararlo
              queda en ADJUST_UNSPECIFIED y lo decide el sistema. -->
+        <!-- screenOrientation: /m es phone-first, sin layout landscape. Android 16 ignora esta
+             restricción en pantallas >= 600 dp para apps con target 36: en tablet la app rota y
+             el layout se estira. Aceptado para v1 (P-04 punto 8). -->
+        <!-- density|fontScale: evita recrear la actividad (y recargar el WebView) al cambiar
+             tamaño de fuente o de pantalla del sistema. Capacitor 8 lo recomienda; inocuo en 7. -->
         <activity
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density|fontScale"
+            android:screenOrientation="portrait"
             android:name=".MainActivity"
             android:windowSoftInputMode="adjustResize"
             android:label="@string/title_activity_main"
@@ -109,4 +116,8 @@
     <!-- Candado local con biometría (@aparajita/capacitor-biometric-auth → androidx.biometric).
          Se declara explícito además del merge del AAR, para BiometricPrompt (API 28+). -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
+    <!-- AD_ID lo hereda facebook-core 18.1.3 (vía @capgo/capacitor-social-login → facebook-login).
+         La app no usa ID de publicidad: se quita del manifest fusionado. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
 </manifest>

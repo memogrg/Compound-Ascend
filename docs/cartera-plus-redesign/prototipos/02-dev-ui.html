@@ -1,0 +1,379 @@
+<title>CARTERA+ Primitivas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/6.0.0/echarts.min.js"></script>
+<style>
+/* CARTERA+ · tokens del design system real (globals.css) + tokens nuevos de gráfico/motion */
+:root{
+  --font-display:"Sora","Segoe UI",system-ui,sans-serif;
+  --font-body:"Manrope","Segoe UI",system-ui,sans-serif;
+  --font-mono:"Space Mono",ui-monospace,Menlo,monospace;
+  --canvas:#f4f2ec;--surface:#ffffff;--surface-2:#fbfaf6;--border:#e7e4dc;--text:#1e1c16;--muted:#625e57;--muted-2:#8a857b;
+  --accent:#378451;--accent-ink:#fff;--accent-soft:rgba(55,132,81,.12);
+  --pos:#378451;--pos-soft:rgba(55,132,81,.12);--neg:#c34f4b;--neg-soft:rgba(195,79,75,.12);--warn:#b07a2e;--warn-soft:rgba(176,122,46,.12);--info:#3a6ea5;--info-soft:rgba(58,110,165,.12);
+  --chip:rgba(20,18,14,.04);--chip-hover:rgba(20,18,14,.07);--line-strong:rgba(30,28,22,.16);
+  --chart-1:#378451;--chart-2:#3a6ea5;--chart-3:#c48a2e;--chart-4:#7b5ea7;--chart-5:#c34f4b;--chart-6:#0f9aa8;
+  --chart-grid:rgba(30,28,22,.08);--chart-axis:#8a857b;--chart-crosshair:rgba(30,28,22,.35);--chart-glow:rgba(55,132,81,.55);
+  --e1:0 1px 2px rgba(20,18,14,.06);--e2:0 4px 14px -6px rgba(20,18,14,.12);--e3:0 14px 40px -16px rgba(20,18,14,.18);
+  --r-sm:8px;--r-md:12px;--r-lg:16px;--r-btn:10px;--r-pill:999px;
+  --dur-micro:120ms;--dur-std:200ms;--dur-tr:320ms;--dur-range:450ms;--ease-std:cubic-bezier(.2,0,0,1);--ease-in:cubic-bezier(.05,.7,.1,1);--ease-out:cubic-bezier(.3,0,.8,.15);
+  --sidebar-w:248px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --canvas:#15140f;--surface:#1e1c16;--surface-2:#23211a;--border:#2e2b23;--text:#ece8dd;--muted:#a29d92;--muted-2:#7d786e;
+  --accent:#4a9d66;--accent-soft:rgba(74,157,102,.16);--pos:#4a9d66;--pos-soft:rgba(74,157,102,.16);--neg:#d46460;--neg-soft:rgba(212,100,96,.16);--warn:#c98a30;--warn-soft:rgba(201,138,48,.16);--info:#5a8ccb;--info-soft:rgba(90,140,203,.16);
+  --chip:rgba(255,255,255,.05);--chip-hover:rgba(255,255,255,.09);--line-strong:rgba(236,232,221,.18);
+  --chart-1:#3f9560;--chart-2:#5a8ccb;--chart-3:#c4862c;--chart-4:#9b7cc8;--chart-5:#d46460;--chart-6:#28a2b0;
+  --chart-grid:rgba(236,232,221,.08);--chart-axis:#7d786e;--chart-crosshair:rgba(236,232,221,.35);--chart-glow:rgba(63,149,96,.6);
+  --e1:0 1px 2px rgba(0,0,0,.3);--e2:0 4px 14px -6px rgba(0,0,0,.5);--e3:0 14px 40px -16px rgba(0,0,0,.6);
+}}
+:root[data-theme="dark"]{
+  --canvas:#15140f;--surface:#1e1c16;--surface-2:#23211a;--border:#2e2b23;--text:#ece8dd;--muted:#a29d92;--muted-2:#7d786e;
+  --accent:#4a9d66;--accent-soft:rgba(74,157,102,.16);--pos:#4a9d66;--pos-soft:rgba(74,157,102,.16);--neg:#d46460;--neg-soft:rgba(212,100,96,.16);--warn:#c98a30;--warn-soft:rgba(201,138,48,.16);--info:#5a8ccb;--info-soft:rgba(90,140,203,.16);
+  --chip:rgba(255,255,255,.05);--chip-hover:rgba(255,255,255,.09);--line-strong:rgba(236,232,221,.18);
+  --chart-1:#3f9560;--chart-2:#5a8ccb;--chart-3:#c4862c;--chart-4:#9b7cc8;--chart-5:#d46460;--chart-6:#28a2b0;
+  --chart-grid:rgba(236,232,221,.08);--chart-axis:#7d786e;--chart-crosshair:rgba(236,232,221,.35);--chart-glow:rgba(63,149,96,.6);
+  --e1:0 1px 2px rgba(0,0,0,.3);--e2:0 4px 14px -6px rgba(0,0,0,.5);--e3:0 14px 40px -16px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+html,body{background:var(--canvas);color:var(--text);font-family:var(--font-body);margin:0}
+body{padding-block:0 60px}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.bar h1{font:600 15px/1.2 var(--font-display);margin:0}
+.cw{font-family:var(--font-display);font-weight:600;font-style:normal;white-space:nowrap}.cw i{color:var(--accent);font-style:normal}
+.bar .note{color:var(--muted);font-size:12px;margin-left:auto}
+.seg{display:inline-flex;background:var(--chip);border-radius:var(--r-pill);padding:3px;gap:2px}
+.seg button,.seg span{border:0;background:transparent;color:var(--muted);font:600 12.5px var(--font-body);padding:6px 12px;border-radius:var(--r-pill);cursor:pointer;transition:background var(--dur-micro) var(--ease-std),color var(--dur-micro)}
+.seg [aria-pressed="true"],.seg .on{background:var(--surface);color:var(--text);box-shadow:var(--e1)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.wrap{padding:24px 16px;max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:30px}
+section>h2{font:600 20px var(--font-display);letter-spacing:-.02em;margin:0 0 4px}
+section>p.lead{margin:0 0 14px;color:var(--muted);font-size:13.5px;max-width:78ch;line-height:1.5}
+.sh{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.sh h3{font:600 11px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+.help{width:16px;height:16px;border-radius:50%;border:1px solid var(--border);color:var(--muted);font:600 10px var(--font-mono);display:inline-grid;place-items:center;cursor:help;position:relative;background:var(--surface)}
+.help:hover .tip,.help:focus .tip{opacity:1;transform:translateY(0);pointer-events:auto}
+.tip{position:absolute;left:0;top:22px;width:240px;background:var(--text);color:var(--canvas);font:400 12px/1.45 var(--font-body);padding:8px 10px;border-radius:8px;box-shadow:var(--e2);opacity:0;transform:translateY(-4px);transition:opacity var(--dur-micro),transform var(--dur-micro);pointer-events:none;z-index:5;text-transform:none;letter-spacing:0}
+.tools{margin-left:auto;display:flex;gap:6px}
+.tools button{border:1px solid var(--border);background:var(--surface);color:var(--muted);font:600 11.5px var(--font-body);padding:4px 9px;border-radius:var(--r-pill);cursor:pointer}
+.tools button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.card{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--e1);padding:16px 18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media (max-width:900px){.grid2,.grid3,.grid4{grid-template-columns:1fr}.hero{grid-template-columns:1fr!important}}
+/* tokens */
+.sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.swatch{border-radius:var(--r-md);overflow:hidden;border:1px solid var(--border)}
+.swatch i{display:block;height:44px}.swatch div{padding:6px 8px;font-size:11.5px}.swatch code{font:400 10.5px var(--font-mono);color:var(--muted)}
+.type div{display:flex;align-items:baseline;gap:14px;padding:6px 0;border-bottom:1px dashed var(--border)}
+.type code{font:400 10.5px var(--font-mono);color:var(--muted);width:150px;flex:none}
+.mo{display:flex;flex-wrap:wrap;gap:10px}
+.mo button{border:1px solid var(--border);background:var(--surface);color:var(--text);padding:8px 12px;border-radius:var(--r-btn);font:600 12.5px var(--font-body);cursor:pointer}
+.mo button i{display:inline-block;width:14px;height:14px;background:var(--accent);border-radius:3px;margin-right:8px;vertical-align:-2px;transition:transform var(--d,200ms) var(--ease-std)}
+.mo button:hover i{transform:translateX(12px) rotate(90deg)}
+/* hero */
+.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;align-items:center}
+.lbl{font:600 11px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px}
+.num{font:600 42px/1.05 var(--font-display);letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin:6px 0 6px}
+.read{font-size:13.5px;color:var(--muted);line-height:1.5;max-width:40ch}.read b{color:var(--text);font-weight:600}
+.delta{display:inline-flex;align-items:center;gap:4px;font:600 12px var(--font-body);padding:2px 8px;border-radius:var(--r-pill);font-variant-numeric:tabular-nums}
+.delta.pos{background:var(--pos-soft);color:var(--pos)}.delta.neg{background:var(--neg-soft);color:var(--neg)}.delta.warn{background:var(--warn-soft);color:var(--warn)}.delta.neu{background:var(--chip);color:var(--muted)}
+.kpi .lbl{justify-content:space-between}
+.kpi .val{font:600 23px var(--font-display);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:6px 0 4px}
+.kpi .sub{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.kpi svg{width:100%;height:36px;margin-top:8px}
+/* chart frame */
+.cf{position:relative}
+.cf .plot{height:320px;position:relative}
+.cf.h180 .plot{height:180px}
+.states{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.states button{border:1px solid var(--border);background:var(--surface);color:var(--muted);font:600 11.5px var(--font-body);padding:4px 9px;border-radius:var(--r-pill);cursor:pointer}
+.states button[aria-pressed="true"]{background:var(--chip);color:var(--text)}
+.skel{background:linear-gradient(90deg,var(--chip),var(--chip-hover),var(--chip));background-size:200% 100%;animation:sk 1.4s linear infinite;border-radius:var(--r-md);height:100%}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.empty{height:100%;display:grid;place-items:center;text-align:center;color:var(--muted);font-size:13px;line-height:1.5;border:1px dashed var(--border);border-radius:var(--r-md);padding:20px}
+.empty b{display:block;color:var(--text);font:600 14px var(--font-display);margin-bottom:4px}
+.empty .btn{margin-top:10px}
+.btn{border:0;border-radius:var(--r-btn);padding:8px 14px;font:600 12.5px var(--font-body);cursor:pointer;display:inline-flex;gap:6px;align-items:center;transition:transform var(--dur-micro),background var(--dur-micro)}
+.btn:active{transform:scale(.98)}
+.btn-p{background:var(--accent);color:#fff}.btn-s{background:var(--chip);color:var(--text)}.btn-g{background:transparent;color:var(--accent)}
+.partial{position:absolute;top:8px;right:8px;background:var(--warn-soft);color:var(--warn);font:600 11px var(--font-body);padding:3px 8px;border-radius:var(--r-pill)}
+/* svg chart (level 1) */
+.svgc{position:relative}.svgc svg{width:100%;height:100%;display:block}
+.ttip{position:absolute;pointer-events:none;background:var(--text);color:var(--canvas);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.45;box-shadow:var(--e2);min-width:150px;opacity:0;transition:opacity var(--dur-micro);z-index:4;font-variant-numeric:tabular-nums}
+.ttip .d{color:var(--muted-2);font-size:11px;margin-bottom:2px}.ttip .v{font:600 14px var(--font-display);letter-spacing:-.01em}.ttip .c{display:flex;justify-content:space-between;gap:12px;margin-top:2px}.ttip .c span:last-child{font-weight:600}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.legend button{border:0;background:var(--chip);color:var(--text);font:600 11.5px var(--font-body);padding:3px 10px 3px 8px;border-radius:var(--r-pill);display:inline-flex;align-items:center;gap:6px;cursor:pointer;transition:opacity var(--dur-std)}
+.legend button i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.legend button[aria-pressed="false"]{opacity:.4}
+.dtable{position:absolute;inset:0;background:var(--surface);overflow:auto;border-radius:var(--r-md);display:none}
+.dtable.on{display:block}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+th{font:600 10.5px var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);position:sticky;top:0;background:var(--surface)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+/* breakdown */
+.bk{display:flex;flex-direction:column;gap:6px}
+.bk .r{display:grid;grid-template-columns:150px 1fr 90px 70px;gap:10px;align-items:center;padding:5px 6px;border-radius:8px;cursor:pointer;transition:background var(--dur-micro),opacity var(--dur-std)}
+.bk .r:hover{background:var(--chip)}.bk .r.sel{background:var(--accent-soft)}.bk.has .r:not(.sel){opacity:.45}
+.bk .nm{font-size:12.5px;display:flex;gap:8px;align-items:center}.bk .nm i{width:9px;height:9px;border-radius:2px;flex:none}
+.bk .track{height:10px;background:var(--chip);border-radius:5px;position:relative;overflow:hidden}
+.bk .track b{position:absolute;left:0;top:0;bottom:0;border-radius:5px;transition:width var(--dur-tr) var(--ease-in)}
+.bk .track s{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--text);opacity:.5}
+.bk .v{font:600 12px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.bk .st{font:600 10.5px var(--font-body);padding:2px 7px;border-radius:var(--r-pill);text-align:center}
+.st.ok{background:var(--pos-soft);color:var(--pos)}.st.risk{background:var(--warn-soft);color:var(--warn)}.st.over{background:var(--neg-soft);color:var(--neg)}
+/* insights / action */
+.sig{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--border);font-size:13px;line-height:1.45;align-items:flex-start}
+.sig:first-child{border-top:0}
+.sig i{width:8px;height:8px;border-radius:50%;margin-top:7px;flex:none}
+.sig .ev{margin-left:auto;font:600 11.5px var(--font-body);color:var(--accent);white-space:nowrap}
+.action{display:flex;gap:12px;align-items:flex-start}
+.action .n{width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font:700 12px var(--font-mono);flex:none}
+.action h4{margin:0 0 3px;font:600 14.5px var(--font-body)}.action p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.45}
+.action .imp{font:600 12px var(--font-mono);color:var(--accent);margin-top:6px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted)}
+.chips span{background:var(--chip);border-radius:var(--r-pill);padding:3px 10px;color:var(--text);display:inline-flex;gap:6px;align-items:center}
+.chips span b{color:var(--muted);font-weight:500;cursor:pointer}
+.chips .reset{color:var(--accent);font-weight:600;cursor:pointer;background:transparent}
+.echart{width:100%;height:100%}
+.tt-anat{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:12.5px;align-items:center}
+.tt-anat code{font:400 11px var(--font-mono);color:var(--muted)}
+.rule{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.5}
+</style>
+
+<div class="bar">
+  <h1><span class="cw">CARTERA<i>+</i></span> · /dev/ui — las 8 primitivas y el lenguaje de gráficos</h1>
+  <div class="seg" role="group" aria-label="Tema"><button id="thL" aria-pressed="true" onclick="setTheme('light')">Claro</button><button id="thD" aria-pressed="false" onclick="setTheme('dark')">Oscuro</button></div>
+  <div class="seg" role="group" aria-label="Movimiento"><button id="moOn" aria-pressed="true" onclick="setMotion(true)">Movimiento</button><button id="moOff" aria-pressed="false" onclick="setMotion(false)">Reducido</button></div>
+  <span class="note">Datos reales de la cuenta demo · agosto 2026 como mes en curso (día 16)</span>
+</div>
+
+<div class="wrap">
+
+<section>
+  <h2>1 · Tokens</h2>
+  <p class="lead">Todo lo de abajo se deriva de estos tokens y se agrega a <code>globals.css</code>. Los seis colores de gráfico pasan el validador de daltonismo (ΔE ≥ 8 en pares adyacentes, contraste ≥ 3:1) en claro y en oscuro; la paleta de dominio actual (verde/ámbar/teal/oliva) no lo pasaba.</p>
+  <div class="grid2">
+    <div class="card"><div class="sh"><h3>Colores de gráfico (orden fijo)</h3></div><div class="sw" id="sw"></div>
+      <div class="rule">Regla: el color sigue a la entidad, no al rango. Ingresos = 1, deudas = 5, inversiones = 2, ahorro = 6, gasto fijo = 3, gasto variable = 4. Sequential = un solo tono claro→oscuro. Estados (bien / riesgo / crítico) usan los semánticos y nunca se reciclan como series.</div></div>
+    <div class="card"><div class="sh"><h3>Tipografía y movimiento</h3></div>
+      <div class="type">
+        <div><code>hero · Sora 600 42</code><span style="font:600 42px/1 var(--font-display);letter-spacing:-.03em;font-variant-numeric:tabular-nums">₡562 420</span></div>
+        <div><code>kpi · Sora 600 23</code><span style="font:600 23px/1 var(--font-display);letter-spacing:-.02em">₡34 244 701</span></div>
+        <div><code>title · Sora 600 17</code><span style="font:600 17px var(--font-display)">Gastos y sobres</span></div>
+        <div><code>body · Manrope 400 13.5</code><span style="font-size:13.5px">Vas por encima porque las cuotas se pagan a inicio de mes.</span></div>
+        <div><code>label · Manrope 600 11</code><span class="lbl">Libre para gastar este mes</span></div>
+        <div><code>axis · Space Mono 10.5</code><span style="font:400 10.5px var(--font-mono);color:var(--chart-axis)">1 ago · 16 ago · 31 ago · ₡1,2 M</span></div>
+      </div>
+      <div class="mo" style="margin-top:12px">
+        <button style="--d:var(--dur-micro)"><i></i>micro · 120 ms</button>
+        <button style="--d:var(--dur-std)"><i></i>estándar · 200 ms</button>
+        <button style="--d:var(--dur-tr)"><i></i>transición · 320 ms</button>
+        <button style="--d:var(--dur-range)"><i></i>rango · 450 ms</button>
+      </div>
+      <div class="rule">Curva de entrada <code>cubic-bezier(.05,.7,.1,1)</code>, salida <code>(.3,0,.8,.15)</code>. Con «Reducido»: sin transform ni dibujo progresivo; queda el crossfade de 150 ms y las cifras aparecen sin rodar.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>2 · SectionHeader + KpiHero + KpiCard</h2>
+  <p class="lead">Un solo KPI grande por pantalla; su comparación y su frase de lectura viven al lado, nunca en un párrafo. La explicación de la fórmula va en el «?». Las cifras ruedan con NumberFlow (≤ 600 ms) y respetan reduced motion.</p>
+  <div class="card cf">
+    <div class="sh"><h3>Libre para gastar este mes</h3><span class="help" tabindex="0">?<span class="tip">Ingreso esperado del mes (₡1 930 000) − gasto real a hoy (₡1 167 580) − compromisos pendientes (₡200 000). Los ingresos quincenales hacen que el ritmo ideal no sea lineal.</span></span>
+      <div class="tools"><button aria-pressed="true">vs julio</button><button>vs presupuesto</button><button onclick="rollNumbers()">↻ animar</button></div></div>
+    <div class="hero">
+      <div><div class="num" id="heroNum" data-v="562420">₡0</div><span class="delta warn">▲ ₡264 055 sobre el ritmo lineal</span>
+        <p class="read">Vas por encima porque <b>₡678 180</b> de cuotas se pagan a inicio de mes. Contra el ritmo real de tus compromisos, vas <b>al día</b>.</p></div>
+      <div class="svgc" id="ritmo" style="height:150px"></div>
+    </div>
+  </div>
+  <div class="grid4" style="margin-top:14px">
+    <div class="card kpi"><div class="lbl">Patrimonio neto <span class="help" tabindex="0">?<span class="tip">Activos − pasivos con precios de hoy. El veredicto «más rico / más pobre» exige dos meses cerrados; mientras tanto se muestra «en curso».</span></span></div><div class="val" data-v="34244701">₡0</div><div class="sub"><span class="delta pos">▲ ₡8,7 M</span> vs hace 12 meses · en curso</div><svg id="sp1"></svg></div>
+    <div class="card kpi"><div class="lbl">Flujo del mes</div><div class="val" data-v="762420">₡0</div><div class="sub"><span class="delta neu">plan ₡173 920</span> al cierre</div><svg id="sp2"></svg></div>
+    <div class="card kpi"><div class="lbl">Gasto del mes</div><div class="val" data-v="1167580">₡0</div><div class="sub"><span class="delta pos">▼ 3,2 %</span> vs julio a la misma fecha</div><svg id="sp3"></svg></div>
+    <div class="card kpi"><div class="lbl">Compromisos · 14 días</div><div class="val" data-v="250000">₡0</div><div class="sub">3 pagos · fondo de emergencia el 26</div><svg id="sp4"></svg></div>
+  </div>
+</section>
+
+<section>
+  <h2>3 · ChartFrame · nivel 1 (lectura, Recharts en producción)</h2>
+  <p class="lead">Altura fija (320 / 180 px), cuatro estados con la misma altura, leyenda propia con atenuado, crosshair punteado, punto activo con glow, tooltip HTML con fecha · valor · delta, y el botón «Tabla» como alternativa accesible. Pasá el cursor o tocá la gráfica.</p>
+  <div class="card cf">
+    <div class="sh"><h3>Flujo mensual · últimos 12 meses</h3><span class="help" tabindex="0">?<span class="tip">Ingresos y gastos reales por mes cerrado (monthly_snapshots). El flujo libre es la diferencia.</span></span>
+      <div class="tools"><button id="tbl1" onclick="toggleTable('t1',this)">Tabla</button><button>PNG</button></div></div>
+    <div class="states"><span style="font-size:11.5px;color:var(--muted);align-self:center">Estado:</span><button aria-pressed="true" onclick="setState('c1','data',this)">Con datos</button><button onclick="setState('c1','loading',this)">Cargando</button><button onclick="setState('c1','empty',this)">Vacío (primera vez)</button><button onclick="setState('c1','filtered',this)">Vacío por filtro</button><button onclick="setState('c1','partial',this)">Datos parciales</button><button onclick="setState('c1','error',this)">Error</button></div>
+    <div class="legend" id="lg1"></div>
+    <div class="plot" id="c1"><div class="svgc" id="flujo" style="height:100%"></div><div class="dtable" id="t1"></div></div>
+  </div>
+</section>
+
+<section>
+  <h2>4 · ChartFrame · nivel 2 (analítica, ECharts 6 modular)</h2>
+  <p class="lead">Solo en las rutas analíticas. Zoom con rueda o pinch, brush en la banda inferior, crosshair, atenuado de series al pasar por la leyenda, línea de referencia y tabla alternativa obligatoria. El tema se construye desde las CSS variables y se reaplica al cambiar a oscuro.</p>
+  <div class="grid2">
+    <div class="card cf"><div class="sh"><h3>Patrimonio neto · activos y pasivos</h3><span class="help" tabindex="0">?<span class="tip">net_worth_snapshots: cierre de cada mes. Pasivos en negativo, patrimonio neto como línea.</span></span><div class="tools"><button onclick="toggleTable('t2',this)">Tabla</button></div></div>
+      <div class="plot"><div class="echart" id="e1"></div><div class="dtable" id="t2"></div></div></div>
+    <div class="card cf"><div class="sh"><h3>¿Dónde se fue el dinero? · agosto</h3><span class="help" tabindex="0">?<span class="tip">Treemap por grupo → categoría. Clic en un grupo para entrar; clic en el título para volver.</span></span><div class="tools"><button onclick="toggleTable('t3',this)">Tabla</button></div></div>
+      <div class="plot"><div class="echart" id="e2"></div><div class="dtable" id="t3"></div></div></div>
+  </div>
+</section>
+
+<section>
+  <h2>5 · BreakdownCard + interacción enlazada + filtros visibles</h2>
+  <p class="lead">Barras ordenadas con la marca del presupuesto y el estado en texto además de color. Clic en un sobre lo selecciona, atenúa el resto, agrega el chip de filtro y actualiza las señales; «Restablecer» aparece solo cuando hay un estado no inicial.</p>
+  <div class="card">
+    <div class="sh"><h3>Sobres · agosto (día 16)</h3><span class="help" tabindex="0">?<span class="tip">Gasto real a hoy contra el presupuesto del sobre. «En riesgo» = % usado supera el % del mes transcurrido en más de 15 puntos.</span></span><div class="chips" id="chips" style="margin-left:auto"><span>Agosto 2026 · día 16</span><span>vs julio</span></div></div>
+    <div class="grid2" style="grid-template-columns:1.4fr 1fr">
+      <div class="bk" id="bk"></div>
+      <div><div class="sh"><h3>Señales</h3></div><div id="sigs"></div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>6 · InsightList + ActionStrip + DataTable</h2>
+  <div class="grid2">
+    <div class="card"><div class="sh"><h3>Tu próxima mejor acción</h3><span class="tools"><button>ver las 3 →</button></span></div>
+      <div class="action"><div class="n">1</div><div><h4>Abonar ₡150 000 extra al préstamo del vehículo</h4><p>Es tu deuda más cara (13,5 %) ahora que la tarjeta está en ₡0. El flujo libre lo permite sin tocar el fondo.</p><div class="imp">Ahorra ₡412 000 en intereses · libre 5 meses antes</div></div></div>
+      <div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-p">Hacerlo</button><button class="btn btn-s">Posponer</button><button class="btn btn-g">✦ Preguntar al asesor</button></div>
+      <div class="rule">Regla: una sola acción principal con su porqué y su impacto en ₡; las demás se cuentan. Los módulos no repiten esta tarjeta: enlazan aquí.</div>
+    </div>
+    <div class="card cf" style="padding:0;overflow:hidden"><div style="padding:14px 18px 8px"><div class="sh" style="margin:0"><h3>Transacciones · Supermercados · agosto</h3><span class="tools"><button>Total ₡180 000</button></span></div></div>
+      <div style="max-height:230px;overflow:auto"><table><thead><tr><th>Fecha</th><th>Comercio</th><th>Sobre</th><th class="n">Monto</th></tr></thead><tbody>
+        <tr><td>26 ago</td><td>Walmart</td><td>Supermercados</td><td class="n">₡58 700</td></tr>
+        <tr><td>18 ago</td><td>Súper La Familia</td><td>Supermercados</td><td class="n">₡40 450</td></tr>
+        <tr><td>12 ago</td><td>Walmart</td><td>Supermercados</td><td class="n">₡40 000</td></tr>
+        <tr><td>04 ago</td><td>Automercado</td><td>Supermercados</td><td class="n">₡40 850</td></tr>
+        <tr><td>20 ago</td><td>Feria del agricultor — San Joaquín</td><td>Feria</td><td class="n">₡33 600</td></tr>
+        <tr><td>06 ago</td><td>Feria del agricultor — Heredia</td><td>Feria</td><td class="n">₡36 400</td></tr>
+      </tbody></table></div>
+      <div class="rule" style="padding:8px 18px 14px;margin:0">TanStack Table v9 + Virtual en producción; cifras alineadas a la derecha con <code>tabular-nums</code>; filas agrupadas por día; atajos J/K/C/R.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>7 · Anatomía del tooltip y reglas de interacción</h2>
+  <div class="grid2">
+    <div class="card"><div class="sh"><h3>Tooltip de gráfico</h3></div>
+      <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+        <div class="ttip" style="opacity:1;position:static;pointer-events:auto"><div class="d">15 de agosto</div><div class="v">₡1 017 580</div><div class="c"><span>Ritmo ideal</span><span>₡888 200</span></div><div class="c"><span>Diferencia</span><span style="color:#e9b26a">+₡129 380</span></div></div>
+        <div class="tt-anat"><code>d</code><span>Fecha o categoría, en gris</span><code>v</code><span>Valor en Sora 600, tabular</span><code>c</code><span>Comparación activa (vs periodo, plan o meta)</span><code>Δ</code><span>Delta con signo y color semántico</span><code>—</code><span>Máximo 4 líneas; en móvil se ancla arriba del gráfico</span></div>
+      </div></div>
+    <div class="card"><div class="sh"><h3>Reglas transversales</h3></div>
+      <div style="font-size:13px;line-height:1.6">
+        <b>Hover</b> → valor exacto; <b>toque</b> mantiene el tooltip; <b>flechas</b> recorren puntos (accessibilityLayer).<br>
+        <b>Crosshair</b> sincronizado entre los gráficos de la pantalla (<code>syncId</code> / <code>connect</code>).<br>
+        <b>Clic</b> selecciona y atenúa el resto a 0,3; <b>Esc</b> o «Restablecer» vuelve al inicio.<br>
+        <b>Leyenda</b>: hover atenúa, clic oculta, doble clic aísla; nunca la leyenda nativa.<br>
+        <b>Brush</b> de 24 px en series de 12+ meses; <b>zoom</b> solo en nivel 2.<br>
+        <b>Tabla</b> disponible en todo gráfico principal; obligatoria en nivel 2.<br>
+        <b>Color</b> nunca es el único código: etiqueta directa al final de la serie y estado en texto.
+      </div></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+const F=n=>'₡'+Math.round(n).toLocaleString('es-CR').replace(/\./g,' ');
+const FM=n=>Math.abs(n)>=1e6?'₡'+(n/1e6).toFixed(1).replace('.',',')+' M':Math.abs(n)>=1e3?'₡'+Math.round(n/1e3)+' k':F(n);
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+let reduced=false;
+const MONTHS=['sep 25','oct','nov','dic','ene 26','feb','mar','abr','may','jun','jul','ago'];
+const INC=[1800000,1800000,1800000,3600000,2450000,1882500,1945000,1932500,3011500,1934000,1924000,1924500];
+const EXP=[1814480,1812780,1809580,3340580,2318180,1827580,1838280,1893880,2903480,1756226,1763780,1750580];
+const NWM=['sep 25','oct','nov','dic','ene 26','feb','mar','abr','may','jun','jul','ago','sep 26'];
+const ASSETS=[62865520,62852740,62843160,63102580,63734400,63989320,64296040,64534660,65902680,66280454,66790674,67314594,67178474];
+const LIAB=[37329070,37105205,36878349,36648448,36330444,35803590,35262613,34707041,34136387,33626200,33306698,32933773,32933773];
+const NW=ASSETS.map((a,i)=>a-LIAB[i]);
+const SOBRES=[['Supermercados',250000,84950],['Combustible',90000,59250],['Formación',85000,85000],['Restaurantes',75000,51400],['Luz',32000,35000],['Farmacia',28000,0],['Internet',27000,27000],['Celular',24000,24000],['Ropa',22000,0],['Cuidado personal',22000,22000],['Mascotas',22000,22000],['Misceláneos',22000,22000]];
+const TREE=[['Deudas',[['Vehículo',366000],['Hipoteca',312180]]],['Ahorro',[['Fondo de emergencia',200000],['Universidad de Sofía',150000]]],['Alimentación',[['Supermercados',180000],['Feria',70000],['Restaurantes',51400],['Delivery',23600]]],['Vivienda',[['Luz',35000],['Internet',27000],['Celular',24000],['Agua',11400]]],['Transporte',[['Combustible',90000]]],['Educación',[['Formación',85000]]],['Salud',[['Farmacia',28000],['Cuidado personal',22000]]],['Estilo de vida',[['Ropa',22000],['Streaming',9000]]],['Otros',[['Misceláneos',22000],['Mascotas',22000]]]];
+/* tokens swatches */
+const SWN=[['--chart-1','Ingresos / positivo'],['--chart-2','Inversiones'],['--chart-3','Gasto fijo'],['--chart-4','Gasto variable'],['--chart-5','Deudas / negativo'],['--chart-6','Ahorro y metas'],['--pos','estado · bien'],['--warn','estado · riesgo'],['--neg','estado · crítico'],['--chart-grid','grid'],['--chart-crosshair','crosshair'],['--chart-glow','glow']];
+document.getElementById('sw').innerHTML=SWN.map(([t,n])=>`<div class="swatch"><i style="background:var(${t})"></i><div>${n}<br><code>${t}</code></div></div>`).join('');
+/* number roll */
+function roll(el,to){const from=0,dur=reduced?0:600,t0=performance.now();const step=t=>{const k=dur?Math.min(1,(t-t0)/dur):1,e=1-Math.pow(1-k,3);el.textContent=F(from+(to-from)*e);if(k<1)requestAnimationFrame(step)};requestAnimationFrame(step)}
+function rollNumbers(){document.querySelectorAll('[data-v]').forEach(el=>roll(el,+el.dataset.v))}
+/* sparkline */
+function spark(id,arr,color){const el=document.getElementById(id);const W=200,H=36,p=3,mn=Math.min(...arr),mx=Math.max(...arr);const x=i=>p+(W-2*p)*i/(arr.length-1),y=v=>H-p-(H-2*p)*(v-mn)/((mx-mn)||1);const d=arr.map((v,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1)).join(' ');el.setAttribute('viewBox',`0 0 ${W} ${H}`);el.innerHTML=`<defs><linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".25"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs><path d="${d} L${x(arr.length-1).toFixed(1)} ${H} L${p} ${H}Z" fill="url(#${id}g)"/><path d="${d}" fill="none" stroke="${color}" stroke-width="1.8"/><circle cx="${x(arr.length-1).toFixed(1)}" cy="${y(arr[arr.length-1]).toFixed(1)}" r="3" fill="${color}"/>`}
+spark('sp1',NW,'var(--chart-1)');spark('sp2',INC.map((v,i)=>v-EXP[i]),'var(--chart-1)');spark('sp3',EXP,'var(--chart-3)');spark('sp4',[520000,310000,250000,250000,410000,250000,250000],'var(--chart-4)');
+/* level-1 SVG chart with crosshair+tooltip */
+function lineChart(host,opts){
+ const {labels,series,fmt=F,markToday}=opts;const el=document.getElementById(host);
+ const W=el.clientWidth||600,H=el.clientHeight||300,pl=52,pr=14,pt=14,pb=26;
+ const all=series.flatMap(s=>s.data).filter(v=>v!=null);const mx=Math.max(...all)*1.08,mn=Math.min(0,...all);
+ const x=i=>pl+(W-pl-pr)*i/(labels.length-1),y=v=>pt+(H-pt-pb)*(1-(v-mn)/(mx-mn));
+ const path=arr0=>{const arr=arr0.filter(v=>v!=null);let d='';arr.forEach((v,i)=>{if(i===0){d=`M${x(0)} ${y(v)}`;return}const x0=x(i-1),x1=x(i),c=(x1-x0)/2;d+=` C${x0+c} ${y(arr[i-1])} ${x1-c} ${y(v)} ${x1} ${y(v)}`});return d};
+ const ticks=4;let g='';for(let t=0;t<=ticks;t++){const v=mn+(mx-mn)*t/ticks;g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--chart-grid)" stroke-dasharray="2 5"/><text x="${pl-8}" y="${y(v)+3.5}" text-anchor="end" font-family="var(--font-mono)" font-size="10" fill="var(--chart-axis)">${FM(v)}</text>`}
+ let xl='';labels.forEach((l,i)=>{if((i%Math.ceil(labels.length/8)===0&&i<labels.length-3)||i===labels.length-1)xl+=`<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--chart-axis)">${l}</text>`});
+ const defs=series.map((s,k)=>`<linearGradient id="${host}g${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${s.color}" stop-opacity=".22"/><stop offset="1" stop-color="${s.color}" stop-opacity="0"/></linearGradient>`).join('')+`<filter id="${host}glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+ const paths=series.map((s,k)=>{const d=path(s.data);const len=2000;return `<g class="s" data-k="${k}" style="transition:opacity var(--dur-std)">${s.area?`<path d="${d} L${x(s.data.filter(v=>v!=null).length-1)} ${y(mn)} L${x(0)} ${y(mn)}Z" fill="url(#${host}g${k})"/>`:''}<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" ${s.dashed?'stroke-dasharray="4 4"':''} style="${reduced?'':`stroke-dasharray:${s.dashed?'4 4':len};stroke-dashoffset:${s.dashed?0:len};animation:draw${host} var(--dur-tr) var(--ease-in) forwards`}"/></g>`}).join('');
+ const today=markToday!=null?`<line x1="${x(markToday)}" x2="${x(markToday)}" y1="${pt}" y2="${H-pb}" stroke="var(--chart-crosshair)" stroke-dasharray="3 3"/><text x="${x(markToday)}" y="${pt-3}" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--muted)">hoy</text>`:'';
+ el.innerHTML=`<style>@keyframes draw${host}{to{stroke-dashoffset:0}}</style><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${opts.aria||''}"><defs>${defs}</defs>${g}${xl}${paths}${today}<g id="${host}ch" style="opacity:0;transition:opacity var(--dur-micro)"><line id="${host}cl" y1="${pt}" y2="${H-pb}" stroke="var(--chart-crosshair)" stroke-dasharray="3 3"/>${series.map((s,k)=>`<circle id="${host}p${k}" r="4.5" fill="${s.color}" filter="url(#${host}glow)"/>`).join('')}</g><rect x="${pl}" y="${pt}" width="${W-pl-pr}" height="${H-pt-pb}" fill="transparent" id="${host}hit"/></svg><div class="ttip" id="${host}tt"></div>`;
+ const hit=document.getElementById(host+'hit'),ch=document.getElementById(host+'ch'),tt=document.getElementById(host+'tt');
+ const show=ev=>{const r=el.getBoundingClientRect();const px=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left;const i=Math.max(0,Math.min(labels.length-1,Math.round((px/r.width*W-pl)/(W-pl-pr)*(labels.length-1))));
+  document.getElementById(host+'cl').setAttribute('x1',x(i));document.getElementById(host+'cl').setAttribute('x2',x(i));
+  series.forEach((s,k)=>{const c=document.getElementById(host+'p'+k);c.setAttribute('cx',x(i));c.setAttribute('cy',y(s.data[i]));c.style.display=s.data[i]==null?'none':''});ch.style.opacity=1;
+  const rows=series.map(s=>`<div class="c"><span style="color:${s.color}">■</span><span style="flex:1">${s.name}</span><span>${fmt(s.data[i])}</span></div>`).join('');
+  const d=series.length>1&&series[1].data[i]!=null?series[0].data[i]-series[1].data[i]:null;
+  tt.innerHTML=`<div class="d">${labels[i]}</div><div class="v">${fmt(series[0].data[i])}</div>${rows}${d!=null?`<div class="c"><span>Diferencia</span><span style="color:${d>=0?'#7bd28f':'#ef8a86'}">${d>=0?'+':'−'}${fmt(Math.abs(d))}</span></div>`:''}`;
+  tt.style.opacity=1;const left=x(i)/W*r.width;tt.style.left=(left+14+tt.offsetWidth>r.width?left-tt.offsetWidth-14:left+14)+'px';tt.style.top=Math.max(4,y(series[0].data[i])/H*r.height-40)+'px'};
+ hit.addEventListener('mousemove',show);hit.addEventListener('touchstart',show,{passive:true});hit.addEventListener('touchmove',show,{passive:true});
+ hit.addEventListener('mouseleave',()=>{ch.style.opacity=0;tt.style.opacity=0});
+ return {setVisible(k,v){el.querySelector(`.s[data-k="${k}"]`).style.opacity=v?1:0.15}}
+}
+function drawRitmo(){const days=[...Array(32).keys()];const real=[0,0,35850,93850,134700,531880,568280,579980,614980,636980,672930,739030,791280,791280,791280,1017580,1167580];while(real.length<32)real.push(null);const ideal=days.map(d=>(1750580-678180)*d/31+(d>=5?312180:0)+(d>=15?216000:0)+(d>=16?150000:0));
+ lineChart('ritmo',{labels:days.map(d=>d===0?'1 ago':d+' ago'),series:[{name:'Gasto real',data:real,color:css('--chart-1'),area:true},{name:'Ritmo ideal',data:ideal,color:css('--chart-axis'),dashed:true}],markToday:16,aria:'Ritmo del mes: gasto real frente al ritmo ideal'})}
+let flujoChart;function drawFlujo(){flujoChart=lineChart('flujo',{labels:MONTHS,series:[{name:'Ingresos',data:INC,color:css('--chart-1'),area:true},{name:'Gastos',data:EXP,color:css('--chart-3'),area:true}],aria:'Ingresos y gastos por mes'});
+ document.getElementById('lg1').innerHTML=[['Ingresos','--chart-1'],['Gastos','--chart-3']].map((l,k)=>`<button aria-pressed="true" onclick="const v=this.getAttribute('aria-pressed')!=='true';this.setAttribute('aria-pressed',v);flujoChart.setVisible(${k},v)" onmouseenter="flujoChart.setVisible(${1-k},false)" onmouseleave="if(this.parentNode.children[${1-k}].getAttribute('aria-pressed')==='true')flujoChart.setVisible(${1-k},true)"><i style="background:var(${l[1]})"></i>${l[0]}</button>`).join('');
+ document.getElementById('t1').innerHTML=`<table><thead><tr><th>Mes</th><th class="n">Ingresos</th><th class="n">Gastos</th><th class="n">Flujo libre</th></tr></thead><tbody>${MONTHS.map((m,i)=>`<tr><td>${m}</td><td class="n">${F(INC[i])}</td><td class="n">${F(EXP[i])}</td><td class="n">${F(INC[i]-EXP[i])}</td></tr>`).join('')}</tbody></table>`}
+function setState(id,st,btn){const p=document.getElementById(id);[...btn.parentNode.querySelectorAll('button')].forEach(b=>b.setAttribute('aria-pressed',b===btn));const pl=p.querySelector('.svgc');const old=p.querySelector('.stt');if(old)old.remove();pl.style.display=st==='data'||st==='partial'?'':'none';
+ const map={loading:`<div class="skel"></div>`,empty:`<div class="empty"><div><b>Todavía no hay meses cerrados</b>Registrá tus ingresos y gastos de este mes y aquí aparecerá tu flujo mes a mes.<br><button class="btn btn-p">Registrar un movimiento</button></div></div>`,filtered:`<div class="empty"><div><b>Nada con este filtro</b>No hay movimientos de «Restaurantes» en marzo 2026.<br><button class="btn btn-s">Quitar filtro</button></div></div>`,error:`<div class="empty"><div><b>No pudimos cargar la gráfica</b>Tus datos están a salvo; fue un problema de conexión.<br><button class="btn btn-s">Reintentar</button></div></div>`,partial:`<span class="partial stt">Con datos incompletos · 4 de 12 meses</span>`};
+ if(map[st]){const d=document.createElement('div');d.className='stt';d.style.cssText='position:absolute;inset:0';d.innerHTML=map[st];if(st==='partial'){d.style.inset='auto';d.innerHTML=map[st]}p.appendChild(d)}}
+function toggleTable(id,btn){const t=document.getElementById(id);t.classList.toggle('on');btn.setAttribute('aria-pressed',t.classList.contains('on'))}
+/* ECharts */
+let e1,e2;function eTheme(){return {textStyle:{fontFamily:css('--font-mono')},color:[css('--chart-1'),css('--chart-2'),css('--chart-3'),css('--chart-4'),css('--chart-5'),css('--chart-6')]}}
+function drawE(){
+ if(e1){e1.dispose();e2.dispose()}
+ const axis={axisLine:{show:false},axisTick:{show:false},axisLabel:{color:css('--chart-axis'),fontSize:10.5},splitLine:{lineStyle:{color:css('--chart-grid'),type:'dashed'}}};
+ const tip={backgroundColor:css('--text'),borderWidth:0,textStyle:{color:css('--canvas'),fontFamily:css('--font-body'),fontSize:12},padding:[8,10],confine:true,valueFormatter:v=>F(Math.abs(v))};
+ e1=echarts.init(document.getElementById('e1'),null,{renderer:'canvas'});
+ e1.setOption({...eTheme(),animation:!reduced,animationDuration:400,animationEasing:'cubicOut',grid:{left:56,right:50,top:28,bottom:46},
+  tooltip:{...tip,trigger:'axis',axisPointer:{type:'cross',label:{show:false},lineStyle:{color:css('--chart-crosshair'),type:'dashed'}},formatter:ps=>{const i=ps[0].dataIndex;return `<div style="color:${css('--muted-2')};font-size:11px">${NWM[i]}</div><div style="font:600 14px ${css('--font-display')}">${F(NW[i])}</div><div>Activos <b style="float:right;margin-left:14px">${F(ASSETS[i])}</b></div><div>Pasivos <b style="float:right;margin-left:14px">−${F(LIAB[i])}</b></div>${i?`<div>vs mes anterior <b style="float:right;margin-left:14px;color:#7bd28f">+${F(NW[i]-NW[i-1])}</b></div>`:''}`}},
+  legend:{top:0,left:0,icon:'roundRect',itemWidth:10,itemHeight:10,textStyle:{color:css('--muted'),fontFamily:css('--font-body'),fontSize:11.5}},
+  xAxis:{type:'category',data:NWM,...axis,splitLine:{show:false},boundaryGap:true},
+  yAxis:{type:'value',...axis,axisLabel:{...axis.axisLabel,formatter:v=>FM(v)}},
+  dataZoom:[{type:'inside'},{type:'slider',height:18,bottom:6,borderColor:css('--border'),fillerColor:css('--accent-soft'),handleSize:'120%',handleStyle:{color:css('--accent')},moveHandleSize:0,textStyle:{color:css('--muted'),fontSize:9.5},dataBackground:{lineStyle:{color:css('--border')},areaStyle:{color:css('--chip')}}}],
+  series:[
+   {name:'Activos',type:'bar',stack:'t',data:ASSETS,itemStyle:{color:css('--chart-2'),borderRadius:[3,3,0,0],opacity:.85},barWidth:'46%',emphasis:{focus:'series'},blur:{itemStyle:{opacity:.15}}},
+   {name:'Pasivos',type:'bar',stack:'t',data:LIAB.map(v=>-v),itemStyle:{color:css('--chart-5'),borderRadius:[0,0,3,3],opacity:.85},emphasis:{focus:'series'},blur:{itemStyle:{opacity:.15}}},
+   {name:'Patrimonio neto',type:'line',data:NW,smooth:true,smoothMonotone:'x',symbol:'circle',symbolSize:7,showSymbol:false,lineStyle:{width:3,color:css('--chart-1'),shadowBlur:8,shadowColor:css('--chart-glow')},itemStyle:{color:css('--chart-1')},areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:css('--chart-1')+'44'},{offset:1,color:css('--chart-1')+'00'}])},emphasis:{focus:'series',itemStyle:{shadowBlur:12,shadowColor:css('--chart-glow')}},blur:{lineStyle:{opacity:.3},areaStyle:{opacity:.05}},endLabel:{show:true,formatter:p=>FM(p.value),color:css('--text'),fontSize:10.5,fontFamily:css('--font-mono')}}
+  ]});
+ e2=echarts.init(document.getElementById('e2'),null,{renderer:'canvas'});
+ const cols=[css('--chart-5'),css('--chart-6'),css('--chart-3'),css('--chart-2'),css('--chart-4'),css('--chart-1'),'#8a857b','#b58cc9','#6b8a5f'];
+ e2.setOption({animation:!reduced,animationDuration:400,tooltip:{...tip,formatter:p=>{const path=p.treePathInfo.slice(1).map(x=>x.name).join(' › ');const total=1750580;return `<div style="color:${css('--muted-2')};font-size:11px">${path}</div><div style="font:600 14px ${css('--font-display')}">${F(p.value)}</div><div>${(p.value/total*100).toFixed(1).replace('.',',')} % del gasto del mes</div>`}},
+  series:[{type:'treemap',name:'Gasto de agosto',roam:false,leafDepth:1,nodeClick:'zoomToNode',breadcrumb:{show:true,top:4,left:4,itemStyle:{color:css('--chip'),textStyle:{color:css('--text'),fontSize:11}}},label:{show:true,formatter:p=>`${p.name}\n${FM(p.value)}`,color:'#fff',fontFamily:css('--font-body'),fontSize:12,fontWeight:600,lineHeight:16,overflow:'truncate'},upperLabel:{show:true,height:22,color:'#fff',fontSize:11,fontWeight:600,fontFamily:css('--font-body')},itemStyle:{borderColor:css('--surface'),borderWidth:2,gapWidth:2,borderRadius:4},emphasis:{itemStyle:{shadowBlur:10,shadowColor:'rgba(0,0,0,.25)'}},levels:[{itemStyle:{gapWidth:3}},{itemStyle:{gapWidth:2}}],
+   data:TREE.map(([g,items],i)=>({name:g,itemStyle:{color:cols[i]},children:items.map(([n,v],j)=>({name:n,value:v,itemStyle:{color:cols[i],opacity:1-j*0.12}}))}))}]});
+ document.getElementById('t2').innerHTML=`<table><thead><tr><th>Mes</th><th class="n">Activos</th><th class="n">Pasivos</th><th class="n">Patrimonio neto</th></tr></thead><tbody>${NWM.map((m,i)=>`<tr><td>${m}</td><td class="n">${F(ASSETS[i])}</td><td class="n">${F(LIAB[i])}</td><td class="n">${F(NW[i])}</td></tr>`).join('')}</tbody></table>`;
+ document.getElementById('t3').innerHTML=`<table><thead><tr><th>Grupo</th><th>Categoría</th><th class="n">Monto</th><th class="n">% del mes</th></tr></thead><tbody>${TREE.flatMap(([g,items])=>items.map(([n,v])=>`<tr><td>${g}</td><td>${n}</td><td class="n">${F(v)}</td><td class="n">${(v/1750580*100).toFixed(1).replace('.',',')} %</td></tr>`)).join('')}</tbody></table>`;
+}
+/* breakdown linked */
+let sel=null;const DAY=16/31;
+function drawBk(){const host=document.getElementById('bk');host.className='bk'+(sel?' has':'');host.innerHTML=SOBRES.map(([n,b,r],i)=>{const pct=r/b,st=r>b?['over','excedido']:pct>DAY+0.15?['risk','en riesgo']:['ok','al día'];return `<div class="r ${sel===i?'sel':''}" onclick="selectSobre(${i})"><div class="nm"><i style="background:var(--chart-${st[0]==='ok'?'1':st[0]==='risk'?'3':'5'})"></i>${n}</div><div class="track"><b style="width:${Math.min(100,pct*100)}%;background:var(--chart-${st[0]==='ok'?'1':st[0]==='risk'?'3':'5'})"></b><s style="left:${DAY*100}%"></s></div><div class="v">${F(r)} <span style="color:var(--muted);font-weight:400">/ ${FM(b)}</span></div><div class="st ${st[0]}">${st[1]}</div></div>`}).join('');
+ const chips=document.getElementById('chips');chips.innerHTML=`<span>Agosto 2026 · día 16</span><span>vs julio</span>${sel!=null?`<span>Sobre: ${SOBRES[sel][0]} <b onclick="selectSobre(null);event.stopPropagation()">×</b></span><span class="reset" onclick="selectSobre(null)">Restablecer</span>`:''}`;
+ const s=document.getElementById('sigs');const gen=[['--warn','<b>Restaurantes</b> ya usó 69 % del sobre con 52 % del mes.','ver movimientos'],['--neg','<b>Luz</b> excedió el sobre: ₡35 000 de ₡32 000 (+9 %).','ajustar sobre'],['--pos','<b>Supermercados</b> va 12 puntos por debajo del ritmo.','']];
+ const per={0:[['--pos','Supermercados: ₡84 950 en 4 compras; promedio ₡21 200 (−8 % vs julio).','ver 4 movimientos'],['--info','La compra más grande fue Automercado el 4 de agosto (₡40 850).','']],3:[['--warn','Restaurantes: 69 % usado en 3 visitas; al ritmo actual cierra en ₡96 000 (+28 %).','ver 3 movimientos'],['--info','Pizza Hut y McDonald\'s explican el 100 % del sobre.','']],4:[['--neg','Luz: ₡35 000 vs ₡32 000 presupuestados; +12 % vs promedio de 3 meses.','ajustar a ₡35 000']]};
+ s.innerHTML=(sel!=null&&per[sel]?per[sel]:gen).map(([c,t,ev])=>`<div class="sig"><i style="background:var(${c})"></i><div>${t}</div>${ev?`<span class="ev">${ev} →</span>`:''}</div>`).join('')}
+function selectSobre(i){sel=(sel===i)?null:i;drawBk()}
+/* theme & motion */
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);document.getElementById('thL').setAttribute('aria-pressed',t==='light');document.getElementById('thD').setAttribute('aria-pressed',t==='dark');requestAnimationFrame(()=>{drawRitmo();drawFlujo();drawE()})}
+function setMotion(on){reduced=!on;document.getElementById('moOn').setAttribute('aria-pressed',on);document.getElementById('moOff').setAttribute('aria-pressed',!on);document.documentElement.style.setProperty('--dur-micro',on?'120ms':'0ms');document.documentElement.style.setProperty('--dur-std',on?'200ms':'150ms');document.documentElement.style.setProperty('--dur-tr',on?'320ms':'0ms');document.documentElement.style.setProperty('--dur-range',on?'450ms':'0ms');drawRitmo();drawFlujo();drawE();rollNumbers()}
+if(matchMedia('(prefers-reduced-motion: reduce)').matches)reduced=true;
+window.addEventListener('load',()=>{drawRitmo();drawFlujo();drawE();drawBk();rollNumbers()});
+window.addEventListener('resize',()=>{drawRitmo();drawFlujo();if(e1){e1.resize();e2.resize()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')selectSobre(null)});
+</script>

@@ -135,14 +135,16 @@ export function MobileBell() {
       <button
         type="button"
         className="icon-btn"
-        aria-label="Notificaciones"
+        aria-label={count > 0 ? `Notificaciones, ${count} novedades` : "Notificaciones"}
         style={{ position: "relative" }}
         onClick={() => setOpen(true)}
       >
         <Icon name="bell" />
         {count > 0 ? (
           <span
-            aria-label={`${count} novedades`}
+            // Misma clase que el badge de la web: es el ancla con la que la captura de QA lo
+            // oculta. Ver `OCULTAR_EN_CAPTURA` en `scripts/qa/snap.mjs`.
+            className="bell-badge"
             style={{
               position: "absolute",
               top: 0,

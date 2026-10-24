@@ -9,7 +9,12 @@ import {
   monthPeriod,
 } from "@/modules/financial-base";
 import { getFxRates } from "@/lib/market-data/fx-rates";
-import { listDebts, listGoals } from "@/modules/control";
+import {
+  listDebts,
+  listGoals,
+  getCurrentDebtBalances,
+  deriveDebtsForEngine,
+} from "@/modules/control";
 import {
   getDefenseFundsReport,
   getDesiredMonthlyLifestyle,
@@ -51,21 +56,33 @@ async function _getSetupSnapshot(): Promise<SetupSnapshot> {
   // Todo best-effort e independiente: que Patrimonio falle no debe dejar sin
   // asistente al Presupuesto. Un módulo caído se lee como "sin datos", que es
   // exactamente lo que el progreso derivado debe reportar.
-  const [currency, rates, budget, tree, debts, goals, defense, policies, holdings, lifestyle] =
-    await Promise.all([
-      getPrimaryCurrency().catch(() => "CRC"),
-      // Las tasas viajan con la proyección: los ítems se guardan en su moneda nativa y los
-      // totales del hub son una sola. Ver `SetupSnapshot.rates`.
-      getFxRates().catch(() => ({}) as Record<string, number>),
-      getBudgetTotals(period).catch(() => null),
-      listCategoryTree("expense").catch(() => []),
-      listDebts().catch(() => []),
-      listGoals().catch(() => []),
-      getDefenseFundsReport().catch(() => null),
-      listPolicies().catch(() => []),
-      listHoldings().catch(() => []),
-      getDesiredMonthlyLifestyle().catch(() => null),
-    ]);
+  const [
+    currency,
+    rates,
+    budget,
+    tree,
+    debts,
+    goals,
+    liveBalances,
+    defense,
+    policies,
+    holdings,
+    lifestyle,
+  ] = await Promise.all([
+    getPrimaryCurrency().catch(() => "CRC"),
+    // Las tasas viajan con la proyección: los ítems se guardan en su moneda nativa y los
+    // totales del hub son una sola. Ver `SetupSnapshot.rates`.
+    getFxRates().catch(() => ({}) as Record<string, number>),
+    getBudgetTotals(period).catch(() => null),
+    listCategoryTree("expense").catch(() => []),
+    listDebts().catch(() => []),
+    listGoals().catch(() => []),
+    getCurrentDebtBalances().catch(() => []),
+    getDefenseFundsReport().catch(() => null),
+    listPolicies().catch(() => []),
+    listHoldings().catch(() => []),
+    getDesiredMonthlyLifestyle().catch(() => null),
+  ]);
 
   const items = budget?.items ?? [];
   const incomeItems = items.filter((i) => i.type === "income");
@@ -137,14 +154,21 @@ async function _getSetupSnapshot(): Promise<SetupSnapshot> {
     sobres,
     budgetedMonthly: budget?.budgetExpense ?? 0,
 
-    debts: debts.map((d) => ({
-      id: d.id,
-      name: d.name,
-      balance: d.balance,
-      minPayment: d.minPayment,
-      apr: d.apr ?? null,
-      currency: d.currency,
-    })),
+    // Saldo VIVO (ancla − pagos), NO el ancla de alta (`debts.balance`, que record_debt_payment
+    // nunca decrementa): el detalle del hub sumaba las altas y una deuda ya saldada seguía
+    // contando. Misma derivación que el diagnóstico de control (deriveDebtsForEngine), en la
+    // moneda NATIVA de cada deuda (destino = su propia moneda ⇒ convertCurrency es identidad):
+    // el hub convierte después con `totalEnMoneda`, que necesita el monto en su moneda de origen.
+    debts: debts
+      .flatMap((d) => deriveDebtsForEngine([d], liveBalances, d.currency, {}))
+      .map((d) => ({
+        id: d.id,
+        name: d.name,
+        balance: d.balance,
+        minPayment: d.minPayment,
+        apr: d.apr ?? null,
+        currency: d.currency,
+      })),
     goals: goals.map((g) => ({
       id: g.id,
       name: g.name,

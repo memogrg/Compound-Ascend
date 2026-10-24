@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { formatMoney, currencySymbol } from "@/lib/format";
+import { currencySymbol, formatDecimal, formatMoney } from "@/lib/format";
 // Motor compartido: mismo cálculo que la web y que la proyección de ingreso pasivo.
 import {
   calcularRendimiento,
@@ -1306,7 +1306,7 @@ function RentalCostsBlock(props: {
           ) : null}
           <div className="between" style={{ fontSize: 12.5, marginTop: 6 }}>
             <span className="muted">ROI operativo anual</span>
-            <strong>{(roi.operatingRoi * 100).toFixed(1)}%</strong>
+            <strong>{formatDecimal(roi.operatingRoi * 100, 1)}%</strong>
           </div>
         </div>
       ) : null}

@@ -1,8 +1,10 @@
 import { getRichLifeSummary, ensureCurrentNetWorthSnapshot } from "@/modules/rich-life";
-import { getSnapshotHistory, ensureTodaySnapshot } from "@/modules/wealth";
+import { getSnapshotHistory } from "@/modules/wealth";
+import { etiquetaUltimoDato } from "@/modules/wealth/engine/ultimo-dato";
+import { userToday } from "@/lib/time/user-time";
 import { MobileHeader } from "../../components/mobile-header";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
-import { formatMoney, formatCompact, currencySymbol } from "@/lib/format";
+import { currencySymbol, formatCompact, formatDayMonthTiny, formatMoney } from "@/lib/format";
 import { MDonut, type MSlice } from "../../components/m-donut";
 import { MScrubChart, type MPoint } from "../../components/m-scrub-chart";
 import {
@@ -23,21 +25,17 @@ import { PatrimonioManager } from "./patrimonio-manager";
  */
 export const dynamic = "force-dynamic"; // datos por sesión
 
-// El anillo de composición NO usa --s3: es el mismo rojo que --danger, y aquí las
-// porciones son clases de activo, no pérdidas. Va el neutro cálido de series.
-const RING_COLORS = ["var(--s1)", "var(--s2)", "var(--s-neutral)", "var(--s4)", "var(--s5)"];
-
 export default async function MobilePatrimonio() {
   const summary = await getRichLifeSummary();
   const { snapshot, assets, allAssets, liabilities, currency } = summary;
   const ind = snapshot.indicators;
   const bd = computeWealthBreakdown(allAssets); // invertido / líquido / otros (o undefined)
 
-  // Deja registrado el punto de HOY antes de leer la serie (best-effort e idempotente, mismo
-  // patrón que ensureMonthlyContributions en Inversiones). Sin esto la tabla se quedaba vacía
-  // —no había nada que escribiera snapshots— y el gráfico no aparecía nunca. Si falla, la
-  // pantalla se pinta igual: solo se queda sin el punto de hoy.
-  await ensureTodaySnapshot(ind.netWorth, currency).catch(() => {});
+  // Esta pantalla NO escribe el snapshot de hoy. Lo hacía —y por eso el gráfico cambiaba de
+  // forma entre dos visitas seguidas, sin que el usuario tocara nada—; ahora lo escribe el
+  // barrido diario (`generatePortfolioSnapshotsForAllUsers`, `/api/investments/snapshot`).
+  // Si el barrido aún no pasó, la curva termina en el último punto que haya y se dice desde
+  // cuándo es, en vez de fingir que llega hasta hoy.
 
   // Y el patrimonio del MES en curso en net_worth_snapshots: es la serie mensual que lee el
   // asesor ("¿cómo cambió mi patrimonio?"). Reusa lo ya calculado, no vuelve a agregar.
@@ -46,22 +44,28 @@ export default async function MobilePatrimonio() {
   // Historia REAL de patrimonio neto (snapshots) para el gráfico con scrub. Sin datos inventados:
   // si aún no hay ≥2 snapshots, se muestra un estado honesto en vez del gráfico.
   const snapshots = await getSnapshotHistory("all");
+  const ultimoDato = etiquetaUltimoDato(snapshots, await userToday());
   const nwPoints: MPoint[] = snapshots.map((s) => ({
-    label: new Date(`${s.date}T00:00:00`).toLocaleDateString("es-CR", {
-      day: "numeric",
-      month: "short",
-    }),
+    label: formatDayMonthTiny(s.date),
     value: s.netWorth,
   }));
 
-  // Distribución por clase (ya agrupada por el engine); mapeamos a los colores del móvil.
+  // Distribución por clase, con el color que YA trae cada clase del engine
+  // (`ASSET_COLOR` en rich-life-engine). Antes se pintaba con una paleta cíclica indexada
+  // por posición, así que el color seguía al RANKING: el mes en que «Inversión» adelantaba
+  // a «Líquidos» las dos intercambiaban color y el anillo contaba otra historia sin que
+  // nada hubiera cambiado. El color pertenece a la entidad, nunca a su puesto — y la web
+  // ya lo hacía así (`rich-life-dashboard.tsx`), así que además estaban discrepando.
+  //
+  // El motivo por el que la paleta vieja evitaba `--s3` sigue cubierto: ninguna clase lo
+  // usa (líquidos teal, inversión azul, productivos verde, uso personal y especiales ámbar).
   const slices: MSlice[] = snapshot.assetsByClass
     .filter((c) => c.value > 0)
     .slice(0, 5)
-    .map((c, i) => ({
+    .map((c) => ({
       label: c.label,
       value: c.value,
-      color: RING_COLORS[i % RING_COLORS.length]!,
+      color: c.color,
     }));
 
   // 0 no es ni positivo ni negativo: sin signo y en neutro. Los agregados (netWorth,
@@ -114,13 +118,27 @@ export default async function MobilePatrimonio() {
           // en vez de inventar una serie de ejemplo.
           slot={
             nwPoints.length >= 2 ? (
-              <MScrubChart points={nwPoints} currency={currency} />
+              <>
+                <MScrubChart points={nwPoints} currency={currency} />
+                {/* Hasta cuándo llega la curva, cuando no llega hasta hoy. La pantalla ya no
+                    escribe su propio punto (lo hace el barrido diario), así que sin esto una
+                    serie que termina el martes se lee como si terminara hoy. */}
+                {ultimoDato ? (
+                  <div
+                    className="muted"
+                    style={{ fontSize: 11, textAlign: "center", marginTop: 6 }}
+                  >
+                    {ultimoDato}
+                  </div>
+                ) : null}
+              </>
             ) : (
               <div
                 className="muted"
                 style={{ fontSize: 12, lineHeight: 1.5, textAlign: "center", padding: "10px 0" }}
               >
-                Tu historial de patrimonio empieza hoy: la línea aparecerá conforme pasen los días.
+                Tu historial de patrimonio se arma con un punto por día: la línea aparece en cuanto
+                haya dos.
               </div>
             )
           }

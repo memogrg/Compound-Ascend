@@ -1,5 +1,12 @@
 import Link from "next/link";
 import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
+import {
+  ChartFrame,
+  LeyendaDona,
+  describirDona,
+  filasLeyenda,
+  tablaDona,
+} from "@/components/charts/core";
 import { Icon } from "@/components/ui/icon";
 import { AgentMark } from "@/components/ui/agent-mark";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
@@ -281,56 +288,69 @@ function HealthCard({ health, etiqueta }: { health: HealthScore; etiqueta?: stri
   );
 }
 
+/** El tamaño del anillo, el mismo que usa `DonutChart` por defecto. */
+const ANILLO = 132;
+
 function CompositionCard({
   donutData,
   expenseMonthly,
   currency,
 }: {
   donutData: DonutDatum[];
+  /** El PRESUPUESTO mensual (`budget_items`), no el gasto real. El nombre viene del engine. */
   expenseMonthly: number;
   currency: string;
 }) {
+  const TITULO = "Presupuesto del mes por bloque";
+  /* Taxonomía FIJA: los bloques de gasto son nueve y cada uno significa algo. Se muestran todos,
+     en el orden canónico de `EXPENSE_NATURES`. Plegarlos en «Otras N» —como se hacía— tapaba justo
+     lo que esta tarjeta viene a responder: en qué se va el dinero por bloque. Y que un bloque
+     desaparezca porque este mes gastó poco hace imposible comparar dos meses. */
+  const leyenda = filasLeyenda(donutData, { modo: "taxonomia" });
+  const dinero = (v: number) => formatMoney(v, currency);
+
   return (
     <div className="card card-pad">
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <div className="card-title">Composición de gastos</div>
-        <Link className="ghost-link" href="/mi-base-financiera">
-          Detalle <Icon name="chev" width={2.2} />
-        </Link>
-      </div>
-      <div
-        style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14, flexWrap: "wrap" }}
+      {/* «Presupuesto», no «gastos». Esta tarjeta suma `budget_items` —lo PLANIFICADO del mes— y lo
+          presentaba bajo un título de gasto: en la cuenta de demo eso son ₡1.726.097 presentados
+          como si fueran los ₡1.167.030 que se llevan gastados. Hay un caso que fija el hecho
+          (`tests/a11y/panel-composicion.spec.ts`) antes de que nadie vuelva a cambiar el rótulo
+          por suposición. */}
+      <ChartFrame
+        titulo={TITULO}
+        /* `alto` es el del ANILLO y no el del `ChartSkeleton`. El esqueleto (240) hace de hueco
+           para el bloque entero —anillo y leyenda al lado—, mientras que `alto` mide solo el
+           lienzo; igualarlos metería ~50 px de aire muerto bajo un anillo de 132, porque en modo
+           taxonomía el alto de la tarjeta lo manda la leyenda de nueve filas, no el anillo. */
+        alto={ANILLO}
+        /* El lienzo mide el anillo y nada más. Sin esto el piso de `ALTO_MINIMO` (160) le metía
+           28 px de aire muerto debajo, y el hueco anillo→leyenda salía de 50 px a 390 en vez de
+           los 18 del `gap` de la fila. Una dona no tiene ejes ni tooltip anclado, que es para lo
+           que ese piso existe. */
+        ajustadoAlContenido
+        estado={leyenda.filas.length === 0 ? "vacio" : "datos"}
+        mensajeVacio="Agregá tu presupuesto en Mi Base Financiera."
+        /* El total se dice en el nombre de la figura. Vivía solo en el centro del anillo, que es un
+           `<div>` encima del SVG: un lector lo leía suelto, sin saber de qué gráfico era. */
+        descripcion={describirDona({ titulo: TITULO, filas: leyenda.filas, formato: dinero })}
+        tabla={tablaDona(leyenda, dinero, "Bloque")}
+        disposicionLeyenda="lateral"
+        leyenda={<LeyendaDona filas={leyenda.filas} ocultas={leyenda.ocultas} moneda={currency} />}
+        acciones={
+          <Link className="ghost-link" href="/mi-base-financiera">
+            Detalle <Icon name="chev" width={2.2} />
+          </Link>
+        }
       >
         <DonutChart
-          data={donutData}
+          data={leyenda.filas.map((f) => ({ name: f.name, value: f.value, color: f.color }))}
+          size={ANILLO}
           centerLabel={formatCompact(expenseMonthly, currency)}
-          centerSub="al mes"
+          /* Naturaleza además del período: «al mes» decía cuándo pero no qué. El período lo pone
+             el título, que está justo encima. */
+          centerSub="presupuesto"
         />
-        <div style={{ flex: 1, minWidth: 140, display: "flex", flexDirection: "column", gap: 8 }}>
-          {donutData.length === 0 ? (
-            <span className="muted" style={{ fontSize: 12.5 }}>
-              Agrega gastos en tu Base Financiera.
-            </span>
-          ) : (
-            donutData.slice(0, 5).map((d) => (
-              <div
-                key={d.name}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "10px 1fr auto",
-                  gap: 9,
-                  alignItems: "center",
-                  fontSize: 12.5,
-                }}
-              >
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
-                <span style={{ color: "var(--ink-2)" }}>{d.name}</span>
-                <span className="muted tnum">{formatMoney(d.value, currency)}</span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      </ChartFrame>
     </div>
   );
 }

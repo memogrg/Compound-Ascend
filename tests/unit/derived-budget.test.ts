@@ -75,3 +75,70 @@ describe("plan derivado (Fase 3)", () => {
     expect(toMonthly(7000, null)).toBe(7000);
   });
 });
+
+describe("diffDerived · modo congelado", () => {
+  const linea = (sourceId: string, amount: number): DesiredLine => ({
+    type: "expense",
+    name: `Pago — ${sourceId}`,
+    amount,
+    currency: "CRC",
+    categoryId: "cat-deudas",
+    sourceKind: "debt",
+    sourceId,
+  });
+  const existente = (id: string, sourceId: string, amount: number): ExistingDerived => ({
+    id,
+    type: "expense",
+    name: `Pago — ${sourceId}`,
+    amount,
+    currency: "CRC",
+    categoryId: "cat-deudas",
+    sourceKind: "debt",
+    sourceId,
+  });
+
+  it("un monto que cambió NO produce update", () => {
+    // Sobre un mes cerrado, actualizar reescribe la historia en vez de fijarla: bajar una cuota
+    // hoy cambiaría lo que se presupuestó hace cuatro meses.
+    const d = diffDerived([existente("b1", "deuda-1", 312_180)], [linea("deuda-1", 280_000)], {
+      congelado: true,
+    });
+    expect(d.toUpdate).toEqual([]);
+    expect(d.toInsert).toEqual([]);
+    expect(d.toDeleteIds).toEqual([]);
+  });
+
+  it("una entidad que desapareció NO produce delete", () => {
+    // Saldar una deuda borraría la línea que PRUEBA que ese mes se presupuestó.
+    const d = diffDerived([existente("b1", "deuda-1", 312_180)], [], { congelado: true });
+    expect(d.toDeleteIds).toEqual([]);
+    expect(d.toInsert).toEqual([]);
+  });
+
+  it("un periodo que YA tiene derivadas no recibe nada", () => {
+    // Idempotencia del cron ante reintentos: si el mes ya se materializó, no se toca más. Se
+    // mira si hay ALGUNA derivada, no si falta esta: un mes a medio materializar sería peor.
+    const d = diffDerived([existente("b1", "otra-deuda", 90_000)], [linea("deuda-1", 312_180)], {
+      congelado: true,
+    });
+    expect(d.toInsert).toEqual([]);
+  });
+
+  it("un periodo VACÍO sí recibe sus líneas", () => {
+    const d = diffDerived([], [linea("deuda-1", 312_180), linea("deuda-2", 92_500)], {
+      congelado: true,
+    });
+    expect(d.toInsert.map((l) => l.sourceId)).toEqual(["deuda-1", "deuda-2"]);
+    expect(d.toUpdate).toEqual([]);
+    expect(d.toDeleteIds).toEqual([]);
+  });
+
+  it("sin el flag, nada cambia", () => {
+    // El caso que protege lo que ya funciona: el mes en curso se sigue reconciliando.
+    const d = diffDerived([existente("b1", "deuda-1", 312_180)], [linea("deuda-1", 280_000)]);
+    expect(d.toUpdate).toHaveLength(1);
+    expect(d.toUpdate[0]!.id).toBe("b1");
+    const e = diffDerived([existente("b1", "deuda-1", 312_180)], []);
+    expect(e.toDeleteIds).toEqual(["b1"]);
+  });
+});

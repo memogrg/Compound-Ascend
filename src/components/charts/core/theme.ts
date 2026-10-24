@@ -1,0 +1,229 @@
+import { formatMonthShort } from "@/lib/format";
+
+/**
+ * Las constantes de marca de los gráficos. Un solo sitio donde está escrito qué es «premium»
+ * en CARTERA+: grosores, radios, opacidades y qué token usa cada cosa.
+ *
+ * Regla dura, y hay un test que la vigila: **acá no se escribe ningún color literal**. Todo
+ * color sale de un token (`var(--chart-N)`, `var(--chart-grid)`, …). Un hex suelto en este
+ * archivo es un color que no cambia con el tema y que nadie encuentra después.
+ */
+
+/** Cómo se dibuja una serie. Decide el swatch de la leyenda y el relleno del área. */
+export type MarcaSerie = "linea" | "area" | "barra";
+
+export type SerieDef = {
+  /** Clave del dato en cada punto. Es también la identidad de la serie. */
+  clave: string;
+  etiqueta: string;
+  /** Token de color, p. ej. `var(--chart-1)`. Pertenece a la ENTIDAD, no al índice. */
+  color: string;
+  marca: MarcaSerie;
+  /** Trazo discontinuo: se usa para proyecciones, que no son un dato observado. */
+  guion?: boolean;
+  /**
+   * Hacia dónde es BUENO que se mueva esta serie. Decide el color del delta vs comparación:
+   * en ingresos subir es bueno, en gastos es malo. Sin esto, el tooltip pintaría de verde una
+   * subida de gasto. Si no se declara, el delta va en neutro.
+   */
+  sentidoBueno?: "arriba" | "abajo";
+  /**
+   * La serie es un VALOR VIGENTE hasta que cambia, no una medición continua: presupuesto,
+   * meta mensual, límite. Se dibuja en escalón.
+   *
+   * Un presupuesto de 1,9 M en junio y 1,95 M en julio no pasó por 1,92 M a mediados de mes:
+   * saltó el día 1. La curva `monotone` dibuja esa rampa inexistente y, peor, hace que en la
+   * segunda quincena de junio el presupuesto pintado esté por encima del real cuando la
+   * regla todavía era 1,9 M. Las series REALES (gasto, ingreso, patrimonio) sí son continuas
+   * y conservan su curva.
+   */
+  escalon?: boolean;
+};
+
+/**
+ * Trazo de 2 px con uniones redondeadas. Por debajo de 2 px la curva se rompe en pantallas
+ * densas; por encima, una serie tapa a la de al lado cuando se cruzan.
+ */
+export const TRAZO = {
+  ancho: 2,
+  union: "round",
+  remate: "round",
+} as const;
+
+/**
+ * Punto activo de ≥ 8 px con anillo del color de la superficie: el anillo es lo que lo
+ * separa de la línea cuando el valor cae sobre ella. Sin anillo, el punto se «come» el trazo.
+ */
+export const PUNTO_ACTIVO = {
+  radio: 4.5,
+  anilloAncho: 2,
+  anilloColor: "var(--surface)",
+} as const;
+
+/**
+ * La lavada del área: 0,18 arriba y 0 abajo.
+ *
+ * Vive acá y no en el token `--chart-gradient-top` (0,28) a propósito: medido sobre el
+ * gráfico real, con 0,28 el relleno tapa la rejilla y, con dos series superpuestas, la de
+ * abajo deja de leerse. 0,18 sigue dando cuerpo al área sin competir con la línea, que es la
+ * que lleva el dato. La divergencia con el token queda anotada para el delta 7, que es cuando
+ * los wrappers viejos pasan por acá y hay un solo sitio donde decidirlo.
+ */
+export const AREA = {
+  opacidadTope: 0.18,
+  opacidadBase: 0,
+} as const;
+
+/** Rejilla de 1 px sólida. Discontinua compite con la serie de proyección, que sí lo es. */
+export const REJILLA = {
+  ancho: 1,
+  color: "var(--chart-grid)",
+  discontinua: false,
+} as const;
+
+export const EJE = {
+  color: "var(--chart-axis)",
+  tamanoFuente: 11,
+} as const;
+
+export const CROSSHAIR = {
+  color: "var(--chart-crosshair)",
+  ancho: 1,
+  patron: "3 3",
+} as const;
+
+/**
+ * Barras de 24 px como máximo con radio solo en el extremo: redondear los cuatro lados hace
+ * que una barra pequeña parezca una píldora y pierda su base. 2 px de aire entre barras.
+ */
+export const BARRA = {
+  anchoMaximo: 24,
+  radio: 4,
+  /**
+   * Entre las barras de un MISMO mes: 2 px, solo para que no se toquen. Y ahora es verdad a
+   * cualquier ancho.
+   *
+   * Con `maxBarSize` NO lo era. Recharts calcula el ancho desde la banda, coloca las barras
+   * con ese ancho y DESPUÉS recorta cada una al máximo: el sobrante se queda como hueco. A
+   * 1280 los 2 px se volvían 9. Se resuelve calculando el `barSize` a partir del ancho medido
+   * del contenedor (`anchoDeBarra`) en vez de recortar. Medido después del cambio:
+   *
+   *   viewport 1280 → barra 24 px · hueco 2 px   (antes: 24 y 9)
+   *   viewport  900 → barra 24 px · hueco 2 px   (antes: 17 y 2)
+   *   viewport  390 → barra 18 px · hueco 2 px   (antes: 11 y 2)
+   *
+   * De paso las barras son más grandes en pantallas estrechas, que es donde más falta hace.
+   */
+  separacion: 2,
+  /**
+   * Entre grupos de meses. En porcentaje porque Recharts lo mide contra el ancho de la
+   * banda: un valor fijo se come el gráfico cuando hay muchas categorías. El aire entre
+   * meses tiene que ser claramente mayor que el de dentro del mes, o el ojo agrupa mal.
+   */
+  separacionCategoria: "28%",
+} as const;
+
+/**
+ * Serie atenuada cuando otra está activa. 0,35 sigue siendo legible —atenuar no es ocultar,
+ * y el dato tiene que poder leerse— pero deja claro cuál manda.
+ */
+export const OPACIDAD = {
+  normal: 1,
+  atenuada: 0.35,
+} as const;
+
+/**
+ * Lo que el PRODUCTO quiere hoy: la animación de entrada de Recharts, apagada.
+ *
+ * No es una decisión de gusto: con `ResponsiveContainer` la animación se re-dispara en cada
+ * medición y el gráfico «late» al redimensionar. El movimiento que sí queremos —el del punto
+ * activo y el tooltip— es CSS y se apaga solo con `prefers-reduced-motion` vía los `--dur-*`.
+ */
+const ANIMACION_DEL_PRODUCTO = false;
+
+/**
+ * Y lo que QA EXIGE: apagada, decida lo que decida el producto.
+ *
+ * `NEXT_PUBLIC_QA_SIN_ANIMACION=1` la fuerza a apagarse. Hoy no cambia nada —el producto ya la
+ * quiere apagada—, y decirlo es parte del punto: lo que la bandera compra no es un
+ * comportamiento nuevo, es que **no pueda dejar de ser cierto sin que las capturas se enteren**.
+ * Va en `BANDERAS_UI`, así que viaja en el manifiesto y `diff.mjs` se niega a comparar una base y
+ * una rama compiladas con distinto valor; y si algún día el producto quiere animar, las capturas
+ * siguen siendo deterministas sin que nadie tenga que acordarse.
+ *
+ * Es también la razón por la que los gráficos leen ESTA constante en vez de escribir `false` a
+ * mano: cuatro `false` repartidos son cuatro sitios donde alguien puede poner `true` sin que la
+ * bandera lo alcance.
+ */
+export const ANIMACION_ACTIVA =
+  process.env.NEXT_PUBLIC_QA_SIN_ANIMACION === "1" ? false : ANIMACION_DEL_PRODUCTO;
+
+/**
+ * Alto que ocupa el tooltip anclado arriba en un puntero grueso, más su respiro.
+ *
+ * **150 px medidos** sobre el caso peor de las muestras (cabecera + tres filas con delta +
+ * nota), más 10 de respiro. En táctil el gráfico RESERVA este espacio con `margin.top`, en vez
+ * de dejar que el tooltip flote sobre el trazado: anclarlo arriba no sirve de nada si al
+ * hacerlo tapa la curva que se está recorriendo con el dedo. En escritorio no se reserva —
+ * ahí el tooltip sigue al ratón y se aparta solo.
+ *
+ * Es una constante y no una medición en vivo porque medir obligaría a un ciclo
+ * render → medir → re-render en cada punto. Si un tooltip futuro crece más (más de tres
+ * series con delta y nota a la vez), el test táctil lo caza: comprueba que la caja del
+ * tooltip NO se solapa con la de la rejilla.
+ */
+export const ALTO_TOOLTIP_ANCLADO = 160;
+
+/** Alto mínimo de un gráfico. Por debajo, los ejes y el tooltip no caben. */
+export const ALTO_MINIMO = 160;
+
+/**
+ * La etiqueta del eje X, y la MISMA en la cabecera del tooltip.
+ *
+ * Que el eje diga «ago 26» y el tooltip «2026-08-01» es el defecto más común en un gráfico y
+ * el más fácil de colar: son dos formateadores distintos escritos en sitios distintos. Acá hay
+ * uno solo y las tres muestras lo comparten.
+ *
+ * Delega en `formatMonthShort` de `format.ts` —determinista, sin `Intl`— y deja pasar lo que
+ * no sea una fecha ISO: las etiquetas ya legibles («abr», «may») se escriben tal cual.
+ */
+/**
+ * La curva con la que se dibuja una serie. `stepAfter` mantiene el valor hasta el punto
+ * siguiente, que es exactamente la semántica de «esto rige desde hoy»: el escalón cae en el
+ * punto nuevo, no a mitad de camino.
+ */
+export function curvaDe(s: Pick<SerieDef, "escalon">): "monotone" | "stepAfter" {
+  return s.escalon ? "stepAfter" : "monotone";
+}
+
+export function formatoEjeX(label: string | number | undefined): string {
+  if (label === undefined || label === null) return "";
+  const s = String(label);
+  return /^\d{4}-\d{2}/.test(s) ? formatMonthShort(s) : s;
+}
+
+/**
+ * Sincronización entre gráficos: `grupoSync` en `ChartFrame` → `syncId` de Recharts, con
+ * `syncMethod="value"`.
+ *
+ * **Qué sincroniza: el tooltip y el crosshair.** Dos gráficos del mismo grupo muestran el
+ * mismo periodo a la vez, que es lo que se quiere cuando están apilados en una pantalla.
+ *
+ * **Qué NO sincroniza: el resaltado de serie.** Eso vive en `useSerieActiva`, es de cada
+ * gráfico y no cruza: señalar «Presupuesto» en el de abajo no tiene por qué atenuar nada en
+ * el de arriba, donde esa serie ni existe.
+ *
+ * `"value"` y no el `"index"` por defecto: casa por el valor del eje categórico, así que dos
+ * series de distinta longitud (12 meses y 7) se alinean por el MES y no por la posición. Con
+ * `"index"`, el punto 3 de una se emparejaría con el punto 3 de la otra aunque sean meses
+ * distintos — el propio tipo de Recharts avisa de que con longitudes distintas «this might
+ * yield unexpected results».
+ */
+export const SYNC_METHOD = "value" as const;
+
+/** El crosshair pasa de punteado a SÓLIDO cuando el tooltip está fijado: el estado se ve. */
+export const CROSSHAIR_FIJO = {
+  color: "var(--chart-crosshair)",
+  ancho: 1.5,
+  patron: undefined,
+} as const;

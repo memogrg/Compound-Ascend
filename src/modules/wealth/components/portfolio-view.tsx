@@ -9,8 +9,11 @@
  * existentes (addHolding/edit/sell/remove via wizard, detalle y modales).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
+
+import { navV2Enabled } from "@/lib/flags";
 import "./portfolio-view.css";
-import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
+import { DonutConLeyenda, type DonutDatum } from "@/components/charts/lazy";
 import { PerformanceChart, type AreaPoint } from "@/components/charts/lazy";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
@@ -83,12 +86,28 @@ const SUBTABS: { id: Subtab; label: string }[] = [
   { id: "monitor", label: "Monitor de fondos" },
 ];
 
+/** Valor de subtab válido, o el default. Pura: es lo que prueba el test. */
+export function parseSubtab(valor: string | null | undefined): Subtab {
+  return SUBTABS.some((t) => t.id === valor) ? (valor as Subtab) : "portafolio";
+}
+
 /** Subtab desde el hash de la URL ('#monitor' → 'monitor'); default portafolio. */
 function subtabFromHash(): Subtab {
   if (typeof window === "undefined") return "portafolio";
-  const h = window.location.hash.replace(/^#/, "");
-  return SUBTABS.some((t) => t.id === h) ? (h as Subtab) : "portafolio";
+  return parseSubtab(window.location.hash.replace(/^#/, ""));
 }
+
+/**
+ * `?tab=` con los mismos tres valores. Se usa solo con NAV_V2.
+ *
+ * `history: "push"` conserva lo que hacía el hash: `window.location.hash = id` apilaba una
+ * entrada, así que «atrás» volvía a la subpestaña anterior. El default de nuqs es `replace`,
+ * con el que «atrás» se sale de Patrimonio — y 03-navigation pide justo lo contrario, que el
+ * botón atrás sea consistente porque las pestañas viven en la URL.
+ */
+const subtabParser = parseAsStringLiteral(SUBTABS.map((t) => t.id) as [Subtab, ...Subtab[]])
+  .withDefault("portafolio")
+  .withOptions({ history: "push" });
 
 function periodCutoff(period: Period): string | null {
   if (period === "all") return null;
@@ -110,11 +129,17 @@ export function PortfolioView({
   displayCurrency,
   rates,
   openContributions,
+  ultimoDato = null,
 }: {
   report: PortfolioReport;
   snapshots: PortfolioSnapshot[];
   dividends: Dividend[];
   summary: WealthSummary;
+  /**
+   * «Datos al <fecha>» cuando el último snapshot NO es de hoy, ya resuelto con el hoy del
+   * USUARIO por el servidor: este componente es cliente y no puede leer la zona del perfil.
+   */
+  ultimoDato?: string | null;
   /** Tasa de inversión (0-1) de BaseIndicators (financial-base). */
   investmentRate: number;
   /** Moneda del dropdown (display): solo afecta agregados/gráficas, no las filas. */
@@ -122,18 +147,35 @@ export function PortfolioView({
   rates: Record<string, number>;
   openContributions: OpenContribution[];
 }) {
-  // Subtab dirigido por el hash (deep-link /patrimonio#monitor + back/forward).
-  // Arranca en "portafolio" para no romper la hidratación SSR.
-  const [subtab, setSubtab] = useState<Subtab>("portafolio");
+  // Dos fuentes para la subpestaña y una bandera que decide cuál manda:
+  //  · NAV_V2 → `?tab=` en la URL (nuqs). Las pestañas por #hash se retiran (03-navigation)
+  //    y así el estado es enlazable y compartible como el resto.
+  //  · sin la bandera → el hash de siempre, intacto.
+  // Los dos hooks se llaman SIEMPRE: React no admite hooks condicionales, y aunque la
+  // bandera sea constante en tiempo de build, hacerlo dependiente de ella sería frágil.
+  // `useQueryState` solo LEE hasta que se llama su setter, así que con la bandera apagada
+  // es inerte y no escribe `?tab=` en la URL.
+  const navV2 = navV2Enabled();
+  const [tabUrl, setTabUrl] = useQueryState("tab", subtabParser);
+  const [subtabHash, setSubtabHash] = useState<Subtab>("portafolio");
   useEffect(() => {
-    const sync = () => setSubtab(subtabFromHash());
+    if (navV2) return;
+    const sync = () => setSubtabHash(subtabFromHash());
     sync();
     window.addEventListener("hashchange", sync);
     return () => window.removeEventListener("hashchange", sync);
-  }, []);
+  }, [navV2]);
+
+  const subtab = navV2 ? tabUrl : subtabHash;
   const selectSubtab = (id: Subtab) => {
-    window.location.hash = id;
-    setSubtab(id);
+    if (navV2) {
+      // `shallow: true` (el default): la subpestaña es estado de CLIENTE — la página ya
+      // trae los tres paneles y no hay nada que recalcular en el servidor.
+      void setTabUrl(id);
+    } else {
+      window.location.hash = id;
+      setSubtabHash(id);
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -157,6 +199,7 @@ export function PortfolioView({
       {subtab === "portafolio" ? (
         <PortfolioPanel
           report={report}
+          ultimoDato={ultimoDato}
           snapshots={snapshots}
           dividends={dividends}
           summary={summary}
@@ -186,6 +229,7 @@ function PortfolioPanel({
   displayCurrency,
   rates,
   openContributions,
+  ultimoDato,
 }: {
   report: PortfolioReport;
   snapshots: PortfolioSnapshot[];
@@ -195,6 +239,8 @@ function PortfolioPanel({
   displayCurrency: string;
   rates: Record<string, number>;
   openContributions: OpenContribution[];
+  /** «Datos al <fecha>», ya resuelto con el hoy del USUARIO por el servidor. */
+  ultimoDato: string | null;
 }) {
   const { analytics, currency } = report;
   // Los agregados/gráficas siguen la moneda del dropdown (display): se calculan
@@ -353,6 +399,14 @@ function PortfolioPanel({
           {investedSeries.length >= 2 ? (
             <div className="invline">
               <PerformanceChart data={investedSeries} currency={displayCurrency} height={88} />
+              {/* Hasta cuándo llega la serie, cuando no llega hasta hoy. La pantalla ya no
+                  escribe su propio punto —lo hace el barrido diario—, así que sin esto una
+                  curva que termina el martes se lee como si terminara hoy. */}
+              {ultimoDato ? (
+                <div className="muted fs12" style={{ marginTop: 4 }}>
+                  {ultimoDato}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -392,7 +446,6 @@ function PortfolioPanel({
           centerTop={formatCompact(toDisplay(analytics.totalPortfolioValue), displayCurrency)}
           centerSub="total"
           currency={displayCurrency}
-          showAmount
         />
         <DonutCard
           title="Distribución por categoría"
@@ -493,14 +546,12 @@ function DonutCard({
   centerTop,
   centerSub,
   currency,
-  showAmount,
 }: {
   title: string;
   slices: AllocationSlice[];
   centerTop: string;
   centerSub: string;
   currency: string;
-  showAmount?: boolean;
 }) {
   const visible = slices.filter((s) => s.value > 0);
   const data: DonutDatum[] = visible.map((s) => ({
@@ -513,31 +564,13 @@ function DonutCard({
       <div className="card-title" style={{ fontSize: 14 }}>
         {title}
       </div>
-      <div className="donut-row">
-        <div className="ring-wrap">
-          <DonutChart data={data} centerLabel={centerTop} centerSub={centerSub} />
-        </div>
-        <div className="leg">
-          {visible.length === 0 ? (
-            <span className="muted" style={{ fontSize: 12.5 }}>
-              Agrega inversiones para ver su distribución.
-            </span>
-          ) : (
-            visible.map((s) => (
-              <div key={s.label} className="leg-row">
-                <span className="sw" style={{ background: s.color }} />
-                <span className="nm" title={s.label}>
-                  {s.label}
-                </span>
-                <span className="pc">
-                  {formatPercent(s.pct)}
-                  {showAmount ? ` · ${formatCompact(s.value, currency)}` : ""}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      <DonutConLeyenda
+        data={data}
+        currency={currency}
+        centerLabel={centerTop}
+        centerSub={centerSub}
+        vacio="Agrega inversiones para ver su distribución."
+      />
     </div>
   );
 }

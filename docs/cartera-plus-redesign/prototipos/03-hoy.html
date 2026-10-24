@@ -1,0 +1,269 @@
+<title>CARTERA+ Hoy A/B/C</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap">
+<style>
+/* CARTERA+ · tokens del design system real (globals.css) + tokens nuevos de gráfico/motion */
+:root{
+  --font-display:"Sora","Segoe UI",system-ui,sans-serif;
+  --font-body:"Manrope","Segoe UI",system-ui,sans-serif;
+  --font-mono:"Space Mono",ui-monospace,Menlo,monospace;
+  --canvas:#f4f2ec;--surface:#ffffff;--surface-2:#fbfaf6;--border:#e7e4dc;--text:#1e1c16;--muted:#625e57;--muted-2:#8a857b;
+  --accent:#378451;--accent-ink:#fff;--accent-soft:rgba(55,132,81,.12);
+  --pos:#378451;--pos-soft:rgba(55,132,81,.12);--neg:#c34f4b;--neg-soft:rgba(195,79,75,.12);--warn:#b07a2e;--warn-soft:rgba(176,122,46,.12);--info:#3a6ea5;--info-soft:rgba(58,110,165,.12);
+  --chip:rgba(20,18,14,.04);--chip-hover:rgba(20,18,14,.07);--line-strong:rgba(30,28,22,.16);
+  --chart-1:#378451;--chart-2:#3a6ea5;--chart-3:#c48a2e;--chart-4:#7b5ea7;--chart-5:#c34f4b;--chart-6:#0f9aa8;
+  --chart-grid:rgba(30,28,22,.08);--chart-axis:#8a857b;--chart-crosshair:rgba(30,28,22,.35);--chart-glow:rgba(55,132,81,.55);
+  --e1:0 1px 2px rgba(20,18,14,.06);--e2:0 4px 14px -6px rgba(20,18,14,.12);--e3:0 14px 40px -16px rgba(20,18,14,.18);
+  --r-sm:8px;--r-md:12px;--r-lg:16px;--r-btn:10px;--r-pill:999px;
+  --dur-micro:120ms;--dur-std:200ms;--dur-tr:320ms;--dur-range:450ms;--ease-std:cubic-bezier(.2,0,0,1);--ease-in:cubic-bezier(.05,.7,.1,1);--ease-out:cubic-bezier(.3,0,.8,.15);
+  --sidebar-w:248px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --canvas:#15140f;--surface:#1e1c16;--surface-2:#23211a;--border:#2e2b23;--text:#ece8dd;--muted:#a29d92;--muted-2:#7d786e;
+  --accent:#4a9d66;--accent-soft:rgba(74,157,102,.16);--pos:#4a9d66;--pos-soft:rgba(74,157,102,.16);--neg:#d46460;--neg-soft:rgba(212,100,96,.16);--warn:#c98a30;--warn-soft:rgba(201,138,48,.16);--info:#5a8ccb;--info-soft:rgba(90,140,203,.16);
+  --chip:rgba(255,255,255,.05);--chip-hover:rgba(255,255,255,.09);--line-strong:rgba(236,232,221,.18);
+  --chart-1:#3f9560;--chart-2:#5a8ccb;--chart-3:#c4862c;--chart-4:#9b7cc8;--chart-5:#d46460;--chart-6:#28a2b0;
+  --chart-grid:rgba(236,232,221,.08);--chart-axis:#7d786e;--chart-crosshair:rgba(236,232,221,.35);--chart-glow:rgba(63,149,96,.6);
+  --e1:0 1px 2px rgba(0,0,0,.3);--e2:0 4px 14px -6px rgba(0,0,0,.5);--e3:0 14px 40px -16px rgba(0,0,0,.6);
+}}
+:root[data-theme="dark"]{
+  --canvas:#15140f;--surface:#1e1c16;--surface-2:#23211a;--border:#2e2b23;--text:#ece8dd;--muted:#a29d92;--muted-2:#7d786e;
+  --accent:#4a9d66;--accent-soft:rgba(74,157,102,.16);--pos:#4a9d66;--pos-soft:rgba(74,157,102,.16);--neg:#d46460;--neg-soft:rgba(212,100,96,.16);--warn:#c98a30;--warn-soft:rgba(201,138,48,.16);--info:#5a8ccb;--info-soft:rgba(90,140,203,.16);
+  --chip:rgba(255,255,255,.05);--chip-hover:rgba(255,255,255,.09);--line-strong:rgba(236,232,221,.18);
+  --chart-1:#3f9560;--chart-2:#5a8ccb;--chart-3:#c4862c;--chart-4:#9b7cc8;--chart-5:#d46460;--chart-6:#28a2b0;
+  --chart-grid:rgba(236,232,221,.08);--chart-axis:#7d786e;--chart-crosshair:rgba(236,232,221,.35);--chart-glow:rgba(63,149,96,.6);
+  --e1:0 1px 2px rgba(0,0,0,.3);--e2:0 4px 14px -6px rgba(0,0,0,.5);--e3:0 14px 40px -16px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+html,body{background:var(--canvas);color:var(--text);font-family:var(--font-body);margin:0}
+body{padding-block:0 48px}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.bar h1{font:600 15px/1.2 var(--font-display);margin:0}
+.cw{font-family:var(--font-display);font-weight:600;font-style:normal;white-space:nowrap}.cw i{color:var(--accent);font-style:normal}
+.bar .note{color:var(--muted);font-size:12px;margin-left:auto}
+.seg{display:inline-flex;background:var(--chip);border-radius:var(--r-pill);padding:3px;gap:2px}
+.seg button{border:0;background:transparent;color:var(--muted);font:600 12.5px var(--font-body);padding:6px 12px;border-radius:var(--r-pill);cursor:pointer;transition:background var(--dur-micro) var(--ease-std),color var(--dur-micro)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--text);box-shadow:var(--e1)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.wrap{padding:20px 16px;max-width:1320px;margin:0 auto}
+.stage{display:flex;justify-content:center}
+.frame{background:var(--canvas);border:1px solid var(--border);border-radius:14px;box-shadow:var(--e3);overflow:hidden;position:relative;width:100%;max-width:1280px;height:820px}
+.frame.mobile{width:390px;height:820px;border-radius:40px;border:8px solid #1e1c16}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* shell B (recomendado) */
+.app{display:grid;grid-template-columns:232px 1fr;height:100%}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;min-width:0}
+.brand{display:flex;align-items:center;gap:10px;padding:18px 16px 10px}
+.iso{width:30px;height:30px;border-radius:50%;background:var(--surface);border:2px solid var(--accent);display:grid;place-items:center;flex:none}.iso svg{width:18px;height:18px}
+.brand-name{font:600 15px var(--font-display);white-space:nowrap}.brand-name i{color:var(--accent);font-style:normal}
+.nav{padding:4px 10px;display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-btn);color:var(--muted);font:500 13.5px var(--font-body);text-decoration:none;white-space:nowrap}
+.nav-item svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav-item.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.nav-item .badge{margin-left:auto;background:var(--accent);color:#fff;font:700 10.5px var(--font-mono);padding:1px 6px;border-radius:var(--r-pill)}
+.rail{margin-top:auto;padding:12px 14px;border-top:1px solid var(--border)}
+.rail-t{font:600 10.5px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2)}
+.rail-steps{display:flex;gap:3px;margin:8px 0 6px}.rail-steps i{flex:1;height:4px;border-radius:2px;background:var(--border)}.rail-steps i.on{background:var(--accent)}
+.rail-s{font-size:12px}.rail-s b{font-weight:600}.rail-s small{display:block;color:var(--muted);font-size:11px}
+.user{display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--border);font-size:12.5px}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font:700 11px var(--font-mono);flex:none}
+.main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.topbar{display:flex;align-items:center;gap:14px;padding:10px 22px;background:var(--surface);border-bottom:1px solid var(--border);min-height:56px}
+.crumb{font-size:12px;color:var(--muted)}.crumb b{color:var(--text);font-weight:600}
+.ptitle{font:600 17px var(--font-display);letter-spacing:-.01em}
+.period{display:inline-flex;align-items:center;gap:2px;background:var(--chip);border-radius:var(--r-pill);padding:3px}
+.period button{border:0;background:transparent;color:var(--muted);width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:14px}
+.period .cur{font:600 12.5px var(--font-body);padding:0 8px;white-space:nowrap}
+.period .cmp{font-size:11px;color:var(--muted);padding:0 8px 0 4px;border-left:1px solid var(--border);white-space:nowrap}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.ck{display:inline-flex;align-items:center;gap:8px;background:var(--chip);border-radius:var(--r-btn);padding:6px 10px;color:var(--muted);font-size:12.5px;min-width:170px}
+.ck kbd{margin-left:auto;font:600 10.5px var(--font-mono);border:1px solid var(--border);border-radius:5px;padding:1px 5px}
+.ibtn{width:32px;height:32px;border-radius:50%;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;position:relative}
+.ibtn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ibtn .dot{position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--neg);border:1.5px solid var(--surface)}
+.tabs{display:flex;padding:0 22px;background:var(--surface);border-bottom:1px solid var(--border)}
+.tab{padding:10px 4px;margin-right:18px;font:600 13px var(--font-body);color:var(--muted);border-bottom:2px solid transparent}
+.tab.on{color:var(--text);border-bottom-color:var(--accent)}
+.content{padding:20px 22px;overflow:auto;flex:1}
+/* shared */
+.greet{font:600 24px/1.15 var(--font-display);letter-spacing:-.02em;margin:0 0 2px}.greet .it{font-style:italic;color:var(--accent);font-weight:500}
+.greet-sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+.viewing{font-size:11.5px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}.viewing span{background:var(--chip);border-radius:var(--r-pill);padding:2px 9px}
+.card{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--e1);padding:16px 18px;position:relative}
+.card-t{font:600 11px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card-t .lk{color:var(--accent);text-transform:none;letter-spacing:0;font-size:12px;cursor:pointer}
+.help{width:15px;height:15px;border-radius:50%;border:1px solid var(--border);color:var(--muted);font:600 9.5px var(--font-mono);display:inline-grid;place-items:center;cursor:help;position:relative;background:var(--surface);vertical-align:middle;margin-left:4px}
+.help:hover .tip,.help:focus .tip{opacity:1;pointer-events:auto}
+.tip{position:absolute;left:0;top:20px;width:230px;background:var(--text);color:var(--canvas);font:400 12px/1.45 var(--font-body);padding:8px 10px;border-radius:8px;box-shadow:var(--e2);opacity:0;transition:opacity var(--dur-micro);pointer-events:none;z-index:5;text-transform:none;letter-spacing:0}
+.lbl{font:600 11px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.num{font:600 40px/1.05 var(--font-display);letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin:6px 0 6px}
+.read{font-size:13px;color:var(--muted);line-height:1.5;max-width:40ch}.read b{color:var(--text);font-weight:600}
+.delta{display:inline-flex;align-items:center;gap:4px;font:600 12px var(--font-body);padding:2px 8px;border-radius:var(--r-pill);font-variant-numeric:tabular-nums}
+.delta.pos{background:var(--pos-soft);color:var(--pos)}.delta.neg{background:var(--neg-soft);color:var(--neg)}.delta.warn{background:var(--warn-soft);color:var(--warn)}.delta.neu{background:var(--chip);color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.kpi .lbl{display:flex;justify-content:space-between}
+.kpi .val{font:600 22px var(--font-display);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:6px 0 4px}
+.kpi .sub{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.kpi svg{width:100%;height:30px;margin-top:6px}
+.row2{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:14px}
+.btn{border:0;border-radius:var(--r-btn);padding:8px 14px;font:600 12.5px var(--font-body);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.btn-p{background:var(--accent);color:#fff}.btn-s{background:var(--chip);color:var(--text)}.btn-g{background:transparent;color:var(--accent);padding-left:6px}
+.action{display:flex;gap:12px;align-items:flex-start}
+.action .n{width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font:700 12px var(--font-mono);flex:none}
+.action h4{margin:0 0 3px;font:600 14px var(--font-body)}.action p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.45}
+.action .imp{font:600 12px var(--font-mono);color:var(--accent);margin-top:6px}
+.more{display:flex;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:12.5px;color:var(--muted)}
+.more span{flex:1}.more b{color:var(--text);font-weight:600}
+.sig{display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--border);font-size:12.5px;line-height:1.45}
+.sig:first-of-type{border-top:0}.sig i{width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none}.sig .ev{margin-left:auto;color:var(--accent);font-weight:600;white-space:nowrap;font-size:11.5px}
+.svgc{position:relative}.svgc svg{width:100%;height:100%;display:block}
+.ttip{position:absolute;pointer-events:none;background:var(--text);color:var(--canvas);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.45;box-shadow:var(--e2);min-width:150px;opacity:0;transition:opacity var(--dur-micro);z-index:4;font-variant-numeric:tabular-nums}
+.ttip .d{color:var(--muted-2);font-size:11px}.ttip .v{font:600 14px var(--font-display)}.ttip .c{display:flex;justify-content:space-between;gap:12px;margin-top:2px}.ttip .c span:last-child{font-weight:600}
+.quick{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center}
+.quick .btn-s{background:var(--surface);box-shadow:var(--e1)}
+.quick .rev{margin-left:auto;font-size:12.5px;color:var(--muted)}.quick .rev b{color:var(--accent)}
+/* A */
+.norte{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--e1);padding:18px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start}
+.norte .big{font:600 30px/1.05 var(--font-display);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:4px 0}
+.pillars{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px}
+.pillar{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--e1);padding:14px 16px;border-top:3px solid var(--c)}
+.pillar .lbl{color:var(--c)}.pillar .val{font:600 20px var(--font-display);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:6px 0 4px}
+.pillar p{margin:0;font-size:12px;color:var(--muted);line-height:1.45}
+.health{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+.ring{width:84px;height:84px;border-radius:50%;background:conic-gradient(var(--accent) 0 90%,var(--chip) 90% 100%);display:grid;place-items:center}
+.ring b{width:64px;height:64px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font:600 20px var(--font-display)}
+.hb{display:grid;grid-template-columns:110px 1fr 36px;gap:8px;align-items:center;font-size:12px;color:var(--muted);margin:3px 0}
+.hb i{height:6px;border-radius:3px;background:var(--chip);position:relative;display:block}.hb i b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--accent)}
+/* C */
+.chero{background:linear-gradient(135deg,var(--surface),var(--surface-2));border-radius:20px;box-shadow:var(--e2);padding:26px 28px 18px;position:relative;overflow:hidden}
+.chero .num{font-size:56px;margin:8px 0 8px}
+.chero .svgc{height:150px;margin:8px -28px -18px;opacity:.95}
+.cgrid{display:grid;grid-template-columns:1fr 340px;gap:16px;margin-top:16px}
+.feed{display:flex;flex-direction:column;gap:10px}
+.fitem{display:grid;grid-template-columns:36px 1fr;gap:10px;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--e1);padding:12px 14px;align-items:start}
+.fitem .ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font:700 13px var(--font-mono);color:#fff}
+.fitem h5{margin:0 0 2px;font:600 13px var(--font-body)}.fitem p{margin:0;font-size:12px;color:var(--muted);line-height:1.4}
+.fitem .imp{font:600 11.5px var(--font-mono);color:var(--accent);margin-top:4px}
+.askbar{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-pill);padding:8px 8px 8px 14px;color:var(--muted);font-size:13px;margin-top:14px;box-shadow:var(--e1)}
+.askbar .iso{width:26px;height:26px}.askbar .iso svg{width:15px;height:15px}.askbar .btn{margin-left:auto}
+.cstat{display:flex;gap:22px;flex-wrap:wrap;margin-top:6px}
+.cstat div{font-size:12px;color:var(--muted)}.cstat b{display:block;font:600 18px var(--font-display);letter-spacing:-.02em;color:var(--text);font-variant-numeric:tabular-nums}
+.journeyc{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);margin-bottom:12px}
+.journeyc .steps{display:flex;gap:3px;width:180px}.journeyc .steps i{flex:1;height:4px;border-radius:2px;background:var(--border)}.journeyc .steps i.on{background:var(--accent)}
+/* mobile */
+.mapp{display:flex;flex-direction:column;height:100%}
+.mhead{padding:14px 16px 8px;display:flex;align-items:center;gap:10px;background:var(--surface);border-bottom:1px solid var(--border)}
+.mtabs{display:flex;gap:10px;overflow-x:auto;padding:6px 16px;background:var(--surface);border-bottom:1px solid var(--border);scrollbar-width:none}.mtabs .tab{padding:6px 0;margin-right:8px}
+.mperiod{display:flex;align-items:center;gap:8px;padding:8px 16px;font-size:12.5px;color:var(--muted);background:var(--surface)}.mperiod b{color:var(--text)}
+.mcontent{flex:1;overflow:auto;padding:14px 16px 96px}
+.mcontent .kpis,.mcontent .pillars{grid-template-columns:1fr 1fr}
+.mcontent .row2,.mcontent .norte,.mcontent .cgrid{grid-template-columns:1fr}
+.mcontent .chero{padding:18px 18px 12px}.mcontent .chero .num{font-size:44px}.mcontent .chero .svgc{margin:8px -18px -12px}
+.mbar{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 6px calc(10px + env(safe-area-inset-bottom,0px))}
+.mbar a{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font:600 10px var(--font-body);text-decoration:none;min-width:56px}
+.mbar a svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.mbar a.on{color:var(--accent)}
+.mbar .isoq{width:26px;height:26px;border-radius:50%;background:var(--surface);border:2px solid var(--accent);display:grid;place-items:center}.mbar .isoq svg{width:15px;height:15px}
+.fab{position:absolute;right:18px;bottom:78px;width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;box-shadow:var(--e2);font:500 30px/1 var(--font-display)}
+/* notes */
+.opt{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--e1);padding:18px 20px;margin-top:22px;display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:18px}
+.opt h3{margin:0 0 6px;font:600 16px var(--font-display)}.opt p,.opt li{font-size:13.5px;line-height:1.5}.opt ul{margin:6px 0 0;padding-left:18px}
+.opt .k{font:600 11px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:22px;background:var(--surface);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--e1)}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
+th{font:600 11px var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--surface-2)}
+td.s{font:700 13px var(--font-mono);text-align:center}
+.reco{margin-top:22px;background:var(--accent-soft);border-radius:var(--r-lg);padding:18px 20px;font-size:14px;line-height:1.55}
+.tblwrap{overflow-x:auto}
+@media (max-width:900px){.opt{grid-template-columns:1fr}.frame{height:auto;min-height:640px}.kpis,.pillars,.norte,.row2,.cgrid{grid-template-columns:1fr!important}}
+</style>
+
+<div class="bar">
+  <h1><span class="cw">CARTERA<i>+</i></span> · Hoy (panel) — opciones A / B / C sobre el shell B</h1>
+  <div class="seg" role="group" aria-label="Opción"><button id="optA" aria-pressed="true" onclick="setOpt('A')">A · Evolutiva</button><button id="optB" aria-pressed="false" onclick="setOpt('B')">B · Data-first</button><button id="optC" aria-pressed="false" onclick="setOpt('C')">C · Future-forward</button></div>
+  <div class="seg" role="group" aria-label="Dispositivo"><button id="devD" aria-pressed="true" onclick="setDev('desktop')">Escritorio</button><button id="devM" aria-pressed="false" onclick="setDev('mobile')">Móvil</button></div>
+  <div class="seg" role="group" aria-label="Tema"><button id="thL" aria-pressed="true" onclick="setTheme('light')">Claro</button><button id="thD" aria-pressed="false" onclick="setTheme('dark')">Oscuro</button></div>
+  <span class="note">Datos reales de la cuenta demo · agosto 2026 como mes en curso (día 16)</span>
+</div>
+
+<div class="wrap">
+  <div class="stage"><div class="frame" id="frame"></div></div>
+  <div id="notes"></div>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Criterio</th><th>A · Evolutiva</th><th>B · Data-first</th><th>C · Future-forward</th></tr></thead>
+    <tbody>
+      <tr><td>Prueba de 5 segundos (dónde estoy, qué pasa, dato principal, bien/mal, qué explorar)</td><td class="s">3</td><td class="s">5</td><td class="s">5</td></tr>
+      <tr><td>Jerarquía visual (un solo número grande)</td><td class="s">2</td><td class="s">5</td><td class="s">5</td></tr>
+      <tr><td>Interacción (hover, drill-down, acciones)</td><td class="s">3</td><td class="s">5</td><td class="s">4</td></tr>
+      <tr><td>Escalabilidad (nuevas señales y acciones)</td><td class="s">3</td><td class="s">4</td><td class="s">5</td></tr>
+      <tr><td>Complejidad (bloques distintos por pantalla)</td><td class="s">4</td><td class="s">4</td><td class="s">3</td></tr>
+      <tr><td>Móvil (primera pantalla completa)</td><td class="s">3</td><td class="s">4</td><td class="s">5</td></tr>
+      <tr><td>Esfuerzo de ingeniería (reutiliza servicios actuales)</td><td class="s">5</td><td class="s">4</td><td class="s">3</td></tr>
+      <tr><td>Rendimiento percibido (peso del Home)</td><td class="s">4</td><td class="s">5</td><td class="s">4</td></tr>
+      <tr><td><b>Total (sobre 40)</b></td><td class="s">27</td><td class="s"><b>36</b></td><td class="s">34</td></tr>
+    </tbody>
+  </table></div>
+  <div class="reco"><b>Recomendación: B como estructura, con el titular y el feed de C.</b> B cumple la historia «qué pasa → por qué → qué hacer → qué viene» con las primitivas ya aprobadas y sin inventar componentes nuevos. De C conviene tomar el <b>titular a lo ancho con el gráfico integrado</b> (es la primera pantalla en móvil y comunica el ritmo sin leer) y la <b>barra «Preguntale a My Agent C+»</b> al pie, que convierte cada duda en una conversación con contexto. Las señales como feed vertical de C se descartan en escritorio (compiten con las acciones) y se usan solo en móvil. A se descarta: los cuatro pilares con el mismo peso repiten el problema actual.</div>
+</div>
+
+<script>
+const ICON={home:'<svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',flow:'<svg viewBox="0 0 24 24"><path d="M4 7h12l-3-3M20 17H8l3 3"/></svg>',plan:'<svg viewBox="0 0 24 24"><path d="M5 21V4M5 4h12l-2 4 2 4H5"/></svg>',wealth:'<svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg>',spark:'<svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg>',search:'<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',bell:'<svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg>',eye:'<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>',iso:'<svg viewBox="0 0 64 64"><path d="M44 18a18 18 0 1 0 0 28" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/><path d="M46 24v16M38 32h16" fill="none" stroke="#378451" stroke-width="4.6" stroke-linecap="round"/></svg>'};
+const F=n=>'₡'+Math.round(n).toLocaleString('es-CR').replace(/\./g,' ');
+const FM=n=>Math.abs(n)>=1e6?'₡'+(n/1e6).toFixed(1).replace('.',',')+' M':Math.abs(n)>=1e3?'₡'+Math.round(n/1e3)+' k':F(n);
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const REAL=[0,0,35850,93850,134700,531880,568280,579980,614980,636980,672930,739030,791280,791280,791280,1017580,1167580];
+const NW=[25536450,25747535,25964811,26454132,27403956,28185730,29033427,29827619,31766293,32654254,33483976,34380821,34244701];
+let opt='A',dev='desktop',reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function lineChart(host,opts){const {labels,series,fmt=F,markToday,compact}=opts;const el=document.getElementById(host);if(!el)return;const W=el.clientWidth||600,H=el.clientHeight||150,pl=compact?8:48,pr=compact?8:14,pt=14,pb=compact?18:24;const all=series.flatMap(s=>s.data).filter(v=>v!=null);const mx=Math.max(...all)*1.08,mn=0;const x=i=>pl+(W-pl-pr)*i/(labels.length-1),y=v=>pt+(H-pt-pb)*(1-(v-mn)/(mx-mn));const path=a0=>{const arr=a0.filter(v=>v!=null);let d='';arr.forEach((v,i)=>{if(i===0){d=`M${x(0)} ${y(v)}`;return}const x0=x(i-1),x1=x(i),c=(x1-x0)/2;d+=` C${x0+c} ${y(arr[i-1])} ${x1-c} ${y(v)} ${x1} ${y(v)}`});return d};let g='';if(!compact)for(let t=1;t<=3;t++){const v=mx*t/4;g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--chart-grid)" stroke-dasharray="2 5"/><text x="${pl-8}" y="${y(v)+3.5}" text-anchor="end" font-family="var(--font-mono)" font-size="10" fill="var(--chart-axis)">${FM(v)}</text>`}let xl='';labels.forEach((l,i)=>{if((i%Math.ceil(labels.length/(compact?4:8))===0&&i<labels.length-3)||i===labels.length-1)xl+=`<text x="${x(i)}" y="${H-6}" text-anchor="${i===0?'start':i===labels.length-1?'end':'middle'}" font-family="var(--font-mono)" font-size="9.5" fill="var(--chart-axis)">${l}</text>`});const defs=series.map((s,k)=>`<linearGradient id="${host}g${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${s.color}" stop-opacity=".26"/><stop offset="1" stop-color="${s.color}" stop-opacity="0"/></linearGradient>`).join('')+`<filter id="${host}glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;const paths=series.map((s,k)=>{const d=path(s.data),n=s.data.filter(v=>v!=null).length;return `<g>${s.area?`<path d="${d} L${x(n-1)} ${y(mn)} L${x(0)} ${y(mn)}Z" fill="url(#${host}g${k})"/>`:''}<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.dashed?1.5:2.2}" stroke-linejoin="round" ${s.dashed?'stroke-dasharray="4 4"':''} style="${reduced||s.dashed?'':`stroke-dasharray:2000;stroke-dashoffset:2000;animation:draw${host} var(--dur-tr) var(--ease-in) forwards`}"/></g>`}).join('');const today=markToday!=null?`<line x1="${x(markToday)}" x2="${x(markToday)}" y1="${pt}" y2="${H-pb}" stroke="var(--chart-crosshair)" stroke-dasharray="3 3"/><circle cx="${x(markToday)}" cy="${y(series[0].data[markToday])}" r="4.5" fill="${series[0].color}" filter="url(#${host}glow)"/><text x="${x(markToday)}" y="${pt-3}" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--muted)">hoy</text>`:'';el.innerHTML=`<style>@keyframes draw${host}{to{stroke-dashoffset:0}}</style><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${opts.aria||''}"><defs>${defs}</defs>${g}${xl}${paths}${today}<g id="${host}ch" style="opacity:0;transition:opacity var(--dur-micro)"><line id="${host}cl" y1="${pt}" y2="${H-pb}" stroke="var(--chart-crosshair)" stroke-dasharray="3 3"/>${series.map((s,k)=>`<circle id="${host}p${k}" r="4.5" fill="${s.color}" filter="url(#${host}glow)"/>`).join('')}</g><rect x="${pl}" y="${pt}" width="${W-pl-pr}" height="${H-pt-pb}" fill="transparent" id="${host}hit"/></svg><div class="ttip" id="${host}tt"></div>`;const hit=document.getElementById(host+'hit'),ch=document.getElementById(host+'ch'),tt=document.getElementById(host+'tt');const show=ev=>{const r=el.getBoundingClientRect();const px=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left;const i=Math.max(0,Math.min(labels.length-1,Math.round((px/r.width*W-pl)/(W-pl-pr)*(labels.length-1))));document.getElementById(host+'cl').setAttribute('x1',x(i));document.getElementById(host+'cl').setAttribute('x2',x(i));series.forEach((s,k)=>{const c=document.getElementById(host+'p'+k);c.setAttribute('cx',x(i));c.setAttribute('cy',y(s.data[i]??0));c.style.display=s.data[i]==null?'none':''});ch.style.opacity=1;const rows=series.map(s=>`<div class="c"><span>${s.name}</span><span>${s.data[i]==null?'—':fmt(s.data[i])}</span></div>`).join('');const d=series[1]&&series[0].data[i]!=null?series[0].data[i]-series[1].data[i]:null;tt.innerHTML=`<div class="d">${labels[i]}</div><div class="v">${series[0].data[i]==null?'sin datos aún':fmt(series[0].data[i])}</div>${rows}${d!=null?`<div class="c"><span>Diferencia</span><span style="color:${d<=0?'#7bd28f':'#e9b26a'}">${d>=0?'+':'−'}${fmt(Math.abs(d))}</span></div>`:''}`;tt.style.opacity=1;const left=x(i)/W*r.width;tt.style.left=(left+14+tt.offsetWidth>r.width?left-tt.offsetWidth-14:left+14)+'px';tt.style.top=Math.max(4,y(series[0].data[i]??0)/H*r.height-44)+'px'};hit.addEventListener('mousemove',show);hit.addEventListener('touchstart',show,{passive:true});hit.addEventListener('touchmove',show,{passive:true});hit.addEventListener('mouseleave',()=>{ch.style.opacity=0;tt.style.opacity=0})}
+function ritmo(id,compact){const days=[...Array(32).keys()];const real=REAL.slice();while(real.length<32)real.push(null);const ideal=days.map(d=>(1750580-678180)*d/31+(d>=5?312180:0)+(d>=15?216000:0)+(d>=16?150000:0));lineChart(id,{labels:days.map(d=>d===0?'1 ago':d+' ago'),series:[{name:'Gasto real',data:real,color:css('--chart-1'),area:true},{name:'Ritmo ideal',data:ideal,color:css('--chart-axis'),dashed:true}],markToday:16,compact,aria:'Ritmo del mes'})}
+function spark(id,arr,color){const el=document.getElementById(id);if(!el)return;const W=200,H=30,p=3,mn=Math.min(...arr),mx=Math.max(...arr);const x=i=>p+(W-2*p)*i/(arr.length-1),y=v=>H-p-(H-2*p)*(v-mn)/((mx-mn)||1);const d=arr.map((v,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1)).join(' ');el.setAttribute('viewBox',`0 0 ${W} ${H}`);el.innerHTML=`<defs><linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".25"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs><path d="${d} L${x(arr.length-1).toFixed(1)} ${H} L${p} ${H}Z" fill="url(#${id}g)"/><path d="${d}" fill="none" stroke="${color}" stroke-width="1.8"/><circle cx="${x(arr.length-1).toFixed(1)}" cy="${y(arr[arr.length-1]).toFixed(1)}" r="3" fill="${color}"/>`}
+function roll(el,to){const dur=reduced?0:600,t0=performance.now();const step=t=>{const k=dur?Math.min(1,(t-t0)/dur):1,e=1-Math.pow(1-k,3);el.textContent=F(to*e);if(k<1)requestAnimationFrame(step)};requestAnimationFrame(step)}
+const help=t=>`<span class="help" tabindex="0">?<span class="tip">${t}</span></span>`;
+const HELP_LIBRE='Ingreso esperado del mes (₡1 930 000) − gasto real a hoy (₡1 167 580) − compromisos pendientes (₡200 000). El ritmo ideal se construye con las fechas de cobro y pago conocidas.';
+const ACTION=`<div class="action"><div class="n">1</div><div><h4>Abonar ₡150 000 extra al préstamo del vehículo</h4><p>Es tu deuda más cara (13,5 %) ahora que la tarjeta está en ₡0. El flujo libre lo permite sin tocar el fondo.</p><div class="imp">Ahorra ₡412 000 en intereses · libre 5 meses antes</div></div></div>`;
+const SIGS=[['--warn','<b>Restaurantes</b> ya usó 69 % del sobre con 52 % del mes.','ver'],['--pos','Ingreso variable mayor: <b>repostería ₡124 500</b> (+21 % vs promedio).','ver'],['--info','Aporte pendiente de confirmar: <b>CDP BN</b> del 15 de agosto.','confirmar']];
+const sigs=()=>SIGS.map(([c,t,e])=>`<div class="sig"><i style="background:var(${c})"></i><div>${t}</div><span class="ev">${e} →</span></div>`).join('');
+function contentA(){return `<h2 class="greet">Hola, <span class="it">José</span></h2><p class="greet-sub">Esto es lo más importante de tus finanzas hoy.</p>
+ <div class="norte"><div><div class="lbl">¿Más rico o más pobre?</div><div class="big" style="color:var(--pos)">Más rico</div><span class="delta pos">▲ ₡8,7 M en 12 meses</span><p class="read" style="margin-top:6px">Tu patrimonio neto es <b>₡34 244 701</b>. Dos meses cerrados consecutivos al alza.</p></div>
+ <div><div class="lbl">Libre para gastar ${help(HELP_LIBRE)}</div><div class="big" data-v="562420">₡0</div><span class="delta warn">▲ ₡264 055 sobre el ritmo lineal</span><p class="read" style="margin-top:6px">Las cuotas se pagan a inicio de mes; contra tus compromisos vas <b>al día</b>.</p></div>
+ <div><div class="lbl">Próxima mejor decisión</div><p style="margin:6px 0;font:600 14px var(--font-body)">Abonar ₡150 000 extra al vehículo</p><p class="read">Ahorra ₡412 000 en intereses y te libera 5 meses antes.</p><div style="margin-top:8px;display:flex;gap:8px"><button class="btn btn-p">Hacerlo</button><button class="btn btn-s">Ver por qué</button></div></div></div>
+ <div class="pillars">
+  ${[['--chart-1','Flujo','₡762 420','Ingresos esperados − gastos reales. Cierre estimado ₡173 920.'],['--chart-6','Planes','2 metas · 2 deudas','Fondo de emergencia al 43 %. Vehículo: libre en jul 2030.'],['--chart-2','Patrimonio','₡34,2 M','Activos ₡67,2 M · pasivos ₡32,9 M · ratio 2,0×.'],['--chart-4','Protección','3 meses','Fondo de paz cubierto; 2 pólizas activas, ninguna vence en 90 días.']].map(([c,n,v,t])=>`<div class="pillar" style="--c:var(${c})"><div class="lbl">${n}</div><div class="val">${v}</div><p>${t}</p></div>`).join('')}
+ </div>
+ <div class="row2"><div class="card"><div class="card-t">Salud financiera <span class="lk">ver progreso →</span></div><div class="health"><div class="ring"><b>90</b></div><div>${[['Flujo libre',92],['Ahorro',72],['Deuda',68],['Protección',80],['Inversión',35],['Disciplina',96]].map(([n,v])=>`<div class="hb"><span>${n}</span><i><b style="width:${v}%"></b></i><span style="text-align:right;font-family:var(--font-mono)">${v}</span></div>`).join('')}</div></div></div>
+ <div class="card"><div class="card-t">Perspectivas de My Agent C+</div>${sigs()}</div></div>`}
+function contentB(){return `<h2 class="greet">Hola, <span class="it">José</span></h2><p class="greet-sub">Esto es lo más importante de tus finanzas hoy.</p>
+ <div class="viewing"><span>Agosto 2026 · día 16</span><span>vs julio</span><span>Todo el hogar</span></div>
+ <div class="card" style="display:grid;grid-template-columns:1.05fr .95fr;gap:18px;align-items:center" id="heroB"><div><div class="lbl">Libre para gastar este mes ${help(HELP_LIBRE)}</div><div class="num" data-v="562420">₡0</div><span class="delta warn">▲ ₡264 055 sobre el ritmo lineal</span><p class="read">Vas por encima porque <b>₡678 180</b> de cuotas se pagan a inicio de mes. Contra el ritmo real de tus compromisos, vas <b>al día</b>.</p></div><div class="svgc" id="rB" style="height:140px"></div></div>
+ <div class="kpis">
+  <div class="card kpi"><div class="lbl">Patrimonio neto ${help('Activos − pasivos con precios de hoy. El veredicto exige dos meses cerrados.')}</div><div class="val" data-v="34244701">₡0</div><div class="sub"><span class="delta pos">▲ ₡8,7 M</span> vs hace 12 meses · en curso</div><svg id="spB1"></svg></div>
+  <div class="card kpi"><div class="lbl">Flujo del mes</div><div class="val" data-v="762420">₡0</div><div class="sub"><span class="delta neu">cierre est. ₡173 920</span></div><svg id="spB2"></svg></div>
+  <div class="card kpi"><div class="lbl">Compromisos · 14 días</div><div class="val" data-v="250000">₡0</div><div class="sub">3 pagos · fondo de emergencia el 26</div><svg id="spB3"></svg></div>
+ </div>
+ <div class="row2"><div class="card"><div class="card-t">Tu próxima mejor acción <span class="lk">ver las 3 →</span></div>${ACTION}<div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-p">Hacerlo</button><button class="btn btn-s">Posponer</button><button class="btn btn-g">✦ Preguntar al asesor</button></div>
+  <div class="more"><span><b>2</b> · Confirmar el aporte al CDP</span><span><b>3</b> · Repartir ₡20 417 del marchamo</span></div></div>
+  <div class="card"><div class="card-t">Señales del mes</div>${sigs()}<div class="card-t" style="margin:14px 0 6px">Tu camino</div><div class="rail-steps"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div><div class="rail-s"><b>Sin deuda cara</b> ✓ <small>Siguiente: un aporte automático corriendo · 43 % hacia Seguridad</small></div></div></div>
+ <div class="quick"><button class="btn btn-s">+ Gasto</button><button class="btn btn-s">+ Ingreso</button><button class="btn btn-s">📷 Escanear recibo</button><span class="rev"><b>2 por revisar</b> del correo del banco →</span></div>`}
+function contentC(){return `<div class="journeyc"><span>Tu camino</span><div class="steps"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div><span><b style="color:var(--text)">Sin deuda cara</b> · siguiente: aporte automático</span><span style="margin-left:auto">Agosto 2026 · día 16 · vs julio</span></div>
+ <div class="chero"><div class="lbl">Hola, José — libre para gastar este mes ${help(HELP_LIBRE)}</div><div class="num" data-v="562420">₡0</div><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="delta warn">▲ ₡264 055 sobre el ritmo lineal</span><span class="read">Las cuotas se pagan a inicio de mes; contra tus compromisos vas <b>al día</b>.</span></div>
+  <div class="cstat"><div>Patrimonio neto<b>₡34,2 M</b></div><div>Flujo del mes<b>₡762 420</b></div><div>Compromisos 14 d<b>₡250 000</b></div><div>Por revisar<b>2</b></div></div>
+  <div class="svgc" id="rC"></div></div>
+ <div class="cgrid"><div><div class="card-t" style="margin:4px 0 8px">Lo que más mueve la aguja</div><div class="feed">
+   <div class="fitem"><div class="ic" style="background:var(--accent)">1</div><div><h5>Abonar ₡150 000 extra al préstamo del vehículo</h5><p>Tu deuda más cara (13,5 %) ahora que la tarjeta está en ₡0.</p><div class="imp">Ahorra ₡412 000 · libre 5 meses antes</div><div style="margin-top:8px;display:flex;gap:8px"><button class="btn btn-p">Hacerlo</button><button class="btn btn-s">Posponer</button></div></div></div>
+   <div class="fitem"><div class="ic" style="background:var(--chart-2)">2</div><div><h5>Confirmar el aporte al CDP BN</h5><p>Registrado el 15 de agosto; falta confirmar el precio.</p></div></div>
+   <div class="fitem"><div class="ic" style="background:var(--chart-3)">3</div><div><h5>Repartir ₡20 417 del marchamo</h5><p>Sobre anual sin asignación este mes.</p></div></div>
+  </div><div class="askbar"><div class="iso">${ICON.iso}</div>Preguntale a My Agent C+ sobre este mes…<button class="btn btn-p">Preguntar</button></div></div>
+  <div><div class="card-t" style="margin:4px 0 8px">Señales</div><div class="feed">${SIGS.map(([c,t,e])=>`<div class="fitem"><div class="ic" style="background:var(${c})">●</div><div><p style="color:var(--text)">${t}</p><div class="imp" style="color:var(--muted)">${e} →</div></div></div>`).join('')}</div></div></div>`}
+function shell(inner){return `<div class="app"><aside class="sidebar"><div class="brand"><div class="iso">${ICON.iso}</div><div class="brand-name">CARTERA<i>+</i></div></div><nav class="nav">${[['home','Hoy',3,1],['flow','Flujo',2],['plan','Planes',1],['wealth','Patrimonio'],['spark','Asesor']].map(([i,n,b,on])=>`<a class="nav-item ${on?'active':''}" href="#">${ICON[i]}<span>${n}</span>${b?`<b class="badge">${b}</b>`:''}</a>`).join('')}</nav><div class="rail"><div class="rail-t">Tu camino</div><div class="rail-steps"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div><div class="rail-s"><b>Sin deuda cara</b> ✓<small>Siguiente: un aporte automático</small></div></div><div class="user"><div class="avatar">JR</div><div><b>José Ramírez</b><br><span style="color:var(--muted)">Plan Pro+</span></div></div></aside>
+ <div class="main"><div class="topbar"><div><div class="crumb">Hoy / <b>Panel</b></div><div class="ptitle">Hoy</div></div><div class="period" style="margin-left:14px"><button>‹</button><span class="cur">Agosto 2026</span><button>›</button><span class="cmp">vs julio ▾</span></div><div class="tb-right"><div class="ck">${ICON.search.replace('<svg','<svg width="14" height="14" style="stroke:currentColor;fill:none;stroke-width:1.8"')} Buscar o hacer… <kbd>⌘K</kbd></div><button class="ibtn">${ICON.eye}</button><button class="ibtn">${ICON.bell}<i class="dot"></i></button><div class="avatar">JR</div></div></div><div class="tabs"><span class="tab on">Panel</span><span class="tab">Acciones · 3</span><span class="tab">Progreso</span></div><div class="content">${inner}</div></div></div>`}
+function mobileShell(inner){return `<div class="mapp"><div class="mhead"><div class="ptitle" style="font-size:18px">Hoy</div><span style="margin-left:auto" class="ibtn">${ICON.search}</span><span class="ibtn">${ICON.bell}<i class="dot"></i></span><div class="avatar" style="width:26px;height:26px">JR</div></div><div class="mtabs"><span class="tab on">Panel</span><span class="tab">Acciones · 3</span><span class="tab">Progreso</span></div><div class="mperiod">‹ <b>Agosto 2026</b> › <span>· vs julio</span></div><div class="mcontent">${inner}</div><div class="mbar">${[['home','Hoy',1],['flow','Flujo'],['plan','Planes'],['wealth','Patrimonio']].map(([i,n,on])=>`<a class="${on?'on':''}" href="#">${ICON[i]}${n}</a>`).join('')}<a href="#"><span class="isoq">${ICON.iso}</span>Asesor</a></div><div class="fab">+</div></div>`}
+const NOTES={A:{t:'A · Evolutiva — el panel actual, con jerarquía',d:'Conserva la franja Norte (¿más rico o más pobre? + libre para gastar + próxima decisión), los cuatro pilares y la salud financiera, pero reordena y quita el donut de composición y el hub de configuración. Todo con las primitivas nuevas.',p:['Familiar para quien ya usa la app','Reutiliza PanelVM y HealthScore sin cambios','Menor esfuerzo'],c:['Tres números grandes compiten en la franja Norte','Los cuatro pilares con el mismo peso repiten el problema actual','Las señales quedan al final, donde nadie llega','Sin gráfico de ritmo: no se ve si voy adelantado']},B:{t:'B · Data-first — la historia en seis franjas',d:'Titular «Libre para gastar» con el gráfico de ritmo; tres KPIs con sparkline; la acción principal con impacto y las dos siguientes contadas; señales y riel del viaje; registro rápido con el contador de «por revisar». Es la propuesta de la sección 10 del blueprint.',p:['Un solo número grande; el resto es contexto','Cada bloque responde una pregunta en orden','Todo enlaza a su núcleo con el periodo activo','Peso mínimo: un gráfico SVG y tres sparklines'],c:['Más texto que C; exige disciplina en la redacción de señales','La acción y las señales compiten en la misma fila']},C:{t:'C · Future-forward — titular inmersivo y feed',d:'El titular ocupa todo el ancho con el gráfico de ritmo integrado y las cifras secundarias como stats de una línea; las acciones son un feed vertical ordenado por impacto con la barra «Preguntale a My Agent C+» al pie; las señales van en una columna lateral.',p:['La primera pantalla en móvil es completa y memorable','El feed escala a cualquier número de acciones','El asesor tiene entrada natural desde el Home'],c:['Los KPIs secundarios pierden su comparación y sparkline','En escritorio el feed y las señales compiten en dos columnas iguales','Más costoso de mantener (dos layouts distintos)']}};
+function render(){const f=document.getElementById('frame');f.className='frame'+(dev==='mobile'?' mobile':'');const inner=opt==='A'?contentA():opt==='B'?contentB():contentC();f.innerHTML=dev==='desktop'?shell(inner):mobileShell(inner);
+ const n=NOTES[opt];document.getElementById('notes').innerHTML=`<div class="opt"><div><h3>${n.t}</h3><p>${n.d}</p></div><div><div class="k">A favor</div><ul>${n.p.map(x=>`<li>${x}</li>`).join('')}</ul></div><div><div class="k">En contra</div><ul>${n.c.map(x=>`<li>${x}</li>`).join('')}</ul></div></div>`;
+ ['A','B','C'].forEach(o=>document.getElementById('opt'+o).setAttribute('aria-pressed',o===opt));document.getElementById('devD').setAttribute('aria-pressed',dev==='desktop');document.getElementById('devM').setAttribute('aria-pressed',dev==='mobile');
+ requestAnimationFrame(()=>{ritmo('rB',false);ritmo('rC',true);spark('spB1',NW,css('--chart-1'));spark('spB2',[-14480,-12780,-9580,259420,131820,54920,106720,38620,108020,177774,160220,173920],css('--chart-1'));spark('spB3',[520000,310000,250000,250000,410000,250000,250000],css('--chart-4'));document.querySelectorAll('[data-v]').forEach(el=>roll(el,+el.dataset.v))})}
+function setOpt(o){opt=o;render();try{localStorage.setItem('cp-hoy-opt',o)}catch(e){}}
+function setDev(d){dev=d;render()}
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);document.getElementById('thL').setAttribute('aria-pressed',t==='light');document.getElementById('thD').setAttribute('aria-pressed',t==='dark');render()}
+try{opt=localStorage.getItem('cp-hoy-opt')||'A'}catch(e){}
+window.addEventListener('load',render);
+</script>
