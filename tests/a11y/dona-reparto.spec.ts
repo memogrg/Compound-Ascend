@@ -120,6 +120,11 @@ test("a 390 el título del marco cabe en un renglón y el hueco anillo→leyenda
   const cLeyenda = (await leyenda.boundingBox())!;
   const hueco = Math.round(cLeyenda.y - (cAnillo.y + cAnillo.height));
 
+  // Las cotas se afirman, pero los VALORES se imprimen: un caso que solo dice «≤ 24» obliga a
+  // romperlo para saber cuánto mide de verdad, y las dos medidas de la decisión 55 son justo lo que
+  // hay que poder leer de una corrida verde.
+  console.log(`dona a 390: título ${lineas} renglón(es) · hueco anillo→leyenda ${hueco} px`);
+
   // El tope es 24 y no 18 exactos para dejar sitio al redondeo del `line-height` de la primera fila
   // de la leyenda. Lo que no puede volver son los 28 px de aire muerto del lienzo.
   expect(hueco, `hueco anillo→leyenda: ${hueco} px`).toBeLessThanOrEqual(24);
