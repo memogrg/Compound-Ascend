@@ -59,7 +59,7 @@ Nada de esto se puede probar desde Windows ni desde el navegador: hace falta iOS
 2. **Dispositivo**: es la prueba que vale. Face ID / Touch ID entran en el flujo.
 3. **«Ocultar mi correo»**: elegí esa opción al menos una vez. El correo que llega es
    `algo@privaterelay.appleid.com` y el trigger `handle_new_user` rellena `display_name` con
-   `split_part(email, '@', 1)`, o sea basura tipo `k7x2m9q`. `setDisplayNameFromProviderAction`
+   `split_part(email, '@', 1)`, o sea basura tipo `k7x2m9q`. `setDisplayNameFromProvider`
    lo reemplaza con el nombre que manda Apple.
 
    **Apple manda el nombre UNA SOLA VEZ**, en el primer login de cada Apple ID. Para volver a
@@ -87,4 +87,4 @@ nativo, que ya se comporta así en producción.
 | `src/lib/capacitor/social-login-init.ts`                | init del plugin, nonce y heurística de cancelación (compartidos con Google) |
 | `src/lib/capacitor/apple-native.ts`                     | el flujo: nonce → plugin → `signInWithIdToken`                              |
 | `src/app/(mobile)/m/components/mobile-apple-button.tsx` | el botón, solo iOS                                                          |
-| `src/modules/account/api/actions.ts`                    | `setDisplayNameFromProviderAction`                                          |
+| `src/modules/account/api/actions.ts`                    | `setDisplayNameFromProvider`                                                |

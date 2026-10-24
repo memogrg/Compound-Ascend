@@ -232,7 +232,7 @@ const providerNameSchema = z.object({
  * Escribe en los dos lados —`profiles.display_name` y el metadato de auth— porque
  * `getAccountInfo` lee el segundo.
  */
-export async function setDisplayNameFromProviderAction(input: {
+export async function setDisplayNameFromProvider(input: {
   givenName?: string;
   familyName?: string;
 }): Promise<AccountActionResult> {

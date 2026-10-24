@@ -53,7 +53,7 @@ vi.mock("@/lib/supabase/server", () => ({
   })),
 }));
 
-import { setDisplayNameFromProviderAction } from "@/modules/account/api/actions";
+import { setDisplayNameFromProvider } from "@/modules/account/api/actions";
 
 beforeEach(() => {
   escrituras.length = 0;
@@ -62,10 +62,10 @@ beforeEach(() => {
   usuario = { id: "user-1", email: "memo@ejemplo.com" };
 });
 
-describe("setDisplayNameFromProviderAction", () => {
+describe("setDisplayNameFromProvider", () => {
   it("sobre el relleno del trigger, escribe", async () => {
     nombreEnBase = "memo"; // split_part("memo@ejemplo.com", "@", 1)
-    const r = await setDisplayNameFromProviderAction({
+    const r = await setDisplayNameFromProvider({
       givenName: "Guillermo",
       familyName: "Rivera",
     });
@@ -77,20 +77,20 @@ describe("setDisplayNameFromProviderAction", () => {
 
   it("sin nombre previo, también escribe", async () => {
     nombreEnBase = null;
-    await setDisplayNameFromProviderAction({ givenName: "Guillermo", familyName: "" });
+    await setDisplayNameFromProvider({ givenName: "Guillermo", familyName: "" });
     expect(escrituras).toEqual([{ display_name: "Guillermo" }]);
   });
 
   it("con «Ocultar mi correo», el relleno es basura y se reemplaza", async () => {
     usuario = { id: "user-1", email: "k7x2m9q@privaterelay.appleid.com" };
     nombreEnBase = "k7x2m9q";
-    await setDisplayNameFromProviderAction({ givenName: "Guillermo", familyName: "Rivera" });
+    await setDisplayNameFromProvider({ givenName: "Guillermo", familyName: "Rivera" });
     expect(escrituras).toEqual([{ display_name: "Guillermo Rivera" }]);
   });
 
   it("un nombre puesto por la persona NO se toca", async () => {
     nombreEnBase = "Memo R.";
-    const r = await setDisplayNameFromProviderAction({
+    const r = await setDisplayNameFromProvider({
       givenName: "Guillermo",
       familyName: "Rivera",
     });
@@ -101,18 +101,18 @@ describe("setDisplayNameFromProviderAction", () => {
 
   it("sin nombre del proveedor no hace nada, ni siquiera lee", async () => {
     nombreEnBase = "memo";
-    const r = await setDisplayNameFromProviderAction({ givenName: "", familyName: "" });
+    const r = await setDisplayNameFromProvider({ givenName: "", familyName: "" });
     expect(r.ok).toBe(true);
     expect(escrituras).toEqual([]);
   });
 
   it("recorta y rechaza lo que no cabe", async () => {
     nombreEnBase = "memo";
-    await setDisplayNameFromProviderAction({ givenName: "  Guillermo  ", familyName: " Rivera " });
+    await setDisplayNameFromProvider({ givenName: "  Guillermo  ", familyName: " Rivera " });
     expect(escrituras).toEqual([{ display_name: "Guillermo Rivera" }]);
 
     escrituras.length = 0;
-    const largo = await setDisplayNameFromProviderAction({ givenName: "G".repeat(81) });
+    const largo = await setDisplayNameFromProvider({ givenName: "G".repeat(81) });
     expect(largo.ok).toBe(false);
     expect(escrituras).toEqual([]);
   });

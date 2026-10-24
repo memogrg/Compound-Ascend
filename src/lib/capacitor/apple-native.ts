@@ -26,7 +26,7 @@ import {
   sha256hex,
   type NativeLoginResult,
 } from "@/lib/capacitor/social-login-init";
-import { setDisplayNameFromProviderAction } from "@/modules/account/api/actions";
+import { setDisplayNameFromProvider } from "@/modules/account/api/actions";
 
 export async function nativeAppleLogin(): Promise<NativeLoginResult> {
   const plugin = capacitorSocialLogin();
@@ -87,7 +87,7 @@ async function guardarNombreDeApple(
   const familyName = profile?.familyName ?? "";
   if (!givenName && !familyName) return;
   try {
-    await setDisplayNameFromProviderAction({ givenName, familyName });
+    await setDisplayNameFromProvider({ givenName, familyName });
   } catch (e) {
     console.log("[apple-native] display_name:skip", e);
   }
