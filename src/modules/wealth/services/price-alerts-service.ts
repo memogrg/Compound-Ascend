@@ -18,6 +18,7 @@ import {
   getActiveHouseholdId,
 } from "@/lib/household/active";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { formatNumber } from "@/lib/format";
 import {
   inferDirection,
   type AlertDirection,
@@ -156,7 +157,7 @@ export async function createInvestmentAlert(
     }
     const direction = inferDirection(input.targetPrice, quote.price);
     if (direction === null) {
-      const actual = quote.price.toLocaleString("es-CR", { maximumFractionDigits: 8 });
+      const actual = formatNumber(quote.price, { maximumFractionDigits: 8 });
       return { ok: false, message: `Elegí un precio distinto al actual (${actual}).` };
     }
 

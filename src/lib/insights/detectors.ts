@@ -418,3 +418,36 @@ export function detectStaleMarketFeed(input: {
     },
   ];
 }
+
+/**
+ * Kinds que escribe la PASADA de detectores (`refreshInsights` → `syncInsights`): única fuente
+ * para la frescura; el test insights-freshness la contrasta con los literales `kind:` de los
+ * detectores. Excluye `ritual_patrimonio` (escritor con cron propio): es la causa de que la
+ * frescura mintiera — su fila diaria pasaba a ser la más reciente de la tabla y dejaba a los
+ * detectores "frescos" sin haber corrido.
+ */
+export const KINDS_DETECTORES = [
+  // Este fichero.
+  "fondo_paz",
+  "sobre_sobregirado",
+  "ahorro_bajo",
+  "deuda_cara",
+  "fondo_emergencia",
+  "concentracion_inversion",
+  "rendimiento_bajo_inflacion",
+  "meta_estancada",
+  "deuda_creciendo",
+  "racha_positiva",
+  "gasto_disfrute_alza",
+  "aporte_pendiente",
+  "feed_precios_stale",
+  // dividendo-cobro.ts.
+  "dividendo_por_cobrar",
+  // lib/rhythm/detectors.ts, vía detectMonthRhythm. Los crons de ritmo (14:00Z) NO escriben en
+  // user_insights —solo marcan 'descartado'—, así que estas filas también prueban que la pasada corrió.
+  "ventana_presupuesto",
+  "cierre_mes",
+  "registro_diario",
+  "ritmo_sobre",
+  "sobre_ocioso",
+] as const;

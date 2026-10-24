@@ -1,0 +1,770 @@
+/* ============================================================
+   NÚCLEO DE GRÁFICOS — prefijo `cf-`
+   ============================================================
+   `cf` de «chart frame». Prefijo propio como `sb2-`, `tb2-`, `cp-` y `mn2-`: ni colisión con
+   el shell ni con una utilidad de Tailwind (`chart`, `legend`, `tooltip` y `table` son
+   palabras que Tailwind podría generar; `cf-` no).
+
+   Todo color sale de tokens. Los tiempos salen de `--dur-*`, que ya se ponen a 0 bajo
+   `prefers-reduced-motion` en `tokens.css`: acá no hace falta repetir la media query. */
+
+.cf {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Cabecera ─────────────────────────────────────────────────────────────── */
+
+/* `flex-wrap` es lo que deja que los controles BAJEN en vez de estrechar el título.
+   Flexbox decide el salto con los tamaños hipotéticos —el del título es su `max-content`— antes de
+   encoger nada, así que la fila se parte exactamente cuando el título completo y el grupo de
+   controles no caben juntos. Donde ya caben (todas las tarjetas a 768 y 1280) no cambia nada. */
+.cf-cab {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cf-titulos {
+  min-width: 0;
+}
+.cf-titulo {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.cf-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* «Ver tabla» no es un control secundario escondido: es la otra forma de leer el gráfico. */
+.cf-btn-tabla {
+  flex: none;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: var(--r-btn);
+  cursor: pointer;
+  transition: background var(--dur-micro) var(--ease-std);
+}
+.cf-btn-tabla:hover {
+  background: var(--chip);
+}
+
+/* Los controles de la derecha: lo que pase el llamador por `acciones`, y el botón de la tabla.
+   `flex: none` sobre el grupo para que el título siga quedándose el espacio sobrante. */
+.cf-acciones {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* A la derecha también cuando baja sola a su fila: `space-between` con un solo elemento en la
+     línea lo dejaría a la izquierda, y los controles saltarían de lado al envolverse. */
+  margin-left: auto;
+}
+
+/* ── Lienzo ───────────────────────────────────────────────────────────────── */
+
+.cf-lienzo {
+  position: relative;
+  min-height: 0;
+}
+
+/* ── Leyenda ──────────────────────────────────────────────────────────────── */
+
+.cf-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cf-leyenda-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  background: transparent;
+  padding: 3px 2px;
+  /* El texto NUNCA lleva el color de la serie: esos colores están calibrados contra el
+     fondo del gráfico, no para texto de 12 px sobre la tarjeta. */
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: var(--r-btn);
+  transition: opacity var(--dur-micro) var(--ease-std);
+}
+/* Serie apagada: se ve que existe y que está apagada, no se borra de la leyenda. */
+.cf-leyenda-btn[data-oculta] {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.cf-swatch {
+  flex: none;
+  display: inline-block;
+  border-radius: 2px;
+}
+/* El swatch imita la MARCA: bloque para área y barras, línea para líneas. */
+.cf-swatch-bloque {
+  width: 11px;
+  height: 11px;
+}
+.cf-swatch-linea {
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+/* ── Leyenda al lado del lienzo (`disposicionLeyenda="lateral"`) ───────────────
+   Mismo reparto que `DonutConLeyenda`, y a propósito: lo que se mide al pasar la dona al marco
+   es que no cambie nada. El corte es del CONTENEDOR —`container-type: inline-size` en `.cf`— y
+   no de la ventana, porque la misma tarjeta se estrecha en `cols-2` a 1280 y ocupa todo el
+   ancho en `/m`.
+
+   `container-type` solo se declara en la disposición lateral: crea un contexto de contención
+   (`contain: layout inline-size style`) y no hay razón para imponérselo a los marcos que no lo
+   consultan. Los tooltips absolutos siguen anclados a `.cf-lienzo`, que ya es `position:
+   relative`, así que la contención no los mueve. */
+.cf[data-leyenda="lateral"] {
+  container-type: inline-size;
+}
+.cf-lateral {
+  display: flex;
+  /* `flex-start` y no `center`: con veinte filas la leyenda mide 500 px y un anillo centrado
+     contra ella queda flotando a media altura, con un hueco arriba que parece un error de
+     maquetación. Arriba, el anillo y la primera fila empiezan juntos. */
+  align-items: flex-start;
+  gap: 18px;
+}
+/* El lienzo NO se estira: mide lo que mide el gráfico (una dona de `size` px). Si creciera, el
+   anillo quedaría centrado en media tarjeta y la leyenda apretada contra el borde. */
+.cf-lateral > .cf-lienzo {
+  flex: none;
+}
+.cf-leyenda-lado {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Contenedor estrecho: la leyenda baja y se lleva el ancho entero. El tramo intermedio —la
+   leyenda al lado, en una columna de 90 px— era el peor de los dos mundos. */
+@container (max-width: 419px) {
+  .cf-lateral {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cf-lateral > .cf-lienzo {
+    align-self: center;
+  }
+  .cf-leyenda-lado {
+    width: 100%;
+  }
+}
+
+/* Con la tabla abierta, la fila vuelve a columna: la tabla se monta DENTRO del lienzo, y un
+   lienzo de 240 px la dejaría ilegible. El alto fijo del lienzo no se toca. */
+.cf-lateral[data-tabla="abierta"] {
+  flex-direction: column;
+  align-items: stretch;
+}
+.cf-lateral[data-tabla="abierta"] > .cf-lienzo {
+  flex: 1 1 auto;
+  align-self: stretch;
+}
+
+/* ── Nota al pie ──────────────────────────────────────────────────────────── */
+
+.cf-pie {
+  font-size: 12px;
+  color: var(--muted);
+}
+.cf-swatch[data-guion] {
+  mask-image: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 7px);
+  -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 7px);
+}
+
+/* ── Tooltip ──────────────────────────────────────────────────────────────── */
+
+.cf-tip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-float);
+  padding: 8px 10px;
+  min-width: 120px;
+}
+.cf-tip-x {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.cf-tip-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.cf-tip-fila {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+/* Trazo de 2 px, la misma marca que dibuja la serie — no una caja de color. */
+.cf-tip-trazo {
+  flex: none;
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  align-self: center;
+}
+.cf-tip-valor {
+  font-variant-numeric: tabular-nums;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.cf-tip-serie {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ── Tabla de datos ───────────────────────────────────────────────────────── */
+
+.cf-tabla-vista {
+  max-height: 100%;
+  overflow: auto;
+}
+.cf-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.cf-tabla caption {
+  text-align: left;
+  color: var(--muted);
+  font-size: 11px;
+  padding-bottom: 6px;
+}
+/* Columnas NUMÉRICAS a la derecha y con cifras de ancho fijo: así los miles quedan uno
+   debajo de otro y se puede comparar la columna de un vistazo, que es para lo que existe una
+   tabla de datos. El encabezado se alinea con su columna, no al revés. */
+.cf-tabla th,
+.cf-tabla td {
+  text-align: right;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+/* La primera columna es el PERIODO: texto, y va a la izquierda — en el encabezado y en cada
+   fila (que es un `<th scope="row">`). */
+.cf-tabla thead th:first-child,
+.cf-tabla tbody th:first-child {
+  text-align: left;
+}
+.cf-tabla thead th,
+.cf-tabla tbody th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* ── Tooltip: delta, nota y recorte ───────────────────────────────────────── */
+
+.cf-tip-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.cf-tip-linea {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+/* El delta se colorea por DIRECCIÓN × sentido de la serie, nunca por el signo a secas: en
+   gastos, subir es malo. Y el signo (+/−) va siempre delante, que es el canal no cromático
+   (WCAG 1.4.1): el color es un refuerzo, no la información. */
+.cf-tip-delta {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.cf-tip-delta[data-tono="bueno"] {
+  color: var(--pos);
+}
+.cf-tip-delta[data-tono="malo"] {
+  color: var(--neg);
+}
+
+/* «+2 más»: el tooltip recorta por legibilidad, y la tabla del marco sigue completa. */
+.cf-tip-mas {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* La nota del punto («aguinaldo»): una línea, con elipsis. Dos líneas de nota empujan el
+   valor fuera del vistazo, que es lo único que el tooltip tiene que garantizar. */
+.cf-tip-nota {
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Foco del gráfico ─────────────────────────────────────────────────────── */
+
+/* `accessibilityLayer` de Recharts hace el SVG focalizable, y el navegador le dibuja el
+   anillo también al hacer CLIC: quien usa el ratón se encuentra un recuadro que no pidió, en
+   cada punto que toca. El anillo se reserva para `:focus-visible`, que es exactamente la
+   heurística de «llegó por teclado». No se quita el foco: se quita el ruido. */
+/* La regla cubre el SVG y sus grupos internos: un clic no enfoca el `<svg>` sino uno de los
+   `<g class="recharts-zIndex-layer_…">` que Recharts marca con `tabindex="-1"`, así que
+   apuntar solo al svg dejaba el recuadro puesto igual. */
+.cf svg.recharts-surface:focus,
+.cf svg.recharts-surface :focus {
+  outline: none;
+}
+.cf svg.recharts-surface:focus-visible,
+.cf svg.recharts-surface :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-md);
+}
+
+/* ── Presets de rango ─────────────────────────────────────────────────────── */
+
+.cf-rangos {
+  display: flex;
+  gap: 4px;
+  margin: -2px 0 8px;
+}
+
+.cf-rango {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: background var(--dur-micro) var(--ease-std);
+}
+.cf-rango:hover {
+  background: var(--chip);
+}
+/* El activo se marca con relleno Y con el peso del borde, no solo con color: `aria-checked`
+   lo dice al lector, y esto lo dice a quien no distingue tonos. */
+.cf-rango[aria-checked="true"] {
+  background: var(--chip);
+  border-color: var(--text);
+  color: var(--text);
+}
+
+/* ── Calendario de gasto ──────────────────────────────────────────────────── */
+
+.cal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Tope de ancho, y no «lo que dé la tarjeta».
+     Las celdas son cuadradas (`aspect-ratio: 1`), así que en una tarjeta de 940 px crecían a
+     130 px cada una: cinco filas de eso desbordaban el alto del marco y el calendario se
+     pintaba encima del gráfico de abajo. Una celda de día no gana nada por ser enorme — lo
+     que se lee es el patrón del mes, no cada cuadro. 7 × 44 px + separaciones. */
+  max-width: 330px;
+}
+
+.cal-cabecera,
+.cal-fila {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.cal-dow {
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.cal-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cal-dia,
+.cal-hueco {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* El paso más oscuro de la rampa es `--chart-1` puro, y el número del día en tinta sobre él
+   da 3,71:1 — por debajo del 4,5:1 que pide un texto pequeño. Lo cazó axe, no el ojo. Ahí el
+   número se invierte a la superficie. Los pasos más claros no lo necesitan. */
+.cal-dia[data-nivel="4"] {
+  color: var(--surface);
+}
+
+/* Un día sin gasto NO es «poco gasto»: SIN relleno, fuera de la rampa, y un borde fino
+   continuo que dice que la celda existe. Con relleno (`--chip`) competía con el paso más
+   bajo de la rampa —dos grises parecidos, uno dentro de la escala y otro fuera— y el mes
+   se leía como si todos los días tuvieran algo. El borde CONTINUO es lo que lo separa del
+   día futuro, que va punteado. */
+.cal-dia[data-vacio="true"] {
+  background: transparent;
+  border: 1px solid var(--chart-grid);
+  color: var(--muted);
+}
+
+/* Y un día futuro no es un día sin gasto: sin relleno y punteado, o el mes en curso
+   parecería un mes de ahorro ejemplar. */
+.cal-dia[data-futuro="true"] {
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--muted-2);
+}
+
+.cal-dia {
+  cursor: pointer;
+}
+.cal-dia:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+/* HOY: anillo de 2 px en tinta. Es el único ancla temporal de la rejilla — sin él, un mes
+   a medias no dice dónde termina lo ocurrido y empieza lo que falta. Va en `box-shadow`
+   interior y no en `border` para no robarle 2 px a la celda y desalinear la rejilla. */
+.cal-dia[data-hoy="true"] {
+  box-shadow: inset 0 0 0 2px var(--text);
+}
+
+/* La selección usa el ACENTO, no la tinta: con los dos en `--text` el día fijado y el día
+   de hoy se pintaban idénticos y no había forma de saber cuál era cuál. Si hoy está
+   además fijado, gana el acento (esta regla va después). */
+.cal-dia[aria-selected="true"] {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.cal-leyenda {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+.cal-leyenda-t {
+  font-size: 10.5px;
+}
+.cal-leyenda-paso {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex: none;
+}
+
+/* Las muestras de «sin gasto» y «futuro» repiten EXACTAMENTE lo que hace la celda: sin
+   relleno, continua una y punteada la otra. Una leyenda que no se parece a lo que explica
+   no explica nada. */
+.cal-leyenda-vacio {
+  background: transparent;
+  border: 1px solid var(--chart-grid);
+}
+.cal-leyenda-futuro {
+  background: transparent;
+  border: 1px dashed var(--border);
+}
+
+/* Cada entrada es muestra + texto, y el texto no se parte del color que describe. */
+.cal-leyenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.cal-leyenda-rango {
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Área ⇄ línea: el relleno se desvanece, no salta ──────────────────────── */
+
+/* El zoom decide entre área y línea según si el 0 cabe en el dominio (`desdeCeroSiCabe`).
+   Al cambiar de chip, ese relleno aparece o desaparece: sin transición es un parpadeo que
+   parece un error de render. 200 ms es lo que tarda en leerse como «lo mismo, cambiando» en
+   vez de «otra cosa». Solo la OPACIDAD se anima — el trazo y los ejes se mueven a la vez,
+   y animar tres cosas a destiempo se ve peor que no animar nada. */
+.cf .recharts-area-area {
+  transition: fill-opacity 200ms ease;
+}
+
+/* Quien pide menos movimiento no lo pide a medias: el cambio es instantáneo. */
+@media (prefers-reduced-motion: reduce) {
+  .cf .recharts-area-area {
+    transition: none;
+  }
+}
+
+/* ── Periodo en curso ─────────────────────────────────────────────────────── */
+
+/* El mes a medias se dice con PALABRAS además de con el trazo punteado: quien usa lector de
+   pantalla no ve el punteado, y quien no distingue el punto hueco tampoco. */
+.cf-en-curso {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* «· parcial» dentro del tooltip: el dato es real, pero el periodo no terminó. */
+.cf-parcial {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* ── Leyenda estática, tabla del histórico ────────────────────────────────── */
+
+/* La leyenda del histórico de gastos no es interactiva: no hay series que apagar, hay tres
+   cosas que nombrar. Por eso no usa `.cf-leyenda-btn` (que es un botón) sino esto, con el
+   mismo aire y el mismo tamaño para que las dos leyendas del repo se lean igual. */
+.cf-leyenda-fija {
+  margin-top: 8px;
+}
+.cf-leyenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+/* «Parcial»: el swatch tiene que decir lavado Y punteado, igual que la columna. Solo con la
+   opacidad, en oscuro, un bloque al 35 % y uno al 100 % se distinguen mal. */
+.cf-swatch-parcial {
+  background: color-mix(in srgb, var(--neg) 35%, transparent);
+  border: 1px dashed var(--neg);
+  box-sizing: border-box;
+}
+
+/* El desplegable de datos. Cerrado por defecto: la tarjeta no puede doblar su alto por una
+   tabla que casi nadie abre, pero la alternativa no visual del gráfico tiene que existir. */
+.cf-datos {
+  margin-top: 8px;
+}
+.cf-datos-abrir {
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  width: fit-content;
+  border-radius: var(--r-btn);
+}
+.cf-datos-abrir:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.cf-datos-caja {
+  margin-top: 6px;
+  /* 420 y no 260: con 260 cabían cinco meses y el sexto —que en un rango que incluye el mes
+     en curso es justamente el PARCIAL, el único con mensaje— quedaba fuera de vista sin que
+     nada lo indicara. Con doce meses sigue habiendo scroll, que es lo que se quiere. */
+  max-height: 420px;
+  overflow: auto;
+}
+
+/* Los importes no se parten. `+₡1.177.383` daba salto de línea entre el signo y el símbolo
+   de moneda —hay oportunidad de corte ahí— y una celda de dos renglones desalinea la fila
+   entera, que es justo lo que una tabla de cifras no puede permitirse. El mes tampoco: «abr
+   2026» en dos renglones duplica el alto de la fila para nada. */
+.cf-tabla td,
+.cf-tabla tbody th {
+  white-space: nowrap;
+}
+
+/* El signo de la diferencia con color, y además con signo: el color no es el único canal
+   (WCAG 1.4.1). En gasto, POR ENCIMA del presupuesto es lo malo. */
+.cf-tabla td[data-tono="bueno"] {
+  color: var(--pos);
+}
+.cf-tabla td[data-tono="malo"] {
+  color: var(--neg);
+}
+
+/* La celda del mes ABIERTO no es un importe sino una frase («Te quedan ₡X para N días»), así
+   que envuelve en vez de forzar la tabla a lo ancho. Va en NEUTRO: la cifra que queda no es
+   un logro, es dinero que todavía no se gastó. Solo si ya se pasó cambia de tono. */
+.cf-tabla td.cf-tabla-avance {
+  white-space: normal;
+  text-align: left;
+  color: var(--muted);
+}
+/* La fila de la nota no lleva su propia línea: pertenece a la fila de arriba. */
+.cf-tabla tbody tr.cf-tabla-nota td {
+  border-top: 0;
+  padding-top: 0;
+}
+.cf-tabla td.cf-tabla-avance[data-tono="alerta"] {
+  color: var(--neg);
+}
+
+/* Lo mismo en el tooltip. */
+.cf-tip-nota[data-tono="alerta"] {
+  color: var(--neg);
+}
+
+/* ── Dona con leyenda ─────────────────────────────────────────────────────── */
+
+/* El corte es del CONTENEDOR, no de la ventana: la misma tarjeta se estrecha en `/gastos` a
+   1280 (va en `cols-2`) y ocupa todo en `/m`. Una media query de viewport acertaría en una y
+   fallaría en la otra. `container-type: inline-size` solo declara el eje horizontal, que es
+   el único que se consulta — `size` haría que el alto dejase de depender del contenido. */
+.dl {
+  container-type: inline-size;
+}
+.dl-caja {
+  display: flex;
+  /* `flex-start` y no `center`: con veinte categorías la leyenda mide 500 px y una dona
+     centrada contra ella queda flotando a media altura, con un hueco arriba que parece un
+     error de maquetación. Arriba, la dona y la primera fila empiezan juntas. */
+  align-items: flex-start;
+  gap: 18px;
+  margin-top: 14px;
+}
+/* El lado de la leyenda: la lista más el botón de «Ver todas». */
+.dl-lado {
+  flex: 1;
+  min-width: 0;
+}
+.dl-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dl-vertodas {
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  padding: 2px 0;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  border-radius: var(--r-btn);
+}
+.dl-vertodas:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+/* Lo que hay DENTRO de «Otras N» va sangrado y atenuado: es el desglose de una porción, no
+   una porción más. Y sin punto de color, porque su color no está en el anillo. */
+.dl-fila-oculta {
+  padding-left: 18px;
+}
+.dl-fila-oculta .dl-nombre,
+.dl-fila-oculta .dl-pct,
+.dl-fila-oculta .dl-monto {
+  color: var(--muted);
+}
+.dl-fila {
+  display: grid;
+  /* punto · nombre · % · monto. El nombre se lleva el espacio sobrante; el % y el monto
+     ocupan lo suyo y quedan pegados a la derecha, uno debajo de otro en todas las filas. */
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12.5px;
+}
+.dl-punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+  /* `align-items: baseline` deja el punto colgando de la primera línea del nombre; este
+     desplazamiento lo sube al centro del renglón. */
+  transform: translateY(-1px);
+}
+/* SIN `ellipsis`: el nombre envuelve. Un nombre cortado no se puede emparejar con su color,
+   que es lo único para lo que existe una leyenda. `anywhere` para que una palabra sola más
+   larga que la columna —«Mantenimiento»— no desborde la tarjeta. */
+.dl-nombre {
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.dl-pct {
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+.dl-monto {
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+/* La fila del sobrante se dice atenuada: es un agregado, no una categoría con nombre. Y su
+   punto va hueco, porque sus porciones sí están en la dona con su propio color. */
+.dl-fila-resto .dl-nombre {
+  color: var(--muted);
+}
+.dl-fila-resto .dl-punto {
+  background: transparent;
+  border: 1px dashed var(--muted-2);
+  box-sizing: border-box;
+}
+.dl-vacio {
+  font-size: 12.5px;
+}
+
+/* Contenedor estrecho: la leyenda baja y se lleva el ancho entero. El tramo intermedio —la
+   leyenda al lado, en una columna de 90 px— era el peor de los dos mundos. */
+@container (max-width: 419px) {
+  .dl-caja {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dl-caja > [role="img"] {
+    align-self: center;
+  }
+  .dl-lado {
+    width: 100%;
+  }
+}
+
+/* El botón de la tabla conserva su caja cuando no hay datos: sin esto el encabezado medía
+   distinto y el marco entero cambiaba 7 px entre «con datos» y «vacío» — incumpliendo la
+   invariante que el propio componente promete. `visibility` lo saca además del orden de
+   tabulación, que es lo correcto: no hay tabla que abrir. */
+.cf-btn-tabla[data-reservado] {
+  visibility: hidden;
+}

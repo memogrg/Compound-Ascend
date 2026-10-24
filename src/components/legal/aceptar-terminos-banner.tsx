@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import { aceptarTerminosAction } from "@/lib/legal/actions";
 
@@ -16,6 +15,23 @@ import { aceptarTerminosAction } from "@/lib/legal/actions";
  * No se decide acá si hay que mostrarla: eso lo resuelve el servidor comparando contra
  * `LEGAL_VERSION`, así que el día que la versión suba la barra reaparece sola, sin
  * tocar este archivo.
+ *
+ * **Todo el aspecto vive en CSS** (`.legal-accept-*` en `shell.css`), ni un estilo en línea.
+ * No es limpieza: un valor en línea le gana a cualquier hoja, y con `bottom: 0` incrustado
+ * no había forma de subir la barra por encima de la navegación inferior en móvil. Anclada
+ * abajo del todo tapaba los cinco enlaces enteros —y eso contradice su propio motivo de
+ * existir: es una barra y no un modal justamente para que nadie quede encerrado por un aviso.
+ *
+ * El copy tampoco promete un bloqueo que no existe. Decía «confirmá que estás de acuerdo para
+ * seguir usando tu cuenta», y eso es falso: la cuenta sigue funcionando sin aceptar. Ahora
+ * enuncia el hecho y ofrece las dos salidas —leer o aceptar—, con los documentos en
+ * pestaña nueva para que leerlos no interrumpa lo que la persona estaba haciendo.
+ *
+ * **Dos enlaces y no tres.** Había un tercero, «Revisar», y llevaba a `/terminos`: anunciaba
+ * los dos documentos y abría uno. Son dos páginas separadas y no existe ninguna que las
+ * contenga, así que la única versión honesta de «revisar» son los dos enlaces que ya están en
+ * la frase —uno por documento—, y el tercero se fue. Cualquier enlace nuevo que prometa ambos
+ * necesita antes una página que de verdad los contenga.
  */
 export function AceptarTerminosBanner() {
   const [oculto, setOculto] = useState(false);
@@ -37,58 +53,24 @@ export function AceptarTerminosBanner() {
   };
 
   return (
-    <div
-      role="region"
-      aria-label="Aceptación de términos"
-      style={{
-        position: "fixed",
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 60,
-        background: "var(--surface, #fff)",
-        borderTop: "1px solid var(--border, #d8d4c7)",
-        boxShadow: "0 -8px 24px -12px rgba(0,0,0,0.25)",
-        padding: `14px 16px calc(env(safe-area-inset-bottom) + 14px)`,
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 820,
-          margin: "0 auto",
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: 12,
-        }}
-      >
-        <p style={{ flex: "1 1 260px", margin: 0, fontSize: 13.5, lineHeight: 1.5 }}>
-          Actualizamos nuestros <Link href="/terminos">Términos y condiciones</Link> y la{" "}
-          <Link href="/privacidad">Política de privacidad</Link>. Revisalos y confirmá que estás de
-          acuerdo para seguir usando tu cuenta.
+    <div role="region" aria-label="Aceptación de términos" className="legal-accept-bar">
+      <div className="legal-accept-caja">
+        <p className="legal-accept-texto">
+          Actualizamos los{" "}
+          <a href="/terminos" target="_blank" rel="noopener noreferrer">
+            Términos
+          </a>{" "}
+          y la{" "}
+          <a href="/privacidad" target="_blank" rel="noopener noreferrer">
+            Política de privacidad
+          </a>
           {error ? (
-            <span role="alert" style={{ display: "block", color: "var(--neg, #c34f4b)" }}>
+            <span role="alert" className="legal-accept-error">
               No pudimos guardar tu aceptación. Intentá de nuevo.
             </span>
           ) : null}
         </p>
-        <button
-          type="button"
-          onClick={aceptar}
-          disabled={pendiente}
-          style={{
-            minHeight: 44,
-            padding: "0 22px",
-            borderRadius: 12,
-            border: 0,
-            background: "#378451",
-            color: "#fff",
-            fontWeight: 600,
-            fontSize: 15,
-            cursor: pendiente ? "default" : "pointer",
-            opacity: pendiente ? 0.7 : 1,
-          }}
-        >
+        <button type="button" onClick={aceptar} disabled={pendiente} className="legal-accept-btn">
           {pendiente ? "Guardando…" : "Aceptar"}
         </button>
       </div>

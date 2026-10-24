@@ -2,7 +2,7 @@
  * Puente mínimo hacia Capacitor para el sitio remoto (no bundleado con Capacitor).
  *
  * El runtime nativo de Capacitor INYECTA `window.Capacitor` en la WebView incluso
- * cuando esta carga una URL remota (server.url = carteraplus.vercel.app). Por eso el
+ * cuando esta carga una URL remota (server.url = carteraplus.aitechumbrella.com). Por eso el
  * sitio puede llamar a los plugins vía `window.Capacitor.Plugins.*` SIN importar los
  * npm de `@capacitor/*` en el bundle de Next: los plugins viven en el shell nativo
  * (mobile-shell). Fuera de la app (web normal / SSR) todo degrada a no-op / null, así

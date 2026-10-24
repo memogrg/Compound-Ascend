@@ -41,6 +41,7 @@ export type { EnvelopesSummary } from "./services/envelopes-service";
 // al registrar un pago para conciliarlo contra la barra "Recibido".
 export {
   syncDerivedBudget,
+  congelarDerivadasDelPeriodo,
   ingresoPasivoDerivadoPromedio,
   type IngresoPasivoPromedio,
 } from "./services/derived-budget-service";

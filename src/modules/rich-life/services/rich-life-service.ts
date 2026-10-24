@@ -18,7 +18,12 @@ import {
   getLiquidityBalance,
   ingresoPasivoDerivadoPromedio,
 } from "@/modules/financial-base";
-import { computeProtection, computePortfolio, investmentsInCurrency } from "@/modules/wealth";
+import {
+  computeProtection,
+  computePortfolio,
+  investmentsInCurrency,
+  tieneFondoDeDefensa,
+} from "@/modules/wealth";
 import { getCurrentDebtBalances } from "@/modules/control";
 import { buildRichLifeSnapshot } from "@/modules/rich-life/engine/rich-life-engine";
 import { mapInvestmentLiquidity, savingsLiquidity } from "@/modules/rich-life/engine/asset-mapping";
@@ -184,6 +189,14 @@ export type RichLifeSummary = {
    *  el mismo set que usa el motor de patrimonio. Para desgloses (invertido/líquido/otros). */
   allAssets: Asset[];
   liabilities: Liability[];
+  /**
+   * Las deudas del módulo de Deudas, normalizadas a la moneda principal.
+   *
+   * Van APARTE de `liabilities` —que son solo los pasivos manuales— porque la tarjeta «Mis
+   * pasivos» las CUENTA pero no las edita: se gestionan en Planes · Deudas, y poder
+   * escribirlas desde dos sitios daría dos verdades del mismo saldo.
+   */
+  debtLiabilities: Liability[];
   currency: string;
 };
 
@@ -212,9 +225,12 @@ export type NetWorthAggregate = {
   // Extras para preservar EXACTO el resultado de getRichLifeSummary:
   explicitAssets: Asset[]; // solo activos manuales (tabla `assets`)
   explicitLiabilities: Liability[]; // solo pasivos manuales (tabla `liabilities`)
+  /** Las deudas del módulo de Deudas, ya normalizadas. Disjuntas de `explicitLiabilities`. */
+  debtLiabilities: Liability[];
   previousNetWorth: number | null; // patrimonio del último periodo CERRADO (net_worth_snapshots)
   /** Δ entre los dos últimos cierres consecutivos. Único Δ de un mes completo. */
   closedWealthDelta: number | null;
+  closedPeriod: string | null;
 };
 
 /**
@@ -300,7 +316,9 @@ async function aggregarPatrimonio(
     getLiquidityBalance(ctx),
     db
       .from("savings_goals")
-      .select("id,name,current_amount,stored_in,status,currency")
+      // `goal_type` no es decorativo: de él sale si hay fondo de emergencia y fondo de paz
+      // FORMALES, que es lo que puntúa la protección. Ver más abajo.
+      .select("id,name,current_amount,stored_in,status,currency,goal_type")
       .eq("user_id", userId),
     // Renta/intereses DERIVADOS de las inversiones (alquiler, bonos, CDP, préstamos)
     // MÁS los pagos periódicos configurados (dividendos y cupones). Es ingreso pasivo
@@ -476,14 +494,21 @@ async function aggregarPatrimonio(
     // Delta 3b: la moneda NATIVA de la inversión (antes se tageaba con la de display, mezclando).
     currency: r.currency ?? currency,
   }));
+  // Los fondos de defensa se detectan por `goal_type`, igual que en la pantalla autoritativa
+  // de protección (`wealth-service.ts`), y NO por «¿tiene algún activo líquido?».
+  //
+  // El proxy de liquidez decía que sí en cuanto existiera CUALQUIER meta con saldo, y los
+  // activos «líquidos» de Rich Life son sintéticos: el saco más toda meta con saldo. En la
+  // cuenta de demo eso hacía que «Universidad de Sofía» —un fondo para la universidad de una
+  // hija— contara como fondo de PAZ. Y este `protection.score` no se queda en Rich Life:
+  // `patrimonio-service` reusa este mismo agregado, así que el proxy llegaba hasta la tarjeta
+  // del panel. Registrado ≠ acumulado: se exige saldo > 0, como hace wealth-service.
+  const metas = goalRows.data ?? [];
   const protection = computeProtection(
     {
       freeCashflow: base.indicators.freeCashflow,
-      hasEmergencyFund: assets.some((a) => a.assetClass === "liquido"),
-      // Vista secundaria (Rich Life): no consulta metas, así que reutiliza el
-      // mismo proxy de liquidez para el fondo de paz. La pantalla autoritativa
-      // de protección (Patrimonio) sí detecta ambos fondos por goal_type.
-      hasPeaceFund: assets.some((a) => a.assetClass === "liquido"),
+      hasEmergencyFund: tieneFondoDeDefensa(metas, "defensa:fondo_emergencia"),
+      hasPeaceFund: tieneFondoDeDefensa(metas, "defensa:fondo_paz"),
       hasCriticalDebt,
       dependents: profileRow.data?.dependents_count ?? 0,
       riskClassKnown: true,
@@ -507,6 +532,11 @@ async function aggregarPatrimonio(
   return {
     assets: assetsForEngine,
     liabilities: liabsForEngine,
+    debtLiabilities: debtLiabs.map((l) => ({
+      ...l,
+      balance: convertCurrency(l.balance, l.currency, currency, rates),
+      currency,
+    })),
     passiveIncomeMonthly,
     monthlyExpenses: base.indicators.expenseMonthly,
     commitment,
@@ -526,6 +556,9 @@ async function aggregarPatrimonio(
       mesesConsecutivos(penultimoCierre.period, ultimoCierre.period)
         ? Number(ultimoCierre.net_worth) - Number(penultimoCierre.net_worth)
         : null,
+    // El mes que CIERRA ese Δ: lo usa la UI para rotular el veredicto y distinguirlo de
+    // la cifra "en lo que va del mes", que va de este cierre a hoy.
+    closedPeriod: ultimoCierre ? ultimoCierre.period : null,
   };
 }
 
@@ -564,6 +597,7 @@ export async function getRichLifeSummary(
     diversification: agg.portfolio.diversification,
     previous: agg.previousNetWorth !== null ? { netWorth: agg.previousNetWorth } : null,
     closedWealthDelta: agg.closedWealthDelta,
+    closedPeriod: agg.closedPeriod,
     currency: agg.currency,
   };
   const snapshot = buildRichLifeSnapshot(input);
@@ -572,6 +606,7 @@ export async function getRichLifeSummary(
     assets: agg.explicitAssets,
     allAssets: agg.assets,
     liabilities: agg.explicitLiabilities,
+    debtLiabilities: agg.debtLiabilities,
     currency: agg.currency,
   };
 }
@@ -637,6 +672,7 @@ export function buildDemoRichLifeSummary(): RichLifeSummary {
     diversification: "media",
     previous: { netWorth: 29_500_000 },
     closedWealthDelta: 420_000, // demo: dos cierres seguidos → veredicto "más rico"
+    closedPeriod: "2026-08-01", // …y el cierre del que sale ese veredicto: agosto
     currency,
   };
   return {
@@ -644,6 +680,8 @@ export function buildDemoRichLifeSummary(): RichLifeSummary {
     assets,
     allAssets: assets,
     liabilities,
+    // El ejemplo no tiene módulo de Deudas detrás: todos sus pasivos son manuales.
+    debtLiabilities: [],
     currency,
   };
 }

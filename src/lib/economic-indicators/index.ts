@@ -68,69 +68,63 @@ export async function getHistory(
   range: IndicatorRange = "1Y",
 ): Promise<IndicatorPoint[]> {
   const cacheKey = `hist:${code}:${range}`;
-  const cached = indicatorCache.get<IndicatorPoint[]>(cacheKey);
-  if (cached) return cached;
+  return indicatorCache.getOrFetch<IndicatorPoint[]>(cacheKey, TTL.read, async () => {
+    const supabase = await createSupabaseServerClient();
+    let query = supabase
+      .from("economic_indicators")
+      .select("observed_date, value")
+      .eq("indicator_code", code)
+      .order("observed_date", { ascending: true });
 
-  const supabase = await createSupabaseServerClient();
-  let query = supabase
-    .from("economic_indicators")
-    .select("observed_date, value")
-    .eq("indicator_code", code)
-    .order("observed_date", { ascending: true });
+    const from = sinceDate(range);
+    if (from) query = query.gte("observed_date", from);
 
-  const from = sinceDate(range);
-  if (from) query = query.gte("observed_date", from);
+    const { data, error } = await query;
+    if (error) {
+      logger.error("economic-indicators: getHistory falló", {
+        code,
+        table: "economic_indicators",
+        message: error.message,
+      });
+      throw new Error(error.message);
+    }
 
-  const { data, error } = await query;
-  if (error) {
-    logger.error("economic-indicators: getHistory falló", {
-      code,
-      table: "economic_indicators",
-      message: error.message,
-    });
-    throw new Error(error.message);
-  }
-
-  const points: IndicatorPoint[] = (data ?? []).map((r) => ({
-    date: r.observed_date,
-    value: Number(r.value),
-  }));
-  indicatorCache.set(cacheKey, points, TTL.read);
-  return points;
+    return (data ?? []).map((r) => ({
+      date: r.observed_date,
+      value: Number(r.value),
+    }));
+  });
 }
 
 /** Último valor observado de un indicador. */
 export async function getLatest(code: string): Promise<IndicatorLatest | null> {
   const cacheKey = `latest:${code}`;
-  const cached = indicatorCache.get<IndicatorLatest | null>(cacheKey);
-  if (cached !== null) return cached;
+  return indicatorCache.getOrFetch<IndicatorLatest | null>(cacheKey, TTL.read, async () => {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("economic_indicators")
+      .select("value, unit, observed_date")
+      .eq("indicator_code", code)
+      .order("observed_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      logger.error("economic-indicators: getLatest falló", {
+        code,
+        table: "economic_indicators",
+        message: error.message,
+      });
+      throw new Error(error.message);
+    }
+    if (!data) return null;
 
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("economic_indicators")
-    .select("value, unit, observed_date")
-    .eq("indicator_code", code)
-    .order("observed_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) {
-    logger.error("economic-indicators: getLatest falló", {
+    return {
       code,
-      table: "economic_indicators",
-      message: error.message,
-    });
-    throw new Error(error.message);
-  }
-  if (!data) return null;
-
-  const latest: IndicatorLatest = {
-    code,
-    value: Number(data.value),
-    unit: data.unit as IndicatorUnit,
-    observedDate: data.observed_date,
-  };
-  indicatorCache.set(cacheKey, latest, TTL.read);
-  return latest;
+      value: Number(data.value),
+      unit: data.unit as IndicatorUnit,
+      observedDate: data.observed_date,
+    };
+  });
 }
 
 /**

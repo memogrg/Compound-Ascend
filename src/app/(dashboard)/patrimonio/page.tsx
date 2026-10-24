@@ -4,6 +4,8 @@ import { isSupabaseConfigured } from "@/lib/auth/session";
 import { getWealthSummary, buildDemoWealthSummary } from "@/modules/wealth/services/wealth-service";
 import { getPortfolioReport } from "@/modules/wealth/services/portfolio-service";
 import { getSnapshotHistory } from "@/modules/wealth/services/snapshot-service";
+import { etiquetaUltimoDato } from "@/modules/wealth/engine/ultimo-dato";
+import { userToday } from "@/lib/time/user-time";
 import { listDividends } from "@/modules/wealth/services/dividend-service";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -75,11 +77,16 @@ async function PortfolioSection({ summary }: { summary: WealthSummary }) {
     // Sin perfil/diagnóstico: la sección sigue sin la nota.
   }
 
+  // El hoy del USUARIO (zona del perfil), no el del servidor: de ahí sale si la serie llega
+  // hasta hoy o hay que fecharla. Ver `etiquetaUltimoDato`.
+  const hoy = await userToday();
+
   return (
     <>
       {advice ? <AdvisorNote {...advice} /> : null}
       <PortfolioView
         report={report}
+        ultimoDato={etiquetaUltimoDato(snapshots, hoy)}
         snapshots={snapshots}
         dividends={dividends}
         summary={summary}

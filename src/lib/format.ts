@@ -117,6 +117,25 @@ export function formatMoney(amount: number, currency: string, decimals?: number)
   return Number(Math.abs(amount).toFixed(dec)) === 0 || amount >= 0 ? body : `${MINUS}${body}`;
 }
 
+/**
+ * Un decimal suelto —no un importe— con la puntuación de la casa: coma decimal.
+ *
+ * Existe porque los indicadores de patrimonio se pintaban con interpolación directa
+ * (`${r.mesesDeColchon}`), que usa el punto de JavaScript: «Años de libertad 0.21» y «Meses
+ * de colchón 1.7» en una pantalla donde todos los importes van con coma. Dos puntuaciones
+ * distintas en la misma tarjeta se leen como un descuido, y en un número pequeño el punto
+ * llega a parecer un separador de miles.
+ *
+ * Determinista, como el resto de `format.ts`: sin `Intl`, mismo resultado en servidor y en
+ * cliente. Agrupa los miles con punto por si el número crece, y usa el menos tipográfico.
+ */
+export function formatDecimal(n: number, digitos = 1): string {
+  if (!Number.isFinite(n)) return "—";
+  const cuerpo = formatAbs(n, digitos);
+  // El redondeo manda, igual que en `formatMoney`: −0,04 con 1 decimal es «0,0», no «−0,0».
+  return Number(Math.abs(n).toFixed(digitos)) === 0 || n >= 0 ? cuerpo : `${MINUS}${cuerpo}`;
+}
+
 /** Formatea una proporción 0-1 como porcentaje entero. */
 export function formatPercent(ratio: number, decimals = 0): string {
   return `${(ratio * 100).toFixed(decimals)}%`;
@@ -192,4 +211,182 @@ export function formatAxisCompact(amount: number, currency: string): string {
   const dec = Math.round(scaled * 10) % 10 === 0 ? 0 : 1;
   const body = `${prefixOf(currency)}${formatAbs(scaled, dec)}${step.suffix}`;
   return amount < 0 ? `${MINUS}${body}` : body;
+}
+
+/**
+ * Variación con signo explícito: +₡2.500 · −₡2.500 · ₡0 (el cero va SIN signo).
+ *
+ * Reusa formatMoney en vez de Intl con `signDisplay` a propósito: mantiene las cuatro
+ * reglas del encabezado, y sobre todo la 1 —agrupación a mano, no CLDR—. Un delta
+ * formateado con Intl saldría "+₡2 500" (espacio duro) al lado de un "₡2.500" de
+ * formatMoney, que es exactamente el bug de dos separadores que la nota 1 documenta.
+ */
+export function formatDelta(value: number, currency: string, decimals?: number): string {
+  const dec = decimals ?? currencyDecimals(currency);
+  const body = formatMoney(Math.abs(value), currency, decimals);
+  // El redondeo manda, igual que en formatMoney: +0,4 con 0 decimales es "₡0", sin signo.
+  if (Number(Math.abs(value).toFixed(dec)) === 0) return body;
+  return value > 0 ? `+${body}` : `${MINUS}${body}`;
+}
+
+/**
+ * Proporción 0-1 como porcentaje con UNA decimal: 0.123 → "12,3 %".
+ *
+ * Coma decimal y espacio duro antes del signo (tipografía española: el % va separado,
+ * y el espacio duro impide que quede huérfano al final de una línea). El espacio duro
+ * acá es una decisión tipográfica nuestra, no agrupación de CLDR: no depende del ICU
+ * del motor y por lo tanto es idéntico en servidor y cliente.
+ */
+export function formatPct1(ratio: number): string {
+  const pct = ratio * 100;
+  // formatAbs es el formateador de la casa: agrupa miles con punto y usa coma decimal.
+  // Un porcentaje de cuatro cifras (un retorno de 12.345,6 %) se agrupa como cualquier
+  // otra cifra; sin esto saldría "12345,6 %" al lado de importes que sí van agrupados.
+  const body = `${formatAbs(pct, 1)} %`;
+  return Number(Math.abs(pct).toFixed(1)) === 0 || pct > 0 ? body : `${MINUS}${body}`;
+}
+
+/**
+ * LA locale. Una sola, y acá.
+ *
+ * Formatear una fecha es una decisión de producto —qué locale, qué abreviatura— y tomarla en
+ * cada pantalla es cómo se llegó a tener 19 llamadas con 12 combinaciones distintas: `es-MX`
+ * ×9, `es-CR` ×9 y `es` ×1, con la MISMA forma escrita con las tres.
+ *
+ * Se usa para las formas LARGAS, que son idénticas en las tres locales («16 de septiembre de
+ * 2026»). Las cortas no salen de Intl sino de `MONTHS_TINY`, por lo de abajo.
+ */
+const LOCALE = "es-CR";
+
+/**
+ * Meses en minúscula para etiquetas cortas de eje y fila.
+ *
+ * Esta tabla es la ÚNICA fuente del mes corto, por encima de Intl, y es una decisión tomada:
+ * `es-CR` abrevia septiembre «sept» y esta tabla «sep». Es el único mes en el que las locales
+ * del repo diferían — los otros once coinciden y las formas largas son idénticas en las tres.
+ *
+ * Gana la tabla porque es la que alimenta los ejes de todos los gráficos: un eje de doce meses
+ * con «sept» pide una letra más justo donde el espacio se acaba, y ese ancho ya está medido.
+ */
+const MONTHS_TINY = [
+  "ene",
+  "feb",
+  "mar",
+  "abr",
+  "may",
+  "jun",
+  "jul",
+  "ago",
+  "sep",
+  "oct",
+  "nov",
+  "dic",
+];
+
+/**
+ * "2026-08-16" → "16 ago". Parsea la CADENA, sin Date: `new Date("2026-08-16")` se
+ * interpreta en UTC y en Costa Rica (UTC−6) retrocede al día 15.
+ */
+export function formatDayMonth(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  return `${Number(m[3])} ${MONTHS_TINY[Number(m[2]) - 1] ?? ""}`;
+}
+
+/** "2026-08" o "2026-08-16" → "ago 26". Mismo parseo determinista. */
+export function formatMonthShort(iso: string): string {
+  const m = /^(\d{4})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  return `${MONTHS_TINY[Number(m[2]) - 1] ?? ""} ${(m[1] ?? "").slice(2)}`;
+}
+
+/* ── Fechas con nombre de mes ───────────────────────────────────────────────────────
+ *
+ * Lo que había antes: 19 `toLocaleDateString` repartidos por 18 archivos, cada uno con su
+ * locale escrita a mano. Dos pantallas de la misma app escribían el mismo mes distinto, y
+ * solo en septiembre — el tipo de fallo que nadie reproduce cuando lo reportan en octubre.
+ */
+
+/** Un ISO, un `Date` o un epoch en milisegundos → año, mes y día ya resueltos. */
+function partes(v: string | Date | number): { y: number; m: number; d: number } | null {
+  if (typeof v === "string") {
+    // Se parsea la CADENA, sin `new Date`: `new Date("2026-08-16")` se interpreta en UTC y
+    // en Costa Rica (UTC−6) retrocede al día 15. Es el mismo motivo que en `formatDayMonth`.
+    const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?/.exec(v);
+    return m ? { y: Number(m[1]), m: Number(m[2]), d: Number(m[3] ?? 1) } : null;
+  }
+  const d = typeof v === "number" ? new Date(v) : v;
+  return Number.isNaN(d.getTime())
+    ? null
+    : { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
+}
+
+const mesCorto = (m: number) => MONTHS_TINY[m - 1] ?? "";
+
+/** "16 sep" */
+export function formatDayMonthTiny(v: string | Date | number): string {
+  const p = partes(v);
+  return p ? `${p.d} ${mesCorto(p.m)}` : String(v);
+}
+
+/** "16 sep 2026" */
+export function formatDayMonthTinyYear(v: string | Date | number): string {
+  const p = partes(v);
+  return p ? `${p.d} ${mesCorto(p.m)} ${p.y}` : String(v);
+}
+
+/** "sep 2026" — con el año de CUATRO cifras (`formatMonthShort` da "sep 26"). */
+export function formatMonthTinyYear(v: string | Date | number): string {
+  const p = partes(v);
+  return p ? `${mesCorto(p.m)} ${p.y}` : String(v);
+}
+
+/** "sep" */
+export function formatMonthTiny(v: string | Date | number): string {
+  const p = partes(v);
+  return p ? mesCorto(p.m) : String(v);
+}
+
+/**
+ * "16 de septiembre" · "16 de septiembre de 2026".
+ *
+ * Estas sí salen de Intl: la forma larga es idéntica en `es-CR`, `es-MX` y `es`, así que no
+ * hay decisión que tomar y no vale la pena mantener una segunda tabla de doce nombres.
+ */
+function largo(v: string | Date | number, opciones: Intl.DateTimeFormatOptions): string {
+  const p = partes(v);
+  if (!p) return String(v);
+  return new Date(p.y, p.m - 1, p.d).toLocaleDateString(LOCALE, opciones);
+}
+
+/** "16 de septiembre" */
+export function formatDayMonthLong(v: string | Date | number): string {
+  return largo(v, { day: "numeric", month: "long" });
+}
+
+/* ── Intl con LA locale ─────────────────────────────────────────────────────────────
+ *
+ * Para lo que sí necesita Intl —agrupación de miles con decimales variables, nombres largos
+ * de mes— pero no debería elegir la locale en cada pantalla. Mismo comportamiento que antes;
+ * lo único que cambia es dónde se decide.
+ */
+
+/** Un `Intl.NumberFormat` con la locale del producto. */
+export function formateadorNumero(opciones?: Intl.NumberFormatOptions): Intl.NumberFormat {
+  return new Intl.NumberFormat(LOCALE, opciones);
+}
+
+/** Un `Intl.DateTimeFormat` con la locale del producto. */
+export function formateadorFecha(opciones?: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  return new Intl.DateTimeFormat(LOCALE, opciones);
+}
+
+/** Un número con la locale del producto. Equivale a `n.toLocaleString(LOCALE, opciones)`. */
+export function formatNumber(n: number, opciones?: Intl.NumberFormatOptions): string {
+  return n.toLocaleString(LOCALE, opciones);
+}
+
+/** "16 de septiembre de 2026" */
+export function formatDateLong(v: string | Date | number): string {
+  return largo(v, { day: "numeric", month: "long", year: "numeric" });
 }

@@ -3,7 +3,7 @@
  * Reciben los datos ya calculados desde la página. Sincronización: lo real sale
  * de transactions; el presupuesto de budget_items.
  */
-import { formatMoney, formatPercent, formatCompact } from "@/lib/format";
+import { formatMoney, formatPercent, formatCompact, formatMonthShort } from "@/lib/format";
 import { convertCurrency } from "@/lib/fx";
 import { MetricCard, type MetricTone } from "@/components/shared/metric-card";
 import {
@@ -12,6 +12,25 @@ import {
 } from "@/components/shared/financial-insight-card";
 import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
 import { PremiumLineChart, PerformanceChart } from "@/components/charts/lazy";
+import {
+  ChartFrame,
+  HistoricoGasto,
+  LeyendaDona,
+  LeyendaHistoricoGasto,
+  LeyendaSeries,
+  describirDona,
+  describirGrafico,
+  filasLeyenda,
+  tablaDeDatos,
+  tablaDona,
+  tablaHistoricoGasto,
+  type PeriodoEnCurso,
+  type SerieDef,
+} from "@/components/charts/core";
+import {
+  rotuloDelRango,
+  type MesPresupuestado,
+} from "@/modules/financial-base/engine/presupuesto-por-mes";
 import { LiquidityCard } from "@/modules/financial-base/components/v2/liquidity-card";
 import { TransactionsBrowser } from "@/modules/financial-base/components/v2/transactions-browser";
 import { IncomeSources } from "@/modules/financial-base/components/v2/income-sources";
@@ -81,15 +100,20 @@ import type {
 } from "@/modules/financial-base/types";
 import { monthParam, type RangeKey } from "@/modules/financial-base/engine/period";
 
+/**
+ * La paleta de las donas de CATEGORÍA. Son los seis tonos de gráfico, que es la única paleta
+ * del repo validada para daltonismo (`tests/unit/contraste-paleta.test.ts`), y son seis
+ * porque seis es lo que la leyenda muestra antes de agrupar el resto en «Otras N»: con la
+ * lista anterior —ocho tokens semánticos, varios de ellos alias del mismo color— y
+ * veinticinco categorías, el índice daba la vuelta tres veces y la dona repetía colores.
+ */
 const PALETTE = [
-  "var(--pos)",
-  "var(--info)",
-  "var(--gold)",
-  "var(--teal)",
-  "var(--c-networth)",
-  "var(--warn)",
-  "var(--c-protect)",
-  "var(--muted-2)",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
 ];
 
 const PRESSURE: Record<FinancialPressure, { label: string; tone: MetricTone }> = {
@@ -108,6 +132,12 @@ export type V2View = {
   budget: BudgetTotals;
   real: RealTotals;
   history: HistoryPoint[];
+  /** El presupuesto de CADA mes del rango, alineado con `history`. Solo lo arma `/gastos`. */
+  budgetByMonth?: MesPresupuestado[];
+  /** Cuántos meses cubre el rango: lo confiesan los rótulos de los KPI. */
+  rangeMonths?: number;
+  /** El mes a medias, si el periodo de la vista ES el actual. */
+  enCurso?: PeriodoEnCurso | null;
   financialPressure: FinancialPressure;
   transactions: Transaction[];
   categories: Category[];
@@ -252,6 +282,18 @@ function TopTable({
   );
 }
 
+/**
+ * Las tres series del flujo libre, en un solo sitio: las leen el gráfico, la tabla y la leyenda.
+ *
+ * Estaban escritas a mano dentro del JSX del gráfico, y la tabla no existía. Con tres consumidores
+ * de la misma lista, tenerla tres veces es tenerla distinta.
+ */
+const SERIES_FLUJO: SerieDef[] = [
+  { clave: "Ingresos", etiqueta: "Ingresos", color: "var(--pos)", marca: "linea" },
+  { clave: "Gastos", etiqueta: "Gastos", color: "var(--c-expense)", marca: "linea" },
+  { clave: "Flujo libre", etiqueta: "Flujo libre", color: "var(--info)", marca: "linea" },
+];
+
 function tone(v: number, goodWhenPositive = true): MetricTone {
   if (Math.abs(v) < 0.001) return "neutral";
   return v > 0 === goodWhenPositive ? "pos" : "warn";
@@ -268,8 +310,12 @@ export function MiBaseSection({ view }: { view: V2View }) {
     budgetExpense: budget.budgetExpense,
     realExpense: monthFlow.real.operatingExpense,
   });
+  /**
+   * El flujo libre por mes. La clave del eje es `x` y no `label` porque `tablaDeDatos` la lee de
+   * ahí: una sola forma para el gráfico, la tabla y la leyenda.
+   */
   const flujoLine = history.map((h) => ({
-    label: h.label,
+    x: h.label,
     Ingresos: h.realIncome,
     Gastos: h.realExpense,
     "Flujo libre": h.freeCashflow,
@@ -355,31 +401,64 @@ export function MiBaseSection({ view }: { view: V2View }) {
         </ChartCard>
       </section>
 
-      <ChartCard title="C · Flujo de caja libre mensual" hint="ingresos · gastos · flujo">
-        <PremiumLineChart
-          data={flujoLine}
-          xKey="label"
-          currency={currency}
-          series={[
-            { key: "Ingresos", label: "Ingresos", color: "var(--pos)" },
-            { key: "Gastos", label: "Gastos", color: "var(--c-expense)" },
-            { key: "Flujo libre", label: "Flujo libre", color: "var(--info)" },
-          ]}
-        />
-      </ChartCard>
+      {/* C · Flujo de caja libre — al marco del núcleo (26.2).
+       *
+       * `alto` 220 es el del `ChartSkeleton` de `charts/lazy.tsx`, y no es cosmético: este gráfico
+       * es `dynamic(..., { ssr: false })`, así que su esqueleto aparece al hidratar y se va cuando
+       * llega el chunk. Si el marco midiera otra cosa, la página daría un salto justo ahí.
+       *
+       * `estado` sale de los datos. NO se pasa `error`: `loadBaseView` pide el histórico dentro de
+       * un `Promise.all`, así que un fallo del servicio rechaza la vista entera y la recoge el
+       * límite de error de la página — no existe un estado en el que este gráfico se pinte con un
+       * histórico fallido. Pasar `error` sin señal que lo dispare sería una promesa vacía.
+       */}
+      <div className="card card-pad">
+        <ChartFrame
+          titulo="C · Flujo de caja libre mensual"
+          subtitulo="ingresos · gastos · flujo"
+          alto={220}
+          estado={flujoLine.length < 2 ? "vacio" : "datos"}
+          mensajeVacio="Hacen falta al menos dos meses cerrados para trazar el flujo."
+          descripcion={describirGrafico({
+            titulo: "Flujo de caja libre mensual",
+            serie: flujoLine.map((f) => ({ x: f.x, y: f["Flujo libre"] })),
+            formato: (v) => formatMoney(v, currency),
+          })}
+          tabla={tablaDeDatos(flujoLine, SERIES_FLUJO, (v) => formatMoney(v, currency), "Mes")}
+          leyenda={<LeyendaSeries series={SERIES_FLUJO} />}
+        >
+          <PremiumLineChart
+            data={flujoLine}
+            xKey="x"
+            currency={currency}
+            series={SERIES_FLUJO.map((se) => ({
+              key: se.clave,
+              label: se.etiqueta,
+              color: se.color,
+            }))}
+          />
+        </ChartFrame>
+      </div>
 
       <section className="cols-2">
+        {/* Estas dos suman lo REAL (transacciones del periodo), no el presupuesto. El
+            subtítulo lo dice: decía «al mes», que da el período pero no la naturaleza, y con
+            una tarjeta hermana que suma presupuesto la diferencia no es cosmética. */}
         <DonutCard
           title="D · Composición de ingresos"
           data={donutData(real.incomeByKey)}
           total={real.realIncome}
           currency={currency}
+          modo="lista"
+          sub="ingreso real del mes"
         />
         <DonutCard
           title="E · Composición de gastos"
           data={donutData(real.expenseByKey)}
           total={real.realExpense}
           currency={currency}
+          modo="lista"
+          sub="gasto real del mes"
         />
       </section>
 
@@ -403,58 +482,69 @@ export function MiBaseSection({ view }: { view: V2View }) {
   );
 }
 
+/** El tamaño del anillo, el mismo que usa `DonutChart` por defecto. */
+const ANILLO = 132;
+
 function DonutCard({
   title,
   data,
   total,
   currency,
+  modo,
+  sub = "al mes",
 }: {
   title: string;
   data: DonutDatum[];
   total: number;
   currency: string;
+  /**
+   * `lista` para categorías (se ordenan por monto y las que no caben se agrupan);
+   * `taxonomia` —el defecto— para bloques fijos, que se muestran todos.
+   */
+  modo?: "taxonomia" | "lista";
+  /**
+   * Qué periodo describe el total del centro. Por defecto «al mes», que es lo que era
+   * cuando todas estas tarjetas miraban un mes.
+   */
+  sub?: string;
 }) {
+  const leyenda = filasLeyenda(data, { modo });
+  const dinero = (v: number) => formatMoney(v, currency);
+
   return (
     <div className="card card-pad">
-      <div className="card-title">{title}</div>
-      <div
-        style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14, flexWrap: "wrap" }}
+      <ChartFrame
+        titulo={title}
+        /* El lienzo mide el anillo y nada más: una dona no tiene ejes ni tooltip anclado, que es
+           para lo que existe el piso de `ALTO_MINIMO`. */
+        alto={ANILLO}
+        ajustadoAlContenido
+        estado={leyenda.filas.length === 0 ? "vacio" : "datos"}
+        mensajeVacio="Sin datos este mes."
+        /* El `sub` del centro viaja a la descripción, pegado al número que califica. En el centro
+           del anillo es un `<div>` encima del SVG que el lector lee suelto, y un «al mes» sin cifra
+           al lado no dice nada. */
+        descripcion={describirDona({
+          titulo: title,
+          filas: leyenda.filas,
+          formato: dinero,
+          nombrePartes: modo === "lista" ? "categorías" : "bloques",
+          sub,
+        })}
+        /* La tabla sale de LAS MISMAS filas que dibuja el anillo: en modo `lista` eso son las seis
+           mayores más «Otras N», con el desglose de lo agrupado en la nota de esa fila. Armarla con
+           `data` crudo daría veinticinco filas contra seis porciones. */
+        tabla={tablaDona(leyenda, dinero, modo === "lista" ? "Categoría" : "Bloque")}
+        disposicionLeyenda="lateral"
+        leyenda={<LeyendaDona filas={leyenda.filas} ocultas={leyenda.ocultas} moneda={currency} />}
       >
-        <DonutChart data={data} centerLabel={formatCompact(total, currency)} centerSub="al mes" />
-        <div style={{ flex: 1, minWidth: 150, display: "flex", flexDirection: "column", gap: 7 }}>
-          {data.length === 0 ? (
-            <span className="muted" style={{ fontSize: 12.5 }}>
-              Sin datos este mes.
-            </span>
-          ) : (
-            data.map((d) => (
-              <div
-                key={d.name}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "10px 1fr auto",
-                  gap: 8,
-                  alignItems: "center",
-                  fontSize: 12.5,
-                }}
-              >
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
-                <span
-                  style={{
-                    color: "var(--ink-2)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {d.name}
-                </span>
-                <span className="muted tnum">{formatMoney(d.value, currency)}</span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+        <DonutChart
+          data={leyenda.filas.map((f) => ({ name: f.name, value: f.value, color: f.color }))}
+          size={ANILLO}
+          centerLabel={formatCompact(total, currency)}
+          centerSub={sub}
+        />
+      </ChartFrame>
     </div>
   );
 }
@@ -496,21 +586,25 @@ export function IncomeExpenseSection({
   const diff = realTotal - budgetTotal;
   const complPct = budgetTotal > 0 ? realTotal / budgetTotal : 0;
   const items = budget.items.filter((b) => b.type === "expense");
+  // Estas tres tarjetas muestran un total del RANGO, no del mes. Sin decirlo, quien mira
+  // compara un trimestre contra su presupuesto mensual y cree que va sobrado. El cálculo NO
+  // cambia; cambia lo que el rótulo confiesa.
+  const delRango = rotuloDelRango(range ?? "3m", view.rangeMonths ?? 1);
 
   const summary: SumCard[] = [
     {
       ttl: "Gasto planificado",
       val: formatMoney(budgetTotal, currency),
-      sub: `${items.length} categoría(s)`,
+      sub: `${delRango} · ${items.length} categoría(s)`,
     },
     { ttl: "Gasto real", val: formatMoney(realTotal, currency), sub: "hasta hoy" },
     {
       ttl: "Diferencia",
       val: `${diff >= 0 ? "+" : ""}${formatMoney(diff, currency)}`,
-      sub: "real − planificado",
+      sub: `real − planificado, ${delRango}`,
       tone: diff <= 0 ? "pos" : "neg",
     },
-    { ttl: "% ejecución", val: formatPercent(complPct), sub: "del presupuesto" },
+    { ttl: "% ejecución", val: formatPercent(complPct), sub: `del presupuesto ${delRango}` },
   ];
 
   return (
@@ -523,21 +617,65 @@ export function IncomeExpenseSection({
       <SummaryStrip cards={summary} />
 
       <section className="cols-2">
-        <ChartCard title="Histórico de gastos" hint="real vs presupuesto">
-          <PerformanceChart
-            data={history.map((h) => ({ date: h.label, value: h.realExpense }))}
-            currency={currency}
-            tone="neg"
-            goalValue={Math.round(budgetTotal)}
-            height={160}
-            axes="full"
-          />
-        </ChartCard>
+        {(() => {
+          // El estado va EXPLÍCITO, que es lo que trae el núcleo: sin meses no hay nada que
+          // dibujar, y antes eso pintaba un marco vacío del alto de un gráfico sin decir por
+          // qué. `ChartFrame` reserva el mismo alto en los cuatro estados, así que la tarjeta
+          // no salta al pasar de «cargando» a «con datos».
+          const filas = history.map((h, i) => ({
+            label: h.label,
+            real: h.realExpense,
+            presupuesto: view.budgetByMonth?.[i]?.total ?? 0,
+          }));
+          return (
+            /* El marco del núcleo va DENTRO de la tarjeta del layout, igual que los paneles
+               vecinos: `ChartFrame` aporta el título, los cuatro estados de la misma altura y la
+               tabla accesible, pero no es la tarjeta. Sustituirlo por ella quitaba el `.card` que
+               da el fondo, el borde y el padding —medido: `/gastos` a 390 pasó de 4090 a 3967 px
+               de alto— y dejaba a los dos históricos desalineados con todo lo de al lado. */
+            <div className="card card-pad">
+              <ChartFrame
+                titulo="Histórico de gastos"
+                subtitulo="real vs presupuesto mensual"
+                estado={filas.length === 0 ? "vacio" : "datos"}
+                mensajeVacio="Todavía no hay meses cerrados que comparar."
+                alto={180}
+                descripcion={describirGrafico({
+                  titulo: "Histórico de gastos",
+                  serie: filas.map((f) => ({ x: f.label, y: f.real })),
+                  formato: (v) => formatMoney(v, currency),
+                })}
+                /* La tabla la construye el módulo puro del histórico, no `tablaDeDatos`: lleva cinco
+                   columnas (con Diferencia y Ejecución), tono por celda y la nota del mes en curso a
+                   todo el ancho. `HistoricoGasto` la pintaba por su cuenta y quedaban DOS tablas de
+                   los mismos datos en esta misma tarjeta. */
+                tabla={tablaHistoricoGasto(filas, currency, view.enCurso ?? null)}
+                /* Por el SLOT del marco, no dentro del gráfico: los children van en `.cf-lienzo`,
+                   que tiene altura FIJA, y la leyenda se salía de la tarjeta — a 1280 «Parcial»
+                   caía fuera; a 768 y 390 la segunda fila y la nota quedaban tapadas por la
+                   tarjeta de abajo. */
+                leyenda={<LeyendaHistoricoGasto datos={filas} enCurso={view.enCurso ?? null} />}
+              >
+                <HistoricoGasto
+                  datos={filas}
+                  moneda={currency}
+                  enCurso={view.enCurso ?? null}
+                  alto={180}
+                />
+              </ChartFrame>
+            </div>
+          );
+        })()}
+        {/* El centro suma el RANGO, igual que los KPI de arriba — la Hipoteca a tres meses
+            son tres cuotas, no una. El cálculo no cambia; cambia lo que el rótulo confiesa.
+            Decía «al mes» mientras mostraba un trimestre. */}
         <DonutCard
           title="Composición por categoría"
           data={donutData(real.expenseByKey)}
           total={realTotal}
           currency={currency}
+          modo="lista"
+          sub={`gasto real ${delRango}`}
         />
       </section>
 
@@ -663,21 +801,47 @@ function IncomeSection({ view }: { view: V2View }) {
       <SummaryStrip cards={summary} />
 
       <section className="cols-2">
-        <ChartCard title="Histórico de ingresos" hint="recibido por mes">
-          <PerformanceChart
-            data={incomeArea}
-            currency={currency}
-            tone="pos"
-            goalValue={Math.round(budgetIncome)}
-            height={160}
-            axes="full"
-          />
-        </ChartCard>
+        {/* El marco del núcleo va DENTRO de la tarjeta del layout, igual que los paneles vecinos:
+        `ChartFrame` aporta el título, los cuatro estados de la misma altura y la tabla accesible,
+        pero no es la tarjeta. Sustituirlo por ella quitaba el `.card` que da el fondo, el borde y
+        el padding —medido: `/gastos` a 390 pasó de 4090 a 3967 px de alto— y dejaba a los dos
+        históricos desalineados con todo lo de al lado. */}
+        <div className="card card-pad">
+          <ChartFrame
+            titulo="Histórico de ingresos"
+            subtitulo="recibido por mes"
+            estado={incomeArea.length === 0 ? "vacio" : "datos"}
+            mensajeVacio="Todavía no hay ingresos registrados en este rango."
+            alto={160}
+            descripcion={describirGrafico({
+              titulo: "Histórico de ingresos",
+              serie: incomeArea.map((d) => ({ x: formatMonthShort(d.date), y: d.value })),
+              formato: (v) => formatMoney(v, currency),
+            })}
+            tabla={tablaDeDatos(
+              incomeArea.map((d) => ({ x: formatMonthShort(d.date), value: d.value })),
+              [{ clave: "value", etiqueta: "Ingreso", color: "var(--chart-1)", marca: "area" }],
+              (v) => formatMoney(v, currency),
+              "Mes",
+            )}
+          >
+            <PerformanceChart
+              data={incomeArea}
+              currency={currency}
+              tone="pos"
+              goalValue={Math.round(budgetIncome)}
+              height={160}
+              axes="full"
+            />
+          </ChartFrame>
+        </div>
         <DonutCard
           title="Composición por fuente"
           data={donutData(incomeByManualSource)}
           total={realIncome}
           currency={currency}
+          modo="lista"
+          sub="ingreso real del mes"
         />
       </section>
 

@@ -21,6 +21,9 @@ function fakeDb(): { db: SupabaseClient<Database>; upserted: unknown[] } {
     Object.assign(b, {
       select: self,
       eq: self,
+      // getInsightsFreshness filtra por KINDS_DETECTORES; el doble tiene que encadenarlo
+      // igual que el cliente real, aunque este test no dependa del filtro.
+      in: self,
       order: self,
       limit: self,
       upsert: (rows: unknown) => {

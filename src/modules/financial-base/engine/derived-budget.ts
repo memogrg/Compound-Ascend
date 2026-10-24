@@ -43,12 +43,41 @@ export type DerivedDiff = {
   toDeleteIds: string[];
 };
 
+/** Opciones del diff. */
+export type OpcionesDiff = {
+  /**
+   * El periodo está CERRADO: solo se inserta, y solo si no hay nada.
+   *
+   * Un presupuesto congelado que se puede editar no es un presupuesto congelado. Sobre un mes
+   * cerrado, `toUpdate` reescribe la historia en vez de fijarla —bajar una cuota hoy cambiaría
+   * lo que se presupuestó hace cuatro meses— y `toDeleteIds` borra la línea que PRUEBA que ese
+   * mes se presupuestó: saldar una deuda haría desaparecer su rastro.
+   *
+   * Y no se inserta nada si el periodo ya tiene ALGUNA línea derivada. Es la idempotencia del
+   * cron ante reintentos, y se mira el periodo entero y no cada entidad a propósito: un mes a
+   * medio materializar —unas líneas del cierre y otras de hoy— sería peor que uno sin ninguna.
+   */
+  congelado?: boolean;
+};
+
 /**
  * Diff por (sourceKind, sourceId): inserta lo nuevo, actualiza lo cambiado
  * (nombre/monto/moneda/categoría), borra las líneas cuya entidad ya no
  * existe o dejó de aportar. Las líneas manuales nunca entran aquí.
+ *
+ * Con `congelado`, solo inserta. Ver `OpcionesDiff`.
  */
-export function diffDerived(existing: ExistingDerived[], desired: DesiredLine[]): DerivedDiff {
+export function diffDerived(
+  existing: ExistingDerived[],
+  desired: DesiredLine[],
+  { congelado = false }: OpcionesDiff = {},
+): DerivedDiff {
+  if (congelado) {
+    // El periodo ya se materializó: no se toca más. Da igual qué haya cambiado desde entonces.
+    if (existing.length > 0) return { toInsert: [], toUpdate: [], toDeleteIds: [] };
+    return { toInsert: [...desired], toUpdate: [], toDeleteIds: [] };
+  }
+
   const key = (k: string, id: string | null) => `${k}:${id ?? ""}`;
   const desiredByKey = new Map(desired.map((d) => [key(d.sourceKind, d.sourceId), d]));
   const existingByKey = new Map(existing.map((e) => [key(e.sourceKind, e.sourceId), e]));
