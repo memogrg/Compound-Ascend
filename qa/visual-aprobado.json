@@ -1,114 +1,78 @@
 {
-  "pr": 920,
-  "corrida": 40037189546,
+  "pr": 948,
+  "corrida": 40124776581,
   "capturas": [
     {
-      "ruta": "/mi-base-financiera",
+      "ruta": "/mi-rich-life",
       "tema": "dark",
       "ancho": 1280,
-      "sha256_despues": "abfdbad2b0b6606d40d97ed88181cb4d30d7b953f826dcff30d9776fe50c8235"
+      "sha256_despues": "8f2dbaacf8d84ba1a732020ed919426f0d763ebc54f235e9cdb060f96d7ed7d8"
     },
     {
-      "ruta": "/mi-base-financiera",
-      "tema": "light",
-      "ancho": 1280,
-      "sha256_despues": "3f7e797ac643b7d0dbe732871c64fe973b08ca455fd635e7330117116c9db73d"
-    },
-    {
-      "ruta": "/gastos",
-      "tema": "dark",
-      "ancho": 768,
-      "sha256_despues": "82337ebba33aff3c832cedb03ae5b13ba8a8e06b4adbd501655b19089b8791fd"
-    },
-    {
-      "ruta": "/gastos",
-      "tema": "light",
-      "ancho": 768,
-      "sha256_despues": "8c14f52b110eef28cd6d76a08e241d19d9e6f1c37d8931b090e61456b4e8bb33"
-    },
-    {
-      "ruta": "/mi-base-financiera",
-      "tema": "dark",
-      "ancho": 768,
-      "sha256_despues": "10a5f1e160f6d5dd9886f01c9cb1d64320c9b04d113412cf0fd98fa645e8b330"
-    },
-    {
-      "ruta": "/mi-base-financiera",
-      "tema": "light",
-      "ancho": 768,
-      "sha256_despues": "970e30f36099671f463b891fec1619d566529e5e52ea663cc1065cd4461bf5be"
-    },
-    {
-      "ruta": "/mi-base-financiera",
-      "tema": "dark",
-      "ancho": 390,
-      "sha256_despues": "6cb6d17559374e2141408b0881df34d2bc85ab6c200166604c1664877b5f1756"
-    },
-    {
-      "ruta": "/mi-base-financiera",
-      "tema": "light",
-      "ancho": 390,
-      "sha256_despues": "13df4aa8472c9ba4d11b52859be6761fa1c7e8434794b3dcc96aa9d8612e3260"
-    },
-    {
-      "ruta": "/gastos",
-      "tema": "dark",
-      "ancho": 390,
-      "sha256_despues": "ee380c90d01ebf2588cd87fc3ad18c54da58163ea2a9ce439c66248ecef7a072"
-    },
-    {
-      "ruta": "/gastos",
-      "tema": "light",
-      "ancho": 390,
-      "sha256_despues": "38611d354eb227ab6c5620fd7d951fdb0d6d6846c19d8b8eb9c2c4871561faa4"
-    },
-    {
-      "ruta": "/ingresos",
-      "tema": "dark",
-      "ancho": 390,
-      "sha256_despues": "3386cdde79b890c0909ebd2f57b8efe9e067121656a7dd2d47d0298d1578be64"
-    },
-    {
-      "ruta": "/ingresos",
-      "tema": "light",
-      "ancho": 390,
-      "sha256_despues": "32346af57cda4f03ec584a5fe74e52ed4fda4f984fc1074785878660601f1474"
-    },
-    {
-      "ruta": "/gastos",
-      "tema": "light",
-      "ancho": 1280,
-      "sha256_despues": "eb6b0fa4b32ab852345db93f24f35487a39ddc53b77b64f3fb5fc5c8639de303"
-    },
-    {
-      "ruta": "/gastos",
+      "ruta": "/patrimonio",
       "tema": "dark",
       "ancho": 1280,
-      "sha256_despues": "06a9b49d4bee7836cc85717fa9cfa80765174990b700fd17a9195d4ee421fee9"
+      "sha256_despues": "f2dae94c65d766edfe0dafb20f98f5579adc51c38321fe6ebfb33acb77554b4a"
     },
     {
-      "ruta": "/ingresos",
-      "tema": "light",
-      "ancho": 768,
-      "sha256_despues": "e09b3d6a542721f72d75d432a114d0c5f164ed346583526645c68b17c12d5d69"
+      "ruta": "/mi-rich-life",
+      "tema": "dark",
+      "ancho": 390,
+      "sha256_despues": "bcdb2ee021669b8ed7c142c9d3fdf9580e7368d053f3798dfe5c3add9ecdc13c"
     },
     {
-      "ruta": "/ingresos",
+      "ruta": "/patrimonio",
+      "tema": "dark",
+      "ancho": 390,
+      "sha256_despues": "aea9cf1601ba40ca423d96132a0fb930d36d0306c182cd256c30ea99a3668809"
+    },
+    {
+      "ruta": "/mi-rich-life",
       "tema": "dark",
       "ancho": 768,
-      "sha256_despues": "aacd045f2a2f79792ae0e23f1c07926ac8786980f1d846fd9959f054ebc72f2d"
+      "sha256_despues": "1268b6d2c68cd14b664678bf54be9d4017669c2eeb3a45492c0240fd1b3dc4d5"
     },
     {
-      "ruta": "/ingresos",
+      "ruta": "/patrimonio",
+      "tema": "dark",
+      "ancho": 768,
+      "sha256_despues": "c14f08f2e2f1aea9e7226c9abcc54390583e31ace65b722facf4caa026f2c276"
+    },
+    {
+      "ruta": "/mi-rich-life",
       "tema": "light",
       "ancho": 1280,
-      "sha256_despues": "33c83b64d1f65c35bb534f0614fa1709633aefa2a8a0446250b3d8df3bafe0a5"
+      "sha256_despues": "c3397234ac5b642b2534ee5eee1d6d17317e0db6a2e440dbd15cb641c94c998e"
     },
     {
-      "ruta": "/ingresos",
-      "tema": "dark",
+      "ruta": "/patrimonio",
+      "tema": "light",
       "ancho": 1280,
-      "sha256_despues": "97bca9fc73f787242aa411298df1a7e9ff4c72a2b78f0898c85a4494c89da2e7"
+      "sha256_despues": "68942d535a7f56a1715015775618ff5cc719c5abaa3f358a7cb3aaa2fef74825"
+    },
+    {
+      "ruta": "/mi-rich-life",
+      "tema": "light",
+      "ancho": 390,
+      "sha256_despues": "68d0587e8b1cfb0b433674f9e3cf676d321e9df1acfc82afba1dd77d2c084c1a"
+    },
+    {
+      "ruta": "/patrimonio",
+      "tema": "light",
+      "ancho": 390,
+      "sha256_despues": "849c641a9d557a785b6d9db37241b3a60af80b8d569fb39fe04e831434942239"
+    },
+    {
+      "ruta": "/mi-rich-life",
+      "tema": "light",
+      "ancho": 768,
+      "sha256_despues": "7f02451ef8b4305fcafc781646bc1f0428db9a525536470ca483ecd6b2e7f9eb"
+    },
+    {
+      "ruta": "/patrimonio",
+      "tema": "light",
+      "ancho": 768,
+      "sha256_despues": "655c928e373351123a4bddb61362b099bf88df6ca107bf2f59bc0ca0559054db"
     }
   ]
 }
