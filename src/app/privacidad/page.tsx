@@ -171,6 +171,15 @@ export default function PrivacidadPage() {
               </td>
             </tr>
             <tr>
+              <td>RevenueCat</td>
+              <td>
+                Gestión de suscripciones compradas en App Store y Google Play: recibe el
+                identificador de tu cuenta, el producto comprado y el estado de la suscripción;
+                nunca tu tarjeta, que la procesa Apple o Google. Transferencia internacional: EE.
+                UU.
+              </td>
+            </tr>
+            <tr>
               <td>Sentry</td>
               <td>Diagnóstico de errores. Sin datos personales y sin grabación de pantalla</td>
             </tr>

@@ -63,6 +63,17 @@ export type ProfileRow = Timestamps & {
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
 
+  // ── Suscripción de tienda vía RevenueCat (migración 20261025000001) ─────
+  // Las escribe SOLO el webhook de RevenueCat; las blinda `protect_profile_store_billing`.
+  /** Suscripción viva comprada en App Store / Google Play. */
+  store_subscription_active: boolean;
+  store_platform: "ios" | "android" | null;
+  store_product_id: string | null;
+  /** Fin del período pagado en la tienda. */
+  store_period_end: string | null;
+  /** original_app_user_id de RevenueCat. */
+  revenuecat_app_user_id: string | null;
+
   // ── Aceptación legal (migración 20260912000001) ───────────────────────
   /** LEGAL_VERSION que la persona aceptó. `null` = pendiente (cuenta anterior al registro). */
   terms_version: string | null;
