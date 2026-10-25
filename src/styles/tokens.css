@@ -10,6 +10,18 @@
   --font-display: var(--font-sora), "Sora", "Segoe UI", system-ui, sans-serif;
   --font-body: var(--font-manrope), "Manrope", "Segoe UI", system-ui, sans-serif;
   --font-mono: var(--font-space-mono), "Space Mono", ui-monospace, Menlo, monospace;
+
+  /* ── El título de una tarjeta ─────────────────────────────────────────────────
+     Un solo sitio para las cuatro propiedades, porque hay DOS clases que lo pintan:
+     `.card-title` (la tarjeta de siempre) y `.cf-titulo` (la cabecera del marco de
+     gráficos). Vivían con valores distintos —15 px con `--font-display` contra 14 px
+     con la familia del cuerpo—, así que cada pantalla que pasaba al marco cambiaba de
+     tipografía sin que nadie lo hubiera decidido. Con el token, cambiarlo es cambiarlo
+     en los dos. */
+  --titulo-tarjeta-familia: var(--font-display);
+  --titulo-tarjeta-tamano: 15px;
+  --titulo-tarjeta-peso: 600;
+  --titulo-tarjeta-espaciado: -0.01em;
   --sans: var(--font-body);
   --serif: var(--font-display);
   --mono: var(--font-mono);
