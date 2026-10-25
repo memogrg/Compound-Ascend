@@ -84,6 +84,10 @@ const serverSchema = z.object({
   // suscripción lo dice en vez de romperse con un checkout que no existe.
   STRIPE_SECRET_KEY: optionalStr, // sk_live_... / sk_test_...
   STRIPE_WEBHOOK_SECRET: optionalStr, // whsec_... del endpoint de Stripe
+  // RevenueCat (suscripciones de App Store / Google Play). Sin el secreto, el webhook
+  // responde 503 en vez de aceptar eventos sin autenticar.
+  REVENUECAT_WEBHOOK_SECRET: optionalStr,
+  REVENUECAT_ACCEPT_SANDBOX: optionalStr, // "1" = aceptar compras de prueba
   CRON_SECRET: optionalStr,
   // Firma HMAC de los tokens de baja de correo (ruta pública). Si falta, la baja
   // por enlace se degrada con un error controlado (no crashea).
