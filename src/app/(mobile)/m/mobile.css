@@ -759,6 +759,23 @@ body:has(.m-shell[data-theme="dark"]) {
   cursor: pointer;
   box-shadow: var(--e1);
 }
+/* Sign in with Apple. Las HIG piden el botón negro sobre fondo claro y blanco sobre fondo
+   oscuro —negro sobre negro no se distingue del lienzo—, así que invierte con el tema en
+   vez de usar los tokens de superficie. Mismo chasis que .m-oauth: solo cambia la piel.
+   El borde acompaña al fondo para que el botón no pierda su silueta en ninguno de los dos. */
+.m-shell .m-oauth-apple {
+  background: #000000;
+  border-color: #000000;
+  color: #ffffff;
+}
+[data-theme="dark"] .m-shell .m-oauth-apple,
+.m-shell[data-theme="dark"] .m-oauth-apple,
+.m-shell.dark .m-oauth-apple {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #000000;
+}
+
 .m-shell .m-oauth:active {
   transform: scale(0.98);
 }
