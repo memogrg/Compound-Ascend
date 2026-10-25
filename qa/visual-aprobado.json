@@ -1,78 +1,174 @@
 {
-  "pr": 948,
-  "corrida": 40124776581,
+  "pr": 954,
+  "corrida": 40141166855,
   "capturas": [
     {
+      "ruta": "/dashboard",
+      "tema": "dark",
+      "ancho": 1280,
+      "sha256_despues": "285c888a561724a0ebbe121da80a25700b60e64f0921ba2ba3ca9112211c4db8"
+    },
+    {
+      "ruta": "/gastos",
+      "tema": "dark",
+      "ancho": 1280,
+      "sha256_despues": "bf96fb679c14503585ade63b34b245024b0852b58f444a3500354b9fcb360c17"
+    },
+    {
+      "ruta": "/ingresos",
+      "tema": "dark",
+      "ancho": 1280,
+      "sha256_despues": "3a60eaa50f19f6d5b9369a0787293c75ee5dd89ff9a496d438fbc1b2634881b4"
+    },
+    {
       "ruta": "/mi-rich-life",
       "tema": "dark",
       "ancho": 1280,
-      "sha256_despues": "8f2dbaacf8d84ba1a732020ed919426f0d763ebc54f235e9cdb060f96d7ed7d8"
+      "sha256_despues": "ea883fb3bacc48be179ed49b9087924a56affe4c2af737767f658a53112a075a"
     },
     {
-      "ruta": "/patrimonio",
+      "ruta": "/dashboard",
       "tema": "dark",
-      "ancho": 1280,
-      "sha256_despues": "f2dae94c65d766edfe0dafb20f98f5579adc51c38321fe6ebfb33acb77554b4a"
+      "ancho": 390,
+      "sha256_despues": "f4e88e823d74da5273ea442179807dce1e0944dbb132d0662fe42bb16e7b087e"
+    },
+    {
+      "ruta": "/gastos",
+      "tema": "dark",
+      "ancho": 390,
+      "sha256_despues": "0ed5283c368967076f2435978914918e39132d1e0c51fc5973d0248cb69c9c69"
+    },
+    {
+      "ruta": "/ingresos",
+      "tema": "dark",
+      "ancho": 390,
+      "sha256_despues": "bf3eebedd3337b0920d9afda9de37898b3d3efec7bc5bfd5f66f15588b59df5d"
     },
     {
       "ruta": "/mi-rich-life",
       "tema": "dark",
       "ancho": 390,
-      "sha256_despues": "bcdb2ee021669b8ed7c142c9d3fdf9580e7368d053f3798dfe5c3add9ecdc13c"
+      "sha256_despues": "efd32d51d13e1a5e72e83770991f084e8e63eca9f6adbad4bf7d8727d69c6544"
     },
     {
       "ruta": "/patrimonio",
       "tema": "dark",
       "ancho": 390,
-      "sha256_despues": "aea9cf1601ba40ca423d96132a0fb930d36d0306c182cd256c30ea99a3668809"
+      "sha256_despues": "71d60221735c8e8585d3d46136ecb7535801dcacf165714bdc558756c95ecfae"
+    },
+    {
+      "ruta": "/dashboard",
+      "tema": "dark",
+      "ancho": 768,
+      "sha256_despues": "b24861d709c56df516cfbba017230375df0336e44bacbbd881d0284d2a1b47bb"
+    },
+    {
+      "ruta": "/gastos",
+      "tema": "dark",
+      "ancho": 768,
+      "sha256_despues": "623381fd321967e4ccb211fe3b9f7e5c09dc6aef4d6172ba4df796aa635812b9"
+    },
+    {
+      "ruta": "/ingresos",
+      "tema": "dark",
+      "ancho": 768,
+      "sha256_despues": "2f79abc1a6420f58273445b0e638870821b78890e16654e7eef9fa7afe2b8455"
     },
     {
       "ruta": "/mi-rich-life",
       "tema": "dark",
       "ancho": 768,
-      "sha256_despues": "1268b6d2c68cd14b664678bf54be9d4017669c2eeb3a45492c0240fd1b3dc4d5"
+      "sha256_despues": "e0bac1de52e52edb8935b5bb18cb722840def42914af7b2518641e2adb38646e"
     },
     {
       "ruta": "/patrimonio",
       "tema": "dark",
       "ancho": 768,
-      "sha256_despues": "c14f08f2e2f1aea9e7226c9abcc54390583e31ace65b722facf4caa026f2c276"
+      "sha256_despues": "2d41d69148cee6fd841c3cc0d1b6a133aacd7ea35c9ebbcc86e2d331f6983df7"
+    },
+    {
+      "ruta": "/dashboard",
+      "tema": "light",
+      "ancho": 1280,
+      "sha256_despues": "4ae6acfa0d5752a36b5a95befe08964f676e577697d0d637916b76617273d603"
+    },
+    {
+      "ruta": "/gastos",
+      "tema": "light",
+      "ancho": 1280,
+      "sha256_despues": "9524b6d9f372ec411192e639428c00d995a5786297f40a9c056436940705f408"
+    },
+    {
+      "ruta": "/ingresos",
+      "tema": "light",
+      "ancho": 1280,
+      "sha256_despues": "f86578cb603a44f895f38d73783c6858e5d66db594f418ffef4300b4f0dc98d5"
     },
     {
       "ruta": "/mi-rich-life",
       "tema": "light",
       "ancho": 1280,
-      "sha256_despues": "c3397234ac5b642b2534ee5eee1d6d17317e0db6a2e440dbd15cb641c94c998e"
+      "sha256_despues": "67629dbd77edaf059fbeffe9080a25a4245b49fa51620fb65e31f662e3c236ad"
     },
     {
-      "ruta": "/patrimonio",
+      "ruta": "/dashboard",
       "tema": "light",
-      "ancho": 1280,
-      "sha256_despues": "68942d535a7f56a1715015775618ff5cc719c5abaa3f358a7cb3aaa2fef74825"
+      "ancho": 390,
+      "sha256_despues": "1722c02a90edfbcd64817a21fabb4eefb37fde71d801a71cc460cb8695ebffb8"
+    },
+    {
+      "ruta": "/gastos",
+      "tema": "light",
+      "ancho": 390,
+      "sha256_despues": "182759c8c51dac54779465b98ce0b4bf83f3a447c97711e31f255c5d7d0ceeaa"
+    },
+    {
+      "ruta": "/ingresos",
+      "tema": "light",
+      "ancho": 390,
+      "sha256_despues": "7188fdc06f2574c607b920a875ecbd79aedc5afc232049d3499a2e17c00eb24e"
     },
     {
       "ruta": "/mi-rich-life",
       "tema": "light",
       "ancho": 390,
-      "sha256_despues": "68d0587e8b1cfb0b433674f9e3cf676d321e9df1acfc82afba1dd77d2c084c1a"
+      "sha256_despues": "7a89d8606c383aea169faac0fb6cf9eb08ae49d001201c99aa70e3f243082d14"
     },
     {
       "ruta": "/patrimonio",
       "tema": "light",
       "ancho": 390,
-      "sha256_despues": "849c641a9d557a785b6d9db37241b3a60af80b8d569fb39fe04e831434942239"
+      "sha256_despues": "8602ad5b84313833243ab10ca9f7563eb671935c188812526cf760d5deae38ce"
+    },
+    {
+      "ruta": "/dashboard",
+      "tema": "light",
+      "ancho": 768,
+      "sha256_despues": "c0d4ccd321a29e5222a317341ae890318cfdc0066e6906f1fe39d0d7d6589263"
+    },
+    {
+      "ruta": "/gastos",
+      "tema": "light",
+      "ancho": 768,
+      "sha256_despues": "7996ccb7d7e9a9bda4db43005041cfa42bfc6ae07cd2e9a2bdb7abed4e3c4334"
+    },
+    {
+      "ruta": "/ingresos",
+      "tema": "light",
+      "ancho": 768,
+      "sha256_despues": "f0a62049f86ee8f4a7273eca63eb1e3c2848e2dd8a8e0fdc94ef62b632b828a0"
     },
     {
       "ruta": "/mi-rich-life",
       "tema": "light",
       "ancho": 768,
-      "sha256_despues": "7f02451ef8b4305fcafc781646bc1f0428db9a525536470ca483ecd6b2e7f9eb"
+      "sha256_despues": "8ba84a1ca3bdd1994fc43e944624b58d11470277a21bff60356f0ad9a1f07ac0"
     },
     {
       "ruta": "/patrimonio",
       "tema": "light",
       "ancho": 768,
-      "sha256_despues": "655c928e373351123a4bddb61362b099bf88df6ca107bf2f59bc0ca0559054db"
+      "sha256_despues": "f94512f8ccdc3b02f30a1f378ba43cfac74e080d1249c52db74687395394fdfd"
     }
   ]
 }
