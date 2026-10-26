@@ -1,24 +1,30 @@
 import { MobileHeader } from "../../components/mobile-header";
 import { MEmptyState } from "../../components/content-kit";
-import { signOutAction } from "@/lib/auth/actions";
+import { CerrarSesionForm } from "../../components/cerrar-sesion-form";
+import { getUser } from "@/lib/auth/session";
+import { Paywall } from "./paywall";
 
 /**
  * /m/sin-plan — la cuenta existe pero no tiene plan activo.
  *
- * Dice el ESTADO y ofrece las dos salidas reales dentro de la app: ir a Ajustes
- * (descargar los datos, borrar la cuenta) o cerrar sesión.
+ * Dice el ESTADO y ofrece las salidas reales: ir a Ajustes (descargar los datos, borrar la
+ * cuenta) o cerrar sesión, y dentro de la app nativa además suscribirse.
  *
- * Lo que NO hace, y no es un olvido: no menciona planes, precios, Stripe ni «elegí un
- * plan», ni enlaza a /empezar o /suscripcion, ni sugiere «entrá por la web». Dirigir a
- * comprar fuera de la tienda viola Apple 3.1.1 y las Google Payments Policies, y eso
- * incluye el rodeo de mandar al navegador. Hasta que exista IAP, acá solo se informa.
+ * El paywall nativo vive en `paywall.tsx` y solo se renderiza dentro de Capacitor: compra en
+ * App Store / Google Play con los precios que da la tienda. En el navegador no pinta nada y la
+ * pantalla queda como siempre.
+ *
+ * Lo que NO hace, y no es un olvido: no menciona Stripe, ni enlaza a /empezar o
+ * /suscripcion, ni sugiere «entrá por la web». Dirigir a comprar fuera de la tienda viola
+ * Apple 3.1.1 y las Google Payments Policies, y eso incluye el rodeo de mandar al navegador.
  *
  * No hace falta lógica para salir de esta pantalla: cuando el plan vuelva a estar
  * activo, la guarda del layout deja de redirigir y la app se abre sola.
  */
 export const dynamic = "force-dynamic"; // depende de la sesión
 
-export default function MobileSinPlan() {
+export default async function MobileSinPlan() {
+  const user = await getUser();
   return (
     <>
       <MobileHeader title="Tu cuenta" />
@@ -31,11 +37,12 @@ export default function MobileSinPlan() {
             actionLabel="Ir a Ajustes"
             actionHref="/m/perfil"
           />
-          <form action={signOutAction.bind(null, "/m/login")} style={{ marginTop: 12 }}>
+          {user ? <Paywall userId={user.id} /> : null}
+          <CerrarSesionForm style={{ marginTop: 12 }}>
             <button className="m-btn m-btn-block m-btn-secondary" type="submit">
               Cerrar sesión
             </button>
-          </form>
+          </CerrarSesionForm>
         </div>
       </div>
     </>

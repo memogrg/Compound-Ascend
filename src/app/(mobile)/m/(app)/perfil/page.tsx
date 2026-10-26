@@ -1,9 +1,12 @@
 import { getAccountInfo } from "@/modules/account/services/account-service";
 import { getUserTimezone } from "@/lib/time/user-time";
 import { MobileHeader } from "../../components/mobile-header";
-import { signOutAction } from "@/lib/auth/actions";
+import { CerrarSesionForm } from "../../components/cerrar-sesion-form";
 import { PLAN_LABEL } from "@/lib/plan";
-import { isSupabaseConfigured } from "@/lib/auth/session";
+import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { origenDeSuscripcion, type OrigenSuscripcion } from "@/lib/billing/subscription-source";
+import { SuscripcionTienda } from "./suscripcion-tienda";
 import { isEmailConfigured } from "@/lib/email/send";
 import { listHouseholdMembers, type HouseholdMembersView } from "@/modules/personal-profile";
 import { getOrCreateIngestAddress } from "@/modules/account/services/ingest-address-service";
@@ -24,7 +27,7 @@ import { formatDecimal } from "@/lib/format";
 /**
  * /m/perfil — identidad + ajustes agrupados (plan, moneda, hogar, cuenta).
  * Reutiliza la MISMA lógica de la web: getAccountInfo (identidad/plan/uso IA/moneda)
- * y la Server Action signOutAction (cerrar sesión).
+ * y la Server Action signOutAction (cerrar sesión, vía CerrarSesionForm).
  * Piel del diseño (data-screen="configuracion"), es-MX tono "tú", tema claro.
  */
 export const dynamic = "force-dynamic"; // datos por sesión
@@ -71,6 +74,26 @@ export default async function MobilePerfil() {
     }
   }
   const emailConfigured = isEmailConfigured();
+
+  // ¿Por dónde paga? Decide si Ajustes ofrece gestionar/restaurar en la tienda (solo en la app
+  // nativa). Best-effort: si la consulta falla, se ofrecen las filas de tienda.
+  let origen: OrigenSuscripcion = "ninguna";
+  if (isSupabaseConfigured()) {
+    try {
+      const user = await getUser();
+      if (user) {
+        const supabase = await createSupabaseServerClient();
+        const { data } = await supabase
+          .from("profiles")
+          .select("plan, stripe_subscription_id, store_subscription_active")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (data) origen = origenDeSuscripcion(data);
+      }
+    } catch {
+      origen = "ninguna";
+    }
+  }
 
   const initials = (acc.name || acc.email || "CA").slice(0, 2).toUpperCase();
   const usePct = acc.tokenLimit > 0 ? Math.min(1, acc.tokensUsed / acc.tokenLimit) : 0;
@@ -161,6 +184,9 @@ export default async function MobilePerfil() {
           />
         </MContentCard>
 
+        {/* Suscripción en la tienda (App Store / Google Play): solo en la app nativa. */}
+        <SuscripcionTienda origen={origen} />
+
         {/* Invitar: el mismo ReferralCard de la web con skin="mobile" — ahí está el
             share nativo y la descarga del QR para compartirlo. */}
         {referral ? (
@@ -194,8 +220,8 @@ export default async function MobilePerfil() {
           emailConfigured={emailConfigured}
         />
 
-        {/* Cerrar sesión (Server Action reutilizada de la web) */}
-        <form action={signOutAction.bind(null, "/m/login")}>
+        {/* Cerrar sesión (Server Action reutilizada de la web; antes desvincula RevenueCat) */}
+        <CerrarSesionForm>
           <button
             className="m-btn m-btn-block m-btn-secondary"
             type="submit"
@@ -216,7 +242,7 @@ export default async function MobilePerfil() {
             </svg>
             Cerrar sesión
           </button>
-        </form>
+        </CerrarSesionForm>
 
         {/* Identidad del build: en dos segundos sabes si esto es producción o un build raro. */}
         <BuildIdentity />

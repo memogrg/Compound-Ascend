@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { signOutAction } from "@/lib/auth/actions";
+import { cerrarSesionCompras } from "@/lib/capacitor/purchases";
 
 import {
   isNativeApp,
@@ -182,6 +183,7 @@ export function AppLockOverlay() {
   const recover = useCallback(async () => {
     // Escape seguro: borra el flag y cierra sesión (destruye la sesión, no revela datos).
     await clearAppLockFlagForRecovery();
+    await cerrarSesionCompras();
     await signOutAction("/m/login");
   }, []);
 

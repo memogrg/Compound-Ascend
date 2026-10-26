@@ -74,6 +74,47 @@ type SplashScreenPlugin = {
   hide(options?: { fadeOutDuration?: number }): Promise<void>;
 };
 
+/**
+ * Subconjunto de @revenuecat/purchases-capacitor 11.3.2 (compras dentro de la app). Las firmas
+ * salen de su `definitions.d.ts`; solo están los campos que leemos. El plugin no trae
+ * `showManageSubscriptions`: para gestionar se usa `customerInfo.managementURL`.
+ */
+export type PurchasesStoreProduct = {
+  readonly identifier: string;
+  readonly title: string;
+  /** El precio formateado por la tienda, con su moneda. Es el ÚNICO precio que se muestra. */
+  readonly priceString: string;
+};
+
+export type PurchasesPackage = {
+  readonly identifier: string;
+  readonly product: PurchasesStoreProduct;
+};
+
+export type PurchasesOffering = {
+  readonly identifier: string;
+  readonly availablePackages: PurchasesPackage[];
+};
+
+export type PurchasesCustomerInfo = {
+  readonly entitlements: { readonly active: { readonly [id: string]: unknown } };
+  readonly managementURL: string | null;
+};
+
+export type PurchasesPlugin = {
+  configure(configuration: { apiKey: string; appUserID?: string | null }): Promise<void>;
+  isConfigured(): Promise<{ isConfigured: boolean }>;
+  getAppUserID(): Promise<{ appUserID: string }>;
+  logIn(options: { appUserID: string }): Promise<{ customerInfo: PurchasesCustomerInfo }>;
+  logOut(): Promise<{ customerInfo: PurchasesCustomerInfo }>;
+  getOfferings(): Promise<{ readonly current: PurchasesOffering | null }>;
+  purchasePackage(options: {
+    aPackage: PurchasesPackage;
+  }): Promise<{ productIdentifier: string; customerInfo: PurchasesCustomerInfo }>;
+  restorePurchases(): Promise<{ customerInfo: PurchasesCustomerInfo }>;
+  getCustomerInfo(): Promise<{ customerInfo: PurchasesCustomerInfo }>;
+};
+
 type CapacitorBridge = {
   isNativePlatform?: () => boolean;
   getPlatform?: () => string;
@@ -82,6 +123,7 @@ type CapacitorBridge = {
     Browser?: CapacitorBrowserPlugin;
     SocialLogin?: SocialLoginPlugin;
     SplashScreen?: SplashScreenPlugin;
+    Purchases?: PurchasesPlugin;
   };
 };
 
@@ -133,4 +175,9 @@ export function capacitorSplashHide(): void {
   bridge()
     ?.Plugins?.SplashScreen?.hide?.({ fadeOutDuration: 120 })
     ?.catch?.(() => {});
+}
+
+/** Plugin Purchases (RevenueCat) para las compras dentro de la app. null fuera de la app nativa. */
+export function capacitorPurchases(): PurchasesPlugin | null {
+  return bridge()?.Plugins?.Purchases ?? null;
 }

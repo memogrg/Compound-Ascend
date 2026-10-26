@@ -15,6 +15,7 @@ import { AppLockOverlay } from "../components/app-lock-overlay";
 import { AndroidBackHandler } from "../components/android-back-handler";
 import { WidgetSnapshotWriter } from "../components/widget-snapshot-writer";
 import { MobileRhythmNudge } from "../components/mobile-rhythm-nudge";
+import { PurchasesBootstrap } from "../components/purchases-bootstrap";
 
 /**
  * Layout de las pantallas AUTENTICADAS del móvil. Usa la sesión existente
@@ -102,6 +103,9 @@ export default async function MobileAppLayout({ children }: { children: React.Re
           <AndroidBackHandler />
           {/* Escribe el snapshot del widget nativo en cada carga (solo app nativa; no-op en web). */}
           <WidgetSnapshotWriter />
+          {/* RevenueCat con el UUID de la cuenta (solo app nativa): así el webhook sabe de
+          quién es cada compra en la tienda. No-op en web. */}
+          {user ? <PurchasesBootstrap userId={user.id} /> : null}
           {/* Captura silenciosa de la zona horaria del dispositivo (una vez, si no hay guardada). */}
           <TimezoneSync savedTz={savedTz} />
           {/* Ritmo del mes: ventana de configuración, cierre y recordatorio de registro.
