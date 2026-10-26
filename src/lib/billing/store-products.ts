@@ -2,15 +2,15 @@
  * Productos de las tiendas (App Store / Google Play) → nuestro plan. Puro, sin IO.
  *
  * Los ids los da de alta cada tienda y RevenueCat los manda tal cual en el webhook. Google
- * Play los manda con el base plan pegado («cartera_pro_mensual:mensual»): lo que manda es lo
+ * Play los manda con el base plan pegado («cartera_proplus_mensual:mensual»): lo que manda es lo
  * de antes de los dos puntos.
  */
 import type { PaidPlan } from "@/lib/plan";
 
 export const PRODUCT_TO_PLAN: Record<string, PaidPlan> = {
   cartera_esencial_mensual: "esencial",
-  cartera_pro_mensual: "pro",
-  cartera_max_mensual: "max",
+  cartera_proplus_mensual: "pro",
+  cartera_maxplus_mensual: "max",
 };
 
 /** Entitlements de RevenueCat, por nombre. */

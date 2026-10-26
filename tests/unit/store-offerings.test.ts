@@ -13,16 +13,16 @@ const pkg = (id: string, productId: string, priceString = "$9.99") => ({
 describe("ordenarOfertas", () => {
   it("ordena Esencial+ → Pro+ → Max+ venga como venga la oferta", () => {
     const r = ordenarOfertas([
-      pkg("max", "cartera_max_mensual"),
+      pkg("max", "cartera_maxplus_mensual"),
       pkg("esencial", "cartera_esencial_mensual"),
-      pkg("pro", "cartera_pro_mensual"),
+      pkg("pro", "cartera_proplus_mensual"),
     ]);
     expect(r.map((o) => o.plan)).toEqual(["esencial", "pro", "max"]);
     expect(r.map((o) => o.paquete.identifier)).toEqual(["esencial", "pro", "max"]);
   });
 
   it("mapea el producto de Google Play con el base plan pegado", () => {
-    const r = ordenarOfertas([pkg("p", "cartera_pro_mensual:mensual")]);
+    const r = ordenarOfertas([pkg("p", "cartera_proplus_mensual:mensual")]);
     expect(r).toEqual([{ paquete: expect.objectContaining({ identifier: "p" }), plan: "pro" }]);
   });
 
@@ -33,8 +33,8 @@ describe("ordenarOfertas", () => {
 
   it("con dos paquetes del mismo plan queda el primero", () => {
     const r = ordenarOfertas([
-      pkg("pro-a", "cartera_pro_mensual"),
-      pkg("pro-b", "cartera_pro_mensual:mensual"),
+      pkg("pro-a", "cartera_proplus_mensual"),
+      pkg("pro-b", "cartera_proplus_mensual:mensual"),
     ]);
     expect(r.map((o) => o.paquete.identifier)).toEqual(["pro-a"]);
   });
