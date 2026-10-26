@@ -26,25 +26,23 @@ export const dynamic = "force-dynamic"; // depende de la sesión
 export default async function MobileSinPlan() {
   const user = await getUser();
   return (
-    <>
-      <MobileHeader title="Tu cuenta" />
-      <div className="m-scroll">
-        <div className="m-pad">
-          <MEmptyState
-            icon="protection"
-            title="Tu cuenta no tiene un plan activo"
-            description="Podés seguir accediendo a tus datos, descargarlos o borrar tu cuenta desde Ajustes."
-            actionLabel="Ir a Ajustes"
-            actionHref="/m/perfil"
-          />
-          {user ? <Paywall userId={user.id} /> : null}
-          <CerrarSesionForm style={{ marginTop: 12 }}>
-            <button className="m-btn m-btn-block m-btn-secondary" type="submit">
-              Cerrar sesión
-            </button>
-          </CerrarSesionForm>
-        </div>
+    <div className="m-scroll">
+      <div className="m-pad">
+        <MobileHeader variant="inner" title="Tu cuenta" />
+        <MEmptyState
+          icon="protection"
+          title="Tu cuenta no tiene un plan activo"
+          description="Podés seguir accediendo a tus datos, descargarlos o borrar tu cuenta desde Ajustes."
+          actionLabel="Ir a Ajustes"
+          actionHref="/m/perfil"
+        />
+        {user ? <Paywall userId={user.id} /> : null}
+        <CerrarSesionForm style={{ marginTop: 12 }}>
+          <button className="m-btn m-btn-block m-btn-secondary" type="submit">
+            Cerrar sesión
+          </button>
+        </CerrarSesionForm>
       </div>
-    </>
+    </div>
   );
 }
