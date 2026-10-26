@@ -64,7 +64,11 @@ export async function nativeAppleLogin(): Promise<NativeLoginResult> {
     return { ok: true };
   } catch (e) {
     if (isCancel(e)) return { ok: false, cancelled: true, error: "" };
-    console.log("[apple-native] error", e);
+    // Mensaje completo y código, para diagnosticar desde Safari Web Inspector: un objeto
+    // logueado a secas llega como "{}" desde el bridge.
+    const message = e instanceof Error ? e.message : String(e);
+    const code = (e as { code?: unknown } | null)?.code;
+    console.log("[apple-native] error", message, code === undefined ? "" : `code=${String(code)}`);
     return { ok: false, error: "No pudimos iniciar sesión con Apple. Inténtalo de nuevo." };
   }
 }
