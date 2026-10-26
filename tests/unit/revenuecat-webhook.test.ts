@@ -97,7 +97,7 @@ function evento(tipo: string, extra: Record<string, unknown> = {}) {
       type: tipo,
       app_user_id: USER,
       original_app_user_id: USER,
-      product_id: "cartera_pro_mensual",
+      product_id: "cartera_proplus_mensual",
       entitlement_ids: ["pro"],
       expiration_at_ms: EXPIRA,
       store: "APP_STORE",
@@ -182,7 +182,7 @@ describe("webhook revenuecat · reglas", () => {
     expect(perfiles[0]).toMatchObject({
       store_subscription_active: true,
       store_platform: "ios",
-      store_product_id: "cartera_pro_mensual",
+      store_product_id: "cartera_proplus_mensual",
       store_period_end: new Date(EXPIRA).toISOString(),
       revenuecat_app_user_id: USER,
     });
@@ -190,7 +190,7 @@ describe("webhook revenuecat · reglas", () => {
 
   it("producto de Play con base plan («:mensual») → mismo plan", async () => {
     await pedir(
-      evento("RENEWAL", { product_id: "cartera_max_mensual:mensual", store: "PLAY_STORE" }),
+      evento("RENEWAL", { product_id: "cartera_maxplus_mensual:mensual", store: "PLAY_STORE" }),
     );
     expect(sus.aplicarPlan).toHaveBeenCalledWith(USER, "max");
     expect(perfiles[0]!.store_platform).toBe("android");
