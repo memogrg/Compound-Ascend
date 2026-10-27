@@ -12,6 +12,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
+import { readEffectivePlan } from "@/lib/auth/effective-plan";
 import { PLAN_TOKEN_LIMITS, isWithinLimit, type PlanConLimite } from "@/lib/ai/limits";
 
 export { PLAN_TOKEN_LIMITS, isWithinLimit };
@@ -25,13 +26,17 @@ function currentPeriod(): string {
 /**
  * Verifica el límite ANTES de llamar a la IA. Lanza RATE_LIMITED si se superó.
  * Si Supabase/service-role no están disponibles, no bloquea (solo rate-limit por IP aplica).
+ *
+ * El límite es el del plan EFECTIVO (propio o heredado del hogar Max+), por persona: cada
+ * miembro tiene su propio ledger y su propio cupo. Si el plan no se puede saber cae a
+ * 'ninguno' (límite 0): ante la duda no se regala IA, igual que antes sin fila de perfil.
  */
 export async function assertTokenBudget(userId: string): Promise<void> {
   if (!isSupabaseConfigured()) return;
   try {
     const supabase = createServiceRoleClient();
-    const [{ data: profile }, { data: usage }] = await Promise.all([
-      supabase.from("profiles").select("plan").eq("id", userId).maybeSingle(),
+    const [efectivo, { data: usage }] = await Promise.all([
+      readEffectivePlan(supabase, userId),
       supabase
         .from("ai_usage_ledger")
         .select("tokens_used")
@@ -39,7 +44,7 @@ export async function assertTokenBudget(userId: string): Promise<void> {
         .eq("period", currentPeriod())
         .maybeSingle(),
     ]);
-    const plan = (profile?.plan ?? "ninguno") as PlanConLimite;
+    const plan: PlanConLimite = efectivo ?? "ninguno";
     const used = Number(usage?.tokens_used ?? 0);
     if (!isWithinLimit(plan, used)) {
       throw new AppError(
