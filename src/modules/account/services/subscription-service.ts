@@ -169,8 +169,10 @@ export async function aplicarPlan(
  * paga es quien conserva el hogar.
  *
  * A cada miembro desalojado se le marca `status = 'removed'` —no se borra la
- * fila, para que quede el registro de que estuvo— y se le pone `plan = 'ninguno'`.
- * Sus movimientos NO se tocan: son suyos y siguen en su cuenta.
+ * fila, para que quede el registro de que estuvo—. Su `profiles.plan` NO se toca:
+ * es lo que paga él (Stripe o tienda), y lo que heredaba del hogar lo pierde solo,
+ * porque el plan efectivo (`effective_plan`) solo hereda de membresías `active`.
+ * Sus movimientos tampoco se tocan: son suyos y siguen en su cuenta.
  */
 async function desalojarSiNoCabe(ownerId: string, anterior: Plan, destino: Plan): Promise<number> {
   if (householdMemberLimit(destino) >= householdMemberLimit(anterior)) return 0;
@@ -206,10 +208,6 @@ async function desalojarSiNoCabe(ownerId: string, anterior: Plan, destino: Plan)
     logger.error("orfandad: no se pudo desalojar", { message: e1.message });
     return 0;
   }
-
-  // Quedan sin suscripción propia: al entrar verán el muro con el link de pago.
-  const { error: e2 } = await s.from("profiles").update({ plan: "ninguno" }).in("id", usuarios);
-  if (e2) logger.error("orfandad: no se pudo dejar sin plan", { message: e2.message });
 
   logger.info("orfandad aplicada", { desalojados: usuarios.length, destino });
   return usuarios.length;
