@@ -1,6 +1,10 @@
 import Link from "next/link";
 
-import { getAccountInfo, getAccountDeletionInfo } from "@/modules/account/services/account-service";
+import {
+  getAccountInfo,
+  getAccountDeletionInfo,
+  textoPlanHeredado,
+} from "@/modules/account/services/account-service";
 import { DeleteAccountButton } from "@/modules/account/components/delete-account-button";
 import { ExportDataButton } from "@/modules/account/components/export-data-button";
 import { ReferralCard } from "@/components/referrals/referral-card";
@@ -22,6 +26,7 @@ import {
 } from "@/modules/account/services/ingest-notices-service";
 import { INGEST_HELP } from "@/modules/account/constants";
 import { UpgradePrompt } from "@/components/shared/upgrade-prompt";
+import { HelpTip } from "@/components/shared/help-tip";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Icon } from "@/components/ui/icon";
 import {
@@ -154,8 +159,14 @@ export default async function Page() {
       </SetRow>
 
       <SetRow title="Tu plan" desc="Tu suscripción y consumo de IA del mes.">
-        <span className={`plan-chip${isPaidPlan(acc.plan) ? " prem" : ""}`}>
-          {PLAN_LABEL[acc.plan]}
+        {/* El plan con el que usa la app (el efectivo). Si viene del hogar, el «?» dice de dónde. */}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span className={`plan-chip${isPaidPlan(acc.planEfectivo) ? " prem" : ""}`}>
+            {PLAN_LABEL[acc.planEfectivo]}
+          </span>
+          {acc.heredadoDe ? (
+            <HelpTip text={textoPlanHeredado(acc.heredadoDe)} label="De dónde viene tu plan" />
+          ) : null}
         </span>
         <div className="usage-lb">
           <span>Uso de IA este mes</span>
@@ -250,9 +261,9 @@ export default async function Page() {
         </p>
       </SetRow>
 
-      {acc.plan !== "max" ? (
+      {acc.planEfectivo !== "max" ? (
         <div style={{ marginTop: 12 }}>
-          <UpgradePrompt plan={acc.plan} />
+          <UpgradePrompt plan={acc.planEfectivo} />
         </div>
       ) : null}
 

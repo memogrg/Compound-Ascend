@@ -82,6 +82,13 @@ export type InviteResult = { ok: boolean; sent: number; configured: boolean; mes
  * `household_invitations` con un token y envía el correo con un enlace a
  * `/invitacion/aceptar?token=...`. Si el email no está configurado, no falla:
  * informa que se enviará al activarlo.
+ *
+ * Valida EN EL SERVIDOR, antes de crear nada:
+ *  · el rol: con hogar activo, solo owner/adult (la RLS de household_invitations
+ *    es el candado; esto da el mensaje claro). Sin hogar se permite: va a ser el
+ *    titular del que crea ensure_household;
+ *  · el cupo: los correos nuevos no pueden superar lo disponible del plan del
+ *    TITULAR (activos + pendientes no vencidas).
  */
 export async function inviteHouseholdMembersAction(emails: string[]): Promise<InviteResult> {
   const parsed = inviteSchema.safeParse(emails);
@@ -110,6 +117,32 @@ export async function inviteHouseholdMembersAction(emails: string[]): Promise<In
   if (!user) {
     return { ok: false, sent: 0, configured: false, message: "Inicia sesión para invitar." };
   }
+
+  const { hasHouseholdInviteCapacity } =
+    await import("@/modules/personal-profile/services/household-members-service");
+  const cap = await hasHouseholdInviteCapacity(parsed.data);
+  if (!cap.canManage) {
+    return {
+      ok: false,
+      sent: 0,
+      configured: true,
+      message: "Solo el titular o un adulto del hogar puede invitar.",
+    };
+  }
+  if (!cap.ok) {
+    const quedan =
+      cap.remaining === 0
+        ? "No quedan cupos"
+        : cap.remaining === 1
+          ? "Te queda 1 cupo"
+          : `Te quedan ${cap.remaining} cupos`;
+    return {
+      ok: false,
+      sent: 0,
+      configured: true,
+      message: `Tu plan permite hasta ${cap.limit} ${cap.limit === 1 ? "persona" : "personas"} en el hogar (incluido vos). ${quedan}.`,
+    };
+  }
   const inviter =
     (user.user_metadata?.display_name as string | undefined) ?? user.email ?? "Un familiar";
   const appUrl = getClientEnv().NEXT_PUBLIC_APP_URL;
@@ -128,13 +161,15 @@ export async function inviteHouseholdMembersAction(emails: string[]): Promise<In
   }
 
   const targets = parsed.data;
-  // Reutiliza el token de invitaciones pendientes ya existentes (correos repetidos).
+  // Reutiliza el token de invitaciones pendientes ya existentes (correos repetidos). Las
+  // vencidas no: su enlace ya no sirve, y tampoco ocupan cupo.
   const tokenByEmail = new Map<string, string>();
   const { data: existing } = await supabase
     .from("household_invitations")
     .select("email, token")
     .eq("household_id", householdId)
     .eq("status", "pending")
+    .gt("expires_at", new Date().toISOString())
     .in("email", targets);
   for (const row of existing ?? []) tokenByEmail.set(row.email.toLowerCase(), row.token);
 
@@ -184,9 +219,8 @@ export async function inviteHouseholdMembersAction(emails: string[]): Promise<In
 }
 
 /**
- * Invita a UN miembro desde Configuración, validando el límite del plan EN EL
- * SERVIDOR (no solo en la UI): si activos + pendientes ya llenan el cupo, rechaza
- * antes de crear la invitación. Reusa inviteHouseholdMembersAction para el envío.
+ * Invita a UN miembro desde Configuración. El rol y el cupo los valida
+ * inviteHouseholdMembersAction en el servidor: la regla vive en un solo lugar.
  */
 export async function inviteHouseholdMemberAction(email: string): Promise<InviteResult> {
   const one = z.string().trim().email().max(120).safeParse(email);
@@ -195,17 +229,6 @@ export async function inviteHouseholdMemberAction(email: string): Promise<Invite
   }
   if (!isSupabaseConfigured()) {
     return { ok: false, sent: 0, configured: false, message: "Conecta Supabase para invitar." };
-  }
-  const { hasHouseholdInviteCapacity } =
-    await import("@/modules/personal-profile/services/household-members-service");
-  const cap = await hasHouseholdInviteCapacity();
-  if (!cap.ok) {
-    return {
-      ok: false,
-      sent: 0,
-      configured: true,
-      message: `Tu plan permite hasta ${cap.limit} personas en el hogar (incluido vos). No quedan cupos.`,
-    };
   }
   return inviteHouseholdMembersAction([one.data]);
 }
