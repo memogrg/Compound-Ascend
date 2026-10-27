@@ -11,10 +11,12 @@ import "server-only";
  * `can()` (módulo puro en `@/lib/plan`) sigue siendo la fuente de verdad de qué
  * incluye cada plan; este helper lo enchufa al plan real del usuario.
  */
+import { cache } from "react";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
 import { can, type Feature, type Plan } from "@/lib/plan";
+import { readEffectivePlan } from "@/lib/auth/effective-plan";
 
 /** Plan del usuario autenticado (server-side). Default seguro: 'ninguno'. */
 export async function getUserPlan(): Promise<Plan> {
@@ -23,6 +25,17 @@ export async function getUserPlan(): Promise<Plan> {
   const { data } = await supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle();
   return (data?.plan ?? "ninguno") as Plan;
 }
+
+/**
+ * Plan EFECTIVO del usuario autenticado: el propio o el heredado del hogar, el mayor (ver
+ * `@/lib/auth/effective-plan`). Una RPC por request gracias a `cache()`. Si la RPC falla cae a
+ * 'ninguno', el mismo default seguro que `getUserPlan`.
+ */
+export const getEffectivePlan = cache(async (): Promise<Plan> => {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  return (await readEffectivePlan(supabase, user.id)) ?? "ninguno";
+});
 
 /**
  * Exige que el plan del usuario incluya `feature`. Lanza `AppError("FORBIDDEN")`

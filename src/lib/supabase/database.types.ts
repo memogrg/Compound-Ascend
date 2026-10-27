@@ -1451,6 +1451,12 @@ export interface Database {
         Args: Record<string, never>;
         Returns: Record<string, unknown> | null;
       };
+      // Plan efectivo (migración 20261026000001): el mayor entre el propio y el del titular
+      // Max+ de cada hogar activo. Null si no hay perfil o si con sesión se pide otro id.
+      effective_plan: {
+        Args: { p_user?: string };
+        Returns: string | null;
+      };
       list_household_members: {
         Args: Record<string, never>;
         Returns: {
