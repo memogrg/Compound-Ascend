@@ -19,7 +19,8 @@ const PERMITIDOS: Record<string, string> = {
   "src/modules/account/services/subscription-service.ts": "facturación: estado de la suscripción",
   "src/modules/account/services/stripe-fulfillment.ts": "facturación: cumplimiento de Stripe",
   "src/app/(mobile)/m/(app)/perfil/page.tsx": "facturación: origen de la suscripción",
-  "src/modules/account/services/account-service.ts": "pantalla de cuenta (plan que se muestra)",
+  "src/modules/account/services/account-service.ts":
+    "pantalla de cuenta: plan propio (suscripción); el que se muestra es el efectivo",
   "src/modules/personal-profile/services/household-members-service.ts":
     "capacidad, no acceso: cupo de quien todavía no tiene hogar",
 };

@@ -1,4 +1,5 @@
-import { getAccountInfo } from "@/modules/account/services/account-service";
+import { getAccountInfo, textoPlanHeredado } from "@/modules/account/services/account-service";
+import { HelpTip } from "@/components/shared/help-tip";
 import { getUserTimezone } from "@/lib/time/user-time";
 import { MobileHeader } from "../../components/mobile-header";
 import { CerrarSesionForm } from "../../components/cerrar-sesion-form";
@@ -175,9 +176,22 @@ export default async function MobilePerfil() {
             subtitle="Presupuesto, Control, Defensa y Crecimiento"
             chevron
           />
-          {/* Uso de IA: es una métrica de verdad → MDataRow + barra MProgress (no una rejilla inventada). */}
+          {/* Uso de IA: es una métrica de verdad → MDataRow + barra MProgress (no una rejilla inventada).
+              Plan EFECTIVO (el propio o el heredado del hogar); la suscripción de abajo es la propia. */}
           <MDataRow
-            title={`Plan ${PLAN_LABEL[acc.plan]}`}
+            title={
+              acc.heredadoDe ? (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  Plan {PLAN_LABEL[acc.planEfectivo]}
+                  <HelpTip
+                    text={textoPlanHeredado(acc.heredadoDe)}
+                    label="De dónde viene tu plan"
+                  />
+                </span>
+              ) : (
+                `Plan ${PLAN_LABEL[acc.planEfectivo]}`
+              )
+            }
             subtitle="Uso de IA este mes"
             value={`${tk(acc.tokensUsed)} / ${tk(acc.tokenLimit)}`}
             slot={<MProgress value={usePct} tone="success" height={8} />}
