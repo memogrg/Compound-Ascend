@@ -1457,6 +1457,12 @@ export interface Database {
         Args: { p_user?: string };
         Returns: string | null;
       };
+      // Plan del titular del hogar activo de quien llama (migración 20261026000002): define el
+      // cupo del hogar. Null sin membresía activa.
+      household_owner_plan: {
+        Args: Record<string, never>;
+        Returns: string | null;
+      };
       list_household_members: {
         Args: Record<string, never>;
         Returns: {
