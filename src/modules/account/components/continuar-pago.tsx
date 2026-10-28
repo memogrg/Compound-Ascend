@@ -21,7 +21,8 @@ export function ContinuarPago({ plan }: { plan: PaidPlan }) {
         <span className="ov">TU ELECCIÓN</span>
         <h2 style={{ margin: "6px 0 2px", fontSize: 22 }}>{PLAN_LABEL[plan]}</h2>
         <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-          ${PLAN_PRICE_USD[plan]} al mes · {TRIAL_DAYS} días sin cobro · Cancelás cuando querás
+          ${PLAN_PRICE_USD[plan].mensual} al mes · {TRIAL_DAYS} días sin cobro · Cancelás cuando
+          querás
         </p>
       </div>
       <div>

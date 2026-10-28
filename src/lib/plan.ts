@@ -20,6 +20,10 @@ export type Plan = "ninguno" | "esencial" | "pro" | "max";
 export const PAID_PLANS = ["esencial", "pro", "max"] as const;
 export type PaidPlan = (typeof PAID_PLANS)[number];
 
+/** Cada cuánto se cobra un plan. El plan (lo que da) no cambia con el período. */
+export const PERIODOS = ["mensual", "anual"] as const;
+export type Periodo = (typeof PERIODOS)[number];
+
 export function isPaidPlan(plan: Plan): plan is PaidPlan {
   return plan !== "ninguno";
 }
@@ -114,10 +118,10 @@ export const PLAN_LABEL: Record<Plan, string> = {
 };
 
 /** Precio de referencia en dólares, para mostrar. El cobro real lo manda Stripe. */
-export const PLAN_PRICE_USD: Record<PaidPlan, number> = {
-  esencial: 17,
-  pro: 34,
-  max: 47,
+export const PLAN_PRICE_USD: Record<PaidPlan, Record<Periodo, number>> = {
+  esencial: { mensual: 17, anual: 160 },
+  pro: { mensual: 34, anual: 320 },
+  max: { mensual: 47, anual: 450 },
 };
 
 /** Días de prueba antes del primer cobro. La tarjeta se registra al abrir la cuenta. */
