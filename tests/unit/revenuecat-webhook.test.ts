@@ -50,7 +50,9 @@ function tabla() {
       return consulta([...filtros, (f) => f[col] === val]);
     },
     async maybeSingle() {
-      return { data: perfiles.find((f) => filtros.every((p) => p(f))) ?? null, error: null };
+      // Una copia, como Supabase: un update posterior no cambia lo que ya se leyó.
+      const fila = perfiles.find((f) => filtros.every((p) => p(f)));
+      return { data: fila ? { ...fila } : null, error: null };
     },
   });
   return {
@@ -262,5 +264,59 @@ describe("webhook revenuecat · reglas", () => {
     expect(await r.json()).toMatchObject({ status: "ignored", motivo: "producto desconocido" });
     expect(sus.aplicarPlan).not.toHaveBeenCalled();
     expect(log.warn).toHaveBeenCalled();
+  });
+});
+
+describe("webhook revenuecat · planes anuales", () => {
+  const EXPIRA_ANUAL = Date.parse("2027-10-27T00:00:00.000Z");
+
+  it("Play anual («:anual») → mismo plan, guarda el producto con el período y el fin anual", async () => {
+    await pedir(
+      evento("INITIAL_PURCHASE", {
+        product_id: "cartera_proplus_mensual:anual",
+        store: "PLAY_STORE",
+        expiration_at_ms: EXPIRA_ANUAL,
+      }),
+    );
+    expect(sus.aplicarPlan).toHaveBeenCalledWith(USER, "pro");
+    expect(perfiles[0]).toMatchObject({
+      store_product_id: "cartera_proplus_mensual:anual",
+      store_period_end: new Date(EXPIRA_ANUAL).toISOString(),
+    });
+  });
+
+  it("Apple anual → el plan sale del producto, aunque no venga el entitlement", async () => {
+    await pedir(
+      evento("INITIAL_PURCHASE", { product_id: "cartera_maxplus_anual", entitlement_ids: [] }),
+    );
+    expect(sus.aplicarPlan).toHaveBeenCalledWith(USER, "max");
+  });
+
+  it("TRANSFER de un anual de Apple → el destino recibe el plan", async () => {
+    const DESDE = "99999999-2222-4333-8444-555555555555";
+    perfiles = [
+      perfilBase({
+        id: DESDE,
+        plan: "pro",
+        store_subscription_active: true,
+        store_platform: "ios",
+        store_product_id: "cartera_proplus_anual",
+        store_period_end: new Date(EXPIRA_ANUAL).toISOString(),
+      }),
+      perfilBase(),
+    ];
+    await pedir({
+      api_version: "1.0",
+      event: {
+        id: "evt-transfer-anual",
+        type: "TRANSFER",
+        transferred_from: [DESDE],
+        transferred_to: [USER],
+        store: "APP_STORE",
+        environment: "PRODUCTION",
+      },
+    });
+    expect(sus.aplicarPlan).toHaveBeenCalledWith(USER, "pro");
+    expect(perfiles[1]!.store_product_id).toBe("cartera_proplus_anual");
   });
 });

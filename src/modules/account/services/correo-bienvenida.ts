@@ -15,10 +15,10 @@ import type Stripe from "stripe";
 import { sendEmail, isEmailConfigured } from "@/lib/email/send";
 import { getClientEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
-import { PAID_PLANS, PLAN_LABEL, type PaidPlan } from "@/lib/plan";
+import { PAID_PLANS, PLAN_LABEL, type PaidPlan, type Periodo } from "@/lib/plan";
 import { alreadyProcessed } from "@/lib/security/idempotency";
 import { escapeHtml } from "@/lib/security/escape-html";
-import { planDeSuscripcion } from "@/lib/billing/stripe";
+import { periodoDeSuscripcion, planDeSuscripcion } from "@/lib/billing/stripe";
 
 import { formatDateLong, formateadorNumero } from "@/lib/format";
 function fecha(epoch: number | null | undefined): string | null {
@@ -41,6 +41,7 @@ function monto(sub: Stripe.Subscription): string | null {
 /** Cuerpo del correo. Exportado para probarlo sin mandar nada. */
 export function htmlBienvenida(input: {
   plan: PaidPlan;
+  periodo: Periodo;
   enPrueba: boolean;
   primerCobro: string | null;
   monto: string | null;
@@ -48,7 +49,10 @@ export function htmlBienvenida(input: {
   urlApp: string;
 }): { subject: string; html: string } {
   const nombre = escapeHtml(PLAN_LABEL[input.plan]);
-  const precio = input.monto ? `${escapeHtml(input.monto)} al mes` : "el precio de tu plan";
+  const anual = input.periodo === "anual";
+  const precio = input.monto
+    ? `${escapeHtml(input.monto)} ${anual ? "al año" : "al mes"}`
+    : "el precio de tu plan";
   const cuando = input.primerCobro ? escapeHtml(input.primerCobro) : "al terminar la prueba";
 
   const subject = input.enPrueba
@@ -59,7 +63,7 @@ export function htmlBienvenida(input: {
     ? `<p style="margin:0 0 14px">Hoy registraste la tarjeta y <strong>no pagaste nada</strong>. ` +
       `El primer cobro sería el <strong>${cuando}</strong> por <strong>${precio}</strong>. ` +
       `Siete días antes te mandamos un recordatorio.</p>`
-    : `<p style="margin:0 0 14px">El cobro de <strong>${precio}</strong> se hizo hoy y se repite cada mes.</p>`;
+    : `<p style="margin:0 0 14px">El cobro de <strong>${precio}</strong> se hizo hoy y se repite ${anual ? "cada año" : "cada mes"}.</p>`;
 
   const html =
     `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;padding:28px 24px;color:#1d1d1f;line-height:1.55">` +
@@ -102,6 +106,8 @@ export async function enviarBienvenidaUnaVez(input: {
   const enPrueba = input.sub.status === "trialing" && Boolean(input.sub.trial_end);
   const { subject, html } = htmlBienvenida({
     plan,
+    // Sin período reconocible se dice «al mes», como antes de los anuales.
+    periodo: periodoDeSuscripcion(input.sub) ?? "mensual",
     enPrueba,
     primerCobro: fecha(enPrueba ? input.sub.trial_end : null),
     monto: monto(input.sub),
