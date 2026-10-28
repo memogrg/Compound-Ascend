@@ -16,9 +16,9 @@ import {
   type PurchasesPlugin,
 } from "@/lib/capacitor/native";
 import {
+  agruparPorPlan,
   esCompraCancelada,
-  ordenarOfertas,
-  type PaqueteConPlan,
+  type PlanConPeriodos,
 } from "@/lib/billing/store-offerings";
 
 export type ResultadoCompra =
@@ -101,12 +101,15 @@ export async function cerrarSesionCompras(): Promise<void> {
   }
 }
 
-/** Los paquetes de la oferta actual, ordenados Esencial+ → Pro+ → Max+. [] si no hay. */
-export async function obtenerOfertas(): Promise<PaqueteConPlan<PurchasesPackage>[]> {
+/**
+ * Los planes de la oferta actual con su paquete mensual y anual, ordenados Esencial+ → Pro+ →
+ * Max+. [] si no hay.
+ */
+export async function obtenerOfertas(): Promise<PlanConPeriodos<PurchasesPackage>[]> {
   const plugin = await pluginListo();
   if (!plugin) return [];
   const { current } = await plugin.getOfferings();
-  return ordenarOfertas(current?.availablePackages ?? []);
+  return agruparPorPlan(current?.availablePackages ?? []);
 }
 
 export async function comprar(paquete: PurchasesPackage): Promise<ResultadoCompra> {

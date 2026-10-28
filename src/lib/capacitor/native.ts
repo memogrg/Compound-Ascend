@@ -84,6 +84,11 @@ export type PurchasesStoreProduct = {
   readonly title: string;
   /** El precio formateado por la tienda, con su moneda. Es el ÚNICO precio que se muestra. */
   readonly priceString: string;
+  /**
+   * El mismo precio como número, en la moneda de la tienda. No se muestra: solo sirve para
+   * calcular cuánto se ahorra con el anual frente al mensual (misma tienda, misma moneda).
+   */
+  readonly price: number;
 };
 
 export type PurchasesPackage = {
