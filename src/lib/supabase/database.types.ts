@@ -69,6 +69,11 @@ export type ProfileRow = Timestamps & {
   store_subscription_active: boolean;
   store_platform: "ios" | "android" | null;
   store_product_id: string | null;
+  /**
+   * Producto que entra al renovar tras un PRODUCT_CHANGE diferido (migración 20261028000001);
+   * null si no hay cambio diferido. `store_product_id` sigue siendo el vigente.
+   */
+  store_product_pending: string | null;
   /** Fin del período pagado en la tienda. */
   store_period_end: string | null;
   /** original_app_user_id de RevenueCat. */
