@@ -50,6 +50,7 @@ export const empezarSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
   plan: z.enum(["esencial", "pro", "max"], { message: "Elegí un plan" }),
+  periodo: z.enum(["mensual", "anual"], { message: "Elegí cada cuánto pagar" }),
   acepta_terminos: aceptaTerminosSchema,
 });
 

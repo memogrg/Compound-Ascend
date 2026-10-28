@@ -2,8 +2,9 @@
 
 import { useActionState } from "react";
 import { empezarAction, signInWithGoogleAction, type ActionState } from "@/lib/auth/actions";
-import { PAID_PLANS, PLAN_LABEL, PLAN_PRICE_USD, PLAN_PROMISE, type PaidPlan } from "@/lib/plan";
+import { PAID_PLANS, esPeriodo, type PaidPlan, type Periodo } from "@/lib/plan";
 import { CasillaTerminos } from "@/components/legal/casilla-terminos";
+import { PeriodoYPlanes, PrecioPrimerCobro } from "./empezar-planes";
 
 const inicial: ActionState = { ok: false };
 
@@ -12,24 +13,29 @@ function esPlanDePago(v: string | undefined): v is PaidPlan {
 }
 
 /**
- * El formulario de /empezar. Un solo <form>: correo, contraseña y el plan como
- * radios estilizados dentro de la tarjeta lateral. Sin JS para cambiar de plan —
- * la línea de tiempo de la derecha muestra el precio del plan marcado con CSS
+ * El formulario de /empezar. Un solo <form>: correo, contraseña, y el período y el plan
+ * como radios estilizados dentro de la tarjeta lateral. Sin JS para cambiarlos —la línea
+ * de tiempo de la derecha muestra el precio del plan y el período marcados con CSS
  * `:has()`— y sin campos que no hagan falta antes de pagar.
  */
 export function EmpezarForm({
   plan,
+  periodo,
   fechaCobro,
   errorPago,
+  errorPrecio,
 }: {
   plan: PaidPlan;
+  periodo: Periodo;
   fechaCobro: string;
   errorPago: boolean;
+  errorPrecio: string | null;
 }) {
   const [state, action, pending] = useActionState(empezarAction, inicial);
   // Tras un error, lo escrito vuelve (React reinicia el form al terminar la acción).
   const emailPrevio = state.values?.email ?? "";
   const planMarcado: PaidPlan = esPlanDePago(state.values?.plan) ? state.values.plan : plan;
+  const periodoMarcado: Periodo = esPeriodo(state.values?.periodo) ? state.values.periodo : periodo;
 
   return (
     <form action={action} className="emp-form" noValidate>
@@ -39,6 +45,11 @@ export function EmpezarForm({
           {errorPago ? (
             <p className="emp-aviso" role="alert">
               No pudimos abrir el pago. Tu cuenta quedó creada: probá de nuevo con el botón.
+            </p>
+          ) : null}
+          {errorPrecio ? (
+            <p className="emp-aviso" role="alert">
+              {errorPrecio}
             </p>
           ) : null}
           {state.message ? (
@@ -100,21 +111,7 @@ export function EmpezarForm({
         {/* ── Columna 2: el plan y la línea de tiempo ─────────────────────── */}
         <aside className="emp-lado">
           <p className="lp-rotulo">Tu plan</p>
-          <div className="emp-planes" role="radiogroup" aria-label="Plan">
-            {PAID_PLANS.map((p) => (
-              <label key={p} className="emp-plan">
-                <input type="radio" name="plan" value={p} defaultChecked={p === planMarcado} />
-                <span className="emp-plan-cuerpo">
-                  <span className="emp-plan-nombre">{PLAN_LABEL[p]}</span>
-                  <span className="emp-plan-precio">
-                    ${PLAN_PRICE_USD[p].mensual}
-                    <small>/mes</small>
-                  </span>
-                  <span className="emp-plan-promesa">{PLAN_PROMISE[p]}</span>
-                </span>
-              </label>
-            ))}
-          </div>
+          <PeriodoYPlanes plan={planMarcado} periodo={periodoMarcado} />
 
           <p className="lp-rotulo emp-rotulo-2">Qué pasa con tu tarjeta</p>
           <ol className="emp-linea">
@@ -131,13 +128,7 @@ export function EmpezarForm({
             <li>
               <b>{fechaCobro}</b>
               <span>
-                Primer cobro:{" "}
-                {PAID_PLANS.map((p) => (
-                  <strong key={p} className={`emp-precio-${p}`}>
-                    ${PLAN_PRICE_USD[p].mensual}
-                  </strong>
-                ))}
-                . Si cancelás antes, no pagás nada.
+                Primer cobro: <PrecioPrimerCobro />. Si cancelás antes, no pagás nada.
               </span>
             </li>
           </ol>
@@ -152,13 +143,14 @@ export function EmpezarForm({
  * puede anidar otro (el navegador descarta el interno y React no logra hidratar
  * —pasó—), así que el botón usa `formAction`. `formNoValidate` para que el
  * `required` del correo y la contraseña no frene a quien entra con Google, y
- * `next` se arma con el plan marcado en ese momento, no con el inicial, para que
- * cambiar de plan y después elegir Google lleve a /empezar/pagar con el correcto.
+ * `next` se arma con el plan y el período marcados en ese momento, no con los iniciales,
+ * para que cambiarlos y después elegir Google lleve a /empezar/pagar con los correctos.
  */
 function GoogleEnvio() {
   const conGoogle = (fd: FormData) => {
     const plan = String(fd.get("plan") ?? "pro");
-    fd.set("next", `/empezar/pagar?plan=${plan}`);
+    const periodo = fd.get("periodo") === "anual" ? "anual" : "mensual";
+    fd.set("next", `/empezar/pagar?plan=${plan}&periodo=${periodo}`);
     return signInWithGoogleAction(fd);
   };
   return (

@@ -250,18 +250,20 @@ export async function empezarAction(_prev: ActionState, formData: FormData): Pro
     email: formData.get("email"),
     password: formData.get("password"),
     plan: formData.get("plan"),
+    periodo: formData.get("periodo"),
     acepta_terminos: formData.get("acepta_terminos"),
   });
   // Nunca la contraseña: `values` vuelve al navegador dentro del estado.
   const values = {
     email: String(formData.get("email") ?? ""),
     plan: String(formData.get("plan") ?? ""),
+    periodo: String(formData.get("periodo") ?? ""),
     acepta_terminos: String(formData.get("acepta_terminos") ?? ""),
   };
   if (!parsed.success) {
     return { ok: false, fieldErrors: zodToFieldErrors(parsed.error.issues), values };
   }
-  const { email, password, plan } = parsed.data;
+  const { email, password, plan, periodo } = parsed.data;
 
   const ip = clientIpFromHeaders(await headers());
   const rl = await rateLimit(`signup:ip:${ip}`, RATE_LIMITS.auth);
@@ -314,7 +316,7 @@ export async function empezarAction(_prev: ActionState, formData: FormData): Pro
     }
   }
 
-  redirect(`/empezar/pagar?plan=${plan}`);
+  redirect(`/empezar/pagar?plan=${plan}&periodo=${periodo}`);
 }
 
 /**
@@ -328,7 +330,8 @@ export async function empezarAction(_prev: ActionState, formData: FormData): Pro
 export async function reanudarPagoAction(formData: FormData): Promise<void> {
   const plan = String(formData.get("plan") ?? "pro");
   const seguro = ["esencial", "pro", "max"].includes(plan) ? plan : "pro";
-  redirect(`/empezar/pagar?plan=${seguro}`);
+  const periodo = formData.get("periodo") === "anual" ? "anual" : "mensual";
+  redirect(`/empezar/pagar?plan=${seguro}&periodo=${periodo}`);
 }
 
 export async function signOutAction(next?: string | FormData): Promise<void> {

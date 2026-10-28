@@ -1,10 +1,11 @@
 import { reanudarPagoAction, signOutAction } from "@/lib/auth/actions";
-import { PAID_PLANS, PLAN_LABEL, PLAN_PRICE_USD, PLAN_PROMISE, type PaidPlan } from "@/lib/plan";
+import type { PaidPlan, Periodo } from "@/lib/plan";
+import { PeriodoYPlanes } from "./empezar-planes";
 
 /**
  * Modo «reanudar» de /empezar: la cuenta existe, falta pagar.
  *
- * Lo único que viaja es el plan elegido, y /empezar/pagar sigue siendo la única
+ * Lo único que viaja es el plan y el período elegidos, y /empezar/pagar sigue siendo la única
  * puerta hacia Stripe. Va como acción del servidor y no como <form method="get">
  * por la CSP (`form-action 'self'` bloquea la redirección del envío hacia
  * checkout.stripe.com; ver reanudarPagoAction). El correo se muestra pero no se
@@ -12,13 +13,17 @@ import { PAID_PLANS, PLAN_LABEL, PLAN_PRICE_USD, PLAN_PROMISE, type PaidPlan } f
  */
 export function ReanudarPago({
   plan,
+  periodo,
   email,
   errorPago,
+  errorPrecio,
   yaUsoPrueba,
 }: {
   plan: PaidPlan;
+  periodo: Periodo;
   email: string;
   errorPago: boolean;
+  errorPrecio: string | null;
   yaUsoPrueba: boolean;
 }) {
   return (
@@ -28,6 +33,11 @@ export function ReanudarPago({
           {errorPago ? (
             <p className="emp-aviso" role="alert">
               No pudimos abrir el pago. Probá de nuevo; si sigue fallando, escribinos.
+            </p>
+          ) : null}
+          {errorPrecio ? (
+            <p className="emp-aviso" role="alert">
+              {errorPrecio}
             </p>
           ) : null}
           <div className="emp-campo">
@@ -44,21 +54,7 @@ export function ReanudarPago({
 
         <aside className="emp-lado">
           <p className="lp-rotulo">Tu plan</p>
-          <div className="emp-planes" role="radiogroup" aria-label="Plan">
-            {PAID_PLANS.map((p) => (
-              <label key={p} className="emp-plan">
-                <input type="radio" name="plan" value={p} defaultChecked={p === plan} />
-                <span className="emp-plan-cuerpo">
-                  <span className="emp-plan-nombre">{PLAN_LABEL[p]}</span>
-                  <span className="emp-plan-precio">
-                    ${PLAN_PRICE_USD[p].mensual}
-                    <small>/mes</small>
-                  </span>
-                  <span className="emp-plan-promesa">{PLAN_PROMISE[p]}</span>
-                </span>
-              </label>
-            ))}
-          </div>
+          <PeriodoYPlanes plan={plan} periodo={periodo} />
         </aside>
       </div>
       {/* «Usar otra cuenta» va en SU PROPIO <form> hermano (UsarOtraCuenta):
@@ -67,8 +63,8 @@ export function ReanudarPago({
   );
 }
 
-export function UsarOtraCuenta({ plan }: { plan: PaidPlan }) {
-  const salir = signOutAction.bind(null, `/empezar?plan=${plan}`);
+export function UsarOtraCuenta({ plan, periodo }: { plan: PaidPlan; periodo: Periodo }) {
+  const salir = signOutAction.bind(null, `/empezar?plan=${plan}&periodo=${periodo}`);
   return (
     <form action={salir} className="fine emp-otra">
       ¿No sos vos?{" "}

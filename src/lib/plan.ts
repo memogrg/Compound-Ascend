@@ -24,6 +24,10 @@ export type PaidPlan = (typeof PAID_PLANS)[number];
 export const PERIODOS = ["mensual", "anual"] as const;
 export type Periodo = (typeof PERIODOS)[number];
 
+export function esPeriodo(v: unknown): v is Periodo {
+  return typeof v === "string" && (PERIODOS as readonly string[]).includes(v);
+}
+
 export function isPaidPlan(plan: Plan): plan is PaidPlan {
   return plan !== "ninguno";
 }

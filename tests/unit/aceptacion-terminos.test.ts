@@ -49,7 +49,7 @@ describe("el schema exige la casilla", () => {
   });
 
   it("el alta de /empezar también la exige", () => {
-    const base = { email: "a@b.com", password: "unaclavelarga", plan: "pro" };
+    const base = { email: "a@b.com", password: "unaclavelarga", plan: "pro", periodo: "mensual" };
     expect(empezarSchema.safeParse({ ...base, acepta_terminos: "on" }).success).toBe(true);
     expect(empezarSchema.safeParse({ ...base, acepta_terminos: null }).success).toBe(false);
   });
