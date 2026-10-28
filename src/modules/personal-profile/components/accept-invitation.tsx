@@ -39,7 +39,7 @@ export function AcceptInvitation({
     <div>
       <p style={{ fontSize: 15, lineHeight: 1.6, marginBottom: 18 }}>
         <strong>{inviterName}</strong> te invitó a su hogar <strong>{householdName}</strong>. Al
-        aceptar te sumas a la gestión compartida y heredas la configuración del perfil; no tendrás
+        aceptar te sumás a la gestión compartida y heredás la configuración del perfil; no tendrás
         que llenar el cuestionario.
       </p>
       <button
