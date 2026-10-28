@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { capacitorBrowser, capacitorPlatform, isCapacitor } from "@/lib/capacitor/native";
+import { capacitorPlatform, isCapacitor } from "@/lib/capacitor/native";
 import { restaurar, urlDeGestion } from "@/lib/capacitor/purchases";
+import { abrirGestionTienda, refrescarAlVolver } from "./gestion-tienda";
 import type { OrigenSuscripcion } from "@/lib/billing/subscription-source";
 import { MContentCard, MDataRow, MSectionHeader } from "../../components/content-kit";
 
@@ -38,9 +39,8 @@ export function SuscripcionTienda({ origen }: { origen: OrigenSuscripcion }) {
     const url =
       (await urlDeGestion()) ?? (plataforma === "web" ? null : GESTION_TIENDA[plataforma]);
     if (!url) return;
-    const browser = capacitorBrowser();
-    if (browser) await browser.open({ url }).catch(() => window.open(url, "_blank"));
-    else window.open(url, "_blank");
+    refrescarAlVolver(() => router.refresh());
+    await abrirGestionTienda(url);
   };
 
   const restaurarCompras = async () => {
