@@ -1,6 +1,7 @@
 /**
  * Aceptación de invitación a un hogar: /invitacion/aceptar?token=...
- * - Sin sesión: invita a registrarse con el correo prellenado y vuelve aquí.
+ * - Sin sesión: invita a registrarse con el correo prellenado (o a iniciar sesión primero, si
+ *   ese correo ya tiene cuenta) y vuelve aquí.
  * - Con sesión y correo coincidente: muestra el botón para unirse al hogar; si vuelve del
  *   login o del registro (`auto=1`), la acepta sola.
  * - Con sesión y correo distinto: pide iniciar sesión con el correo invitado.
@@ -58,10 +59,38 @@ export default async function AcceptInvitationPage({
   // la invitación se acepta sola.
   const next = `/invitacion/aceptar?token=${token}&auto=1`;
 
-  // Sin sesión: registrarse con el correo invitado y volver a este enlace.
+  // Sin sesión: autenticarse con el correo invitado y volver a este enlace.
   if (!user) {
     const signupHref = `/signup?email=${encodeURIComponent(invitation.email)}&next=${encodeURIComponent(next)}`;
     const loginHref = `/login?next=${encodeURIComponent(next)}`;
+    // Si ese correo ya tiene cuenta, lo primero es iniciar sesión, no registrarse otra vez.
+    // Ante cualquier fallo, el orden de siempre (registrarse primero).
+    const { data: tieneCuenta } = await supabase.rpc("invitation_email_has_account", {
+      p_token: token,
+    });
+    if (tieneCuenta === true) {
+      return (
+        <Shell
+          subtitle={`${invitation.inviter_name} te invitó al hogar ${invitation.household_name}. Iniciá sesión con ${invitation.email} para unirte.`}
+        >
+          <Link
+            href={loginHref}
+            className="btn btn-primary"
+            style={{ width: "100%", textAlign: "center" }}
+          >
+            Iniciar sesión y unirme
+          </Link>
+          <div className="auth-divider">o</div>
+          <Link
+            href={signupHref}
+            className="btn btn-secondary"
+            style={{ width: "100%", textAlign: "center" }}
+          >
+            Crear cuenta
+          </Link>
+        </Shell>
+      );
+    }
     return (
       <Shell
         subtitle={`${invitation.inviter_name} te invitó al hogar ${invitation.household_name}. Creá tu cuenta con ${invitation.email} para unirte.`}

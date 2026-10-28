@@ -1443,6 +1443,12 @@ export interface Database {
           household_name: string;
         }[];
       };
+      // ¿El correo de la invitación (pendiente y vigente) ya tiene cuenta? Migración
+      // 20261027000001. False en todo otro caso.
+      invitation_email_has_account: {
+        Args: { p_token: string };
+        Returns: boolean;
+      };
       accept_household_invitation: {
         Args: { p_token: string };
         Returns: string;

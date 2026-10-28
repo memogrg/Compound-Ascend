@@ -1,7 +1,8 @@
 /**
  * Invitación al hogar: quien se autentica desde el enlace vuelve con `auto=1` y la invitación
  * se acepta sola; quien entra directo con sesión sigue viendo el botón; un correo distinto
- * sigue viendo el aviso de siempre.
+ * sigue viendo el aviso de siempre. Sin sesión, si el correo invitado ya tiene cuenta, el botón
+ * principal es iniciar sesión.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -10,6 +11,7 @@ const TOKEN = "11111111-2222-4333-8444-555555555555";
 
 const s = vi.hoisted(() => ({
   user: null as { id: string; email: string } | null,
+  tieneCuenta: { data: false as boolean | null, error: null as { message: string } | null },
 }));
 
 vi.mock("@/lib/auth/session", () => ({
@@ -18,17 +20,20 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({
-    rpc: async () => ({
-      data: [
-        {
-          email: "ana@example.com",
-          status: "pending",
-          expired: false,
-          inviter_name: "José",
-          household_name: "Casa Mora",
-        },
-      ],
-    }),
+    rpc: async (fn: string) =>
+      fn === "invitation_email_has_account"
+        ? s.tieneCuenta
+        : {
+            data: [
+              {
+                email: "ana@example.com",
+                status: "pending",
+                expired: false,
+                inviter_name: "José",
+                household_name: "Casa Mora",
+              },
+            ],
+          },
   }),
 }));
 vi.mock("@/components/auth/auth-shell", () => ({
@@ -59,13 +64,43 @@ const NEXT_AUTO = encodeURIComponent(`/invitacion/aceptar?token=${TOKEN}&auto=1`
 
 beforeEach(() => {
   s.user = null;
+  s.tieneCuenta = { data: false, error: null };
 });
+
+/** Texto de los botones, en el orden en que aparecen. */
+const botones = (html: string) =>
+  [...html.matchAll(/class="btn (btn-\w+)"[^>]*>([^<]+)</g)].map((m) => `${m[1]}:${m[2]}`);
 
 describe("/invitacion/aceptar", () => {
   it("sin sesión: crear cuenta e iniciar sesión vuelven con auto=1", async () => {
     const html = await pagina({ token: TOKEN });
     expect(html).toContain(`/signup?email=ana%40example.com&amp;next=${NEXT_AUTO}`);
     expect(html).toContain(`/login?next=${NEXT_AUTO}`);
+  });
+
+  it("sin sesión y el correo ya tiene cuenta: iniciar sesión primero", async () => {
+    s.tieneCuenta = { data: true, error: null };
+    const html = await pagina({ token: TOKEN });
+    expect(botones(html)).toEqual([
+      "btn-primary:Iniciar sesión y unirme",
+      "btn-secondary:Crear cuenta",
+    ]);
+    expect(html).toContain(`/login?next=${NEXT_AUTO}`);
+    expect(html).toContain(`/signup?email=ana%40example.com&amp;next=${NEXT_AUTO}`);
+  });
+
+  it("sin sesión y el correo sin cuenta: registrarse primero, como hoy", async () => {
+    const html = await pagina({ token: TOKEN });
+    expect(botones(html)).toEqual([
+      "btn-primary:Crear cuenta y unirme",
+      "btn-secondary:Iniciar sesión",
+    ]);
+  });
+
+  it("sin sesión y la RPC falla: el orden de siempre", async () => {
+    s.tieneCuenta = { data: null, error: { message: "function does not exist" } };
+    const html = await pagina({ token: TOKEN });
+    expect(botones(html)[0]).toBe("btn-primary:Crear cuenta y unirme");
   });
 
   it("de vuelta con auto=1 y el correo invitado: se acepta sola", async () => {
