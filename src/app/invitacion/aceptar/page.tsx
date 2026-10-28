@@ -37,9 +37,7 @@ export default async function AcceptInvitationPage({
     return <Shell subtitle="Este enlace de invitación no es válido o está incompleto." />;
   }
   if (!isSupabaseConfigured()) {
-    return (
-      <Shell subtitle="El servicio no está disponible en este momento. Inténtalo más tarde." />
-    );
+    return <Shell subtitle="El servicio no está disponible en este momento. Intentá más tarde." />;
   }
 
   const supabase = await createSupabaseServerClient();
@@ -51,7 +49,7 @@ export default async function AcceptInvitationPage({
   }
   if (invitation.status !== "pending" || invitation.expired) {
     return (
-      <Shell subtitle="Esta invitación ya no está disponible (fue aceptada, revocada o expiró). Pide una nueva al administrador del hogar." />
+      <Shell subtitle="Esta invitación ya no está disponible (fue aceptada, revocada o expiró). Pedí una nueva al administrador del hogar." />
     );
   }
 
@@ -66,7 +64,7 @@ export default async function AcceptInvitationPage({
     const loginHref = `/login?next=${encodeURIComponent(next)}`;
     return (
       <Shell
-        subtitle={`${invitation.inviter_name} te invitó al hogar ${invitation.household_name}. Crea tu cuenta con ${invitation.email} para unirte.`}
+        subtitle={`${invitation.inviter_name} te invitó al hogar ${invitation.household_name}. Creá tu cuenta con ${invitation.email} para unirte.`}
       >
         <Link
           href={signupHref}
@@ -75,7 +73,7 @@ export default async function AcceptInvitationPage({
         >
           Crear cuenta y unirme
         </Link>
-        <div className="auth-divider">¿ya tienes cuenta?</div>
+        <div className="auth-divider">¿ya tenés cuenta?</div>
         <Link
           href={loginHref}
           className="btn btn-secondary"
@@ -91,7 +89,7 @@ export default async function AcceptInvitationPage({
   if ((user.email ?? "").toLowerCase() !== invitation.email.toLowerCase()) {
     return (
       <Shell
-        subtitle={`Esta invitación es para ${invitation.email}, pero tu sesión usa otro correo. Inicia sesión con el correo invitado para aceptarla.`}
+        subtitle={`Esta invitación es para ${invitation.email}, pero tu sesión usa otro correo. Iniciá sesión con el correo invitado para aceptarla.`}
       >
         <Link
           href={`/login?next=${encodeURIComponent(next)}`}
