@@ -5,6 +5,10 @@
  * huérfana porque el titular del hogar bajó de plan— el middleware la manda acá.
  * Por eso la página tiene que explicarse sola: alguien puede caer sin haber
  * pedido nada.
+ *
+ * Si la suscripción se compró en la app (App Store / Google Play, vía RevenueCat), acá no se
+ * puede cambiar ni cancelar: la cobra Apple o Google. La página lo dice y no ofrece planes,
+ * para no abrir un segundo cobro por Stripe a quien ya paga en la tienda.
  */
 import { requireUser } from "@/lib/auth/session";
 import { getEstadoSuscripcion } from "@/modules/account/services/subscription-service";
@@ -34,6 +38,7 @@ export default async function SuscripcionPage({
   const user = await requireUser();
   const e = await getEstadoSuscripcion(user.id);
   const sinPlan = e.plan === "ninguno";
+  const enTienda = e.origen === "store";
   // El plan que traía de la landing solo manda si todavía no tiene ninguno:
   // a alguien que ya paga no se le empuja un cambio que no pidió.
   const preelegido = sinPlan && esPlanDePago(plan) ? plan : null;
@@ -60,7 +65,30 @@ export default async function SuscripcionPage({
         </div>
       ) : null}
 
-      {!sinPlan ? (
+      {enTienda ? (
+        <div className="card card-pad" style={{ marginBottom: 24 }}>
+          <p style={{ margin: 0, fontSize: 15 }}>
+            Tu suscripción se gestiona desde la app (App Store / Google Play).
+          </p>
+          <p className="muted" style={{ margin: "8px 0 0", fontSize: 13.5 }}>
+            Estás en <strong>{PLAN_LABEL[e.plan]}</strong>
+            {e.tienda?.finDePeriodo ? ` · se renueva el ${fecha(e.tienda.finDePeriodo)}` : ""}. Para
+            cambiar de plan o cancelar, entrá a las suscripciones de{" "}
+            {e.tienda?.plataforma === "android"
+              ? "Google Play"
+              : e.tienda?.plataforma === "ios"
+                ? "tu cuenta de Apple"
+                : "tu tienda"}
+            .
+          </p>
+          {e.planPendiente && e.cambiaEl ? (
+            <p className="muted" style={{ margin: "8px 0 0", fontSize: 13.5 }}>
+              Programado: pasás a <strong>{PLAN_LABEL[e.planPendiente]}</strong> el{" "}
+              {fecha(e.cambiaEl)}. Hasta entonces conservás todo lo de tu plan actual.
+            </p>
+          ) : null}
+        </div>
+      ) : !sinPlan ? (
         <div className="card card-pad" style={{ marginBottom: 24 }}>
           <p style={{ margin: 0, fontSize: 15 }}>
             Estás en <strong>{PLAN_LABEL[e.plan]}</strong>
@@ -82,7 +110,7 @@ export default async function SuscripcionPage({
         </div>
       ) : null}
 
-      {stripeConfigurado() ? (
+      {enTienda ? null : stripeConfigurado() ? (
         <PlanesPicker actual={e.plan} />
       ) : (
         <div className="card card-pad">
@@ -93,10 +121,12 @@ export default async function SuscripcionPage({
         </div>
       )}
 
-      <p className="muted" style={{ fontSize: 12.5, marginTop: 22 }}>
-        {TRIAL_DAYS} días de prueba · No se cobra hasta el día {TRIAL_DAYS + 1} · Cancelás cuando
-        querás
-      </p>
+      {enTienda ? null : (
+        <p className="muted" style={{ fontSize: 12.5, marginTop: 22 }}>
+          {TRIAL_DAYS} días de prueba · No se cobra hasta el día {TRIAL_DAYS + 1} · Cancelás cuando
+          querás
+        </p>
+      )}
     </div>
   );
 }

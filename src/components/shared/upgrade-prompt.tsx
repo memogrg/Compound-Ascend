@@ -48,7 +48,7 @@ export function UpgradePrompt({
         </ul>
       ) : null}
       <Link className="btn btn-gold" href="/suscripcion">
-        Pasar a {PLAN_LABEL[destino]} · ${PLAN_PRICE_USD[destino]}/mes
+        Pasar a {PLAN_LABEL[destino]} · ${PLAN_PRICE_USD[destino].mensual}/mes
       </Link>
       <p className="ps" style={{ fontSize: 12, margin: "14px 0 0", opacity: 0.75 }}>
         Al subir, el cambio entra de una. Al bajar, seguís con tu plan hasta que venza el mes ya

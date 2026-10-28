@@ -63,6 +63,17 @@ export type ProfileRow = Timestamps & {
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
 
+  // ── Suscripción de tienda vía RevenueCat (migración 20261025000001) ─────
+  // Las escribe SOLO el webhook de RevenueCat; las blinda `protect_profile_store_billing`.
+  /** Suscripción viva comprada en App Store / Google Play. */
+  store_subscription_active: boolean;
+  store_platform: "ios" | "android" | null;
+  store_product_id: string | null;
+  /** Fin del período pagado en la tienda. */
+  store_period_end: string | null;
+  /** original_app_user_id de RevenueCat. */
+  revenuecat_app_user_id: string | null;
+
   // ── Aceptación legal (migración 20260912000001) ───────────────────────
   /** LEGAL_VERSION que la persona aceptó. `null` = pendiente (cuenta anterior al registro). */
   terms_version: string | null;
@@ -1432,6 +1443,12 @@ export interface Database {
           household_name: string;
         }[];
       };
+      // ¿El correo de la invitación (pendiente y vigente) ya tiene cuenta? Migración
+      // 20261027000001. False en todo otro caso.
+      invitation_email_has_account: {
+        Args: { p_token: string };
+        Returns: boolean;
+      };
       accept_household_invitation: {
         Args: { p_token: string };
         Returns: string;
@@ -1439,6 +1456,18 @@ export interface Database {
       get_household_profile: {
         Args: Record<string, never>;
         Returns: Record<string, unknown> | null;
+      };
+      // Plan efectivo (migración 20261026000001): el mayor entre el propio y el del titular
+      // Max+ de cada hogar activo. Null si no hay perfil o si con sesión se pide otro id.
+      effective_plan: {
+        Args: { p_user?: string };
+        Returns: string | null;
+      };
+      // Plan del titular del hogar activo de quien llama (migración 20261026000002): define el
+      // cupo del hogar. Null sin membresía activa.
+      household_owner_plan: {
+        Args: Record<string, never>;
+        Returns: string | null;
       };
       list_household_members: {
         Args: Record<string, never>;

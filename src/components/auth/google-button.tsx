@@ -2,10 +2,17 @@
 
 import { signInWithGoogleAction } from "@/lib/auth/actions";
 
-/** Botón "Continuar con Google" (OAuth vía Supabase). */
-export function GoogleButton() {
+/**
+ * Botón "Continuar con Google" (OAuth vía Supabase).
+ *
+ * `next` es a dónde vuelve después del login: el mismo destino que el formulario de correo de
+ * la página. Sin él, quien entra por una invitación al hogar con Google caía en /dashboard y la
+ * invitación nunca se aceptaba. La acción lo filtra con `safeInternalPath`.
+ */
+export function GoogleButton({ next }: { next?: string }) {
   return (
     <form action={signInWithGoogleAction}>
+      {next ? <input type="hidden" name="next" value={next} /> : null}
       <button type="submit" className="btn btn-secondary auth-google">
         <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
           <path

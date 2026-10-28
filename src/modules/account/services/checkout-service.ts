@@ -95,7 +95,8 @@ export async function crearCheckout(input: {
 
   try {
     const customer = await clienteDe(input.userId, input.email);
-    const price = await precioDe(input.plan);
+    // Todavía no hay selector de período en el alta: todo checkout es mensual.
+    const price = await precioDe(input.plan, "mensual");
 
     const sesion = await stripe.checkout.sessions.create({
       mode: "subscription",

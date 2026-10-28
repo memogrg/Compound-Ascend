@@ -34,6 +34,29 @@ describe("ningún job del CI se salta su propio veredicto", () => {
   });
 });
 
+/**
+ * Todo job tiene su `timeout-minutes`. Sin él GitHub lo deja correr 6 h: el E2E smoke de
+ * `main` (corrida 40218920444) se colgó 1,5 h y, como el Diff visual de cada PR espera a que
+ * la corrida del merge-base termine en verde, bloqueó el de todos los PRs abiertos.
+ */
+describe("ningún job del CI corre sin límite de tiempo", () => {
+  it("todo job declara `timeout-minutes`", () => {
+    const lineas = DIRECTIVAS.split("\n").map((l) => l.replace(/\r$/, ""));
+    const desde = lineas.findIndex((l) => l === "jobs:");
+    const jobs: { id: string; cuerpo: string[] }[] = [];
+    for (const l of lineas.slice(desde + 1)) {
+      const id = /^  ([A-Za-z0-9_-]+):\s*$/.exec(l)?.[1];
+      if (id) jobs.push({ id, cuerpo: [] });
+      else jobs.at(-1)?.cuerpo.push(l);
+    }
+    expect(jobs.length, "jobs leídos de ci.yml").toBeGreaterThan(0);
+    const sinTimeout = jobs
+      .filter((j) => !j.cuerpo.some((l) => /^    timeout-minutes:\s*\d+/.test(l)))
+      .map((j) => j.id);
+    expect(sinTimeout, `jobs sin timeout-minutes: ${sinTimeout.join(", ")}`).toEqual([]);
+  });
+});
+
 describe("los guards siguen existiendo", () => {
   const ESPERADOS = [
     "Lint, Typecheck, Test & Build",

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { readEffectivePlan } from "@/lib/auth/effective-plan";
 import { debeRedirigirSinPlan } from "../lib/plan-guard";
 import { AceptarTerminosBanner } from "@/components/legal/aceptar-terminos-banner";
 import { aceptacionPendiente } from "@/lib/legal/aceptacion";
@@ -15,6 +16,7 @@ import { AppLockOverlay } from "../components/app-lock-overlay";
 import { AndroidBackHandler } from "../components/android-back-handler";
 import { WidgetSnapshotWriter } from "../components/widget-snapshot-writer";
 import { MobileRhythmNudge } from "../components/mobile-rhythm-nudge";
+import { PurchasesBootstrap } from "../components/purchases-bootstrap";
 
 /**
  * Layout de las pantallas AUTENTICADAS del móvil. Usa la sesión existente
@@ -46,15 +48,11 @@ export default async function MobileAppLayout({ children }: { children: React.Re
   // de la app (Apple 3.1.1). Una consulta, best-effort: si falla, NO se bloquea — un
   // muro que se cae encerrando es peor que uno que deja pasar de más.
   if (user) {
+    // Plan EFECTIVO (propio o heredado del hogar), de la misma fuente que
+    // /api/account/plan: si no, el paywall esperaría un plan que el muro ya ve.
     let plan: string | null = null;
     try {
-      const supabase = await createSupabaseServerClient();
-      const { data } = await supabase
-        .from("profiles")
-        .select("plan")
-        .eq("id", user.id)
-        .maybeSingle();
-      plan = data?.plan ?? null;
+      plan = await readEffectivePlan(await createSupabaseServerClient(), user.id);
     } catch {
       plan = null;
     }
@@ -102,6 +100,9 @@ export default async function MobileAppLayout({ children }: { children: React.Re
           <AndroidBackHandler />
           {/* Escribe el snapshot del widget nativo en cada carga (solo app nativa; no-op en web). */}
           <WidgetSnapshotWriter />
+          {/* RevenueCat con el UUID de la cuenta (solo app nativa): así el webhook sabe de
+          quién es cada compra en la tienda. No-op en web. */}
+          {user ? <PurchasesBootstrap userId={user.id} /> : null}
           {/* Captura silenciosa de la zona horaria del dispositivo (una vez, si no hay guardada). */}
           <TimezoneSync savedTz={savedTz} />
           {/* Ritmo del mes: ventana de configuración, cierre y recordatorio de registro.
