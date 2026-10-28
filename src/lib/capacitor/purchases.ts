@@ -20,9 +20,52 @@ import {
   esCompraCancelada,
   type PlanConPeriodos,
 } from "@/lib/billing/store-offerings";
+import { PLAN_RANK, type PaidPlan, type Periodo } from "@/lib/plan";
 
 export type ResultadoCompra =
   { ok: true } | { ok: false; cancelled: true } | { ok: false; error: string };
+
+/**
+ * Modos de reemplazo de Google Play para un cambio de plan. Copiados del enum `PRORATION_MODE`
+ * de mobile-shell/node_modules/@revenuecat/purchases-typescript-internal-esm/dist/offerings.js
+ * (17.25.0, la que fija purchases-capacitor 11.3.2). No se importa el paquete interno: es una
+ * dependencia de mobile-shell, no de la web.
+ *  · IMMEDIATE_WITH_TIME_PRORATION (1): entra ya y lo que quedaba del período se acredita.
+ *  · DEFERRED (6): entra cuando vence lo pagado, y recién ahí se cobra el plan nuevo.
+ */
+export const PRORATION_MODE = {
+  IMMEDIATE_WITH_TIME_PRORATION: 1,
+  DEFERRED: 6,
+} as const;
+
+export type ModoDeCambio = (typeof PRORATION_MODE)[keyof typeof PRORATION_MODE];
+
+/**
+ * Cómo se cambia de un plan+período a otro. Puro. Subir de plan entra ya (paga la diferencia y
+ * quiere lo que compró); bajar, o cambiar solo el período, entra al vencer lo pagado — la misma
+ * regla que Stripe y que la que aplica Apple dentro del grupo de suscripciones.
+ */
+export function modoDeCambio(
+  actual: { plan: PaidPlan; periodo: Periodo },
+  destino: { plan: PaidPlan; periodo: Periodo },
+): ModoDeCambio {
+  return PLAN_RANK[destino.plan] > PLAN_RANK[actual.plan]
+    ? PRORATION_MODE.IMMEDIATE_WITH_TIME_PRORATION
+    : PRORATION_MODE.DEFERRED;
+}
+
+/** Un cambio de plan en curso: el producto que se deja y cómo se reemplaza. */
+export type CambioDePlan = { productoActual: string; prorationMode: ModoDeCambio };
+
+/**
+ * `store_product_id` llega del webhook con el base plan pegado («cartera_proplus_mensual:anual»).
+ * Google Play identifica la suscripción por el producto: el SDK de Android (purchases 9.18.0) le
+ * quita el «:basePlan» por su cuenta pero lo avisa como no recomendado en un DEFERRED, así que
+ * se manda ya sin él.
+ */
+export function productoSinBasePlan(productId: string): string {
+  return productId.split(":")[0] ?? productId;
+}
 
 /** Las NEXT_PUBLIC_* se inlinean en build: hay que nombrarlas literalmente. */
 function apiKey(): string | null {
@@ -112,11 +155,28 @@ export async function obtenerOfertas(): Promise<PlanConPeriodos<PurchasesPackage
   return agruparPorPlan(current?.availablePackages ?? []);
 }
 
-export async function comprar(paquete: PurchasesPackage): Promise<ResultadoCompra> {
+/**
+ * Compra un paquete. Con `cambio`, en Android reemplaza la suscripción actual con el modo dado;
+ * en iOS no se manda nada: Apple resuelve el cambio dentro del grupo de suscripciones.
+ */
+export async function comprar(
+  paquete: PurchasesPackage,
+  cambio?: CambioDePlan,
+): Promise<ResultadoCompra> {
   const plugin = await pluginListo();
   if (!plugin) return { ok: false, error: "Las compras no están disponibles en este momento." };
   try {
-    await plugin.purchasePackage({ aPackage: paquete });
+    await plugin.purchasePackage({
+      aPackage: paquete,
+      ...(cambio && capacitorPlatform() === "android"
+        ? {
+            googleProductChangeInfo: {
+              oldProductIdentifier: productoSinBasePlan(cambio.productoActual),
+              prorationMode: cambio.prorationMode,
+            },
+          }
+        : {}),
+    });
     return { ok: true };
   } catch (err) {
     if (esCompraCancelada(err)) return { ok: false, cancelled: true };
