@@ -3,14 +3,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { isCapacitor, type PurchasesPackage } from "@/lib/capacitor/native";
-import { comprar, configurarCompras, obtenerOfertas, restaurar } from "@/lib/capacitor/purchases";
+import { capacitorPlatform, isCapacitor, type PurchasesPackage } from "@/lib/capacitor/native";
+import {
+  PRORATION_MODE,
+  comprar,
+  configurarCompras,
+  modoDeCambio,
+  obtenerOfertas,
+  restaurar,
+} from "@/lib/capacitor/purchases";
 import {
   tarjetasDelPeriodo,
   type PlanConPeriodos,
   type Tarjeta,
 } from "@/lib/billing/store-offerings";
-import { PLAN_BENEFITS, PLAN_LABEL, type Periodo } from "@/lib/plan";
+import { PLAN_BENEFITS, PLAN_LABEL, type PaidPlan, type Periodo } from "@/lib/plan";
+import { formatDateLong } from "@/lib/format";
 import { MContentCard } from "../../components/content-kit";
 import { Segmented } from "../../components/form-kit";
 
@@ -29,9 +37,20 @@ import { Segmented } from "../../components/form-kit";
  *
  * La compra NO cambia el plan: lo cambia el webhook de RevenueCat. Después de comprar, la
  * pantalla pregunta a /api/account/plan cada 2 s durante 20 s y entra a la app cuando llega.
+ *
+ * `modo="cambio"` (/m/perfil/plan) es el mismo paywall para quien ya paga en la tienda: la
+ * tarjeta de su plan y período queda marcada y deshabilitada, y las demás reemplazan la
+ * suscripción (`modoDeCambio`). Subir entra ya y se espera el plan nuevo; bajar o cambiar solo
+ * el período entra al vencer lo pagado, así que no se espera nada: se avisa la fecha y se
+ * vuelve a Configuración. Una suscripción de Play no se cambia desde un iPhone ni al revés: con
+ * otra plataforma los botones quedan deshabilitados.
  */
 
-type Fase = "oculto" | "cargando" | "sin-ofertas" | "lista" | "activando" | "pendiente";
+type Fase =
+  "oculto" | "cargando" | "sin-ofertas" | "lista" | "activando" | "pendiente" | "programado";
+
+/** La suscripción de tienda que se está cambiando. */
+export type PlanActualTienda = { productId: string; plan: PaidPlan; periodo: Periodo };
 
 const INTERVALO_MS = 2_000;
 const ESPERA_MAX_MS = 20_000;
@@ -56,11 +75,29 @@ async function planActual(): Promise<string | null> {
   }
 }
 
-export function Paywall({ userId }: { userId: string }) {
+export function Paywall({
+  userId,
+  modo = "alta",
+  actual,
+  plataformaTienda = null,
+  finDePeriodo = null,
+}: {
+  userId: string;
+  modo?: "alta" | "cambio";
+  /** Solo en modo "cambio": el plan y período que se pagan hoy. */
+  actual?: PlanActualTienda;
+  /** Solo en modo "cambio": la tienda donde se pagó (`store_platform`). */
+  plataformaTienda?: "ios" | "android" | null;
+  /** Solo en modo "cambio": fin del período pagado (`store_period_end`), para el aviso. */
+  finDePeriodo?: string | null;
+}) {
   const router = useRouter();
+  const enCambio = modo === "cambio" && actual !== undefined;
   const [fase, setFase] = useState<Fase>("oculto");
   const [ofertas, setOfertas] = useState<PlanConPeriodos<PurchasesPackage>[]>([]);
-  const [periodo, setPeriodo] = useState<Periodo>("mensual");
+  const [periodo, setPeriodo] = useState<Periodo>(actual?.periodo ?? "mensual");
+  // Se decide en el cliente: el servidor no sabe desde qué dispositivo se abre la pantalla.
+  const [mismaPlataforma, setMismaPlataforma] = useState(!enCambio);
   // Por id de paquete: el mismo plan tiene un paquete mensual y otro anual.
   const [comprando, setComprando] = useState<string | null>(null);
   const [restaurando, setRestaurando] = useState(false);
@@ -70,6 +107,7 @@ export function Paywall({ userId }: { userId: string }) {
   useEffect(() => {
     vivo.current = true;
     if (!isCapacitor()) return;
+    if (enCambio) setMismaPlataforma(capacitorPlatform() === plataformaTienda);
     setFase("cargando");
     void (async () => {
       await configurarCompras(userId);
@@ -81,33 +119,51 @@ export function Paywall({ userId }: { userId: string }) {
     return () => {
       vivo.current = false;
     };
-  }, [userId]);
+  }, [userId, enCambio, plataformaTienda]);
 
-  const esperarPlan = useCallback(async () => {
-    setFase("activando");
-    setAviso(null);
-    for (let t = 0; t < ESPERA_MAX_MS; t += INTERVALO_MS) {
-      const plan = await planActual();
-      if (!vivo.current) return;
-      if (plan && plan !== "ninguno") {
-        router.replace("/m");
-        router.refresh();
-        return;
+  /** Espera a que el webhook escriba el plan: cualquiera pago, o `objetivo` si es un cambio. */
+  const esperarPlan = useCallback(
+    async (objetivo?: PaidPlan) => {
+      setFase("activando");
+      setAviso(null);
+      for (let t = 0; t < ESPERA_MAX_MS; t += INTERVALO_MS) {
+        const plan = await planActual();
+        if (!vivo.current) return;
+        if (objetivo ? plan === objetivo : plan && plan !== "ninguno") {
+          router.replace("/m");
+          router.refresh();
+          return;
+        }
+        await esperar(INTERVALO_MS);
+        if (!vivo.current) return;
       }
-      await esperar(INTERVALO_MS);
-      if (!vivo.current) return;
-    }
-    setFase("pendiente");
-  }, [router]);
+      setFase("pendiente");
+    },
+    [router],
+  );
 
   const suscribirme = async (o: Tarjeta<PurchasesPackage>) => {
     setComprando(o.paquete.identifier);
     setAviso(null);
-    const r = await comprar(o.paquete);
+    const modoCambio = enCambio ? modoDeCambio(actual, { plan: o.plan, periodo }) : null;
+    const r = await comprar(
+      o.paquete,
+      enCambio && modoCambio !== null
+        ? { productoActual: actual.productId, prorationMode: modoCambio }
+        : undefined,
+    );
     if (!vivo.current) return;
     setComprando(null);
-    if (r.ok) return void esperarPlan();
-    if ("error" in r) setAviso(r.error);
+    if (!r.ok) {
+      if ("error" in r) setAviso(r.error);
+      return;
+    }
+    if (!enCambio) return void esperarPlan();
+    // Diferido, o solo otro período del mismo plan: el plan efectivo no cambia hoy.
+    if (modoCambio === PRORATION_MODE.DEFERRED || o.plan === actual.plan) {
+      return setFase("programado");
+    }
+    void esperarPlan(o.plan);
   };
 
   const restaurarCompras = async () => {
@@ -117,7 +173,7 @@ export function Paywall({ userId }: { userId: string }) {
     if (!vivo.current) return;
     setRestaurando(false);
     if (!r.ok) return setAviso(r.error);
-    if (r.activa) return void esperarPlan();
+    if (r.activa) return void (enCambio ? router.refresh() : esperarPlan());
     setAviso("No encontramos compras para restaurar en esta cuenta de la tienda.");
   };
 
@@ -134,6 +190,29 @@ export function Paywall({ userId }: { userId: string }) {
         <p style={{ margin: 0, fontWeight: 600 }} role="status">
           Estamos activando tu plan…
         </p>
+      </MContentCard>
+    );
+  }
+
+  if (fase === "programado") {
+    return (
+      <MContentCard style={{ marginTop: 14 }}>
+        <p style={{ margin: 0, fontWeight: 600 }} role="status">
+          {finDePeriodo
+            ? `Tu cambio se aplica el ${formatDateLong(finDePeriodo)}.`
+            : "Tu cambio se aplica cuando termine tu período actual."}
+        </p>
+        <button
+          type="button"
+          className="m-btn m-btn-block m-btn-primary"
+          style={{ marginTop: 12 }}
+          onClick={() => {
+            router.replace("/m/perfil");
+            router.refresh();
+          }}
+        >
+          Volver a Configuración
+        </button>
       </MContentCard>
     );
   }
@@ -179,40 +258,57 @@ export function Paywall({ userId }: { userId: string }) {
               options={OPCIONES_PERIODO}
             />
           ) : null}
-          {tarjetas.map((o) => (
-            <MContentCard key={o.paquete.identifier} style={{ marginBottom: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: 17 }}>{PLAN_LABEL[o.plan]}</div>
-              <div style={{ marginTop: 4 }}>
-                <span style={{ fontWeight: 700, fontSize: 20 }}>
-                  {o.paquete.product.priceString}
-                </span>{" "}
-                <span className="muted" style={{ fontSize: 13 }}>
-                  {POR[periodo]}
-                </span>
-              </div>
-              {o.ahorro !== null ? (
-                <div
-                  style={{ marginTop: 4, fontSize: 13, fontWeight: 600, color: "var(--success)" }}
-                >
-                  Ahorrás {o.ahorro}% frente a pagar mes a mes
+          {enCambio && !mismaPlataforma ? (
+            <p className="muted" role="note" style={{ fontSize: 13, margin: "0 0 12px" }}>
+              Tu suscripción es de {plataformaTienda === "ios" ? "App Store" : "Google Play"}: el
+              cambio se hace desde un dispositivo con esa tienda.
+            </p>
+          ) : null}
+          {tarjetas.map((o) => {
+            const esActual = enCambio && o.plan === actual.plan && periodo === actual.periodo;
+            return (
+              <MContentCard key={o.paquete.identifier} style={{ marginBottom: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: 17 }}>{PLAN_LABEL[o.plan]}</div>
+                <div style={{ marginTop: 4 }}>
+                  <span style={{ fontWeight: 700, fontSize: 20 }}>
+                    {o.paquete.product.priceString}
+                  </span>{" "}
+                  <span className="muted" style={{ fontSize: 13 }}>
+                    {POR[periodo]}
+                  </span>
                 </div>
-              ) : null}
-              <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 13.5, lineHeight: 1.5 }}>
-                {PLAN_BENEFITS[o.plan].slice(0, 3).map((b) => (
-                  <li key={b}>{b}</li>
-                ))}
-              </ul>
-              <button
-                type="button"
-                className="m-btn m-btn-block m-btn-primary"
-                style={{ marginTop: 12 }}
-                disabled={ocupado}
-                onClick={() => void suscribirme(o)}
-              >
-                {comprando === o.paquete.identifier ? "Abriendo la tienda…" : "Suscribirme"}
-              </button>
-            </MContentCard>
-          ))}
+                {o.ahorro !== null ? (
+                  <div
+                    style={{ marginTop: 4, fontSize: 13, fontWeight: 600, color: "var(--success)" }}
+                  >
+                    Ahorrás {o.ahorro}% frente a pagar mes a mes
+                  </div>
+                ) : null}
+                <ul
+                  style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 13.5, lineHeight: 1.5 }}
+                >
+                  {PLAN_BENEFITS[o.plan].slice(0, 3).map((b) => (
+                    <li key={b}>{b}</li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  className="m-btn m-btn-block m-btn-primary"
+                  style={{ marginTop: 12 }}
+                  disabled={ocupado || esActual || !mismaPlataforma}
+                  onClick={() => void suscribirme(o)}
+                >
+                  {comprando === o.paquete.identifier
+                    ? "Abriendo la tienda…"
+                    : esActual
+                      ? "Tu plan actual"
+                      : enCambio
+                        ? "Cambiar"
+                        : "Suscribirme"}
+                </button>
+              </MContentCard>
+            );
+          })}
         </>
       )}
 

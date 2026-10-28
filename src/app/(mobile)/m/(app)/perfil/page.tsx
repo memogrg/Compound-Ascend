@@ -84,6 +84,7 @@ export default async function MobilePerfil() {
   // ¿Por dónde paga? Decide si Ajustes ofrece gestionar/restaurar en la tienda (solo en la app
   // nativa). Best-effort: si la consulta falla, se ofrecen las filas de tienda.
   let origen: OrigenSuscripcion = "ninguna";
+  let plataformaTienda: "ios" | "android" | null = null;
   if (isSupabaseConfigured()) {
     try {
       const user = await getUser();
@@ -91,10 +92,13 @@ export default async function MobilePerfil() {
         const supabase = await createSupabaseServerClient();
         const { data } = await supabase
           .from("profiles")
-          .select("plan, stripe_subscription_id, store_subscription_active")
+          .select("plan, stripe_subscription_id, store_subscription_active, store_platform")
           .eq("id", user.id)
           .maybeSingle();
-        if (data) origen = origenDeSuscripcion(data);
+        if (data) {
+          origen = origenDeSuscripcion(data);
+          plataformaTienda = (data.store_platform as "ios" | "android" | null) ?? null;
+        }
       }
     } catch {
       origen = "ninguna";
@@ -213,7 +217,12 @@ export default async function MobilePerfil() {
         </MContentCard>
 
         {/* Suscripción en la tienda (App Store / Google Play): solo en la app nativa. */}
-        <SuscripcionTienda origen={origen} />
+        {/* Quien hereda el plan del hogar no cambia una suscripción que no paga: sin plataforma,
+            no ve «Cambiar de plan». */}
+        <SuscripcionTienda
+          origen={origen}
+          plataformaTienda={acc.heredadoDe ? null : plataformaTienda}
+        />
 
         {/* Invitar: el mismo ReferralCard de la web con skin="mobile" — ahí está el
             share nativo y la descarga del QR para compartirlo. */}
