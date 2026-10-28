@@ -51,7 +51,7 @@ export default async function SignupPage({
           /mes · {TRIAL_DAYS} días sin cobro
         </p>
       ) : null}
-      <GoogleButton />
+      <GoogleButton next={destino} />
       <div className="auth-divider">o con tu correo</div>
       <SignupForm defaultEmail={email} next={destino} />
       <PieLegal
