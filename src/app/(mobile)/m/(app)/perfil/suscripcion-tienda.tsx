@@ -21,16 +21,27 @@ const GESTION_TIENDA = {
  *
  * Si la cuenta paga por Stripe no se ofrecen filas de tienda: comprar o restaurar en la tienda
  * abriría un segundo cobro. Solo se dice que el plan está activo, sin nombrar dónde se paga.
+ *
+ * «Cambiar de plan» (→ /m/perfil/plan) solo aparece si paga en la tienda y este dispositivo es
+ * de esa misma tienda: una suscripción de Play no se cambia desde un iPhone.
  */
-export function SuscripcionTienda({ origen }: { origen: OrigenSuscripcion }) {
+export function SuscripcionTienda({
+  origen,
+  plataformaTienda = null,
+}: {
+  origen: OrigenSuscripcion;
+  plataformaTienda?: "ios" | "android" | null;
+}) {
   const router = useRouter();
   const [nativo, setNativo] = useState(false);
+  const [mismaPlataforma, setMismaPlataforma] = useState(false);
   const [restaurando, setRestaurando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
   useEffect(() => {
     setNativo(isCapacitor());
-  }, []);
+    setMismaPlataforma(plataformaTienda !== null && capacitorPlatform() === plataformaTienda);
+  }, [plataformaTienda]);
 
   if (!nativo) return null;
 
@@ -65,6 +76,14 @@ export function SuscripcionTienda({ origen }: { origen: OrigenSuscripcion }) {
           <MDataRow title="Tu plan está activo" />
         ) : (
           <>
+            {origen === "store" && mismaPlataforma ? (
+              <MDataRow
+                title="Cambiar de plan"
+                subtitle="Mensual o anual, subir o bajar de plan"
+                chevron
+                href="/m/perfil/plan"
+              />
+            ) : null}
             <MDataRow
               title="Gestionar suscripción"
               subtitle="Cambiar de plan o cancelar en la tienda"

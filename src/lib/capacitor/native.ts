@@ -115,6 +115,8 @@ export type PurchasesPlugin = {
   getOfferings(): Promise<{ readonly current: PurchasesOffering | null }>;
   purchasePackage(options: {
     aPackage: PurchasesPackage;
+    /** Solo Google Play: de qué producto se cambia y cómo. */
+    googleProductChangeInfo?: { oldProductIdentifier: string; prorationMode?: number } | null;
   }): Promise<{ productIdentifier: string; customerInfo: PurchasesCustomerInfo }>;
   restorePurchases(): Promise<{ customerInfo: PurchasesCustomerInfo }>;
   getCustomerInfo(): Promise<{ customerInfo: PurchasesCustomerInfo }>;
