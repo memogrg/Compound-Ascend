@@ -5,9 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { isCapacitor, type PurchasesPackage } from "@/lib/capacitor/native";
 import { comprar, configurarCompras, obtenerOfertas, restaurar } from "@/lib/capacitor/purchases";
-import type { PaqueteConPlan } from "@/lib/billing/store-offerings";
-import { PLAN_BENEFITS, PLAN_LABEL, type PaidPlan } from "@/lib/plan";
+import {
+  tarjetasDelPeriodo,
+  type PlanConPeriodos,
+  type Tarjeta,
+} from "@/lib/billing/store-offerings";
+import { PLAN_BENEFITS, PLAN_LABEL, type Periodo } from "@/lib/plan";
 import { MContentCard } from "../../components/content-kit";
+import { Segmented } from "../../components/form-kit";
 
 /**
  * Paywall nativo de /m/sin-plan: compra dentro de la app (App Store / Google Play) vía
@@ -19,6 +24,8 @@ import { MContentCard } from "../../components/content-kit";
  *  · Restaurar compras, enlaces a Términos y Privacidad, y el texto de renovación automática
  *    con cómo cancelar desde la tienda.
  *  · Nada de Stripe, la web ni «más barato en otro lado».
+ *  · El ahorro del anual se calcula con los dos precios de la MISMA tienda (`product.price`),
+ *    redondeado hacia abajo; si la tienda no trae alguno de los dos, no se dice nada.
  *
  * La compra NO cambia el plan: lo cambia el webhook de RevenueCat. Después de comprar, la
  * pantalla pregunta a /api/account/plan cada 2 s durante 20 s y entra a la app cuando llega.
@@ -30,6 +37,13 @@ const INTERVALO_MS = 2_000;
 const ESPERA_MAX_MS = 20_000;
 
 const esperar = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+const OPCIONES_PERIODO = [
+  { value: "mensual", label: "Mensual" },
+  { value: "anual", label: "Anual" },
+];
+const POR: Record<Periodo, string> = { mensual: "por mes", anual: "por año" };
+const CADA: Record<Periodo, string> = { mensual: "cada mes", anual: "cada año" };
 
 async function planActual(): Promise<string | null> {
   try {
@@ -45,8 +59,10 @@ async function planActual(): Promise<string | null> {
 export function Paywall({ userId }: { userId: string }) {
   const router = useRouter();
   const [fase, setFase] = useState<Fase>("oculto");
-  const [ofertas, setOfertas] = useState<PaqueteConPlan<PurchasesPackage>[]>([]);
-  const [comprando, setComprando] = useState<PaidPlan | null>(null);
+  const [ofertas, setOfertas] = useState<PlanConPeriodos<PurchasesPackage>[]>([]);
+  const [periodo, setPeriodo] = useState<Periodo>("mensual");
+  // Por id de paquete: el mismo plan tiene un paquete mensual y otro anual.
+  const [comprando, setComprando] = useState<string | null>(null);
   const [restaurando, setRestaurando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const vivo = useRef(true);
@@ -84,8 +100,8 @@ export function Paywall({ userId }: { userId: string }) {
     setFase("pendiente");
   }, [router]);
 
-  const suscribirme = async (o: PaqueteConPlan<PurchasesPackage>) => {
-    setComprando(o.plan);
+  const suscribirme = async (o: Tarjeta<PurchasesPackage>) => {
+    setComprando(o.paquete.identifier);
     setAviso(null);
     const r = await comprar(o.paquete);
     if (!vivo.current) return;
@@ -108,6 +124,9 @@ export function Paywall({ userId }: { userId: string }) {
   if (fase === "oculto") return null;
 
   const ocupado = comprando !== null || restaurando;
+  const tarjetas = tarjetasDelPeriodo(ofertas, periodo);
+  // El selector solo aparece si la tienda trae algún anual; si no, es el paywall de siempre.
+  const hayAnual = ofertas.some((g) => g.anual !== null);
 
   if (fase === "activando") {
     return (
@@ -150,31 +169,51 @@ export function Paywall({ userId }: { userId: string }) {
           <p style={{ margin: 0 }}>No pudimos cargar los planes. Intentá más tarde.</p>
         </MContentCard>
       ) : (
-        ofertas.map((o) => (
-          <MContentCard key={o.paquete.identifier} style={{ marginBottom: 12 }}>
-            <div style={{ fontWeight: 700, fontSize: 17 }}>{PLAN_LABEL[o.plan]}</div>
-            <div style={{ marginTop: 4 }}>
-              <span style={{ fontWeight: 700, fontSize: 20 }}>{o.paquete.product.priceString}</span>{" "}
-              <span className="muted" style={{ fontSize: 13 }}>
-                por mes
-              </span>
-            </div>
-            <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 13.5, lineHeight: 1.5 }}>
-              {PLAN_BENEFITS[o.plan].slice(0, 3).map((b) => (
-                <li key={b}>{b}</li>
-              ))}
-            </ul>
-            <button
-              type="button"
-              className="m-btn m-btn-block m-btn-primary"
-              style={{ marginTop: 12 }}
-              disabled={ocupado}
-              onClick={() => void suscribirme(o)}
-            >
-              {comprando === o.plan ? "Abriendo la tienda…" : "Suscribirme"}
-            </button>
-          </MContentCard>
-        ))
+        <>
+          {hayAnual ? (
+            <Segmented
+              name="periodo"
+              label="Período de pago"
+              value={periodo}
+              onChange={(v) => setPeriodo(v === "anual" ? "anual" : "mensual")}
+              options={OPCIONES_PERIODO}
+            />
+          ) : null}
+          {tarjetas.map((o) => (
+            <MContentCard key={o.paquete.identifier} style={{ marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 17 }}>{PLAN_LABEL[o.plan]}</div>
+              <div style={{ marginTop: 4 }}>
+                <span style={{ fontWeight: 700, fontSize: 20 }}>
+                  {o.paquete.product.priceString}
+                </span>{" "}
+                <span className="muted" style={{ fontSize: 13 }}>
+                  {POR[periodo]}
+                </span>
+              </div>
+              {o.ahorro !== null ? (
+                <div
+                  style={{ marginTop: 4, fontSize: 13, fontWeight: 600, color: "var(--success)" }}
+                >
+                  Ahorrás {o.ahorro}% frente a pagar mes a mes
+                </div>
+              ) : null}
+              <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 13.5, lineHeight: 1.5 }}>
+                {PLAN_BENEFITS[o.plan].slice(0, 3).map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                className="m-btn m-btn-block m-btn-primary"
+                style={{ marginTop: 12 }}
+                disabled={ocupado}
+                onClick={() => void suscribirme(o)}
+              >
+                {comprando === o.paquete.identifier ? "Abriendo la tienda…" : "Suscribirme"}
+              </button>
+            </MContentCard>
+          ))}
+        </>
       )}
 
       {aviso ? (
@@ -193,8 +232,8 @@ export function Paywall({ userId }: { userId: string }) {
       </button>
 
       <p className="muted" style={{ fontSize: 12, lineHeight: 1.5, margin: "12px 0 6px" }}>
-        La suscripción se renueva automáticamente cada mes hasta que la cancelés desde los ajustes
-        de tu App Store o Google Play, al menos 24 horas antes del fin del período.
+        La suscripción se renueva automáticamente {CADA[periodo]} hasta que la cancelés desde los
+        ajustes de tu App Store o Google Play, al menos 24 horas antes del fin del período.
       </p>
       <p style={{ fontSize: 12, margin: 0 }}>
         <Link href="/terminos">Términos y condiciones</Link> ·{" "}
