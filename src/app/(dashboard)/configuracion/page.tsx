@@ -5,6 +5,8 @@ import {
   getAccountDeletionInfo,
   textoPlanHeredado,
 } from "@/modules/account/services/account-service";
+import { getDetalleSuscripcion } from "@/modules/account/services/subscription-detail";
+import { lineaDeRenovacion } from "@/lib/billing/subscription-detail-rules";
 import { DeleteAccountButton } from "@/modules/account/components/delete-account-button";
 import { ExportDataButton } from "@/modules/account/components/export-data-button";
 import { ReferralCard } from "@/components/referrals/referral-card";
@@ -67,6 +69,8 @@ function SetRow({
 export default async function Page() {
   const acc = await getAccountInfo();
   const del = await getAccountDeletionInfo();
+  const detalle = await getDetalleSuscripcion(acc);
+  const renovacion = detalle ? lineaDeRenovacion(detalle) : null;
   const savedTz = isSupabaseConfigured() ? await getUserTimezone().catch(() => null) : null;
   const usagePct =
     acc.tokenLimit > 0 ? Math.min(100, Math.round((acc.tokensUsed / acc.tokenLimit) * 100)) : 0;
@@ -163,11 +167,17 @@ export default async function Page() {
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           <span className={`plan-chip${isPaidPlan(acc.planEfectivo) ? " prem" : ""}`}>
             {PLAN_LABEL[acc.planEfectivo]}
+            {detalle ? ` · ${detalle.periodo}` : null}
           </span>
           {acc.heredadoDe ? (
             <HelpTip text={textoPlanHeredado(acc.heredadoDe)} label="De dónde viene tu plan" />
           ) : null}
         </span>
+        {renovacion ? (
+          <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+            {renovacion}
+          </div>
+        ) : null}
         <div className="usage-lb">
           <span>Uso de IA este mes</span>
           <span className="tk">

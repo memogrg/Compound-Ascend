@@ -1,4 +1,6 @@
 import { getAccountInfo, textoPlanHeredado } from "@/modules/account/services/account-service";
+import { getDetalleSuscripcion } from "@/modules/account/services/subscription-detail";
+import { lineaDeRenovacion } from "@/lib/billing/subscription-detail-rules";
 import { HelpTip } from "@/components/shared/help-tip";
 import { getUserTimezone } from "@/lib/time/user-time";
 import { MobileHeader } from "../../components/mobile-header";
@@ -41,6 +43,9 @@ function tk(n: number): string {
 export default async function MobilePerfil() {
   const acc = await getAccountInfo();
   const savedTz = isSupabaseConfigured() ? await getUserTimezone().catch(() => null) : null;
+  // Período y renovación de la suscripción propia (null si hereda, no paga o Stripe falla).
+  const detalle = await getDetalleSuscripcion(acc);
+  const renovacion = detalle ? lineaDeRenovacion(detalle) : null;
   // Referidos (paridad con Ajustes web, mismo componente con la piel móvil).
   const referral = isSupabaseConfigured() ? await getMyReferral() : null;
   // Memoria del asesor (paridad con Ajustes web, mismo componente con la piel móvil).
@@ -189,10 +194,19 @@ export default async function MobilePerfil() {
                   />
                 </span>
               ) : (
-                `Plan ${PLAN_LABEL[acc.planEfectivo]}`
+                `Plan ${PLAN_LABEL[acc.planEfectivo]}${detalle ? ` · ${detalle.periodo}` : ""}`
               )
             }
-            subtitle="Uso de IA este mes"
+            subtitle={
+              renovacion ? (
+                <>
+                  <span style={{ display: "block" }}>{renovacion}</span>
+                  Uso de IA este mes
+                </>
+              ) : (
+                "Uso de IA este mes"
+              )
+            }
             value={`${tk(acc.tokensUsed)} / ${tk(acc.tokenLimit)}`}
             slot={<MProgress value={usePct} tone="success" height={8} />}
           />
