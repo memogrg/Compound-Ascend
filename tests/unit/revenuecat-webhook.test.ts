@@ -426,6 +426,86 @@ describe("webhook revenuecat · cambio de producto", () => {
     expect(perfiles[0]!.store_product_pending).toBeNull();
   });
 
+  // En Google Play el PRODUCT_CHANGE diferido trae como expiration_at_ms el instante del cambio
+  // (evento de sandbox 3e241fdb-9450-412a-a175-7d51f8177a0b), no el fin del período.
+  const cambioConExpiracion = (nuevo: string, expiracionMs: number) =>
+    evento("PRODUCT_CHANGE", {
+      store: "PLAY_STORE",
+      product_id: "cartera_proplus_mensual:mensual",
+      new_product_id: nuevo,
+      expiration_at_ms: expiracionMs,
+    });
+
+  it("bajada diferida con expiration_at_ms = ahora: conserva el fin guardado y programa ahí", async () => {
+    pagaProMensual();
+    await pedir(cambioConExpiracion("cartera_esencial_mensual:mensual", Date.now()));
+    expect(perfiles[0]).toMatchObject({
+      store_product_id: "cartera_proplus_mensual:mensual",
+      store_product_pending: "cartera_esencial_mensual:mensual",
+      store_period_end: FIN_ACTUAL,
+    });
+    expect(sus.programarBajada).toHaveBeenCalledWith(USER, "esencial", FIN_ACTUAL);
+  });
+
+  it("cambio de período con expiration_at_ms = ahora: tampoco toca el fin guardado", async () => {
+    pagaProMensual();
+    await pedir(cambioConExpiracion("cartera_proplus_mensual:anual", Date.now()));
+    expect(perfiles[0]).toMatchObject({
+      store_product_pending: "cartera_proplus_mensual:anual",
+      store_period_end: FIN_ACTUAL,
+    });
+  });
+
+  it("bajada sin fin guardado y expiration en el pasado: no programa y deja warn", async () => {
+    pagaProMensual({ store_period_end: null });
+    const r = await pedir(
+      cambioConExpiracion("cartera_esencial_mensual:mensual", Date.now() - 60_000),
+    );
+    expect(r.status).toBe(200);
+    expect(sus.programarBajada).not.toHaveBeenCalled();
+    expect(sus.aplicarPlan).not.toHaveBeenCalled();
+    expect(perfiles[0]).toMatchObject({
+      store_product_pending: "cartera_esencial_mensual:mensual",
+      store_period_end: null,
+    });
+    expect(log.warn).toHaveBeenCalledWith(
+      "webhook revenuecat: bajada sin fecha de fin, no se programa",
+      expect.anything(),
+    );
+  });
+
+  it("bajada sin fin guardado: usa el expiration_at_ms si cae más de una hora adelante", async () => {
+    pagaProMensual({ store_period_end: null });
+    const enDosDias = Date.now() + 2 * 24 * 60 * 60 * 1000;
+    await pedir(cambioConExpiracion("cartera_esencial_mensual:mensual", enDosDias));
+    expect(sus.programarBajada).toHaveBeenCalledWith(
+      USER,
+      "esencial",
+      new Date(enDosDias).toISOString(),
+    );
+  });
+
+  it("subida en Play: el PRODUCT_CHANGE no toca el fin; lo escribe la INITIAL_PURCHASE que sigue", async () => {
+    pagaProMensual();
+    await pedir(cambioConExpiracion("cartera_maxplus_mensual:mensual", Date.now()));
+    expect(perfiles[0]).toMatchObject({
+      store_product_id: "cartera_maxplus_mensual:mensual",
+      store_period_end: FIN_ACTUAL,
+    });
+    expect(sus.aplicarPlan).toHaveBeenCalledWith(USER, "max");
+
+    const FIN_NUEVO = Date.parse("2026-12-01T00:00:00.000Z");
+    await pedir(
+      evento("INITIAL_PURCHASE", {
+        store: "PLAY_STORE",
+        product_id: "cartera_maxplus_mensual:mensual",
+        entitlement_ids: ["max"],
+        expiration_at_ms: FIN_NUEVO,
+      }),
+    );
+    expect(perfiles[0]!.store_period_end).toBe(new Date(FIN_NUEVO).toISOString());
+  });
+
   it("sin producto actual reconocible: el comportamiento de antes, con aviso en el log", async () => {
     pagaProMensual({ store_product_id: null });
     await pedir(cambio("cartera_esencial_mensual:mensual"));
@@ -438,5 +518,15 @@ describe("webhook revenuecat · cambio de producto", () => {
       "webhook revenuecat: cambio de producto sin producto actual reconocible",
       expect.anything(),
     );
+  });
+
+  it("sin producto actual reconocible y expiration_at_ms = ahora: el fin guardado no se toca", async () => {
+    pagaProMensual({ store_product_id: null });
+    await pedir(cambioConExpiracion("cartera_esencial_mensual:mensual", Date.now()));
+    expect(perfiles[0]).toMatchObject({
+      store_product_id: "cartera_esencial_mensual:mensual",
+      store_period_end: FIN_ACTUAL,
+    });
+    expect(sus.programarBajada).toHaveBeenCalledWith(USER, "esencial", FIN_ACTUAL);
   });
 });

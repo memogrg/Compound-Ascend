@@ -91,6 +91,21 @@ function aIso(ms: number | null | undefined): string | null {
   return typeof ms === "number" && Number.isFinite(ms) ? new Date(ms).toISOString() : null;
 }
 
+/** Margen para confiar en un `expiration_at_ms` de PRODUCT_CHANGE como fin del período. */
+const UNA_HORA_MS = 60 * 60 * 1000;
+
+/**
+ * Cuándo entra la bajada de un PRODUCT_CHANGE: el fin del período que ya tenemos guardado. Solo
+ * si no hay ninguno se usa el `expiration_at_ms` del evento, y únicamente si cae más de una hora
+ * en el futuro (en Play es el instante del cambio, ver la rama de PRODUCT_CHANGE). null si no hay
+ * una fecha creíble.
+ */
+function finParaBajada(guardado: string | null, delEvento: string | null): string | null {
+  if (guardado) return guardado;
+  if (delEvento && Date.parse(delEvento) > Date.now() + UNA_HORA_MS) return delEvento;
+  return null;
+}
+
 async function perfil(userId: string): Promise<PerfilTienda | null> {
   const { data } = await createServiceRoleClient()
     .from("profiles")
@@ -152,6 +167,14 @@ export async function manejarEventoTienda(
     }
     // Un PRODUCT_CHANGE diferido es solo un aviso: la tienda sigue cobrando el producto de hoy
     // hasta que vence lo pagado. El vigente no se toca; el nuevo queda pendiente.
+    //
+    // Ningún PRODUCT_CHANGE escribe `store_period_end`: en Google Play su `expiration_at_ms` es
+    // el instante del cambio, no el fin del período (evento de sandbox
+    // 3e241fdb-9450-412a-a175-7d51f8177a0b: event_timestamp_ms 1793298977772, expiration_at_ms
+    // 1793298977771). Escribirlo dejaba el período vencido y la bajada programada para «ahora»:
+    // el cron la aplicaba días antes de tiempo, y desde Max+ desalojaba al hogar. El fin nuevo
+    // lo escribe la compra o renovación que confirma el cambio (INITIAL_PURCHASE en Play,
+    // RENEWAL en Apple).
     const diferido =
       ev.type === "PRODUCT_CHANGE" &&
       producto !== null &&
@@ -167,11 +190,7 @@ export async function manejarEventoTienda(
       .from("profiles")
       .update(
         diferido
-          ? {
-              ...cuenta,
-              store_product_pending: producto,
-              ...(fin ? { store_period_end: fin } : {}),
-            }
+          ? { ...cuenta, store_product_pending: producto }
           : // Compra, renovación o subida: este producto es el vigente, y un cambio diferido
             // que esperaba ya entró (o se descartó).
             // Caso conocido, aceptado: si el pedido diferido llega segundos antes de una
@@ -182,7 +201,7 @@ export async function manejarEventoTienda(
               ...cuenta,
               store_product_id: producto,
               store_product_pending: null,
-              store_period_end: fin,
+              ...(ev.type === "PRODUCT_CHANGE" ? {} : { store_period_end: fin }),
             },
       )
       .eq("id", userId);
@@ -203,7 +222,15 @@ export async function manejarEventoTienda(
       return { status: "scheduled" };
     }
     if (ev.type === "PRODUCT_CHANGE" && isDowngrade(actual.plan, plan)) {
-      const r = await programarBajada(userId, plan, fin);
+      // La fecha es el fin guardado, no el `expiration_at_ms` del evento (ver arriba).
+      const cuando = finParaBajada(actual.store_period_end, fin);
+      if (!cuando) {
+        // Sin fecha creíble no se adivina: la compra o renovación que confirma el cambio aplica
+        // el plan nuevo igual.
+        logger.warn("webhook revenuecat: bajada sin fecha de fin, no se programa", { a: plan });
+        return { status: "ignored", motivo: "bajada sin fecha de fin" };
+      }
+      const r = await programarBajada(userId, plan, cuando);
       logger.info("webhook revenuecat: bajada programada", { a: plan, cuando: r.cambiaEl });
       return r.ok ? { status: "scheduled" } : { status: "ignored", motivo: r.message };
     }

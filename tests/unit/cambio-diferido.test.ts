@@ -137,6 +137,20 @@ describe("registrarCambioDiferido", () => {
     expect(perfil.store_product_pending).toBeNull();
   });
 
+  it("bajada sin fin de período de la tienda: no programa ni anota (nunca fechas de Stripe)", async () => {
+    pagaProMensual({ store_period_end: null });
+    expect(await registrarCambioDiferido("cartera_esencial_mensual:mensual")).toEqual({
+      ok: false,
+    });
+    expect(sus.programarBajada).not.toHaveBeenCalled();
+    expect(perfil.store_product_pending).toBeNull();
+    expect(perfil.plan_pending).toBeNull();
+    expect(log.warn).toHaveBeenCalledWith(
+      "cambio diferido: bajada sin fin de período de la tienda",
+      expect.anything(),
+    );
+  });
+
   it("si la bajada no se puede programar, tampoco anota el pendiente", async () => {
     sus.programarBajada.mockResolvedValueOnce({ ok: false, message: "sin fecha" });
     expect(await registrarCambioDiferido("cartera_esencial_mensual:mensual")).toEqual({
