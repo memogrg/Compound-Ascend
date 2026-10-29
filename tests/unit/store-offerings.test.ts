@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 import {
   agruparPorPlan,
   ahorroAnual,
+  esCambioRechazado,
   esCompraCancelada,
   tarjetasDelPeriodo,
 } from "@/lib/billing/store-offerings";
@@ -162,5 +163,21 @@ describe("esCompraCancelada", () => {
     expect(esCompraCancelada({ code: "2", message: "Store problem" })).toBe(false);
     expect(esCompraCancelada(new Error("boom"))).toBe(false);
     expect(esCompraCancelada(null)).toBe(false);
+  });
+});
+
+describe("esCambioRechazado", () => {
+  it('code "4" (PURCHASE_INVALID_ERROR: el DEVELOPER_ERROR de Play) es un rechazo del cambio', () => {
+    expect(esCambioRechazado({ code: "4", message: "The purchase is invalid." })).toBe(true);
+    expect(esCambioRechazado({ code: 4 })).toBe(true);
+  });
+
+  it("red, tienda caída o cancelación no son un rechazo del cambio", () => {
+    expect(esCambioRechazado({ code: "10", message: "Network error" })).toBe(false);
+    expect(esCambioRechazado({ code: "35", message: "Offline" })).toBe(false);
+    expect(esCambioRechazado({ code: "2", message: "Store problem" })).toBe(false);
+    expect(esCambioRechazado({ code: "1" })).toBe(false);
+    expect(esCambioRechazado(new Error("boom"))).toBe(false);
+    expect(esCambioRechazado(null)).toBe(false);
   });
 });

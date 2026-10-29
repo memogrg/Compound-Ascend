@@ -17,6 +17,7 @@ import {
 } from "@/lib/capacitor/native";
 import {
   agruparPorPlan,
+  esCambioRechazado,
   esCompraCancelada,
   type PlanConPeriodos,
 } from "@/lib/billing/store-offerings";
@@ -24,6 +25,9 @@ import { PLAN_RANK, type PaidPlan, type Periodo } from "@/lib/plan";
 
 export type ResultadoCompra =
   { ok: true } | { ok: false; cancelled: true } | { ok: false; error: string };
+
+export const CAMBIO_RECHAZADO =
+  "Google Play no aceptó el cambio. Si ya tenés un cambio programado o tu plan acaba de cambiar, probá después de la próxima renovación.";
 
 /**
  * Modos de reemplazo de Google Play para un cambio de plan. Copiados del enum `PRORATION_MODE`
@@ -165,10 +169,11 @@ export async function comprar(
 ): Promise<ResultadoCompra> {
   const plugin = await pluginListo();
   if (!plugin) return { ok: false, error: "Las compras no están disponibles en este momento." };
+  const reemplazoEnPlay = cambio !== undefined && capacitorPlatform() === "android";
   try {
     await plugin.purchasePackage({
       aPackage: paquete,
-      ...(cambio && capacitorPlatform() === "android"
+      ...(cambio && reemplazoEnPlay
         ? {
             googleProductChangeInfo: {
               oldProductIdentifier: productoSinBasePlan(cambio.productoActual),
@@ -181,6 +186,7 @@ export async function comprar(
   } catch (err) {
     if (esCompraCancelada(err)) return { ok: false, cancelled: true };
     console.warn("[compras] purchasePackage", err);
+    if (reemplazoEnPlay && esCambioRechazado(err)) return { ok: false, error: CAMBIO_RECHAZADO };
     return { ok: false, error: "No se pudo completar la compra. Intentá de nuevo." };
   }
 }
