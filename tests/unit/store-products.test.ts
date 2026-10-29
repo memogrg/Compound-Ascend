@@ -3,7 +3,7 @@
  * pueden renombrar), los anuales de Apple, y que los ids viejos ya no den plan.
  */
 import { describe, it, expect } from "vitest";
-import { planDeProducto, productoDeTienda } from "@/lib/billing/store-products";
+import { cambioDiferido, planDeProducto, productoDeTienda } from "@/lib/billing/store-products";
 
 describe("planDeProducto", () => {
   it("Pro+ con el base plan de Play pegado", () => {
@@ -57,5 +57,38 @@ describe("productoDeTienda", () => {
     expect(productoDeTienda(null)).toBeNull();
     expect(productoDeTienda("")).toBeNull();
     expect(productoDeTienda("otra_cosa:anual")).toBeNull();
+  });
+});
+
+describe("cambioDiferido", () => {
+  it("bajar de plan es diferido, en cualquier período y tienda", () => {
+    expect(
+      cambioDiferido("cartera_proplus_mensual:mensual", "cartera_esencial_mensual:mensual"),
+    ).toBe(true);
+    expect(cambioDiferido("cartera_maxplus_anual", "cartera_proplus_mensual")).toBe(true);
+  });
+  it("el mismo plan con otro período es diferido", () => {
+    expect(cambioDiferido("cartera_proplus_mensual:mensual", "cartera_proplus_mensual:anual")).toBe(
+      true,
+    );
+    expect(cambioDiferido("cartera_proplus_anual", "cartera_proplus_mensual")).toBe(true);
+  });
+  it("subir de plan entra ya, aunque cambie el período", () => {
+    expect(
+      cambioDiferido("cartera_esencial_mensual:mensual", "cartera_proplus_mensual:mensual"),
+    ).toBe(false);
+    expect(cambioDiferido("cartera_proplus_mensual:anual", "cartera_maxplus_mensual:mensual")).toBe(
+      false,
+    );
+  });
+  it("el mismo producto no es un cambio", () => {
+    expect(cambioDiferido("cartera_proplus_mensual:anual", "cartera_proplus_mensual:anual")).toBe(
+      false,
+    );
+  });
+  it("si alguno de los dos no es nuestro, no se puede saber: false", () => {
+    expect(cambioDiferido(null, "cartera_esencial_mensual")).toBe(false);
+    expect(cambioDiferido("otro_producto", "cartera_esencial_mensual")).toBe(false);
+    expect(cambioDiferido("cartera_proplus_mensual", "otro_producto")).toBe(false);
   });
 });

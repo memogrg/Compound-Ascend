@@ -6,7 +6,7 @@
  * lo de antes de los dos puntos y el período del base plan (`:anual` es anual). Apple no tiene
  * base plans: el anual es otro producto (`cartera_proplus_anual`).
  */
-import type { PaidPlan, Periodo } from "@/lib/plan";
+import { isDowngrade, type PaidPlan, type Periodo } from "@/lib/plan";
 
 export type { Periodo } from "@/lib/plan";
 
@@ -42,6 +42,20 @@ export function productoDeTienda(productId: string | null | undefined): Producto
 /** Plan de un producto de tienda, o null si no es nuestro. */
 export function planDeProducto(productId: string | null | undefined): PaidPlan | null {
   return productoDeTienda(productId)?.plan ?? null;
+}
+
+/**
+ * ¿Un cambio de producto entra recién al renovar? Bajar de plan, o quedarse en el mismo plan con
+ * otro período: es la regla de `modoDeCambio` en la app y la que aplica Apple dentro del grupo.
+ * Subir de plan entra ya. Si alguno de los dos productos no es nuestro, no se puede saber: false
+ * (quien llama sigue con el comportamiento de siempre).
+ */
+export function cambioDiferido(actual: string | null | undefined, nuevo: string): boolean {
+  const desde = productoDeTienda(actual);
+  const hacia = productoDeTienda(nuevo);
+  if (!desde || !hacia) return false;
+  if (isDowngrade(desde.plan, hacia.plan)) return true;
+  return desde.plan === hacia.plan && desde.periodo !== hacia.periodo;
 }
 
 /** Plan de una lista de entitlements: el primero que reconocemos. */

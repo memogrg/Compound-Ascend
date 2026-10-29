@@ -83,6 +83,7 @@ function perfilBase(extra: Partial<Perfil> = {}): Perfil {
     store_subscription_active: false,
     store_platform: null,
     store_product_id: null,
+    store_product_pending: null,
     store_period_end: null,
     revenuecat_app_user_id: null,
     ...extra,
@@ -318,5 +319,124 @@ describe("webhook revenuecat · planes anuales", () => {
     });
     expect(sus.aplicarPlan).toHaveBeenCalledWith(USER, "pro");
     expect(perfiles[1]!.store_product_id).toBe("cartera_proplus_anual");
+  });
+});
+
+describe("webhook revenuecat · cambio de producto", () => {
+  // Quien paga Pro+ mensual en Google Play, con el período en curso hasta el 12 de noviembre.
+  const FIN_ACTUAL = "2026-11-12T00:00:00.000Z";
+  function pagaProMensual(extra: Partial<Perfil> = {}) {
+    perfiles = [
+      perfilBase({
+        plan: "pro",
+        store_subscription_active: true,
+        store_platform: "android",
+        store_product_id: "cartera_proplus_mensual:mensual",
+        store_period_end: FIN_ACTUAL,
+        ...extra,
+      }),
+    ];
+  }
+  const cambio = (nuevo: string) =>
+    evento("PRODUCT_CHANGE", {
+      store: "PLAY_STORE",
+      product_id: "cartera_proplus_mensual:mensual",
+      new_product_id: nuevo,
+      expiration_at_ms: Date.parse(FIN_ACTUAL),
+    });
+
+  it("bajada diferida: conserva el producto vigente, guarda el pendiente y programa la bajada", async () => {
+    pagaProMensual();
+    const r = await pedir(cambio("cartera_esencial_mensual:mensual"));
+    expect(r.status).toBe(200);
+    expect(perfiles[0]).toMatchObject({
+      store_product_id: "cartera_proplus_mensual:mensual",
+      store_product_pending: "cartera_esencial_mensual:mensual",
+      store_period_end: FIN_ACTUAL,
+    });
+    expect(sus.programarBajada).toHaveBeenCalledWith(USER, "esencial", FIN_ACTUAL);
+    expect(sus.aplicarPlan).not.toHaveBeenCalled();
+  });
+
+  it("cambio de período en el mismo plan: igual de diferido, y no toca el plan", async () => {
+    pagaProMensual();
+    await pedir(cambio("cartera_proplus_mensual:anual"));
+    expect(perfiles[0]).toMatchObject({
+      store_product_id: "cartera_proplus_mensual:mensual",
+      store_product_pending: "cartera_proplus_mensual:anual",
+    });
+    expect(sus.aplicarPlan).not.toHaveBeenCalled();
+    expect(sus.programarBajada).not.toHaveBeenCalled();
+  });
+
+  it("subida: el producto nuevo es el vigente, limpia un pendiente viejo y aplica el plan", async () => {
+    pagaProMensual({ store_product_pending: "cartera_proplus_mensual:anual" });
+    await pedir(cambio("cartera_maxplus_mensual:mensual"));
+    expect(perfiles[0]).toMatchObject({
+      store_product_id: "cartera_maxplus_mensual:mensual",
+      store_product_pending: null,
+    });
+    expect(sus.aplicarPlan).toHaveBeenCalledWith(USER, "max");
+  });
+
+  it("la renovación con el producto nuevo lo promueve y limpia el pendiente", async () => {
+    pagaProMensual({ store_product_pending: "cartera_proplus_mensual:anual" });
+    const FIN_ANUAL = Date.parse("2027-11-12T00:00:00.000Z");
+    await pedir(
+      evento("RENEWAL", {
+        store: "PLAY_STORE",
+        product_id: "cartera_proplus_mensual:anual",
+        expiration_at_ms: FIN_ANUAL,
+      }),
+    );
+    expect(perfiles[0]).toMatchObject({
+      store_product_id: "cartera_proplus_mensual:anual",
+      store_product_pending: null,
+      store_period_end: new Date(FIN_ANUAL).toISOString(),
+    });
+    expect(sus.aplicarPlan).toHaveBeenCalledWith(USER, "pro");
+  });
+
+  it("en Play el cambio entra con un INITIAL_PURCHASE: también promueve y limpia", async () => {
+    pagaProMensual({ plan: "pro", store_product_pending: "cartera_esencial_mensual:mensual" });
+    await pedir(
+      evento("INITIAL_PURCHASE", {
+        store: "PLAY_STORE",
+        product_id: "cartera_esencial_mensual:mensual",
+        entitlement_ids: ["esencial"],
+      }),
+    );
+    expect(perfiles[0]).toMatchObject({
+      store_product_id: "cartera_esencial_mensual:mensual",
+      store_product_pending: null,
+    });
+    expect(sus.aplicarPlan).toHaveBeenCalledWith(USER, "esencial");
+  });
+
+  it("CANCELLATION limpia el pendiente: sin renovación no entra ningún cambio", async () => {
+    pagaProMensual({ store_product_pending: "cartera_proplus_mensual:anual" });
+    await pedir(evento("CANCELLATION", { store: "PLAY_STORE" }));
+    expect(perfiles[0]!.store_product_pending).toBeNull();
+    expect(perfiles[0]!.store_product_id).toBe("cartera_proplus_mensual:mensual");
+  });
+
+  it("EXPIRATION limpia el pendiente", async () => {
+    pagaProMensual({ store_product_pending: "cartera_proplus_mensual:anual" });
+    await pedir(evento("EXPIRATION", { store: "PLAY_STORE" }));
+    expect(perfiles[0]!.store_product_pending).toBeNull();
+  });
+
+  it("sin producto actual reconocible: el comportamiento de antes, con aviso en el log", async () => {
+    pagaProMensual({ store_product_id: null });
+    await pedir(cambio("cartera_esencial_mensual:mensual"));
+    expect(perfiles[0]).toMatchObject({
+      store_product_id: "cartera_esencial_mensual:mensual",
+      store_product_pending: null,
+    });
+    expect(sus.programarBajada).toHaveBeenCalledWith(USER, "esencial", FIN_ACTUAL);
+    expect(log.warn).toHaveBeenCalledWith(
+      "webhook revenuecat: cambio de producto sin producto actual reconocible",
+      expect.anything(),
+    );
   });
 });

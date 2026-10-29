@@ -10,7 +10,7 @@ import { origenDeSuscripcion } from "@/lib/billing/subscription-source";
 import { productoDeTienda } from "@/lib/billing/store-products";
 import { alVencer } from "@/lib/billing/subscription-detail-rules";
 import { formatDateLong } from "@/lib/format";
-import { PLAN_LABEL, type Plan } from "@/lib/plan";
+import { PLAN_LABEL, type PaidPlan, type Periodo, type Plan } from "@/lib/plan";
 
 /**
  * /m/perfil/plan — cambiar de plan o de período sin salir de la app, para quien paga en la
@@ -21,13 +21,32 @@ import { PLAN_LABEL, type Plan } from "@/lib/plan";
  * paga. Cualquier otro caso vuelve a /m/perfil. Que el dispositivo sea de la misma tienda lo
  * decide el paywall en el cliente.
  *
- * Con un cambio a otro plan pago ya programado no se ofrece otro: el webhook escribe
- * `store_product_id` al recibir PRODUCT_CHANGE aunque el cambio sea diferido, así que en esa
- * ventana el producto guardado es el de destino y no el que Play tiene vivo. Un segundo cambio
- * mandaría ese id como `oldProductIdentifier` y Play lo rechaza. Una cancelación pendiente
- * (`plan_pending = 'ninguno'`) no escribe producto nuevo: ahí el paywall se muestra igual.
+ * Con un cambio ya programado no se ofrece otro hasta que entre: un cambio diferido deja el
+ * producto nuevo en `store_product_pending` (o, en cuentas de antes de esa columna, una bajada
+ * en `plan_pending`). Un segundo reemplazo encima de uno que no entró deja el «actual» y el
+ * «pendiente» que guardamos sin corresponder a lo que tiene la tienda. Una cancelación pendiente
+ * (`plan_pending = 'ninguno'`) no es un cambio de producto: ahí el paywall se muestra igual.
  */
 export const dynamic = "force-dynamic"; // depende de la sesión
+
+/** El aviso de un cambio ya programado, o null si no hay ninguno. */
+function avisoDeCambioProgramado(p: {
+  actual: { plan: PaidPlan; periodo: Periodo };
+  pendiente: { plan: PaidPlan; periodo: Periodo } | null;
+  hayPendienteDesconocido: boolean;
+  bajadaA: PaidPlan | null;
+  fin: string | null;
+}): string | null {
+  const cuando = p.fin ? `el ${formatDateLong(p.fin)}` : "cuando termine tu período actual";
+  const despues = p.fin ? " Podés hacer otro cambio después de esa fecha." : "";
+  if (p.pendiente && p.pendiente.plan === p.actual.plan) {
+    return `Ya tenés el cambio a ${PLAN_LABEL[p.pendiente.plan]} ${p.pendiente.periodo} programado para ${cuando}.${despues}`;
+  }
+  const a = p.pendiente?.plan ?? p.bajadaA;
+  if (a) return `Ya tenés un cambio a ${PLAN_LABEL[a]} programado para ${cuando}.${despues}`;
+  if (p.hayPendienteDesconocido) return `Ya tenés un cambio programado para ${cuando}.${despues}`;
+  return null;
+}
 
 export default async function MobileCambiarPlan() {
   const user = isSupabaseConfigured() ? await getUser() : null;
@@ -39,7 +58,7 @@ export default async function MobileCambiarPlan() {
   const { data } = await supabase
     .from("profiles")
     .select(
-      "store_subscription_active, store_platform, store_product_id, store_period_end, stripe_subscription_id, plan_pending",
+      "store_subscription_active, store_platform, store_product_id, store_product_pending, store_period_end, stripe_subscription_id, plan_pending",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -55,9 +74,16 @@ export default async function MobileCambiarPlan() {
     redirect("/m/perfil");
   }
 
-  const pendiente = alVencer({
+  const alVencerPlan = alVencer({
     plan: acc.plan,
     plan_pending: (data.plan_pending ?? null) as Plan | null,
+  });
+  const aviso = avisoDeCambioProgramado({
+    actual: producto,
+    pendiente: productoDeTienda(data.store_product_pending),
+    hayPendienteDesconocido: data.store_product_pending !== null,
+    bajadaA: alVencerPlan.tipo === "cambia" ? alVencerPlan.a : null,
+    fin: data.store_period_end,
   });
 
   return (
@@ -69,12 +95,10 @@ export default async function MobileCambiarPlan() {
           title="Cambiar de plan"
           backHref="/m/perfil"
         />
-        {pendiente.tipo === "cambia" ? (
+        {aviso ? (
           <MContentCard style={{ marginTop: 14 }}>
             <p style={{ margin: 0, fontWeight: 600 }} role="status">
-              {data.store_period_end
-                ? `Ya tenés un cambio a ${PLAN_LABEL[pendiente.a]} programado para el ${formatDateLong(data.store_period_end)}. Podés hacer otro cambio después de esa fecha.`
-                : `Ya tenés un cambio a ${PLAN_LABEL[pendiente.a]} programado para cuando termine tu período actual.`}
+              {aviso}
             </p>
             <Link
               href="/m/perfil"
