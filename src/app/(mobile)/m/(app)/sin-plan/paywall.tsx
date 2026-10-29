@@ -19,6 +19,7 @@ import {
 } from "@/lib/billing/store-offerings";
 import { PLAN_BENEFITS, PLAN_LABEL, type PaidPlan, type Periodo } from "@/lib/plan";
 import { formatDateLong } from "@/lib/format";
+import { registrarCambioDiferido } from "@/modules/account/api/cambio-diferido-actions";
 import { MContentCard } from "../../components/content-kit";
 import { Segmented } from "../../components/form-kit";
 
@@ -41,8 +42,9 @@ import { Segmented } from "../../components/form-kit";
  * `modo="cambio"` (/m/perfil/plan) es el mismo paywall para quien ya paga en la tienda: la
  * tarjeta de su plan y período queda marcada y deshabilitada, y las demás reemplazan la
  * suscripción (`modoDeCambio`). Subir entra ya y se espera el plan nuevo; bajar o cambiar solo
- * el período entra al vencer lo pagado, así que no se espera nada: se avisa la fecha y se
- * vuelve a Configuración. Una suscripción de Play no se cambia desde un iPhone ni al revés: con
+ * el período entra al vencer lo pagado, así que no se espera nada: se anota el cambio en la
+ * cuenta (`registrarCambioDiferido`, porque RevenueCat no avisa un DEFERRED de Play), se avisa
+ * la fecha y se vuelve a Configuración. Una suscripción de Play no se cambia desde un iPhone ni al revés: con
  * otra plataforma los botones quedan deshabilitados.
  */
 
@@ -159,8 +161,11 @@ export function Paywall({
       return;
     }
     if (!enCambio) return void esperarPlan();
-    // Diferido, o solo otro período del mismo plan: el plan efectivo no cambia hoy.
+    // Diferido, o solo otro período del mismo plan: el plan efectivo no cambia hoy. Si anotarlo
+    // falla, el aviso se muestra igual: el cambio ya lo tiene la tienda.
     if (modoCambio === PRORATION_MODE.DEFERRED || o.plan === actual.plan) {
+      await registrarCambioDiferido(o.paquete.product.identifier).catch(() => null);
+      if (!vivo.current) return;
       return setFase("programado");
     }
     void esperarPlan(o.plan);

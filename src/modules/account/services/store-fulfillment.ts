@@ -174,6 +174,10 @@ export async function manejarEventoTienda(
             }
           : // Compra, renovación o subida: este producto es el vigente, y un cambio diferido
             // que esperaba ya entró (o se descartó).
+            // Caso conocido, aceptado: si el pedido diferido llega segundos antes de una
+            // renovación que todavía trae el producto viejo, el cambio entra el ciclo siguiente
+            // pero acá el pendiente se pierde. El plan queda correcto (lo aplica la compra que
+            // confirma el cambio) y un segundo cambio en ese ciclo cae en CAMBIO_RECHAZADO.
             {
               ...cuenta,
               store_product_id: producto,
