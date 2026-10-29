@@ -79,3 +79,16 @@ export function esCompraCancelada(err: unknown): boolean {
   const data = e.data as { userCancelled?: unknown } | undefined;
   return data?.userCancelled === true;
 }
+
+/**
+ * ¿Google Play rechazó el reemplazo de la suscripción? Play contesta DEVELOPER_ERROR cuando el
+ * `oldProductIdentifier` no es lo que tiene vivo o ya hay un reemplazo diferido esperando, y el
+ * SDK de Android (purchases 9.18.0, `billingResponseToPurchasesError`) lo traduce a
+ * PURCHASE_INVALID_ERROR, `code: "4"`. Red, tienda caída o cualquier otro código no cuentan:
+ * ahí el mensaje genérico de «intentá de nuevo» es el correcto.
+ */
+export function esCambioRechazado(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = (err as { code?: unknown }).code;
+  return code === "4" || code === 4;
+}
