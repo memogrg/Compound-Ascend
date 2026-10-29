@@ -63,7 +63,15 @@ export async function registrarCambioDiferido(productoNuevo: string): Promise<{ 
   // al renovar, igual que en el webhook. El mismo plan con otro período no toca el plan. Va
   // primero: si no hay fecha de fin, no se anota nada.
   if (isDowngrade(estado.plan, nuevo.plan)) {
-    const r = await programarBajada(user.id, nuevo.plan, estado.tienda?.finDePeriodo ?? null);
+    // Solo el fin del período de la tienda. Sin él no se programa: `programarBajada` caería a
+    // las fechas de Stripe (`period_end`, `trial_ends_at`), que no saben cuándo vence lo pagado
+    // en la tienda.
+    const fin = estado.tienda?.finDePeriodo ?? null;
+    if (!fin) {
+      logger.warn("cambio diferido: bajada sin fin de período de la tienda", { a: nuevo.plan });
+      return { ok: false };
+    }
+    const r = await programarBajada(user.id, nuevo.plan, fin);
     if (!r.ok) {
       logger.warn("cambio diferido: no se pudo programar la bajada", { a: nuevo.plan });
       return { ok: false };
