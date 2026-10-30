@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { capacitorPlatform, isCapacitor, type PurchasesPackage } from "@/lib/capacitor/native";
+import { capacitorPlatform, isCapacitor } from "@/lib/capacitor/native";
 import {
   PRORATION_MODE,
   comprar,
@@ -11,8 +11,10 @@ import {
   modoDeCambio,
   obtenerOfertas,
   restaurar,
+  type PaqueteOfertado,
 } from "@/lib/capacitor/purchases";
 import {
+  frasePrueba,
   tarjetasDelPeriodo,
   type PlanConPeriodos,
   type Tarjeta,
@@ -35,6 +37,9 @@ import { Segmented } from "../../components/form-kit";
  *  · Nada de Stripe, la web ni «más barato en otro lado».
  *  · El ahorro del anual se calcula con los dos precios de la MISMA tienda (`product.price`),
  *    redondeado hacia abajo; si la tienda no trae alguno de los dos, no se dice nada.
+ *  · La prueba gratis se dice si la tienda la da (`pruebaGratis`), debajo del precio, que sigue
+ *    siendo lo más visible, y con su texto de renovación (3.1.2). Solo en el alta: un cambio de
+ *    plan no estrena prueba.
  *
  * La compra NO cambia el plan: lo cambia el webhook de RevenueCat. Después de comprar, la
  * pantalla pregunta a /api/account/plan cada 2 s durante 20 s y entra a la app cuando llega.
@@ -96,7 +101,7 @@ export function Paywall({
   const router = useRouter();
   const enCambio = modo === "cambio" && actual !== undefined;
   const [fase, setFase] = useState<Fase>("oculto");
-  const [ofertas, setOfertas] = useState<PlanConPeriodos<PurchasesPackage>[]>([]);
+  const [ofertas, setOfertas] = useState<PlanConPeriodos<PaqueteOfertado>[]>([]);
   const [periodo, setPeriodo] = useState<Periodo>(actual?.periodo ?? "mensual");
   // Se decide en el cliente: el servidor no sabe desde qué dispositivo se abre la pantalla.
   const [mismaPlataforma, setMismaPlataforma] = useState(!enCambio);
@@ -144,7 +149,7 @@ export function Paywall({
     [router],
   );
 
-  const suscribirme = async (o: Tarjeta<PurchasesPackage>) => {
+  const suscribirme = async (o: Tarjeta<PaqueteOfertado>) => {
     setComprando(o.paquete.identifier);
     setAviso(null);
     const modoCambio = enCambio ? modoDeCambio(actual, { plan: o.plan, periodo }) : null;
@@ -188,6 +193,9 @@ export function Paywall({
   const tarjetas = tarjetasDelPeriodo(ofertas, periodo);
   // El selector solo aparece si la tienda trae algún anual; si no, es el paywall de siempre.
   const hayAnual = ofertas.some((g) => g.anual !== null);
+  // En modo "cambio" la prueba se ignora siempre.
+  const pruebaDe = (o: Tarjeta<PaqueteOfertado>) => (modo === "alta" ? o.paquete.prueba : null);
+  const hayPrueba = tarjetas.some((o) => pruebaDe(o) !== null);
 
   if (fase === "activando") {
     return (
@@ -271,6 +279,7 @@ export function Paywall({
           ) : null}
           {tarjetas.map((o) => {
             const esActual = enCambio && o.plan === actual.plan && periodo === actual.periodo;
+            const prueba = pruebaDe(o);
             return (
               <MContentCard key={o.paquete.identifier} style={{ marginBottom: 12 }}>
                 <div style={{ fontWeight: 700, fontSize: 17 }}>{PLAN_LABEL[o.plan]}</div>
@@ -282,6 +291,11 @@ export function Paywall({
                     {POR[periodo]}
                   </span>
                 </div>
+                {prueba ? (
+                  <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+                    {frasePrueba(prueba, o.paquete.product.priceString, POR[periodo])}
+                  </div>
+                ) : null}
                 {o.ahorro !== null ? (
                   <div
                     style={{ marginTop: 4, fontSize: 13, fontWeight: 600, color: "var(--success)" }}
@@ -309,7 +323,9 @@ export function Paywall({
                       ? "Tu plan actual"
                       : enCambio
                         ? "Cambiar"
-                        : "Suscribirme"}
+                        : prueba
+                          ? "Empezar prueba gratis"
+                          : "Suscribirme"}
                 </button>
               </MContentCard>
             );
@@ -333,8 +349,9 @@ export function Paywall({
       </button>
 
       <p className="muted" style={{ fontSize: 12, lineHeight: 1.5, margin: "12px 0 6px" }}>
-        La suscripción se renueva automáticamente {CADA[periodo]} hasta que la cancelés desde los
-        ajustes de tu App Store o Google Play, al menos 24 horas antes del fin del período.
+        {hayPrueba
+          ? `Si no cancelás al menos 24 horas antes de que termine la prueba, se cobra el precio del plan y la suscripción se renueva automáticamente ${CADA[periodo]} hasta que la cancelés desde los ajustes de tu App Store o Google Play.`
+          : `La suscripción se renueva automáticamente ${CADA[periodo]} hasta que la cancelés desde los ajustes de tu App Store o Google Play, al menos 24 horas antes del fin del período.`}
       </p>
       <p style={{ fontSize: 12, margin: 0 }}>
         <Link href="/terminos">Términos y condiciones</Link> ·{" "}
