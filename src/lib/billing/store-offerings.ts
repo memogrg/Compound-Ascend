@@ -8,6 +8,11 @@
  * primero.
  */
 import { productoDeTienda } from "@/lib/billing/store-products";
+import {
+  INTRO_ELIGIBILITY_STATUS,
+  type IntroEligibilityStatus,
+  type PurchasesStoreProduct,
+} from "@/lib/capacitor/native";
 import { PLAN_RANK, type PaidPlan, type Periodo } from "@/lib/plan";
 
 /** Un plan con su paquete de cada período; null si la oferta no trae ese período. */
@@ -91,4 +96,79 @@ export function esCambioRechazado(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
   const code = (err as { code?: unknown }).code;
   return code === "4" || code === 4;
+}
+
+/** La prueba gratis de un producto, tal como la configura la tienda. */
+export type PruebaGratis = { cantidad: number; unidad: "dia" | "semana" | "mes" | "año" };
+
+const UNIDAD_TIENDA: Record<string, PruebaGratis["unidad"]> = {
+  DAY: "dia",
+  WEEK: "semana",
+  MONTH: "mes",
+  YEAR: "año",
+};
+
+const UNIDAD_ISO: Record<string, PruebaGratis["unidad"]> = {
+  D: "dia",
+  W: "semana",
+  M: "mes",
+  Y: "año",
+};
+
+function prueba(
+  cantidad: number,
+  unidad: PruebaGratis["unidad"] | undefined,
+  veces: number | null,
+): PruebaGratis | null {
+  const total = cantidad * (veces && veces > 0 ? veces : 1);
+  if (!unidad || !Number.isInteger(total) || total <= 0) return null;
+  return { cantidad: total, unidad };
+}
+
+/**
+ * La prueba gratis que la tienda le ofrece a esta persona en este producto, o null. Nada fijo:
+ * la duración sale de la tienda.
+ *  · iOS: solo con un precio introductorio de 0 Y elegibilidad confirmada (2). Desconocida (0),
+ *    no elegible (1), sin oferta (3) o consulta fallida (null) → null: ante la duda se muestra
+ *    el precio sin prueba, que es lo que cobra la tienda.
+ *  · Android: la fase gratis de la opción por defecto (Play ya filtra las ofertas a las que no
+ *    tiene derecho; su elegibilidad siempre es 0, así que no se mira).
+ */
+export function pruebaGratis(
+  producto: Pick<PurchasesStoreProduct, "introPrice" | "defaultOption">,
+  plataforma: "ios" | "android",
+  elegibilidad: IntroEligibilityStatus | null,
+): PruebaGratis | null {
+  if (plataforma === "ios") {
+    const intro = producto.introPrice;
+    if (!intro || intro.price !== 0) return null;
+    if (elegibilidad !== INTRO_ELIGIBILITY_STATUS.ELIGIBLE) return null;
+    return prueba(intro.periodNumberOfUnits, UNIDAD_TIENDA[intro.periodUnit], intro.cycles);
+  }
+  const fase = producto.defaultOption?.freePhase;
+  if (!fase) return null;
+  const iso = /^P(\d+)([DWMY])$/.exec(fase.billingPeriod.iso8601);
+  if (!iso) return null;
+  return prueba(Number(iso[1]), UNIDAD_ISO[iso[2] ?? ""], fase.billingCycleCount);
+}
+
+/**
+ * «Los primeros 14 días», «El primer mes», «Los primeros 2 meses». Días y semanas se dicen en
+ * días (como lo dice la hoja de Apple); meses y años no se convierten: no tienen días fijos.
+ */
+export function textoPrueba(p: PruebaGratis): string {
+  if (p.unidad === "dia" || p.unidad === "semana") {
+    const dias = p.unidad === "semana" ? p.cantidad * 7 : p.cantidad;
+    return dias === 1 ? "El primer día" : `Los primeros ${dias} días`;
+  }
+  if (p.unidad === "mes")
+    return p.cantidad === 1 ? "El primer mes" : `Los primeros ${p.cantidad} meses`;
+  return p.cantidad === 1 ? "El primer año" : `Los primeros ${p.cantidad} años`;
+}
+
+/** «Los primeros 14 días son gratis. Después, USD 4.99 por mes.» (y «El primer mes es gratis…»). */
+export function frasePrueba(p: PruebaGratis, priceString: string, por: string): string {
+  const texto = textoPrueba(p);
+  const verbo = texto.startsWith("El ") ? "es" : "son";
+  return `${texto} ${verbo} gratis. Después, ${priceString} ${por}.`;
 }

@@ -530,3 +530,45 @@ describe("webhook revenuecat · cambio de producto", () => {
     expect(sus.programarBajada).toHaveBeenCalledWith(USER, "esencial", FIN_ACTUAL);
   });
 });
+
+describe("webhook revenuecat · prueba gratis de Apple", () => {
+  // «Free · 2 weeks» de App Store Connect: la compra inicial llega con period_type TRIAL y la
+  // expiración en el fin de la prueba. No hay rama propia para la prueba: es una compra más.
+  const FIN_PRUEBA_MS = Date.now() + 14 * 24 * 60 * 60 * 1000;
+  const FIN_PRUEBA = new Date(FIN_PRUEBA_MS).toISOString();
+  const deLaPrueba = (tipo: string) =>
+    evento(tipo, {
+      store: "APP_STORE",
+      period_type: "TRIAL",
+      product_id: "cartera_proplus_mensual",
+      expiration_at_ms: FIN_PRUEBA_MS,
+    });
+
+  it("INITIAL_PURCHASE en prueba: aplica el plan y el período termina con la prueba", async () => {
+    const r = await pedir(deLaPrueba("INITIAL_PURCHASE"));
+    expect(r.status).toBe(200);
+    expect(sus.aplicarPlan).toHaveBeenCalledWith(USER, "pro");
+    expect(perfiles[0]).toMatchObject({
+      store_subscription_active: true,
+      store_platform: "ios",
+      store_product_id: "cartera_proplus_mensual",
+      store_period_end: FIN_PRUEBA,
+    });
+  });
+
+  it("CANCELLATION durante la prueba: la baja se programa al fin de la prueba", async () => {
+    perfiles = [
+      perfilBase({
+        plan: "pro",
+        store_subscription_active: true,
+        store_platform: "ios",
+        store_product_id: "cartera_proplus_mensual",
+        store_period_end: FIN_PRUEBA,
+      }),
+    ];
+    const r = await pedir(deLaPrueba("CANCELLATION"));
+    expect(r.status).toBe(200);
+    expect(sus.programarBajada).toHaveBeenCalledWith(USER, "ninguno", FIN_PRUEBA);
+    expect(sus.aplicarPlan).not.toHaveBeenCalled();
+  });
+});

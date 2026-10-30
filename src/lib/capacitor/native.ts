@@ -89,6 +89,71 @@ export type PurchasesStoreProduct = {
    * calcular cuánto se ahorra con el anual frente al mensual (misma tienda, misma moneda).
    */
   readonly price: number;
+  /**
+   * Precio introductorio (también la prueba gratis, con `price` 0). En iOS es lo que configura
+   * App Store Connect; si la persona puede usarlo lo dice la consulta de elegibilidad del plugin.
+   */
+  readonly introPrice: PurchasesIntroPrice | null;
+  /** Opción de suscripción por defecto. Solo Google Play; null en iOS. */
+  readonly defaultOption: SubscriptionOption | null;
+};
+
+/** `PurchasesIntroPrice` de purchases-typescript-internal-esm 17.25.0 (offerings.d.ts). */
+export type PurchasesIntroPrice = {
+  /** Precio en la moneda local. */
+  readonly price: number;
+  /** El precio formateado, con su moneda. */
+  readonly priceString: string;
+  /** Cuántos períodos de facturación dura el descuento, p. ej. 3. */
+  readonly cycles: number;
+  /** El período de facturación del descuento, en ISO 8601. */
+  readonly period: string;
+  /** Unidad del período: DAY, WEEK, MONTH o YEAR. */
+  readonly periodUnit: string;
+  /** Cuántas unidades tiene el período. */
+  readonly periodNumberOfUnits: number;
+};
+
+/** `Period` de purchases-typescript-internal-esm 17.25.0. */
+export type PurchasesPeriod = {
+  readonly unit: "DAY" | "WEEK" | "MONTH" | "YEAR" | "UNKNOWN";
+  readonly value: number;
+  /** El período en ISO 8601, p. ej. «P2W». */
+  readonly iso8601: string;
+};
+
+/** `PricingPhase` de purchases-typescript-internal-esm 17.25.0 (sin los campos que no leemos). */
+export type PricingPhase = {
+  readonly billingPeriod: PurchasesPeriod;
+  /** Cuántas veces se repite la fase; null si es infinita. */
+  readonly billingCycleCount: number | null;
+};
+
+/** `SubscriptionOption` de Google Play (purchases-typescript-internal-esm 17.25.0), lo que leemos. */
+export type SubscriptionOption = {
+  readonly id: string;
+  /** La fase gratis de la opción, si la tiene. */
+  readonly freePhase: PricingPhase | null;
+};
+
+/**
+ * `INTRO_ELIGIBILITY_STATUS` de purchases-typescript-internal-esm 17.25.0. Android siempre
+ * contesta 0 (desconocido).
+ */
+export const INTRO_ELIGIBILITY_STATUS = {
+  UNKNOWN: 0,
+  INELIGIBLE: 1,
+  ELIGIBLE: 2,
+  NO_INTRO_OFFER_EXISTS: 3,
+} as const;
+
+export type IntroEligibilityStatus =
+  (typeof INTRO_ELIGIBILITY_STATUS)[keyof typeof INTRO_ELIGIBILITY_STATUS];
+
+/** `IntroEligibility` de purchases-typescript-internal-esm 17.25.0. */
+export type IntroEligibility = {
+  readonly status: IntroEligibilityStatus;
+  readonly description: string;
 };
 
 export type PurchasesPackage = {
@@ -120,6 +185,10 @@ export type PurchasesPlugin = {
   }): Promise<{ productIdentifier: string; customerInfo: PurchasesCustomerInfo }>;
   restorePurchases(): Promise<{ customerInfo: PurchasesCustomerInfo }>;
   getCustomerInfo(): Promise<{ customerInfo: PurchasesCustomerInfo }>;
+  /** Solo iOS da una respuesta útil. Rechaza si falla la consulta. */
+  checkTrialOrIntroductoryPriceEligibility(options: {
+    productIdentifiers: string[];
+  }): Promise<{ [productId: string]: IntroEligibility }>;
 };
 
 type CapacitorBridge = {

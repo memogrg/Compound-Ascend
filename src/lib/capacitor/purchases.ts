@@ -11,6 +11,7 @@ import {
   capacitorPlatform,
   capacitorPurchases,
   isCapacitor,
+  type IntroEligibilityStatus,
   type PurchasesCustomerInfo,
   type PurchasesPackage,
   type PurchasesPlugin,
@@ -19,7 +20,9 @@ import {
   agruparPorPlan,
   esCambioRechazado,
   esCompraCancelada,
+  pruebaGratis,
   type PlanConPeriodos,
+  type PruebaGratis,
 } from "@/lib/billing/store-offerings";
 import { PLAN_RANK, type PaidPlan, type Periodo } from "@/lib/plan";
 
@@ -148,15 +151,55 @@ export async function cerrarSesionCompras(): Promise<void> {
   }
 }
 
+/** Un paquete de la oferta con la prueba gratis que la tienda le da a esta persona, o null. */
+export type PaqueteOfertado = PurchasesPackage & { readonly prueba: PruebaGratis | null };
+
+/**
+ * La elegibilidad de cada producto para su precio introductorio, en una sola llamada. Solo iOS:
+ * Android siempre contesta «desconocido» y su prueba sale de la opción por defecto. Si la
+ * consulta falla, ningún producto es elegible: se muestra el precio sin prueba.
+ */
+async function elegibilidades(
+  plugin: PurchasesPlugin,
+  productIds: string[],
+): Promise<Record<string, IntroEligibilityStatus>> {
+  if (capacitorPlatform() !== "ios" || productIds.length === 0) return {};
+  try {
+    const mapa = await plugin.checkTrialOrIntroductoryPriceEligibility({
+      productIdentifiers: productIds,
+    });
+    const out: Record<string, IntroEligibilityStatus> = {};
+    for (const [id, e] of Object.entries(mapa)) out[id] = e.status;
+    return out;
+  } catch (err) {
+    console.warn("[compras] checkTrialOrIntroductoryPriceEligibility", err);
+    return {};
+  }
+}
+
 /**
  * Los planes de la oferta actual con su paquete mensual y anual, ordenados Esencial+ → Pro+ →
- * Max+. [] si no hay.
+ * Max+, cada paquete con su prueba gratis. [] si no hay.
  */
-export async function obtenerOfertas(): Promise<PlanConPeriodos<PurchasesPackage>[]> {
+export async function obtenerOfertas(): Promise<PlanConPeriodos<PaqueteOfertado>[]> {
   const plugin = await pluginListo();
   if (!plugin) return [];
   const { current } = await plugin.getOfferings();
-  return agruparPorPlan(current?.availablePackages ?? []);
+  const paquetes = current?.availablePackages ?? [];
+  const plataforma = capacitorPlatform();
+  const elegibles = await elegibilidades(
+    plugin,
+    paquetes.map((p) => p.product.identifier),
+  );
+  return agruparPorPlan(
+    paquetes.map((p) => ({
+      ...p,
+      prueba:
+        plataforma === "web"
+          ? null
+          : pruebaGratis(p.product, plataforma, elegibles[p.product.identifier] ?? null),
+    })),
+  );
 }
 
 /**
@@ -164,15 +207,18 @@ export async function obtenerOfertas(): Promise<PlanConPeriodos<PurchasesPackage
  * en iOS no se manda nada: Apple resuelve el cambio dentro del grupo de suscripciones.
  */
 export async function comprar(
-  paquete: PurchasesPackage,
+  paquete: PurchasesPackage | PaqueteOfertado,
   cambio?: CambioDePlan,
 ): Promise<ResultadoCompra> {
   const plugin = await pluginListo();
   if (!plugin) return { ok: false, error: "Las compras no están disponibles en este momento." };
   const reemplazoEnPlay = cambio !== undefined && capacitorPlatform() === "android";
+  // El paquete va tal cual lo dio el SDK (trae campos que acá no se tipan), sin la prueba.
+  const aPackage = { ...paquete };
+  if ("prueba" in aPackage) delete (aPackage as { prueba?: unknown }).prueba;
   try {
     await plugin.purchasePackage({
-      aPackage: paquete,
+      aPackage,
       ...(cambio && reemplazoEnPlay
         ? {
             googleProductChangeInfo: {
