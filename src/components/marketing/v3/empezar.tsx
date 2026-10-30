@@ -1,6 +1,6 @@
 import "./empezar.css";
 import Link from "next/link";
-import type { PaidPlan } from "@/lib/plan";
+import type { PaidPlan, Periodo } from "@/lib/plan";
 import { EmpezarForm } from "./empezar-form";
 import { ReanudarPago, UsarOtraCuenta } from "./empezar-reanudar";
 
@@ -22,13 +22,18 @@ import { ReanudarPago, UsarOtraCuenta } from "./empezar-reanudar";
  */
 export function Empezar({
   plan,
+  periodo,
   fechaCobro,
   errorPago,
+  errorPrecio,
   reanudar,
 }: {
   plan: PaidPlan;
+  periodo: Periodo;
   fechaCobro: string;
   errorPago: boolean;
+  /** El período elegido no tiene precio en Stripe: qué decirle a la persona. */
+  errorPrecio: string | null;
   reanudar: { email: string; yaUsoPrueba: boolean } | null;
 }) {
   return (
@@ -102,11 +107,13 @@ export function Empezar({
             )}
             <ReanudarPago
               plan={plan}
+              periodo={periodo}
               email={reanudar.email}
               errorPago={errorPago}
+              errorPrecio={errorPrecio}
               yaUsoPrueba={reanudar.yaUsoPrueba}
             />
-            <UsarOtraCuenta plan={plan} />
+            <UsarOtraCuenta plan={plan} periodo={periodo} />
           </>
         ) : (
           <>
@@ -117,7 +124,13 @@ export function Empezar({
               Creá tu cuenta, elegí el plan y registrá la tarjeta. Hoy no pagás nada y podés
               cancelar cuando querás.
             </p>
-            <EmpezarForm plan={plan} fechaCobro={fechaCobro} errorPago={errorPago} />
+            <EmpezarForm
+              plan={plan}
+              periodo={periodo}
+              fechaCobro={fechaCobro}
+              errorPago={errorPago}
+              errorPrecio={errorPrecio}
+            />
           </>
         )}
 

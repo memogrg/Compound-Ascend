@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth/session";
 import { getClientEnv } from "@/lib/env";
-import { PAID_PLANS, type PaidPlan } from "@/lib/plan";
+import { PAID_PLANS, esPeriodo, type PaidPlan, type Periodo } from "@/lib/plan";
 import { getEstadoSuscripcion } from "@/modules/account/services/subscription-service";
 import { crearCheckout } from "@/modules/account/services/checkout-service";
 
@@ -26,17 +26,22 @@ function esPlanDePago(v: string | undefined): v is PaidPlan {
  *    todavía no se haya aplicado: esa cuenta paga en la app, no acá;
  *  · sin plan → checkout con `origen: "empezar"`, que vuelve a /bienvenida con
  *    el `session_id`.
+ *
+ * El período viaja tal cual hasta el checkout (mensual si no viene). Si ese período no tiene
+ * precio en Stripe, vuelve a /empezar con `error=precio`: nunca se abre el pago de otro período.
  */
 export default async function PagarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ plan?: string }>;
+  searchParams: Promise<{ plan?: string; periodo?: string }>;
 }) {
-  const { plan } = await searchParams;
+  const { plan, periodo } = await searchParams;
   const elegido: PaidPlan = esPlanDePago(plan) ? plan : "pro";
+  const cada: Periodo = esPeriodo(periodo) ? periodo : "mensual";
+  const volver = `/empezar?plan=${elegido}&periodo=${cada}`;
 
   const user = await getUser();
-  if (!user) redirect(`/empezar?plan=${elegido}`);
+  if (!user) redirect(volver);
 
   const estado = await getEstadoSuscripcion(user.id);
   if (estado.plan !== "ninguno" || estado.origen === "store") redirect("/dashboard");
@@ -45,11 +50,13 @@ export default async function PagarPage({
     userId: user.id,
     email: user.email ?? null,
     plan: elegido,
+    periodo: cada,
     yaUsoPrueba: estado.finDePrueba != null,
     baseUrl: getClientEnv().NEXT_PUBLIC_APP_URL,
     origen: "empezar",
   });
 
-  if (!r.ok || !r.url) redirect(`/empezar?plan=${elegido}&error=pago`);
+  if (r.motivo === "precio_no_disponible") redirect(`${volver}&error=precio`);
+  if (!r.ok || !r.url) redirect(`${volver}&error=pago`);
   redirect(r.url);
 }

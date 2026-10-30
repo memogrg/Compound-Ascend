@@ -14,6 +14,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
 const sessionsCreate = vi.fn();
+const precioDe = vi.fn(async (plan: string, periodo: string) => `price_${plan}_${periodo}`);
 const sessionsRetrieve = vi.fn();
 const subsRetrieve = vi.fn();
 vi.mock("@/lib/billing/stripe", () => ({
@@ -22,7 +23,8 @@ vi.mock("@/lib/billing/stripe", () => ({
     subscriptions: { retrieve: subsRetrieve },
     customers: { create: vi.fn(async () => ({ id: "cus_nuevo" })) },
   }),
-  precioDe: async (plan: string) => `price_${plan}`,
+  precioDe: async (plan: string, periodo: string) => precioDe(plan, periodo),
+  PrecioNoDisponible: class extends Error {},
   planDeSuscripcion: (sub: { items?: { data?: { price?: { lookup_key?: string } }[] } }) => {
     const k = sub.items?.data?.[0]?.price?.lookup_key ?? "";
     return k.startsWith("carteraplus_") ? k.replace("carteraplus_", "") : null;
@@ -69,23 +71,40 @@ beforeEach(() => {
   subsRetrieve.mockReset();
   aplicarPlan.mockReset();
   enviarBienvenida.mockClear();
+  precioDe.mockClear();
 });
 
 describe("empezarSchema", () => {
-  it("acepta correo, contraseña, un plan de pago y la casilla de términos", () => {
-    const r = empezarSchema.safeParse({
-      email: "vos@correo.com",
-      password: "Sandbox123!",
-      plan: "pro",
-      acepta_terminos: "on",
-    });
-    expect(r.success).toBe(true);
+  it("acepta correo, contraseña, un plan de pago, su período y la casilla de términos", () => {
+    for (const periodo of ["mensual", "anual"]) {
+      const r = empezarSchema.safeParse({
+        email: "vos@correo.com",
+        password: "Sandbox123!",
+        plan: "pro",
+        periodo,
+        acepta_terminos: "on",
+      });
+      expect(r.success).toBe(true);
+    }
+  });
+  it("sin período, o con uno inventado, no pasa", () => {
+    for (const periodo of [null, "", "semanal"]) {
+      const r = empezarSchema.safeParse({
+        email: "vos@correo.com",
+        password: "Sandbox123!",
+        plan: "pro",
+        periodo,
+        acepta_terminos: "on",
+      });
+      expect(r.success).toBe(false);
+    }
   });
   it("sin la casilla de términos no se crea la cuenta", () => {
     const r = empezarSchema.safeParse({
       email: "vos@correo.com",
       password: "Sandbox123!",
       plan: "pro",
+      periodo: "mensual",
       acepta_terminos: null,
     });
     expect(r.success).toBe(false);
@@ -96,6 +115,7 @@ describe("empezarSchema", () => {
         email: "vos@correo.com",
         password: "Sandbox123!",
         plan,
+        periodo: "mensual",
         acepta_terminos: "on",
       });
       expect(r.success).toBe(false);
@@ -125,13 +145,40 @@ describe("crearCheckout desde /empezar", () => {
 
     const params = sessionsCreate.mock.calls[0]![0];
     expect(params.success_url).toBe("https://app.test/bienvenida?session_id={CHECKOUT_SESSION_ID}");
-    expect(params.cancel_url).toBe("https://app.test/empezar?plan=pro&reanudar=1");
+    expect(params.cancel_url).toBe("https://app.test/empezar?plan=pro&periodo=mensual&reanudar=1");
     expect(params.payment_method_collection).toBe("always");
     expect(params.subscription_data.trial_period_days).toBe(14);
     expect(params.locale).toBe("es-419");
     expect(params.custom_text.submit.message).toMatch(/Hoy no pagás nada/);
     expect(params.after_expiration.recovery.enabled).toBe(true);
-    expect(params.metadata).toEqual({ userId: "u1", plan: "pro" });
+    // Sin período, mensual: es lo que sigue pidiendo /suscripcion.
+    expect(precioDe).toHaveBeenCalledWith("pro", "mensual");
+    expect(params.line_items).toEqual([{ price: "price_pro_mensual", quantity: 1 }]);
+    expect(params.metadata).toEqual({ userId: "u1", plan: "pro", periodo: "mensual" });
+  });
+
+  it("anual: pide el precio anual y el período viaja a cancel_url y a la metadata", async () => {
+    sessionsCreate.mockResolvedValue({ url: "https://checkout.stripe.com/a" });
+    await crearCheckout({
+      userId: "u1",
+      email: "vos@correo.com",
+      plan: "max",
+      periodo: "anual",
+      yaUsoPrueba: false,
+      baseUrl: "https://app.test",
+      origen: "empezar",
+    });
+    const params = sessionsCreate.mock.calls[0]![0];
+    expect(precioDe).toHaveBeenCalledTimes(1);
+    expect(precioDe).toHaveBeenCalledWith("max", "anual");
+    expect(params.line_items).toEqual([{ price: "price_max_anual", quantity: 1 }]);
+    expect(params.cancel_url).toBe("https://app.test/empezar?plan=max&periodo=anual&reanudar=1");
+    expect(params.metadata).toEqual({ userId: "u1", plan: "max", periodo: "anual" });
+    expect(params.subscription_data.metadata).toEqual({
+      userId: "u1",
+      plan: "max",
+      periodo: "anual",
+    });
   });
 
   it("sin prueba (ya la usó) no regala días y lo dice", async () => {

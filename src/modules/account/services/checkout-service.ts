@@ -12,10 +12,10 @@ import "server-only";
  * Claude nunca ve ni maneja los datos de la tarjeta: los pide Stripe en su
  * propio dominio y nosotros solo recibimos el resultado por webhook.
  */
-import { getStripe, precioDe } from "@/lib/billing/stripe";
+import { getStripe, precioDe, PrecioNoDisponible } from "@/lib/billing/stripe";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { logger } from "@/lib/logger";
-import { TRIAL_DAYS, type PaidPlan } from "@/lib/plan";
+import { TRIAL_DAYS, type PaidPlan, type Periodo } from "@/lib/plan";
 
 import { formatDayMonthLong } from "@/lib/format";
 /** Cliente de Stripe de este usuario; lo crea la primera vez y lo guarda. */
@@ -57,6 +57,11 @@ export async function crearCheckout(input: {
   userId: string;
   email: string | null;
   plan: PaidPlan;
+  /**
+   * Cada cuánto se cobra. Mensual si no viene: /suscripcion todavía no elige período (el
+   * cambio de período por Stripe queda fuera de esta serie).
+   */
+  periodo?: Periodo;
   /** Ya usó la prueba antes: no se le regala otra. */
   yaUsoPrueba: boolean;
   baseUrl: string;
@@ -69,17 +74,24 @@ export async function crearCheckout(input: {
    *  · `suscripcion` — cambio de plan desde adentro: vuelve a /suscripcion.
    */
   origen?: "empezar" | "suscripcion";
-}): Promise<{ ok: boolean; url?: string; message?: string }> {
+}): Promise<{
+  ok: boolean;
+  url?: string;
+  message?: string;
+  /** `precio_no_disponible`: ese plan no tiene precio activo en ese período. */
+  motivo?: "precio_no_disponible";
+}> {
   const stripe = getStripe();
   if (!stripe) return { ok: false, message: "El cobro todavía no está habilitado." };
 
   const origen = input.origen ?? "suscripcion";
+  const periodo: Periodo = input.periodo ?? "mensual";
   const vuelta =
     origen === "empezar"
       ? {
           // `{CHECKOUT_SESSION_ID}` es literal: Stripe lo sustituye al redirigir.
           success_url: `${input.baseUrl}/bienvenida?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${input.baseUrl}/empezar?plan=${input.plan}&reanudar=1`,
+          cancel_url: `${input.baseUrl}/empezar?plan=${input.plan}&periodo=${periodo}&reanudar=1`,
         }
       : {
           success_url: `${input.baseUrl}/suscripcion?listo=1`,
@@ -95,8 +107,9 @@ export async function crearCheckout(input: {
 
   try {
     const customer = await clienteDe(input.userId, input.email);
-    // Todavía no hay selector de período en el alta: todo checkout es mensual.
-    const price = await precioDe(input.plan, "mensual");
+    // Solo el precio del período elegido. Si no existe, se corta acá: cobrar el mensual a
+    // quien eligió el anual es peor que no abrir el pago.
+    const price = await precioDe(input.plan, periodo);
 
     const sesion = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -107,9 +120,9 @@ export async function crearCheckout(input: {
       payment_method_collection: "always",
       subscription_data: {
         ...(input.yaUsoPrueba ? {} : { trial_period_days: TRIAL_DAYS }),
-        metadata: { userId: input.userId, plan: input.plan },
+        metadata: { userId: input.userId, plan: input.plan, periodo },
       },
-      metadata: { userId: input.userId, plan: input.plan },
+      metadata: { userId: input.userId, plan: input.plan, periodo },
       // Sin `locale`, Stripe elige el idioma por el navegador y a buena parte de
       // Costa Rica le salía el checkout en inglés. `es-419` es el español de
       // Latinoamérica.
@@ -126,10 +139,26 @@ export async function crearCheckout(input: {
     if (!sesion.url) return { ok: false, message: "Stripe no devolvió una URL de pago." };
     return { ok: true, url: sesion.url };
   } catch (err) {
+    if (err instanceof PrecioNoDisponible) {
+      logger.error("crearCheckout: precio no disponible", { plan: err.plan, periodo: err.periodo });
+      return {
+        ok: false,
+        motivo: "precio_no_disponible",
+        message: MENSAJE_PRECIO_NO_DISPONIBLE[periodo],
+      };
+    }
     logger.error("crearCheckout falló", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos abrir el pago. Intentá de nuevo." };
   }
 }
+
+/** Lo que ve la persona cuando el período que eligió no tiene precio en Stripe. */
+export const MENSAJE_PRECIO_NO_DISPONIBLE: Record<Periodo, string> = {
+  anual:
+    "El pago anual de ese plan no está disponible en este momento. Elegí el pago mensual o probá más tarde.",
+  mensual:
+    "El pago mensual de ese plan no está disponible en este momento. Probá más tarde o escribinos.",
+};
 
 /**
  * Portal de facturación de Stripe: cambiar tarjeta, ver facturas, cancelar.

@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
 import { Empezar } from "@/components/marketing/v3/empezar";
 import { getUser } from "@/lib/auth/session";
-import { PAID_PLANS, type PaidPlan } from "@/lib/plan";
-import { fechaPrimerCobro } from "@/modules/account/services/checkout-service";
+import { PAID_PLANS, esPeriodo, type PaidPlan, type Periodo } from "@/lib/plan";
+import {
+  fechaPrimerCobro,
+  MENSAJE_PRECIO_NO_DISPONIBLE,
+} from "@/modules/account/services/checkout-service";
 import { getEstadoSuscripcion } from "@/modules/account/services/subscription-service";
 
 export const dynamic = "force-dynamic";
@@ -28,16 +31,20 @@ function esPlanDePago(v: string | undefined): v is PaidPlan {
  *  · con sesión y sin plan → modo «reanudar»: la cuenta existe, falta pagar.
  *    Es adonde manda el muro del middleware y el `cancel_url` de Stripe.
  *
- * `?error=pago` lo pone /empezar/pagar cuando Stripe no devolvió checkout.
+ * `?periodo=` marca mensual o anual (mensual si no viene). `?error=pago` lo pone
+ * /empezar/pagar cuando Stripe no devolvió checkout, y `?error=precio` cuando el período
+ * elegido no tiene precio en Stripe.
  */
 export default async function EmpezarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ plan?: string; error?: string; reanudar?: string }>;
+  searchParams: Promise<{ plan?: string; periodo?: string; error?: string; reanudar?: string }>;
 }) {
-  const { plan, error } = await searchParams;
+  const { plan, periodo, error } = await searchParams;
   const elegido: PaidPlan = esPlanDePago(plan) ? plan : "pro";
+  const cada: Periodo = esPeriodo(periodo) ? periodo : "mensual";
   const errorPago = error === "pago";
+  const errorPrecio = error === "precio" ? MENSAJE_PRECIO_NO_DISPONIBLE[cada] : null;
 
   const user = await getUser();
   let reanudar: { email: string; yaUsoPrueba: boolean } | null = null;
@@ -52,8 +59,10 @@ export default async function EmpezarPage({
   return (
     <Empezar
       plan={elegido}
+      periodo={cada}
       fechaCobro={fechaPrimerCobro()}
       errorPago={errorPago}
+      errorPrecio={errorPrecio}
       reanudar={reanudar}
     />
   );
