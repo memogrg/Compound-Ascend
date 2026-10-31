@@ -4,7 +4,8 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getUser, isSupabaseConfigured, requireUser } from "@/lib/auth/session";
 import { isValidTimeZone } from "@/lib/time/user-time";
-import { aiTokenLimit, type Plan } from "@/lib/plan";
+import { aiTokenLimit, PLAN_RANK, type Plan } from "@/lib/plan";
+import { getEffectivePlan } from "@/lib/auth/feature-gate";
 import {
   setNotificationChannel,
   mergeNotificationPrefs,
@@ -32,8 +33,21 @@ const FINANCIAL_TABLES = [
 export type AccountInfo = {
   email: string | null;
   name: string | null;
+  /** Plan PROPIO (lo que paga): el de la suscripción y la facturación. */
   plan: Plan;
+  /**
+   * Plan con el que la persona usa la app: el mayor entre el propio y el heredado del hogar
+   * (RPC `effective_plan`, el mismo que deciden los muros y `assertTokenBudget`).
+   */
+  planEfectivo: Plan;
+  /**
+   * Si el plan efectivo viene del hogar (supera al propio): de quién. `titular` es el nombre
+   * del titular cuando se conoce; hoy ninguna RPC del hogar lo expone, así que va null y la
+   * pantalla dice «tu hogar». Null si el plan efectivo es el propio.
+   */
+  heredadoDe: { titular: string | null } | null;
   tokensUsed: number;
+  /** Límite del medidor de IA: el del plan EFECTIVO, el mismo que aplica assertTokenBudget. */
   tokenLimit: number;
   currency: string;
   notifications: NotificationPrefs;
@@ -55,6 +69,8 @@ export async function getAccountInfo(): Promise<AccountInfo> {
       email,
       name,
       plan: "ninguno",
+      planEfectivo: "ninguno",
+      heredadoDe: null,
       tokensUsed: 0,
       tokenLimit: aiTokenLimit("ninguno"),
       currency: "CRC",
@@ -64,7 +80,7 @@ export async function getAccountInfo(): Promise<AccountInfo> {
   }
 
   const supabase = await createSupabaseServerClient();
-  const [{ data: profile }, { data: usage }, { data: settings }] = await Promise.all([
+  const [{ data: profile }, { data: usage }, { data: settings }, efectivo] = await Promise.all([
     supabase.from("profiles").select("plan,display_name").eq("id", user.id).maybeSingle(),
     supabase
       .from("ai_usage_ledger")
@@ -77,20 +93,32 @@ export async function getAccountInfo(): Promise<AccountInfo> {
       .select("primary_currency,notifications")
       .eq("user_id", user.id)
       .maybeSingle(),
+    getEffectivePlan(),
   ]);
   const plan = (profile?.plan ?? "ninguno") as Plan;
+  // getEffectivePlan cae a 'ninguno' si la RPC falla: para MOSTRAR nunca se baja del propio.
+  const planEfectivo = PLAN_RANK[efectivo] > PLAN_RANK[plan] ? efectivo : plan;
   return {
     email,
     name: profile?.display_name ?? name,
     plan,
+    planEfectivo,
+    heredadoDe: planEfectivo !== plan ? { titular: null } : null,
     currency: settings?.primary_currency ?? "CRC",
     tokensUsed: Number(usage?.tokens_used ?? 0),
-    tokenLimit: aiTokenLimit(plan),
+    tokenLimit: aiTokenLimit(planEfectivo),
     notifications: mergeNotificationPrefs(
       (settings?.notifications ?? null) as Record<string, unknown> | null,
     ),
     configured: true,
   };
+}
+
+/** Texto del tooltip del plan heredado: «Incluido en el hogar de {titular}», o «tu hogar». */
+export function textoPlanHeredado(heredadoDe: { titular: string | null }): string {
+  return heredadoDe.titular
+    ? `Incluido en el hogar de ${heredadoDe.titular}`
+    : "Incluido en tu hogar";
 }
 
 /** Enciende/apaga un canal de notificación del usuario en sesión. */

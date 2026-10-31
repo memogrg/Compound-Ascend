@@ -16,7 +16,6 @@
  * al hidratar daría un salto.
  */
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { isCapacitor, capacitorPlatform } from "@/lib/capacitor/native";
 import { initSocialLogin } from "@/lib/capacitor/social-login-init";
@@ -35,7 +34,6 @@ function AppleFace() {
 }
 
 export function MobileAppleButton() {
-  const router = useRouter();
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,10 +52,11 @@ export function MobileAppleButton() {
     setLoading(true);
     const res = await nativeAppleLogin();
     if (res.ok) {
-      // replace y no push: volver atrás desde /m no debe devolver a la pantalla de login.
-      // refresh() para que el RSC se re-renderice ya con la sesión en las cookies.
-      router.replace("/m");
-      router.refresh();
+      // Recarga completa, como mobile-google-button: la navegación suave del App Router deja
+      // el WebView de iOS en blanco hasta reabrir la app; la recarga hace SSR con la sesión ya
+      // en las cookies. replace y no href: Atrás desde /m no debe volver al login. Sin
+      // setLoading(false): la página se va.
+      window.location.replace("/m");
       return;
     }
     // Cancelar no es un error: la persona decidió no seguir y ya lo sabe.

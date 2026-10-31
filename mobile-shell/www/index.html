@@ -194,11 +194,27 @@
       (function () {
         "use strict";
 
-        var APP_URL = "https://carteraplus.vercel.app/m";
+        // Debe coincidir con PROD_URL de capacitor.config.ts; si difiere, Capacitor abre Safari.
+        var APP_URL = "https://carteraplus.aitechumbrella.com/m";
 
         var boton = document.getElementById("reintentar");
         var estado = document.getElementById("estado");
         var yendo = false;
+        var relojFallo = null;
+
+        /**
+         * Devolver el botón a su sitio. Si la navegación no ocurrió (el WebView mandó la
+         * URL a Safari, o el intento se perdió en el camino), `yendo` se quedaría en true
+         * para siempre y el botón muerto en «Reintentando…» al volver a la app.
+         */
+        function liberar() {
+          if (!yendo) return;
+          yendo = false;
+          boton.disabled = false;
+          estado.hidden = true;
+          clearTimeout(relojFallo);
+          relojFallo = null;
+        }
 
         /**
          * Un intento = volver a pedir la URL de la app. Si sigue sin cargar, el WebView
@@ -213,6 +229,8 @@
           yendo = true;
           boton.disabled = true;
           estado.hidden = false;
+          clearTimeout(relojFallo);
+          relojFallo = setTimeout(liberar, 10000);
           setTimeout(function () {
             window.location.replace(APP_URL);
           }, 400);
@@ -222,6 +240,13 @@
 
         // Volvió la red: entrar sola, sin que la persona tenga que tocar nada.
         window.addEventListener("online", intentar);
+
+        // Al volver a la app (del segundo plano, o de Safari si la URL se fue para allá)
+        // esta página no se recarga: hay que soltar el estado a mano.
+        window.addEventListener("pageshow", liberar);
+        document.addEventListener("visibilitychange", function () {
+          if (document.visibilityState === "visible") liberar();
+        });
 
         /**
          * Reintento automático cada 15 s, SOLO con red declarada. Cubre el caso en que

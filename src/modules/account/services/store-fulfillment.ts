@@ -8,8 +8,10 @@ import "server-only";
  *
  * Las reglas:
  *  · Compra, renovación, reactivación y extensión → se aplica el plan del producto.
- *  · Cambio de producto a un plan MENOR → se programa para el fin del período, como en
- *    Stripe: la tienda cobra el nuevo recién al renovar.
+ *  · Cambio de producto DIFERIDO (a un plan menor, o al mismo plan con otro período) → no
+ *    está vigente hasta que vence lo pagado: `store_product_id` queda con el vigente y el
+ *    nuevo espera en `store_product_pending`. Si es un plan menor, además se programa la
+ *    bajada, como en Stripe. La compra o renovación que lo confirma lo promueve y limpia.
  *  · Cancelación → NO se corta hoy: se programa `ninguno` para cuando vence lo pagado.
  *  · Vencimiento → se apaga la suscripción de tienda y, si era ella la que daba el plan,
  *    la cuenta pasa a `ninguno`.
@@ -21,7 +23,12 @@ import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { logger } from "@/lib/logger";
 import { isDowngrade, type Plan } from "@/lib/plan";
-import { planDeEntitlements, planDeProducto } from "@/lib/billing/store-products";
+import {
+  cambioDiferido,
+  planDeEntitlements,
+  planDeProducto,
+  productoDeTienda,
+} from "@/lib/billing/store-products";
 import { origenDeSuscripcion } from "@/lib/billing/subscription-source";
 import { aplicarPlan, programarBajada } from "@/modules/account/services/subscription-service";
 
@@ -66,12 +73,13 @@ type PerfilTienda = {
   store_subscription_active: boolean;
   store_platform: "ios" | "android" | null;
   store_product_id: string | null;
+  store_product_pending: string | null;
   store_period_end: string | null;
   revenuecat_app_user_id: string | null;
 };
 
 const COLUMNAS =
-  "id, plan, stripe_subscription_id, store_subscription_active, store_platform, store_product_id, store_period_end, revenuecat_app_user_id";
+  "id, plan, stripe_subscription_id, store_subscription_active, store_platform, store_product_id, store_product_pending, store_period_end, revenuecat_app_user_id";
 
 export function plataformaDe(store: string | null | undefined): "ios" | "android" | null {
   if (store === "APP_STORE" || store === "MAC_APP_STORE") return "ios";
@@ -81,6 +89,21 @@ export function plataformaDe(store: string | null | undefined): "ios" | "android
 
 function aIso(ms: number | null | undefined): string | null {
   return typeof ms === "number" && Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+}
+
+/** Margen para confiar en un `expiration_at_ms` de PRODUCT_CHANGE como fin del período. */
+const UNA_HORA_MS = 60 * 60 * 1000;
+
+/**
+ * Cuándo entra la bajada de un PRODUCT_CHANGE: el fin del período que ya tenemos guardado. Solo
+ * si no hay ninguno se usa el `expiration_at_ms` del evento, y únicamente si cae más de una hora
+ * en el futuro (en Play es el instante del cambio, ver la rama de PRODUCT_CHANGE). null si no hay
+ * una fecha creíble.
+ */
+function finParaBajada(guardado: string | null, delEvento: string | null): string | null {
+  if (guardado) return guardado;
+  if (delEvento && Date.parse(delEvento) > Date.now() + UNA_HORA_MS) return delEvento;
+  return null;
 }
 
 async function perfil(userId: string): Promise<PerfilTienda | null> {
@@ -136,16 +159,51 @@ export async function manejarEventoTienda(
       return { status: "ignored", motivo: "producto desconocido" };
     }
 
+    if (ev.type === "PRODUCT_CHANGE" && producto && !productoDeTienda(actual.store_product_id)) {
+      logger.warn("webhook revenuecat: cambio de producto sin producto actual reconocible", {
+        actual: actual.store_product_id,
+        nuevo: producto,
+      });
+    }
+    // Un PRODUCT_CHANGE diferido es solo un aviso: la tienda sigue cobrando el producto de hoy
+    // hasta que vence lo pagado. El vigente no se toca; el nuevo queda pendiente.
+    //
+    // Ningún PRODUCT_CHANGE escribe `store_period_end`: en Google Play su `expiration_at_ms` es
+    // el instante del cambio, no el fin del período (evento de sandbox
+    // 3e241fdb-9450-412a-a175-7d51f8177a0b: event_timestamp_ms 1793298977772, expiration_at_ms
+    // 1793298977771). Escribirlo dejaba el período vencido y la bajada programada para «ahora»:
+    // el cron la aplicaba días antes de tiempo, y desde Max+ desalojaba al hogar. El fin nuevo
+    // lo escribe la compra o renovación que confirma el cambio (INITIAL_PURCHASE en Play,
+    // RENEWAL en Apple).
+    const diferido =
+      ev.type === "PRODUCT_CHANGE" &&
+      producto !== null &&
+      cambioDiferido(actual.store_product_id, producto);
+
+    const cuenta = {
+      store_subscription_active: true,
+      store_platform: plataformaDe(ev.store) ?? actual.store_platform,
+      revenuecat_app_user_id:
+        ev.original_app_user_id ?? actual.revenuecat_app_user_id ?? ev.app_user_id ?? null,
+    };
     await db
       .from("profiles")
-      .update({
-        store_subscription_active: true,
-        store_platform: plataformaDe(ev.store) ?? actual.store_platform,
-        store_product_id: producto,
-        store_period_end: fin,
-        revenuecat_app_user_id:
-          ev.original_app_user_id ?? actual.revenuecat_app_user_id ?? ev.app_user_id ?? null,
-      })
+      .update(
+        diferido
+          ? { ...cuenta, store_product_pending: producto }
+          : // Compra, renovación o subida: este producto es el vigente, y un cambio diferido
+            // que esperaba ya entró (o se descartó).
+            // Caso conocido, aceptado: si el pedido diferido llega segundos antes de una
+            // renovación que todavía trae el producto viejo, el cambio entra el ciclo siguiente
+            // pero acá el pendiente se pierde. El plan queda correcto (lo aplica la compra que
+            // confirma el cambio) y un segundo cambio en ese ciclo cae en CAMBIO_RECHAZADO.
+            {
+              ...cuenta,
+              store_product_id: producto,
+              store_product_pending: null,
+              ...(ev.type === "PRODUCT_CHANGE" ? {} : { store_period_end: fin }),
+            },
+      )
       .eq("id", userId);
 
     if (origen === "stripe") {
@@ -157,10 +215,22 @@ export async function manejarEventoTienda(
     }
 
     // El cambio a un plan menor lo cobra la tienda recién al renovar: hasta entonces sigue
-    // en el plan que pagó (la misma regla que Stripe). El RENEWAL con el producto nuevo lo
-    // aplica cuando llega.
+    // en el plan que pagó (la misma regla que Stripe). La compra o renovación con el producto
+    // nuevo lo aplica cuando llega. El mismo plan con otro período no toca el plan.
+    if (diferido && !isDowngrade(actual.plan, plan)) {
+      logger.info("webhook revenuecat: cambio de período programado", { producto });
+      return { status: "scheduled" };
+    }
     if (ev.type === "PRODUCT_CHANGE" && isDowngrade(actual.plan, plan)) {
-      const r = await programarBajada(userId, plan, fin);
+      // La fecha es el fin guardado, no el `expiration_at_ms` del evento (ver arriba).
+      const cuando = finParaBajada(actual.store_period_end, fin);
+      if (!cuando) {
+        // Sin fecha creíble no se adivina: la compra o renovación que confirma el cambio aplica
+        // el plan nuevo igual.
+        logger.warn("webhook revenuecat: bajada sin fecha de fin, no se programa", { a: plan });
+        return { status: "ignored", motivo: "bajada sin fecha de fin" };
+      }
+      const r = await programarBajada(userId, plan, cuando);
       logger.info("webhook revenuecat: bajada programada", { a: plan, cuando: r.cambiaEl });
       return r.ok ? { status: "scheduled" } : { status: "ignored", motivo: r.message };
     }
@@ -172,7 +242,11 @@ export async function manejarEventoTienda(
 
   switch (ev.type) {
     case "CANCELLATION": {
-      if (fin) await db.from("profiles").update({ store_period_end: fin }).eq("id", userId);
+      // Sin renovación no entra ningún cambio diferido.
+      await db
+        .from("profiles")
+        .update({ store_product_pending: null, ...(fin ? { store_period_end: fin } : {}) })
+        .eq("id", userId);
       if (origen !== "store") return { status: "ignored", motivo: "el plan no viene de la tienda" };
       const r = await programarBajada(userId, "ninguno", fin ?? actual.store_period_end);
       logger.info("webhook revenuecat: baja programada", { cuando: r.cambiaEl });
@@ -184,6 +258,7 @@ export async function manejarEventoTienda(
         .from("profiles")
         .update({
           store_subscription_active: false,
+          store_product_pending: null,
           store_period_end: fin ?? actual.store_period_end,
         })
         .eq("id", userId);
@@ -239,6 +314,7 @@ export async function transferirTienda(ev: EventoTienda): Promise<ResultadoTiend
       store_subscription_active: false,
       store_platform: null,
       store_product_id: null,
+      store_product_pending: null,
       store_period_end: null,
       revenuecat_app_user_id: null,
     })
@@ -249,6 +325,7 @@ export async function transferirTienda(ev: EventoTienda): Promise<ResultadoTiend
       store_subscription_active: desde.store_subscription_active,
       store_platform: desde.store_platform,
       store_product_id: desde.store_product_id,
+      store_product_pending: desde.store_product_pending,
       store_period_end: desde.store_period_end,
       revenuecat_app_user_id: ev.transferred_to?.[0] ?? desde.revenuecat_app_user_id,
     })

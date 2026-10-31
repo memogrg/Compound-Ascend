@@ -58,10 +58,11 @@ android {
             if (hasReleaseSigning) {
                 signingConfig signingConfigs.release
             }
-            // v1 ships unobfuscated: R8 can strip classes Capacitor plugins reach by reflection
-            // unless each one ships keep rules. Revisit once the release build is tested with R8.
-            minifyEnabled false
-            shrinkResources false
+            // R8 shrinks and obfuscates the release build. Capacitor's consumer rules keep every
+            // plugin class (they are reached by reflection from the JS bridge); proguard-rules.pro
+            // adds only what no library ships. mapping.txt goes to Play to deobfuscate crashes.
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

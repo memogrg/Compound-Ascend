@@ -35,6 +35,12 @@ vi.mock("@/lib/billing/stripe", () => ({
     const k = sub.items?.data?.[0]?.price?.lookup_key ?? "";
     return k.startsWith("carteraplus_") ? k.replace("carteraplus_", "") : null;
   },
+  periodoDeSuscripcion: (sub: {
+    items?: { data?: { price?: { recurring?: { interval?: string } } }[] };
+  }) => {
+    const i = sub.items?.data?.[0]?.price?.recurring?.interval;
+    return i === "year" ? "anual" : i === "month" ? "mensual" : null;
+  },
 }));
 
 import {
@@ -64,6 +70,7 @@ describe("htmlBienvenida", () => {
   it("en prueba: dice $0 hoy, la fecha, el monto y el enlace para cancelar", () => {
     const { subject, html } = htmlBienvenida({
       plan: "pro",
+      periodo: "mensual",
       enPrueba: true,
       primerCobro: "17 de septiembre de 2026",
       monto: "$34.00",
@@ -81,6 +88,7 @@ describe("htmlBienvenida", () => {
   it("sin prueba: el cobro fue hoy", () => {
     const { subject, html } = htmlBienvenida({
       plan: "max",
+      periodo: "mensual",
       enPrueba: false,
       primerCobro: null,
       monto: "$47.00",
@@ -89,6 +97,33 @@ describe("htmlBienvenida", () => {
     });
     expect(subject).toMatch(/está activa/);
     expect(html).toContain("se hizo hoy");
+    expect(html).toContain("se repite cada mes");
+  });
+
+  it("anual: «al año» y «cada año», nunca «al mes»", () => {
+    const prueba = htmlBienvenida({
+      plan: "pro",
+      periodo: "anual",
+      enPrueba: true,
+      primerCobro: "17 de septiembre de 2026",
+      monto: "$320.00",
+      urlSuscripcion: "https://app.test/suscripcion",
+      urlApp: "https://app.test/dashboard",
+    }).html;
+    expect(prueba).toContain("$320.00 al año");
+    expect(prueba).not.toContain("al mes");
+
+    const activa = htmlBienvenida({
+      plan: "pro",
+      periodo: "anual",
+      enPrueba: false,
+      primerCobro: null,
+      monto: "$320.00",
+      urlSuscripcion: "https://app.test/suscripcion",
+      urlApp: "https://app.test/dashboard",
+    }).html;
+    expect(activa).toContain("se repite cada año");
+    expect(activa).not.toContain("cada mes");
   });
 });
 
@@ -111,6 +146,30 @@ describe("enviarBienvenidaUnaVez", () => {
     expect(params.to).toBe("vos@x.com");
     expect(params.html).toContain("$34.00 al mes");
     expect(params.html).toContain("17 de septiembre de 2026");
+  });
+
+  it("suscripción anual: el correo lo dice por el intervalo del precio", async () => {
+    await enviarBienvenidaUnaVez({
+      sessionId: "cs_anual",
+      email: "vos@x.com",
+      sub: sub("pro", {
+        items: {
+          data: [
+            {
+              price: {
+                lookup_key: "carteraplus_pro",
+                unit_amount: 32000,
+                currency: "usd",
+                recurring: { interval: "year" },
+              },
+            },
+          ],
+        },
+      }),
+    });
+    const html = sendEmail.mock.calls[0]![0].html;
+    expect(html).toContain("$320.00 al año");
+    expect(html).not.toContain("al mes");
   });
 
   it("sin correo configurado no manda ni marca", async () => {

@@ -69,6 +69,11 @@ export type ProfileRow = Timestamps & {
   store_subscription_active: boolean;
   store_platform: "ios" | "android" | null;
   store_product_id: string | null;
+  /**
+   * Producto que entra al renovar tras un PRODUCT_CHANGE diferido (migración 20261028000001);
+   * null si no hay cambio diferido. `store_product_id` sigue siendo el vigente.
+   */
+  store_product_pending: string | null;
   /** Fin del período pagado en la tienda. */
   store_period_end: string | null;
   /** original_app_user_id de RevenueCat. */
@@ -1443,6 +1448,12 @@ export interface Database {
           household_name: string;
         }[];
       };
+      // ¿El correo de la invitación (pendiente y vigente) ya tiene cuenta? Migración
+      // 20261027000001. False en todo otro caso.
+      invitation_email_has_account: {
+        Args: { p_token: string };
+        Returns: boolean;
+      };
       accept_household_invitation: {
         Args: { p_token: string };
         Returns: string;
@@ -1450,6 +1461,18 @@ export interface Database {
       get_household_profile: {
         Args: Record<string, never>;
         Returns: Record<string, unknown> | null;
+      };
+      // Plan efectivo (migración 20261026000001): el mayor entre el propio y el del titular
+      // Max+ de cada hogar activo. Null si no hay perfil o si con sesión se pide otro id.
+      effective_plan: {
+        Args: { p_user?: string };
+        Returns: string | null;
+      };
+      // Plan del titular del hogar activo de quien llama (migración 20261026000002): define el
+      // cupo del hogar. Null sin membresía activa.
+      household_owner_plan: {
+        Args: Record<string, never>;
+        Returns: string | null;
       };
       list_household_members: {
         Args: Record<string, never>;

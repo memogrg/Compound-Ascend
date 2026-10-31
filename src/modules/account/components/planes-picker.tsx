@@ -72,7 +72,7 @@ export function PlanesPicker({ actual }: { actual: Plan }) {
               </p>
 
               <p style={{ fontSize: 30, fontWeight: 700, margin: "0 0 2px" }}>
-                ${PLAN_PRICE_USD[plan]}
+                ${PLAN_PRICE_USD[plan].mensual}
                 <span className="muted" style={{ fontSize: 14, fontWeight: 500 }}>
                   {" "}
                   / mes

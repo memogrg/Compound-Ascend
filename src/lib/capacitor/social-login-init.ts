@@ -78,10 +78,13 @@ function toHex(bytes: Uint8Array): string {
  * ¿El usuario canceló? Entonces no se muestra error ni se reintenta el selector.
  *
  * Es una heurística sobre el MENSAJE porque el código no llega: el plugin hace
- * `call.reject(error.localizedDescription)` y el bridge de Capacitor entrega solo texto. En
- * Apple eso es la descripción de `ASAuthorizationError.canceled`, localizada por el sistema
- * — "The user canceled the request." o "El usuario canceló la solicitud." —, y las dos
- * contienen "cancel".
+ * `call.reject(error.localizedDescription)` (`handleLoginResult`, SocialLoginPlugin.swift) y
+ * el bridge de Capacitor entrega solo texto. En Apple eso es la descripción de
+ * `ASAuthorizationError.canceled`, localizada por el sistema — "The user canceled the
+ * request." o "El usuario canceló la solicitud." —, pero a veces iOS entrega solo la genérica
+ * con el código adentro: "The operation couldn't be completed.
+ * (com.apple.AuthenticationServices.AuthorizationError error 1001.)". 1001 es `.canceled`;
+ * 1000 (`.unknown`, p. ej. simulador sin Apple ID) NO es cancelación y se muestra.
  */
 export function isCancel(e: unknown): boolean {
   const m = (e instanceof Error ? e.message : String(e ?? "")).toLowerCase();
@@ -90,6 +93,7 @@ export function isCancel(e: unknown): boolean {
     m.includes("cancell") ||
     m.includes("dismiss") ||
     m.includes("12501") || // Android: SIGN_IN_CANCELLED
-    m.includes("the user canceled")
+    m.includes("the user canceled") ||
+    /\berror 1001\b/.test(m) // iOS: ASAuthorizationError.canceled, solo por código
   );
 }

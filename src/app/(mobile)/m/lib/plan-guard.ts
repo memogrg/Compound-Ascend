@@ -8,7 +8,8 @@
  *
  * Y NO es el mismo muro: la web manda a `/empezar` (checkout de Stripe), y la app
  * nativa no puede dirigir a comprar fuera de la tienda (Apple 3.1.1, Google Payments).
- * Hasta que exista IAP, el móvil solo informa el estado de la cuenta.
+ * La compra dentro de la app es el paywall nativo de `/m/sin-plan` (`sin-plan/paywall.tsx`),
+ * que solo se renderiza dentro de Capacitor; en el navegador la pantalla solo informa.
  */
 
 /**

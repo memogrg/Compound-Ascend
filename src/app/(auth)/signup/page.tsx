@@ -47,11 +47,11 @@ export default async function SignupPage({
     >
       {elegido ? (
         <p className="auth-plan">
-          Empezás con <strong>{PLAN_LABEL[elegido]}</strong> · ${PLAN_PRICE_USD[elegido]}/mes ·{" "}
-          {TRIAL_DAYS} días sin cobro
+          Empezás con <strong>{PLAN_LABEL[elegido]}</strong> · ${PLAN_PRICE_USD[elegido].mensual}
+          /mes · {TRIAL_DAYS} días sin cobro
         </p>
       ) : null}
-      <GoogleButton />
+      <GoogleButton next={destino} />
       <div className="auth-divider">o con tu correo</div>
       <SignupForm defaultEmail={email} next={destino} />
       <PieLegal
