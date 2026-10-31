@@ -20,12 +20,19 @@ Se decide al correr `cap sync`/`cap copy`, que evalúan `capacitor.config.ts`:
 **El default es producción a propósito.** Antes el default era el modo bundled y `www/`
 contenía el prototipo estático de diseño: quien olvidara exportar `CAP_SERVER_URL` compilaba
 un binario que abría una cuenta ficticia con datos verosímiles, sin ningún aviso. Ahora
-olvidar la variable produce el comportamiento correcto, y `www/` es solo una **página de
-diagnóstico** que dice claramente que la app está mal configurada — imposible de confundir
-con la app real.
+olvidar la variable produce el comportamiento correcto.
 
-El prototipo de diseño se conserva en **`design-prototipo/`** como referencia; ya no viaja
-dentro del binario.
+`www/` es hoy la pantalla **«Sin conexión»**, y su trabajo principal no es el modo bundled
+sino ser el **`errorPath`** del modo servidor: lo que el WebView muestra cuando no logra
+cargar la URL — sin red, DNS caído o servidor abajo. Sin `errorPath`, iOS deja la pantalla
+en blanco y Android dibuja la página de error de Chrome; las dos cosas son rechazo de App
+Store (guía 2.1). Está escrita **para quien usa la app**, no para quien la compila: reintenta
+sola cuando vuelve la red, tiene un botón de reintento y no menciona ni `npm run sync` ni
+variables de entorno. La pista para el dev vive en un comentario HTML del archivo.
+
+Como es lo único que viaja dentro del binario, no tiene datos ni finanzas: nada que se pueda
+confundir con la app real. El prototipo de diseño se conserva en **`design-prototipo/`** como
+referencia; ya no viaja dentro del binario.
 
 ## Propagar cambios a los proyectos nativos
 
@@ -257,6 +264,47 @@ Por ahora se usan los **placeholders** del template de Capacitor (Android `ic_la
 adelante, lo más simple es [`@capacitor/assets`](https://github.com/ionic-team/capacitor-assets):
 poné un `assets/icon.png` (1024×1024) y `assets/splash.png` (2732×2732) y corré
 `npx @capacitor/assets generate`.
+
+## Suscripciones (RevenueCat)
+
+`@revenuecat/purchases-capacitor` **11.3.2**. No es el último: del 12 en adelante el
+`peerDependency` es `@capacitor/core >=8.0.0` y este shell va en Capacitor 7 (ver *Notas de
+versión*). El 11 es el último major con `>=7.0.0`, y el mismo `purchases-hybrid-common`
+por debajo.
+
+### El shell no conoce ninguna llave
+
+Las dos API keys de RevenueCat son **públicas por diseño** —van dentro del binario de
+cualquier app que use el SDK, y RevenueCat las trata como identificadores, no como
+secretos—. Viajan desde la web como `NEXT_PUBLIC_REVENUECAT_IOS_KEY` y
+`NEXT_PUBLIC_REVENUECAT_ANDROID_KEY`: la web las lee y llama a `Purchases.configure`.
+
+El shell **no las tiene, no las necesita y no debe tenerlas**. Aquí no vive nada secreto.
+La clave *secreta* de RevenueCat (la del panel, para el backend) no entra ni al shell ni al
+bundle de la web.
+
+### Para Memo: lo que falta en iOS
+
+El `npm i` y el `cap sync android` ya están. iOS necesita una Mac:
+
+```bash
+cd ios/App && LANG=C.UTF-8 pod install
+```
+
+El `LANG` no es adorno: sin él CocoaPods revienta con `Unicode Normalization not appropriate
+for ASCII-8BIT` en cuanto un path o un pod trae acentos.
+
+Después:
+
+1. **Commitear** `Podfile.lock` y lo que el plugin haya cambiado en el `pbxproj`.
+2. **Agregar la capability In-App Purchase** en Xcode (target App → Signing & Capabilities →
+   `+ Capability` → In-App Purchase). Sin eso, StoreKit no responde y el SDK falla en
+   silencio al arrancar.
+3. **Compilar en Xcode** antes de mergear.
+
+En Android no hace falta nada más: el permiso `com.android.vending.BILLING` lo aporta el AAR
+de `com.revenuecat.purchases:purchases-hybrid-common` al fusionar manifiestos, así que el
+`AndroidManifest.xml` de la app no se toca.
 
 ## Notas de versión
 

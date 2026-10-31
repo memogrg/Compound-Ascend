@@ -31,7 +31,17 @@ import {
 } from "recharts";
 import { formatMoney, formatCompact } from "@/lib/format";
 import { niceEscala } from "./scale";
-import { ANIMACION_ACTIVA } from "./core";
+import { ANIMACION_ACTIVA, aireParaRotuloFinal } from "./core";
+
+/**
+ * El tamaño del tick del eje X, en un solo sitio.
+ *
+ * Va acá y no se lee de `EJE` a propósito: el núcleo declara 11 px y este wrapper pinta 10,5
+ * desde antes de la migración. Calcular el aire con 11 mientras se dibuja con 10,5 sería pedir
+ * aire para un rótulo que no existe, y unificar el tamaño es un cambio de tipografía del eje —
+ * no de recorte—, que es el delta 7, no este.
+ */
+const TAMANO_TICK = 10.5;
 
 export type LineSeries = { key: string; label: string; color: string; dashed?: boolean };
 
@@ -52,10 +62,21 @@ export function PremiumLineChart({
     series.map((s) => Number(d[s.key])).filter((v) => Number.isFinite(v)),
   );
   const escala = niceEscala(values, { symmetric: true, ticks: 5 });
+  /** El rótulo más largo del eje decide el aire: con uno solo basta mirar el último. */
+  const rotuloFinal = String(data[data.length - 1]?.[xKey] ?? "");
+  const aireDerecha = aireParaRotuloFinal(rotuloFinal, TAMANO_TICK, 8);
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} accessibilityLayer>
+      {/* `right` sale del ÚLTIMO rótulo, no de un número redondo: en escala de puntos el último
+          tick cae sobre el borde del trazado y la mitad de la etiqueta se sale. Medido con
+          «sep 2026» a 10,5 px: 51 px de ancho, 26 de los cuales sobresalen, contra los 8 px de
+          margen que había — 18 px recortados. */}
+      <LineChart
+        data={data}
+        margin={{ top: 8, right: aireDerecha, left: 0, bottom: 0 }}
+        accessibilityLayer
+      >
         <CartesianGrid
           stroke="var(--border)"
           strokeOpacity={0.6}
@@ -64,7 +85,7 @@ export function PremiumLineChart({
         />
         <XAxis
           dataKey={xKey}
-          tick={{ fill: "var(--muted)", fontSize: 10.5, fontFamily: "var(--font-mono)" }}
+          tick={{ fill: "var(--muted)", fontSize: TAMANO_TICK, fontFamily: "var(--font-mono)" }}
           axisLine={false}
           tickLine={false}
           dy={6}

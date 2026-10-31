@@ -95,4 +95,5 @@ export {
   type ModoLeyenda,
   type ResultadoLeyenda,
 } from "./leyenda-dona";
+export { aireEnBanda, aireParaRotuloFinal, anchoDeTexto } from "./aire-eje";
 export { recortar, presetsUtiles, mesesHaciaAtras, NOMBRE_RANGO, type RangoPreset } from "./rangos";

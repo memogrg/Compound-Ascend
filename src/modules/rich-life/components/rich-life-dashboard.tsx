@@ -1,6 +1,13 @@
 import Link from "next/link";
 
-import { DonutConLeyenda, type DonutDatum } from "@/components/charts/lazy";
+import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
+import {
+  ChartFrame,
+  LeyendaDona,
+  describirDona,
+  filasLeyenda,
+  tablaDona,
+} from "@/components/charts/core";
 import { textoPasivos } from "@/modules/rich-life/engine/pasivos-texto";
 import { DeleteButton } from "./delete-button";
 import { EditRichButton, AddRichButton } from "./rich-actions";
@@ -500,6 +507,9 @@ function Ind({ label, value, note }: { label: string; value: string; note: strin
   );
 }
 
+/** El tamaño del anillo, el mismo que usa `DonutChart` por defecto. */
+const ANILLO = 132;
+
 function DonutCard({
   title,
   data,
@@ -513,15 +523,33 @@ function DonutCard({
   currency: string;
   empty: string;
 }) {
+  const leyenda = filasLeyenda(data, { modo: "taxonomia" });
+  const dinero = (v: number) => formatMoney(v, currency);
+
   return (
     <div className="card card-pad">
-      <div className="card-title">{title}</div>
-      <DonutConLeyenda
-        data={data}
-        currency={currency}
-        centerLabel={formatCompact(total, currency)}
-        vacio={empty}
-      />
+      <ChartFrame
+        titulo={title}
+        alto={ANILLO}
+        ajustadoAlContenido
+        estado={leyenda.filas.length === 0 ? "vacio" : "datos"}
+        mensajeVacio={empty}
+        descripcion={describirDona({
+          titulo: title,
+          filas: leyenda.filas,
+          formato: dinero,
+          nombrePartes: "partes",
+        })}
+        tabla={tablaDona(leyenda, dinero, "Parte")}
+        disposicionLeyenda="lateral"
+        leyenda={<LeyendaDona filas={leyenda.filas} ocultas={leyenda.ocultas} moneda={currency} />}
+      >
+        <DonutChart
+          data={leyenda.filas.map((f) => ({ name: f.name, value: f.value, color: f.color }))}
+          size={ANILLO}
+          centerLabel={formatCompact(total, currency)}
+        />
+      </ChartFrame>
     </div>
   );
 }

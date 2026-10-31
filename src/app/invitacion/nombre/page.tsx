@@ -30,7 +30,7 @@ export default async function NameStepPage() {
   return (
     <AuthShell
       titleHTML={TITLE_HTML}
-      subtitle="Ya formas parte del hogar. Solo falta un detalle: dinos cómo quieres que te llamemos."
+      subtitle="Ya formás parte del hogar. Solo falta un detalle: decinos cómo querés que te llamemos."
     >
       <NameStep defaultName={current} />
     </AuthShell>

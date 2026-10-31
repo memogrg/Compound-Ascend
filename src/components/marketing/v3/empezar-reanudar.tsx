@@ -51,7 +51,7 @@ export function ReanudarPago({
                 <span className="emp-plan-cuerpo">
                   <span className="emp-plan-nombre">{PLAN_LABEL[p]}</span>
                   <span className="emp-plan-precio">
-                    ${PLAN_PRICE_USD[p]}
+                    ${PLAN_PRICE_USD[p].mensual}
                     <small>/mes</small>
                   </span>
                   <span className="emp-plan-promesa">{PLAN_PROMISE[p]}</span>

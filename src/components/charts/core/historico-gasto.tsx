@@ -53,12 +53,13 @@ import {
   type PuntoHistorico,
 } from "./historico-columnas";
 import { rotuloParcial, type PeriodoEnCurso } from "./periodo-en-curso";
+import { aireEnBanda } from "./aire-eje";
 import { anchoDeBarra, useAncho } from "./use-ancho";
 import { ANIMACION_ACTIVA, BARRA, EJE, OPACIDAD, REJILLA } from "./theme";
 
 export type { PuntoHistorico };
 
-/** Ancho reservado al eje Y, y el aire a la derecha. Se restan para medir el trazado. */
+/** Ancho reservado al eje Y, y el aire MÍNIMO a la derecha. Se restan para medir el trazado. */
 const ANCHO_EJE = 52;
 const AIRE_DERECHA = 10;
 
@@ -238,7 +239,28 @@ export function HistoricoGasto({
     { moneda, desdeCero: true },
   );
 
-  const anchoTrazado = Math.max(0, ancho - ANCHO_EJE - AIRE_DERECHA);
+  /**
+   * El aire a la derecha es el MÍNIMO más lo que sobresalga del último rótulo.
+   *
+   * Acá la banda ya protege media etiqueta —el tick va centrado en su columna, no sobre el
+   * borde—, así que con pocas columnas esto da 0 y nada se mueve: con 12 meses a 420 px de
+   * trazado la banda mide 35 px y «sep 26» a 11 px mide 40, o sea 3 px que sobran de los 10 que
+   * ya había. Donde muerde es con muchas columnas o un rótulo largo.
+   *
+   * Se calcula con la banda medida con el aire mínimo y no se vuelve a iterar: al crecer el aire
+   * la banda se estrecha un poco, y pedir después el aire de esa banda más estrecha entra en un
+   * bucle que no converge a nada que se vea. Un paso, y redondeado hacia arriba.
+   */
+  const bandaBase =
+    filas.length > 0 ? Math.max(0, ancho - ANCHO_EJE - AIRE_DERECHA) / filas.length : 0;
+  const aireDerecha = aireEnBanda(
+    filas[filas.length - 1]?.label ?? "",
+    EJE.tamanoFuente,
+    bandaBase,
+    AIRE_DERECHA,
+  );
+
+  const anchoTrazado = Math.max(0, ancho - ANCHO_EJE - aireDerecha);
   const banda = filas.length > 0 ? anchoTrazado / filas.length : 0;
   const anchoColumna = anchoDeBarra(anchoTrazado, filas.length, 1);
   const anchoDeMarca = anchoMarca(anchoColumna, banda);
@@ -246,11 +268,12 @@ export function HistoricoGasto({
   return (
     <div ref={ref}>
       <ResponsiveContainer width="100%" height={alto}>
-        <ComposedChart data={filas} margin={{ top: 8, right: AIRE_DERECHA, left: 0, bottom: 2 }}>
+        <ComposedChart data={filas} margin={{ top: 8, right: aireDerecha, left: 0, bottom: 2 }}>
           <CartesianGrid stroke={REJILLA.color} strokeDasharray="2 5" vertical={false} />
           {/* Sin `padding`: en un gráfico de barras los rótulos van centrados en su banda y
-              no sobre el borde, así que no hay nada que recortar — y el aire desalinearía
-              este eje del de la marca, que no lo lleva. */}
+              no sobre el borde, así que lo que haya que recortar se arregla desde el `margin`
+              (arriba) y no desde acá — el `padding` desalinearía este eje del de la marca, que
+              no lo lleva. */}
           <XAxis
             dataKey="label"
             interval="preserveStartEnd"

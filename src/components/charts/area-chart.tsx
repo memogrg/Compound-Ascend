@@ -14,7 +14,7 @@ import {
 import { formatMoney, formatAxisCompact } from "@/lib/format";
 import { niceEscala } from "./scale";
 import { ChartEmpty } from "./chart-empty";
-import { ANIMACION_ACTIVA } from "./core";
+import { ANIMACION_ACTIVA, aireParaRotuloFinal } from "./core";
 
 export type AreaPoint = { date: string; value: number };
 
@@ -74,6 +74,23 @@ export function PerformanceChart({
 
   const showAxes = axes !== "none";
   const full = axes === "full";
+  const tamanoTick = full ? 10.5 : 9.5;
+  /**
+   * El aire a la derecha lo decide el ÚLTIMO rótulo, repartido entre los dos sitios que ya
+   * separan esa etiqueta del borde del contenedor: el `padding` del eje (que insetea el tick
+   * dentro del trazado) y el `margin` del gráfico. Lo que sobresale es media etiqueta, así que
+   * basta con que `padding.right + margin.right` la cubra.
+   *
+   * Medido en `full` con «sep 26» a 10,5 px: 38 px de ancho, 19 de ellos fuera del tick, contra
+   * los 4 + 8 = 12 px que había — 7 px recortados. En `compact` (9,5 px, `padding.right` 14)
+   * salían 18 contra 18: ahí este cálculo no cambia nada, y por eso los sparklines no se mueven.
+   */
+  const padDerecha = full ? 4 : 14;
+  const rotuloFinal = axisDateLabel(String(data[data.length - 1]?.date ?? ""));
+  const margenDerecha = Math.max(
+    full ? 8 : 4,
+    aireParaRotuloFinal(rotuloFinal, tamanoTick) - padDerecha,
+  );
   const yTicks = full ? 5 : 3;
   const values = data.map((d) => d.value);
   if (costBasis !== undefined) values.push(costBasis);
@@ -98,7 +115,7 @@ export function PerformanceChart({
         <ResponsiveContainer width="100%" height={height}>
           <AreaChart
             data={data}
-            margin={{ top: 6, right: full ? 8 : 4, left: 0, bottom: showAxes ? 2 : 0 }}
+            margin={{ top: 6, right: margenDerecha, left: 0, bottom: showAxes ? 2 : 0 }}
           >
             <defs>
               <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
@@ -137,7 +154,7 @@ export function PerformanceChart({
                 dataKey="date"
                 interval="preserveStartEnd"
                 minTickGap={full ? 24 : 60}
-                tick={{ ...TICK, fill: "var(--muted)", fontSize: full ? 10.5 : 9.5 }}
+                tick={{ ...TICK, fill: "var(--muted)", fontSize: tamanoTick }}
                 axisLine={false}
                 tickLine={false}
                 dy={4}
@@ -145,7 +162,7 @@ export function PerformanceChart({
                 // recorten: en compact no hay eje Y que dé aire a la izquierda, así que la
                 // primera etiqueta se centraba en x≈0 y se cortaba ("nicio"). Insetar los
                 // ticks las deja completas y de paso la línea respira (se ve intencional).
-                padding={{ left: full ? 0 : 16, right: full ? 4 : 14 }}
+                padding={{ left: full ? 0 : 16, right: padDerecha }}
                 tickFormatter={axisDateLabel}
               />
             )}

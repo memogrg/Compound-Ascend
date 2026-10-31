@@ -1,16 +1,54 @@
-# Parches de seguridad y actualizaciones de dependencias (revisión F6).
-# Agrupa los menores/parche para no inundar de PRs; semanal.
+# Dependabot como SEÑAL, no como cola de trabajo (decisión 60).
+#
+# El motivo es medido, no de gusto: con el ruleset «main protegida», **ningún PR de Dependabot
+# puede ponerse verde**. Los 8 jobs que necesitan secretos —los 4 de E2E y las 4 particiones de
+# capturas— fallan siempre en un PR suyo, porque GitHub no le pasa los secretos del repo. Se
+# comprobó en los cinco abiertos a la vez (corridas 40118090919, 40118102237, 40118122045,
+# 40118130135 y 40118329875): los mismos 8 jobs en rojo en todos, con el mismo motivo.
+#
+# Así que su PR no es algo que se mergee: es un aviso de que hay una versión nueva, y el cambio
+# entra en una rama propia donde los secretos sí están (lo que hizo #951 con 14 paquetes). Semanal
+# y sin agrupar `mobile-shell`, eso producía una cola de avisos que nadie podía cerrar y que tapaba
+# los que importan. Mensual, agrupado y con tope, el aviso se sigue recibiendo y se lee.
+#
+# Dos cosas que este fichero NO hace, y conviene no confundirlas con lo de arriba:
+#
+#  1. **No habilita las actualizaciones de seguridad.** Eso es un ajuste del repositorio
+#     (Settings → Code security → «Dependabot security updates»), y está encendido.
+#  2. **No las retrasa.** Una actualización de seguridad la dispara un aviso de seguridad, no el
+#     `schedule`, así que `monthly` no puede frenarla. Lo que sí la afectaría es el agrupamiento:
+#     por eso cada grupo declara `applies-to: version-updates` de forma EXPLÍCITA. Es el valor por
+#     defecto, pero escribirlo es la diferencia entre «da igual» y «se decidió»: si algún día este
+#     grupo se quisiera mensual y además agrupar seguridad, haría falta un segundo grupo con
+#     `applies-to: security-updates`, y entonces los parches de seguridad sí esperarían a juntarse.
+#
+# Lo que queda SIN agrupar, a propósito: los MAYORES. Un salto de mayor cambia API y se decide uno
+# por uno, así que su PR suelto es exactamente la señal que se quiere ver.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: "/"
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
     groups:
       minor-and-patch:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
+  # `mobile-shell` tiene su propio `package-lock.json` y no estaba declarado acá, así que
+  # Dependabot solo lo miraba por seguridad: sus menores y parche no llegaban nunca. Tiene 28
+  # alertas abiertas propias, dos de ellas críticas, y ninguna manera de avisar de una versión
+  # nueva que las cerrara.
+  - package-ecosystem: npm
+    directory: "/mobile-shell"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
         update-types: ["minor", "patch"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
-      interval: weekly
+      interval: monthly

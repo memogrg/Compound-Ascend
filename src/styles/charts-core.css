@@ -31,11 +31,16 @@
 .cf-titulos {
   min-width: 0;
 }
+/* Mismo título que `.card-title`, del mismo token: una pantalla que pasa al marco no cambia de
+   tipografía por el camino. Antes eran 14 px con la familia del cuerpo contra 15 con
+   `--font-display`, y la diferencia se veía en `/patrimonio`, donde el marco convive con dos
+   tarjetas hermanas que siguen usando `.card-title`. */
 .cf-titulo {
   margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-family: var(--titulo-tarjeta-familia);
+  font-size: var(--titulo-tarjeta-tamano);
+  font-weight: var(--titulo-tarjeta-peso);
+  letter-spacing: var(--titulo-tarjeta-espaciado);
   color: var(--text);
 }
 .cf-sub {

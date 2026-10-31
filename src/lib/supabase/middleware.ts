@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/supabase/database.types";
+import { readEffectivePlan } from "@/lib/auth/effective-plan";
 import { isValidReferralCode, normalizeReferralCode } from "@/lib/referrals/code";
 import { REFERRAL_COOKIE, referralCookieOptions } from "@/lib/referrals/cookie";
 
@@ -167,15 +168,18 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   // hogar bajó de plan— entra igual, pero solo a /suscripcion y a las páginas
   // donde puede llevarse sus datos. La cuenta y la información siguen siendo
   // suyas; lo que se corta es el uso de la app.
+  // Decide el plan EFECTIVO, no el propio: un miembro activo del hogar de un
+  // titular Max+ entra aunque él no pague (B-2). Es la misma única consulta de
+  // antes, ahora por RPC.
   if (user && !isPublic(pathname) && !SIN_PLAN_PERMITIDO(pathname)) {
-    const { data } = await supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle();
-    // Sin fila de perfil todavía (recién registrado) no se bloquea: el alta la
-    // termina el propio flujo de registro.
+    const plan = await readEffectivePlan(supabase, user.id);
+    // null = no se pudo saber (sin fila de perfil todavía, recién registrado, o
+    // la RPC falló): no se bloquea. El alta la termina el propio flujo de registro.
     // Va a /empezar y no a /suscripcion: /empezar en modo «reanudar» es una sola
     // pantalla con un solo botón hacia Stripe, mientras que /suscripcion es la
     // página de gestión de quien ya paga. A quien nunca terminó de pagar hay que
     // darle el camino más corto, no el panel de cambiar de plan.
-    if (data && data.plan === "ninguno") {
+    if (plan === "ninguno") {
       const redirect = request.nextUrl.clone();
       redirect.pathname = "/empezar";
       redirect.search = "?reanudar=1";

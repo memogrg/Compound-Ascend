@@ -24,6 +24,10 @@ import "server-only";
  *    bajada a `ninguno` para el fin del período ya pagado.
  *  · Cambio a un plan menor → misma historia: se programa, no se aplica.
  *  · Suscripción muerta → se aplica `ninguno` y con eso corre la orfandad.
+ *  · Salvo que la cuenta tenga una suscripción viva en la tienda
+ *    (`store_subscription_active`): entonces el plan lo da App Store / Google Play y Stripe
+ *    no la baja a `ninguno` ni hoy ni programado. Espejo del «doble canal» de
+ *    `store-fulfillment.ts`.
  *
  * Si un evento no se puede mapear a un plan nuestro, NO se toca la cuenta:
  * dejarla como está es mejor que degradarla por un evento que no entendimos.
@@ -78,8 +82,22 @@ export async function manejarSuscripcion(sub: Stripe.Subscription): Promise<void
   const plan = planDeSuscripcion(sub);
   const viva = suscripcionDaAcceso(sub.status);
 
+  const { data: actual } = await db
+    .from("profiles")
+    .select("plan, store_subscription_active")
+    .eq("id", userId)
+    .maybeSingle();
+  const anterior = ((actual?.plan as Plan | undefined) ?? "ninguno") as Plan;
+  const pagaEnTienda = actual?.store_subscription_active === true;
+
   // Suscripción muerta: sin plan, y con eso corre la orfandad.
   if (!viva) {
+    if (pagaEnTienda) {
+      logger.info("webhook stripe: suscripción muerta, el plan lo da la tienda", {
+        estado: sub.status,
+      });
+      return;
+    }
     await aplicarPlan(userId, "ninguno", { periodEnd: finPeriodo, trialEndsAt: finPrueba });
     logger.info("webhook stripe: cuenta sin plan", { estado: sub.status });
     return;
@@ -90,11 +108,12 @@ export async function manejarSuscripcion(sub: Stripe.Subscription): Promise<void
     return;
   }
 
-  const { data: actual } = await db.from("profiles").select("plan").eq("id", userId).maybeSingle();
-  const anterior = ((actual?.plan as Plan | undefined) ?? "ninguno") as Plan;
-
   // Cancelación pedida: sigue siendo del plan que pagó hasta que venza.
   if (sub.cancel_at_period_end) {
+    if (pagaEnTienda) {
+      logger.info("webhook stripe: cancelación sin baja, el plan lo da la tienda");
+      return;
+    }
     await db
       .from("profiles")
       .update({ plan_pending: "ninguno", plan_effective_at: finPeriodo })
