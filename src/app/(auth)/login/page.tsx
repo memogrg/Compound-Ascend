@@ -26,7 +26,7 @@ export default async function LoginPage({
         </>
       }
     >
-      <GoogleButton />
+      <GoogleButton next={next} />
       <div className="auth-divider">o con tu correo</div>
       <LoginForm next={next} />
       <PieLegal

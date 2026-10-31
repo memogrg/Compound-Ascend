@@ -3,9 +3,11 @@
  *
  *  1. SUBIR se aplica de una.
  *  2. BAJAR espera a que venza el mes ya pagado.
- *  3. Al bajar de Max+ (el único plan de hogar), los miembros que no pagan
- *     quedan HUÉRFANOS: salen del hogar y pasan a `ninguno`, conservando su
- *     cuenta y sus datos. El titular se queda con su plan nuevo.
+ *  3. Al bajar de Max+ (el único plan de hogar), los miembros quedan HUÉRFANOS:
+ *     salen del hogar (`removed`), conservando su cuenta y sus datos. Su plan
+ *     PROPIO no se toca —si pagan por su cuenta lo siguen teniendo—; lo heredado
+ *     lo pierden solos, porque el plan efectivo solo hereda de membresías
+ *     `active`. El titular se queda con su plan nuevo.
  *
  * Se prueba contra un Supabase falso en memoria: lo que importa acá es la
  * decisión, no el driver.
@@ -97,8 +99,9 @@ beforeEach(() => {
       plan_effective_at: null,
       period_end: EN_UN_MES,
     },
-    { id: "pareja", plan: "max", plan_pending: null, plan_effective_at: null },
-    { id: "hijo", plan: "max", plan_pending: null, plan_effective_at: null },
+    // Los miembros no pagan: su plan propio es `ninguno` y usan el del titular (B-2).
+    { id: "pareja", plan: "ninguno", plan_pending: null, plan_effective_at: null },
+    { id: "hijo", plan: "ninguno", plan_pending: null, plan_effective_at: null },
   ];
   miembros = [
     { id: "m1", household_id: "h1", user_id: "titular", role: "owner", status: "active" },
@@ -134,7 +137,7 @@ describe("bajada programada", () => {
 });
 
 describe("orfandad al bajar de Max+", () => {
-  it("el titular conserva su plan y los demás salen del hogar y quedan sin plan", async () => {
+  it("el titular conserva su plan nuevo y los demás salen del hogar", async () => {
     const r = await aplicarPlan("titular", "pro");
 
     expect(r.ok).toBe(true);
@@ -149,6 +152,66 @@ describe("orfandad al bajar de Max+", () => {
     // Las invitaciones pendientes también caen: si no, entrarían a un hogar que ya no cabe.
     expect(miembros.find((m) => m.user_id === "pareja")!.status).toBe("removed");
     expect(miembros.find((m) => m.user_id === "hijo")!.status).toBe("removed");
+  });
+
+  it("desalojado con Pro+ propio pagado por Stripe: conserva pro", async () => {
+    Object.assign(
+      perfiles.find((p) => p.id === "pareja")!,
+      {
+        plan: "pro",
+        stripe_subscription_id: "sub_pareja",
+      },
+    );
+    const r = await aplicarPlan("titular", "pro");
+
+    expect(r.huerfanos).toBe(2);
+    expect(miembros.find((m) => m.user_id === "pareja")!.status).toBe("removed");
+    const pareja = perfiles.find((p) => p.id === "pareja")!;
+    expect(pareja.plan).toBe("pro");
+    expect(pareja.stripe_subscription_id).toBe("sub_pareja");
+  });
+
+  it("desalojado con compra de tienda: conserva su plan", async () => {
+    Object.assign(
+      perfiles.find((p) => p.id === "pareja")!,
+      {
+        plan: "esencial",
+        store_subscription_active: true,
+      },
+    );
+    await aplicarPlan("titular", "ninguno");
+
+    expect(miembros.find((m) => m.user_id === "pareja")!.status).toBe("removed");
+    const pareja = perfiles.find((p) => p.id === "pareja")!;
+    expect(pareja.plan).toBe("esencial");
+    expect(pareja.store_subscription_active).toBe(true);
+  });
+
+  it("desalojado sin plan propio: queda ninguno y fuera del hogar (ya no hereda)", async () => {
+    await aplicarPlan("titular", "pro");
+
+    expect(perfiles.find((p) => p.id === "hijo")!.plan).toBe("ninguno");
+    // `removed` es lo que corta la herencia: effective_plan solo mira membresías `active`
+    // (tests/rls/effective-plan.rls.test.ts prueba removed → sin herencia).
+    expect(miembros.find((m) => m.user_id === "hijo")!.status).toBe("removed");
+    expect(miembros.filter((m) => m.user_id === "hijo" && m.status === "active")).toEqual([]);
+  });
+
+  it("el titular que baja queda con su plan nuevo, aunque desaloje a alguien que paga", async () => {
+    Object.assign(
+      perfiles.find((p) => p.id === "pareja")!,
+      {
+        plan: "pro",
+        stripe_subscription_id: "sub_pareja",
+      },
+    );
+    const r = await aplicarPlan("titular", "esencial");
+
+    expect(r.ok).toBe(true);
+    expect(titular().plan).toBe("esencial");
+    expect(titular().plan_pending).toBeNull();
+    expect(miembros.find((m) => m.user_id === "titular")!.status).toBe("active");
+    expect(perfiles.find((p) => p.id === "pareja")!.plan).toBe("pro");
   });
 
   it("subir de plan nunca desaloja a nadie", async () => {

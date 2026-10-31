@@ -22,6 +22,8 @@ function esPlanDePago(v: string | undefined): v is PaidPlan {
  *  · sin sesión → a /empezar con el plan, que es donde se crea la cuenta;
  *  · con plan vivo → al panel: no se le abre otro checkout a quien ya paga
  *    (docs.stripe.com/payments/checkout/limit-subscriptions);
+ *  · con suscripción de tienda (App Store / Google Play) → al panel, aunque el plan
+ *    todavía no se haya aplicado: esa cuenta paga en la app, no acá;
  *  · sin plan → checkout con `origen: "empezar"`, que vuelve a /bienvenida con
  *    el `session_id`.
  */
@@ -37,7 +39,7 @@ export default async function PagarPage({
   if (!user) redirect(`/empezar?plan=${elegido}`);
 
   const estado = await getEstadoSuscripcion(user.id);
-  if (estado.plan !== "ninguno") redirect("/dashboard");
+  if (estado.plan !== "ninguno" || estado.origen === "store") redirect("/dashboard");
 
   const r = await crearCheckout({
     userId: user.id,

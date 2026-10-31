@@ -23,6 +23,7 @@ import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { logger } from "@/lib/logger";
 import { can, isDowngrade, householdMemberLimit, type Plan } from "@/lib/plan";
+import { origenDeSuscripcion, type OrigenSuscripcion } from "@/lib/billing/subscription-source";
 
 type Db = ReturnType<typeof createServiceRoleClient>;
 
@@ -40,17 +41,28 @@ export type EstadoSuscripcion = {
   /** Fin de la prueba, si sigue en prueba. */
   finDePrueba: string | null;
   enPrueba: boolean;
+  /** Por dónde paga: la web (Stripe), la app (tienda) o ninguno. */
+  origen: OrigenSuscripcion;
+  /** Datos de la tienda, solo si `origen` es "store". */
+  tienda: { plataforma: "ios" | "android" | null; finDePeriodo: string | null } | null;
 };
 
 /** Lo que la interfaz necesita saber para mostrar el estado de la cuenta. */
 export async function getEstadoSuscripcion(userId: string): Promise<EstadoSuscripcion> {
   const { data } = await db()
     .from("profiles")
-    .select("plan, plan_pending, plan_effective_at, period_end, trial_ends_at")
+    .select(
+      "plan, plan_pending, plan_effective_at, period_end, trial_ends_at, stripe_subscription_id, store_subscription_active, store_platform, store_period_end",
+    )
     .eq("id", userId)
     .maybeSingle();
 
   const finDePrueba = (data?.trial_ends_at as string | null) ?? null;
+  const origen = origenDeSuscripcion({
+    plan: data?.plan as Plan | undefined,
+    store_subscription_active: data?.store_subscription_active as boolean | undefined,
+    stripe_subscription_id: data?.stripe_subscription_id as string | null | undefined,
+  });
   return {
     plan: ((data?.plan as Plan | undefined) ?? "ninguno") as Plan,
     planPendiente: ((data?.plan_pending as Plan | null) ?? null) as Plan | null,
@@ -58,6 +70,14 @@ export async function getEstadoSuscripcion(userId: string): Promise<EstadoSuscri
     finDePeriodo: (data?.period_end as string | null) ?? null,
     finDePrueba,
     enPrueba: finDePrueba != null && new Date(finDePrueba) > new Date(),
+    origen,
+    tienda:
+      origen === "store"
+        ? {
+            plataforma: (data?.store_platform as "ios" | "android" | null) ?? null,
+            finDePeriodo: (data?.store_period_end as string | null) ?? null,
+          }
+        : null,
   };
 }
 
@@ -68,16 +88,20 @@ export async function getEstadoSuscripcion(userId: string): Promise<EstadoSuscri
  * Si no hay `period_end` (todavía no llegó ningún webhook de Stripe), no se
  * inventa una fecha: se rechaza. Adivinar cuándo vence lo pagado es la clase de
  * error que le quita días de servicio a alguien que pagó.
+ *
+ * `cuando` es la fecha que da otro canal (la tienda, vía RevenueCat): `period_end` es el
+ * reloj de Stripe y no sabe cuándo vence lo pagado en App Store / Google Play.
  */
 export async function programarBajada(
   userId: string,
   destino: Plan,
+  cuando?: string | null,
 ): Promise<{ ok: boolean; cambiaEl?: string; message?: string }> {
   const estado = await getEstadoSuscripcion(userId);
   if (!isDowngrade(estado.plan, destino)) {
     return { ok: false, message: "Ese cambio no es una bajada de plan." };
   }
-  const cambiaEl = estado.finDePeriodo ?? estado.finDePrueba;
+  const cambiaEl = cuando ?? estado.finDePeriodo ?? estado.finDePrueba;
   if (!cambiaEl) {
     return { ok: false, message: "Todavía no sabemos cuándo vence tu período. Intentá más tarde." };
   }
@@ -145,8 +169,10 @@ export async function aplicarPlan(
  * paga es quien conserva el hogar.
  *
  * A cada miembro desalojado se le marca `status = 'removed'` —no se borra la
- * fila, para que quede el registro de que estuvo— y se le pone `plan = 'ninguno'`.
- * Sus movimientos NO se tocan: son suyos y siguen en su cuenta.
+ * fila, para que quede el registro de que estuvo—. Su `profiles.plan` NO se toca:
+ * es lo que paga él (Stripe o tienda), y lo que heredaba del hogar lo pierde solo,
+ * porque el plan efectivo (`effective_plan`) solo hereda de membresías `active`.
+ * Sus movimientos tampoco se tocan: son suyos y siguen en su cuenta.
  */
 async function desalojarSiNoCabe(ownerId: string, anterior: Plan, destino: Plan): Promise<number> {
   if (householdMemberLimit(destino) >= householdMemberLimit(anterior)) return 0;
@@ -182,10 +208,6 @@ async function desalojarSiNoCabe(ownerId: string, anterior: Plan, destino: Plan)
     logger.error("orfandad: no se pudo desalojar", { message: e1.message });
     return 0;
   }
-
-  // Quedan sin suscripción propia: al entrar verán el muro con el link de pago.
-  const { error: e2 } = await s.from("profiles").update({ plan: "ninguno" }).in("id", usuarios);
-  if (e2) logger.error("orfandad: no se pudo dejar sin plan", { message: e2.message });
 
   logger.info("orfandad aplicada", { desalojados: usuarios.length, destino });
   return usuarios.length;

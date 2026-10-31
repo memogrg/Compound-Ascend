@@ -35,7 +35,7 @@ export function NameStep({ defaultName }: { defaultName: string }) {
     >
       <div className="fld">
         <label className="fld-label" htmlFor="display-name">
-          ¿Cómo quieres que te llamemos?
+          ¿Cómo querés que te llamemos?
         </label>
         <input
           id="display-name"

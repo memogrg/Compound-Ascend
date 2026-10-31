@@ -19,3 +19,12 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# @capgo/capacitor-social-login compiles its Facebook provider against the Facebook SDK as
+# compileOnly (socialLogin.facebook.include=false in the plugin's gradle.properties): the SDK is
+# not in the APK and the provider is never initialized, so its references are expected to be missing.
+-dontwarn com.facebook.**
+
+# Keep file and line numbers in obfuscated stack traces; Play retraces them with mapping.txt.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile

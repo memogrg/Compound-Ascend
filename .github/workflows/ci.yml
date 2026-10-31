@@ -40,6 +40,7 @@ jobs:
   ci:
     name: Lint, Typecheck, Test & Build
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -92,6 +93,7 @@ jobs:
   migrations:
     name: Migraciones aplican en BD fresca
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     env:
       # Solo para poder preguntar por su existencia en el `if` de los pasos de login.
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -327,6 +329,7 @@ jobs:
   e2e:
     name: E2E smoke
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     needs: ci
     # PR (donde bloquea) **y** push a main.
     #
@@ -620,6 +623,7 @@ jobs:
   e2e_nav_v2:
     name: E2E nav-v2
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     needs: ci
     # PR (donde bloquea) **y** push a main.
     #
@@ -956,6 +960,7 @@ jobs:
   e2e_a11y:
     name: E2E a11y (${{ matrix.shard }}/2)
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     needs: ci
     # Dos shards porque la suite entera mide 15,8-17,8 min en una máquina, por encima del
     # tope de 15 que nos pusimos. El reparto lo hace Playwright (`--shard`), así que la
@@ -1171,6 +1176,7 @@ jobs:
   toca_interfaz:
     name: ¿El PR toca interfaz?
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     if: github.event_name == 'pull_request'
     outputs:
       si: ${{ steps.mirar.outputs.si }}
@@ -1194,6 +1200,7 @@ jobs:
   capturas_main:
     name: Capturas de main (${{ matrix.shard }}/4)
     runs-on: ubuntu-24.04
+    timeout-minutes: 40
     needs: ci
     # Solo en push: son la BASE contra la que se compara cada PR.
     if: github.event_name == 'push'
@@ -1409,6 +1416,7 @@ jobs:
   capturas_rama:
     name: Capturas de la rama (${{ matrix.shard }}/4)
     runs-on: ubuntu-24.04
+    timeout-minutes: 40
     needs: [ci, toca_interfaz]
     # Un check SALTADO cuenta como cumplido en el ruleset, así que saltarlo no abre un agujero.
     if: github.event_name == 'pull_request' && needs.toca_interfaz.outputs.si == 'true'
@@ -1638,6 +1646,7 @@ jobs:
   diff_visual:
     name: Diff visual
     runs-on: ubuntu-24.04
+    timeout-minutes: 35
     needs: [capturas_rama, toca_interfaz]
     if: github.event_name == 'pull_request' && needs.toca_interfaz.outputs.si == 'true'
     # Informativo en su primera vida, pero SIN `continue-on-error` — esa directiva está
