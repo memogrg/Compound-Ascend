@@ -34,7 +34,7 @@
     "@revenuecat/purchases-capacitor": "^11.3.2"
   },
   "devDependencies": {
-    "@capacitor/assets": "^3.0.5",
+    "@capacitor/assets": "^4.0.0",
     "@capacitor/cli": "^7.6.7",
     "patch-package": "^8.0.1",
     "typescript": "^6.0.3"
