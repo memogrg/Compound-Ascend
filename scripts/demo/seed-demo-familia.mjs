@@ -157,6 +157,67 @@ const PERSONAS = [
   { email: DEMO_EMAILS.marta, name: "Marta Solano", role: "adult" },
 ];
 
+// ── términos y privacidad (decisión 62) ───────────────────────────────────────
+/**
+ * ¿La cuenta demo nace con los legales ACEPTADOS o pendientes?
+ *
+ * Importa porque `aceptacionPendiente` compara `profiles.terms_version` con `LEGAL_VERSION`: con
+ * la columna en nulo, la barra de re-aceptación se monta en TODA pantalla con sesión. En las
+ * capturas visuales eso es un aviso que tapa el contenido en casi todas las rutas, y no es lo que
+ * se quiere comparar.
+ *
+ * Se escribe la MISMA columna y la MISMA versión que lee la app —de `src/lib/legal/version.ts`,
+ * para que suba sola cuando suba el texto—, y no se toca nada de su lógica.
+ *
+ * El defecto depende de CONTRA QUÉ CUENTA se siembra, y esa es la decisión que importa:
+ *
+ *  · con `DEMO_EMAIL_OVERRIDE` —una cuenta SINTÉTICA, que es lo que corre en CI— `aceptados`;
+ *  · sin él, la siembra apunta al buzón real de la demo de PRODUCCIÓN, y ahí `pendientes`.
+ *    Marcar unos términos como aceptados en nombre de alguien no es cosmético, así que
+ *    producción no cambia de comportamiento por esto.
+ *
+ * Quien quiera lo contrario en cualquiera de los dos lados lo pide por su nombre:
+ * `DEMO_TERMINOS=aceptados` o `DEMO_TERMINOS=pendientes`.
+ *
+ * Lo que esto NO apaga: el job `E2E a11y` vuelve a poner `terms_version` en nulo DESPUÉS de
+ * sembrar, justo para que su barra legal se monte y sus casos la midan. Si ese paso desapareciera
+ * se perdería la cobertura de una pieza global sin que nada avisara — ya pasó con `nav-v2`, que
+ * daba verde mientras la barra tapaba entera la navegación inferior.
+ */
+const TERMINOS_PEDIDOS = String(env.DEMO_TERMINOS ?? process.env.DEMO_TERMINOS ?? "").trim();
+const CUENTA_SINTETICA = Boolean(env.DEMO_EMAIL_OVERRIDE ?? process.env.DEMO_EMAIL_OVERRIDE);
+const TERMINOS = TERMINOS_PEDIDOS || (CUENTA_SINTETICA ? "aceptados" : "pendientes");
+if (TERMINOS !== "aceptados" && TERMINOS !== "pendientes") {
+  console.error(
+    `DEMO_TERMINOS solo admite "aceptados" o "pendientes"; llegó "${TERMINOS_PEDIDOS}".`,
+  );
+  process.exit(2);
+}
+const legalSrc = readFileSync(new URL("../../src/lib/legal/version.ts", import.meta.url), "utf8");
+const LEGAL_VERSION = /LEGAL_VERSION = "([^"]+)"/.exec(legalSrc)?.[1];
+if (!LEGAL_VERSION) {
+  console.error("No se pudo leer LEGAL_VERSION de src/lib/legal/version.ts");
+  process.exit(2);
+}
+/**
+ * Lo que se mezcla en los dos `profiles`. Vacío cuando quedan pendientes: así el nulo lo pone la
+ * creación de la cuenta y no una escritura que diga lo contrario.
+ *
+ * La fecha sale de `AHORA` y no del reloj real: con `QA_FREEZE` la siembra tiene que ser
+ * reproducible, y una marca de tiempo distinta en cada corrida es exactamente lo que hace que una
+ * captura difiera sin que nada haya cambiado.
+ */
+const LEGALES =
+  TERMINOS === "aceptados"
+    ? { terms_version: LEGAL_VERSION, terms_accepted_at: AHORA.toISOString() }
+    : {};
+console.log(
+  `· legales: ${TERMINOS}` +
+    (TERMINOS === "aceptados" ? ` (versión ${LEGAL_VERSION})` : "") +
+    ` · cuenta ${CUENTA_SINTETICA ? "sintética" : "real"}` +
+    (TERMINOS_PEDIDOS ? " · pedido por DEMO_TERMINOS" : " · por defecto"),
+);
+
 async function upsertUser(email, name) {
   const { data: list } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
   const found = list?.users.find((u) => u.email === email);
@@ -1844,6 +1905,7 @@ ok("profiles.jose")(
     .from("profiles")
     .update({
       display_name: "José Ramírez",
+      ...LEGALES,
       onboarding_completed: true,
       profile_completion: 100,
       plan: "max",
@@ -1857,6 +1919,7 @@ ok("profiles.marta")(
     .from("profiles")
     .update({
       display_name: "Marta Solano",
+      ...LEGALES,
       onboarding_completed: true,
       profile_completion: 60,
       plan: "max",
