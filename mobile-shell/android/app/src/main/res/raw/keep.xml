@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Resources reached only by name (Resources.getIdentifier), which R8's optimized resource
+  shrinking cannot see. Cordova's ConfigXmlParser looks up @xml/config that way; without it,
+  it logs "res/xml/config.xml is missing!" and skips its default plugin setup.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@xml/config" />
